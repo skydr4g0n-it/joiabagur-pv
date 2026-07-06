@@ -96,7 +96,7 @@ OIDC: el workflow usa `aws-actions/configure-aws-credentials` con `role-to-assum
 
 Tras el `terraform apply`, apunta el registro **A** de `pv.joiabagur.com` al Elastic IP.
 
-En la EC2: certificados Let’s Encrypt, nginx en **443** haciendo `proxy_pass` a `http://127.0.0.1:8080` y cabeceras `X-Forwarded-*` (la API confía forwarded headers). Detalle, cron de renovación y ejemplo de bloque nginx: sección **§9** de [deploy-aws-ec2-migration.md](deploy-aws-ec2-migration.md).
+En la EC2: certificados Let’s Encrypt, nginx en **443** haciendo `proxy_pass` a `http://127.0.0.1:8080` y cabeceras `X-Forwarded-*` (la API confía forwarded headers). El `user_data` de Terraform programa el cron de renovación (`/usr/local/bin/certbot`, no `certbot` a secas). Detalle, primer certificado y ejemplo de bloque nginx: sección **§9** de [deploy-aws-ec2-migration.md](deploy-aws-ec2-migration.md).
 
 ---
 
@@ -133,6 +133,7 @@ Tras cambiar parámetros en SSM, suele hacer falta **reiniciar** el contenedor (
 | 404 en `/` y API OK | `wwwroot/index.html` en imagen; forwarded headers / HTTPS redirect |
 | Deploy Actions falla SSM | Instancia *Online* en Systems Manager; rol IAM instancia |
 | 403 / errores S3 | Bucket `prod-jpv-files`, política IAM instancia, nombre en SSM |
+| Certificado SSL caducado | `/var/log/cron` con `certbot: command not found` → ver §12 en [deploy-aws-ec2-migration.md](deploy-aws-ec2-migration.md) |
 
 Más detalle: [deploy-aws-ec2-migration.md](deploy-aws-ec2-migration.md) §12.
 
@@ -146,4 +147,4 @@ Más detalle: [deploy-aws-ec2-migration.md](deploy-aws-ec2-migration.md) §12.
 - [Documentos/arquitectura.md](../arquitectura.md) — visión de conjunto del sistema
 - [Documentos/Propuestas/comparacion-aws-azure-deploy.md](../Propuestas/comparacion-aws-azure-deploy.md) — comparativa cloud (puede citar servicios genéricos)
 
-*Última actualización: abril 2026 — arquitectura EC2 + Terraform.*
+*Última actualización: julio 2026 — arquitectura EC2 + Terraform.*

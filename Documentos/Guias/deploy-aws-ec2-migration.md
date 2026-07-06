@@ -345,15 +345,22 @@ Eso **sustituye** el certificado “manual” por uno renovable. Luego certbot g
 Comprueba la renovación simulada:
 
 ```bash
-sudo certbot renew --dry-run
+sudo /usr/local/bin/certbot renew --dry-run
 ```
 
-Si instalaste certbot con **pip** (user_data actual), puede que **no** exista el timer de systemd. Programa la renovación con **cron** (dos veces al día es habitual):
+#### Cron de renovación automática
+
+Certbot se instala con **pip** en `user_data` → el binario queda en `/usr/local/bin/certbot`. **No** uses `certbot` a secas en cron: el PATH de cron es mínimo y el job falla con `certbot: command not found` (el certificado caduca sin renovarse).
+
+Las instancias nuevas creadas por Terraform ya incluyen `/etc/cron.d/certbot-jpv` con la ruta absoluta. En una instancia **ya existente** (p. ej. tras la migración), créalo o corrígelo a mano:
 
 ```bash
-echo '0 3,15 * * * root certbot renew -q --deploy-hook "systemctl reload nginx"' | sudo tee /etc/cron.d/certbot-jpv
+echo '0 3,15 * * * root /usr/local/bin/certbot renew -q --deploy-hook "systemctl reload nginx" >> /var/log/certbot-cron.log 2>&1' | sudo tee /etc/cron.d/certbot-jpv
 sudo chmod 644 /etc/cron.d/certbot-jpv
+sudo /usr/local/bin/certbot renew --dry-run
 ```
+
+Comprueba en `/var/log/cron` o `/var/log/certbot-cron.log` que no aparece `command not found`.
 
 #### Opción B (renovación automática sin esperar al corte DNS): plugin DNS OVH
 
@@ -393,7 +400,7 @@ sudo certbot certonly \
 
 #### Antes del corte: certificado solo con TXT manual
 
-Si aún usas `certbot certonly --manual --preferred-challenges dns`, ejecuta certbot con **`sudo`**. Tras obtener el cert, configura nginx (siguiente apartado) y **migra a la opción A o B antes del 2026-07-03** para no depender de renovación manual.
+Si aún usas `certbot certonly --manual --preferred-challenges dns`, ejecuta certbot con **`sudo`**. Tras obtener el cert, configura nginx (siguiente apartado) y **migra a la opción A o B** cuanto antes para no depender de renovación manual cada 90 días.
 
 ### 9.4 nginx con HTTPS (certificados ya en `/etc/letsencrypt/live/`)
 
@@ -531,6 +538,21 @@ dig pv.joiabagur.com +short
 # Debe coincidir con: terraform output -raw ec2_public_ip
 ```
 
+### Certificado SSL caducado o cron no renueva
+
+Síntoma en `/var/log/cron`: `certbot: command not found` en las líneas de `CROND ... CMD (certbot renew ...)`.
+
+```bash
+# Renovar ya
+sudo /usr/local/bin/certbot renew --force-renewal
+sudo nginx -t && sudo systemctl reload nginx
+
+# Corregir cron (ruta absoluta + log)
+echo '0 3,15 * * * root /usr/local/bin/certbot renew -q --deploy-hook "systemctl reload nginx" >> /var/log/certbot-cron.log 2>&1' | sudo tee /etc/cron.d/certbot-jpv
+sudo chmod 644 /etc/cron.d/certbot-jpv
+sudo /usr/local/bin/certbot renew --dry-run
+```
+
 ### Importación de datos falla (acceso denegado)
 
 Verificar que el túnel SSM está activo y que las credenciales de la nueva cuenta tienen acceso a RDS:
@@ -543,4 +565,4 @@ psql -h localhost -p 5432 -U postgres -d jpv -c "SELECT 1;"
 
 ---
 
-*Última actualización: Abril 2026*
+*Última actualización: Julio 2026*

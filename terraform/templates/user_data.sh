@@ -21,6 +21,12 @@ systemctl start amazon-ssm-agent
 # ─── Certbot (Let's Encrypt) ─────────────────────────────────────────────────
 pip3 install certbot certbot-nginx
 
+# pip installs certbot to /usr/local/bin; cron PATH does not include it — use full path.
+cat > /etc/cron.d/certbot-jpv << 'CRON_EOF'
+0 3,15 * * * root /usr/local/bin/certbot renew -q --deploy-hook "systemctl reload nginx" >> /var/log/certbot-cron.log 2>&1
+CRON_EOF
+chmod 644 /etc/cron.d/certbot-jpv
+
 # ─── nginx (HTTP only — run certbot manually after DNS update) ───────────────
 cat > /etc/nginx/conf.d/jpv.conf << 'NGINX_EOF'
 server {
