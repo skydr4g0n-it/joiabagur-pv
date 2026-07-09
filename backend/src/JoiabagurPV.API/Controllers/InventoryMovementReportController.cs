@@ -22,13 +22,11 @@ public class InventoryMovementReportController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetReport([FromQuery] InventoryMovementReportFilterRequest request)
     {
-        if (!request.StartDate.HasValue || !request.EndDate.HasValue)
+        var badRequest = ValidateAndNormalizeRequest(request);
+        if (badRequest is not null)
         {
-            return BadRequest(new { message = "startDate y endDate son obligatorios." });
+            return badRequest;
         }
-
-        request.StartDate = DateTime.SpecifyKind(request.StartDate.Value, DateTimeKind.Utc);
-        request.EndDate = DateTime.SpecifyKind(request.EndDate.Value.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
 
         var result = await _reportService.GetReportAsync(request);
         return Ok(result);
@@ -40,13 +38,11 @@ public class InventoryMovementReportController : ControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> ExportReport([FromQuery] InventoryMovementReportFilterRequest request)
     {
-        if (!request.StartDate.HasValue || !request.EndDate.HasValue)
+        var badRequest = ValidateAndNormalizeRequest(request);
+        if (badRequest is not null)
         {
-            return BadRequest(new { message = "startDate y endDate son obligatorios." });
+            return badRequest;
         }
-
-        request.StartDate = DateTime.SpecifyKind(request.StartDate.Value, DateTimeKind.Utc);
-        request.EndDate = DateTime.SpecifyKind(request.EndDate.Value.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
 
         try
         {
@@ -67,5 +63,30 @@ public class InventoryMovementReportController : ControllerBase
                 totalCount
             });
         }
+    }
+
+    private BadRequestObjectResult? ValidateAndNormalizeRequest(InventoryMovementReportFilterRequest request)
+    {
+        if (!request.StartDate.HasValue || !request.EndDate.HasValue)
+        {
+            return BadRequest(new { message = "startDate y endDate son obligatorios." });
+        }
+
+        request.OutputModel = string.IsNullOrWhiteSpace(request.OutputModel)
+            ? "summary"
+            : request.OutputModel.Trim().ToLowerInvariant();
+
+        if (request.OutputModel is not ("summary" or "detail"))
+        {
+            return BadRequest(new { message = "outputModel debe ser summary o detail." });
+        }
+
+        request.ProductSearch = string.IsNullOrWhiteSpace(request.ProductSearch)
+            ? null
+            : request.ProductSearch.Trim();
+        request.StartDate = DateTime.SpecifyKind(request.StartDate.Value, DateTimeKind.Utc);
+        request.EndDate = DateTime.SpecifyKind(request.EndDate.Value.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
+
+        return null;
     }
 }

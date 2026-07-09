@@ -1,4 +1,5 @@
 using JoiabagurPV.Domain.Entities;
+using JoiabagurPV.Domain.Enums;
 
 namespace JoiabagurPV.Domain.Interfaces.Repositories;
 
@@ -12,6 +13,28 @@ public record MovementSummaryProjection(
     int Additions,
     int Subtractions,
     int Difference);
+
+/// <summary>
+/// Projection for transaction-level inventory movement report rows.
+/// </summary>
+public record MovementDetailProjection(
+    Guid Id,
+    Guid InventoryId,
+    Guid ProductId,
+    string ProductName,
+    string ProductSku,
+    Guid PointOfSaleId,
+    string PointOfSaleName,
+    MovementType MovementType,
+    int QuantityChange,
+    int QuantityBefore,
+    int QuantityAfter,
+    Guid UserId,
+    string UserName,
+    string? Reason,
+    DateTime MovementDate,
+    Guid? SaleId,
+    Guid? ReturnId);
 
 /// <summary>
 /// Repository interface for InventoryMovement entities.
@@ -50,6 +73,18 @@ public interface IInventoryMovementRepository : IRepository<InventoryMovement>
     Task<List<MovementSummaryProjection>> GetMovementSummaryByProductAsync(
         DateTime startDate,
         DateTime endDate,
-        Guid? pointOfSaleId = null);
+        Guid? pointOfSaleId = null,
+        string? productSearch = null);
+
+    /// <summary>
+    /// Gets inventory movement transaction rows within a date range.
+    /// </summary>
+    Task<(List<MovementDetailProjection> Items, int TotalCount)> GetMovementDetailRowsAsync(
+        DateTime startDate,
+        DateTime endDate,
+        Guid? pointOfSaleId = null,
+        string? productSearch = null,
+        int? page = null,
+        int? pageSize = null);
 }
 

@@ -1,4 +1,4 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: Inventory Movement Summary API with Date and POS Filters
 
@@ -67,30 +67,6 @@ The system SHALL provide a REST API endpoint at `GET /api/reports/inventory-move
 - **WHEN** an unauthenticated user requests `GET /api/reports/inventory-movements`
 - **THEN** the system returns HTTP 401 Unauthorized
 
-### Requirement: Inventory Movement Summary Sorting
-
-The system SHALL support server-side sorting on the summary columns so the administrator can rank products by movement volume.
-
-#### Scenario: Sort by additions descending
-
-- **WHEN** an authenticated administrator requests `GET /api/reports/inventory-movements?startDate=2025-01-01&endDate=2025-03-31&sortBy=additions&sortDirection=desc`
-- **THEN** the returned items are ordered by `additions` in descending order
-
-#### Scenario: Sort by subtractions ascending
-
-- **WHEN** an authenticated administrator requests with `sortBy=subtractions&sortDirection=asc`
-- **THEN** the returned items are ordered by `subtractions` in ascending order
-
-#### Scenario: Sort by difference
-
-- **WHEN** an authenticated administrator requests with `sortBy=difference&sortDirection=desc`
-- **THEN** the returned items are ordered by `difference` in descending order
-
-#### Scenario: Default sort when no sortBy specified
-
-- **WHEN** no `sortBy` parameter is provided
-- **THEN** the system SHALL sort by `productName` ascending by default
-
 ### Requirement: Inventory Movement Summary Excel Export with Row Limit
 
 The system SHALL provide a REST API endpoint at `GET /api/reports/inventory-movements/export` that generates an Excel file (.xlsx) with the full result set for the selected output model using the same filters as the report API. The `outputModel` query parameter SHALL accept `summary` and `detail`, defaulting to `summary` when omitted. The export is limited to 50,000 rows.
@@ -120,7 +96,7 @@ The system SHALL provide a REST API endpoint at `GET /api/reports/inventory-move
 
 - **WHEN** the detail Excel file is generated
 - **THEN** it SHALL contain a single sheet named "Detalle movimientos"
-- **AND** columns in order: Fecha, Tipo, Producto, SKU, Punto de Venta, Cambio, Antes, Despues, Usuario, Motivo, Venta, Devolucion
+- **AND** columns in order: Fecha, Tipo, Producto, SKU, Punto de Venta, Cambio, Antes, Después, Usuario, Motivo, Venta, Devolución
 - **AND** headers are formatted in bold
 - **AND** numeric columns use appropriate number formatting
 - **AND** columns are auto-fitted to content width
@@ -144,7 +120,7 @@ The system SHALL provide a REST API endpoint at `GET /api/reports/inventory-move
 
 - **WHEN** an authenticated administrator requests `GET /api/reports/inventory-movements/export` with filters matching more than 50,000 rows for the selected output model
 - **THEN** the system returns HTTP 409 Conflict
-- **AND** the response body includes `{ "message": "Mas de 50.000 filas en el resultado. Ajuste los filtros para exportar.", "totalCount": <real count> }`
+- **AND** the response body includes `{ "message": "Más de 50.000 filas en el resultado. Ajuste los filtros para exportar.", "totalCount": <real count> }`
 
 #### Scenario: Non-administrator export access denied
 
@@ -199,14 +175,14 @@ The system SHALL provide a frontend page at `/reports/inventory-movement-summary
 #### Scenario: Detail results table
 
 - **WHEN** detail report results are displayed
-- **THEN** a table shows columns: Fecha, Tipo, Producto, SKU, Punto de Venta, Cambio, Antes, Despues, Usuario, Motivo, Venta, Devolucion
+- **THEN** a table shows columns: Fecha, Tipo, Producto, SKU, Punto de Venta, Cambio, Antes, Después, Usuario, Motivo, Venta, Devolución
 - **AND** detail columns are not interactive sort controls
 - **AND** pagination controls allow navigating between pages
 
 #### Scenario: Help legend explains terminology
 
 - **WHEN** the inventory movement summary page is displayed
-- **THEN** a visible text or tooltip explains: "Adiciones = entradas al inventario (devoluciones, ajustes positivos, importaciones). Sustracciones = salidas del inventario (ventas, ajustes negativos). Diferencia = Adiciones - Sustracciones."
+- **THEN** a visible text or tooltip explains: "Adiciones = entradas al inventario (devoluciones, ajustes positivos, importaciones). Sustracciones = salidas del inventario (ventas, ajustes negativos). Diferencia = Adiciones − Sustracciones."
 
 #### Scenario: Export button triggers selected model download
 
@@ -224,7 +200,7 @@ The system SHALL provide a frontend page at `/reports/inventory-movement-summary
 #### Scenario: Export limit notice displayed
 
 - **WHEN** the inventory movement summary page is displayed
-- **THEN** a notice near the export button reads: "Maximo 50.000 filas. Si hay mas resultados, ajuste los filtros."
+- **THEN** a notice near the export button reads: "Máximo 50.000 filas. Si hay más resultados, ajuste los filtros."
 
 #### Scenario: Operator cannot access the report
 

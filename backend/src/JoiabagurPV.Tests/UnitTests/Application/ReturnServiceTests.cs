@@ -27,6 +27,7 @@ public class ReturnServiceTests
     private readonly Mock<IInventoryService> _inventoryServiceMock;
     private readonly Mock<IFileStorageService> _fileStorageServiceMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
+    private readonly Mock<IDashboardService> _dashboardServiceMock;
     private readonly ReturnService _sut;
 
     public ReturnServiceTests()
@@ -40,6 +41,7 @@ public class ReturnServiceTests
         _inventoryServiceMock = new Mock<IInventoryService>();
         _fileStorageServiceMock = new Mock<IFileStorageService>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
+        _dashboardServiceMock = new Mock<IDashboardService>();
 
         _sut = new ReturnService(
             _returnRepositoryMock.Object,
@@ -50,7 +52,8 @@ public class ReturnServiceTests
             _userPointOfSaleRepositoryMock.Object,
             _inventoryServiceMock.Object,
             _fileStorageServiceMock.Object,
-            _unitOfWorkMock.Object);
+            _unitOfWorkMock.Object,
+            _dashboardServiceMock.Object);
     }
 
     #region CreateReturn Validation Tests

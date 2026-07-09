@@ -11,8 +11,10 @@ import { toast } from 'sonner';
 import { inventoryMovementReportService } from '@/services/inventory-movement-report.service';
 import { pointOfSaleService } from '@/services/point-of-sale.service';
 import type {
+  InventoryMovementDetailRow,
+  InventoryMovementOutputModel,
   InventoryMovementReportFilter,
-  InventoryMovementSummaryRow,
+  InventoryMovementReportRow,
 } from '@/types/inventory-movement-report.types';
 import type { PointOfSale } from '@/types/point-of-sale.types';
 
@@ -35,13 +37,14 @@ import {
   AlertDescription,
 } from '@/components/ui/alert';
 
-const columnHelper = createColumnHelper<InventoryMovementSummaryRow>();
+const columnHelper = createColumnHelper<InventoryMovementReportRow>();
 const fmtNum = (v: number) => v.toLocaleString('es-ES');
+const fmtDate = (v: string) => new Date(v).toLocaleString('es-ES');
 
 type SortState = { sortBy?: string; sortDirection?: string };
 
 export function InventoryMovementSummaryPage() {
-  const [items, setItems] = useState<InventoryMovementSummaryRow[]>([]);
+  const [items, setItems] = useState<InventoryMovementReportRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
@@ -52,6 +55,8 @@ export function InventoryMovementSummaryPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [pointOfSaleId, setPointOfSaleId] = useState<string | undefined>();
+  const [outputModel, setOutputModel] = useState<InventoryMovementOutputModel>('summary');
+  const [productSearch, setProductSearch] = useState('');
   const [sort, setSort] = useState<SortState>({});
 
   const [pointsOfSale, setPointsOfSale] = useState<PointOfSale[]>([]);
@@ -75,12 +80,14 @@ export function InventoryMovementSummaryPage() {
     setIsLoading(true);
     try {
       const params: InventoryMovementReportFilter = {
+        outputModel,
         startDate,
         endDate,
         pointOfSaleId,
+        productSearch: productSearch.trim() || undefined,
         page: pagination.pageIndex + 1,
         pageSize: pagination.pageSize,
-        ...sort,
+        ...(outputModel === 'summary' ? sort : {}),
       };
       const result = await inventoryMovementReportService.getReport(params);
       setItems(result.items);
@@ -92,19 +99,25 @@ export function InventoryMovementSummaryPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [startDate, endDate, pointOfSaleId, pagination.pageIndex, pagination.pageSize, sort, canSearch]);
+  }, [startDate, endDate, pointOfSaleId, outputModel, productSearch, pagination.pageIndex, pagination.pageSize, sort, canSearch]);
 
   useEffect(() => {
     if (hasSearched) {
       fetchReport();
     }
-  }, [pagination.pageIndex, pagination.pageSize, sort]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pagination.pageIndex, pagination.pageSize, sort, outputModel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearch = () => {
     setPagination(prev => ({ ...prev, pageIndex: 0 }));
-    setSort({});
+    if (outputModel === 'detail') setSort({});
     setHasSearched(true);
     fetchReport();
+  };
+
+  const handleOutputModelChange = (value: InventoryMovementOutputModel) => {
+    setOutputModel(value);
+    setPagination(prev => ({ ...prev, pageIndex: 0 }));
+    setSort({});
   };
 
   const handleSort = (columnId: string) => {
@@ -123,10 +136,12 @@ export function InventoryMovementSummaryPage() {
     setIsExporting(true);
     try {
       const params: InventoryMovementReportFilter = {
+        outputModel,
         startDate,
         endDate,
         pointOfSaleId,
-        ...sort,
+        productSearch: productSearch.trim() || undefined,
+        ...(outputModel === 'summary' ? sort : {}),
       };
       const blob = await inventoryMovementReportService.exportReport(params);
       const url = URL.createObjectURL(blob);
@@ -150,8 +165,8 @@ export function InventoryMovementSummaryPage() {
     return sort.sortDirection === 'asc' ? ' ↑' : ' ↓';
   };
 
-  const columns = useMemo<ColumnDef<InventoryMovementSummaryRow, unknown>[]>(
-    () => [
+  const columns = useMemo<ColumnDef<InventoryMovementReportRow, unknown>[]>(
+    () => outputModel === 'summary' ? [
       columnHelper.accessor('productName', {
         header: () => 'Producto',
         cell: (info) => info.getValue(),
@@ -193,8 +208,83 @@ export function InventoryMovementSummaryPage() {
         },
         size: 120,
       }),
+    ] : [
+      columnHelper.accessor((row) => (row as InventoryMovementDetailRow).movementDate, {
+        id: 'movementDate',
+        header: () => 'Fecha',
+        cell: (info) => fmtDate(info.getValue() as string),
+        size: 160,
+      }),
+      columnHelper.accessor((row) => (row as InventoryMovementDetailRow).movementTypeName, {
+        id: 'movementTypeName',
+        header: () => 'Tipo',
+        cell: (info) => info.getValue(),
+        size: 110,
+      }),
+      columnHelper.accessor('productName', {
+        header: () => 'Producto',
+        cell: (info) => info.getValue(),
+        size: 220,
+      }),
+      columnHelper.accessor('productSku', {
+        header: () => 'SKU',
+        cell: (info) => <span className="font-mono text-sm">{info.getValue()}</span>,
+        size: 120,
+      }),
+      columnHelper.accessor((row) => (row as InventoryMovementDetailRow).pointOfSaleName, {
+        id: 'pointOfSaleName',
+        header: () => 'Punto de Venta',
+        cell: (info) => info.getValue(),
+        size: 180,
+      }),
+      columnHelper.accessor((row) => (row as InventoryMovementDetailRow).quantityChange, {
+        id: 'quantityChange',
+        header: () => 'Cambio',
+        cell: (info) => {
+          const val = info.getValue() as number;
+          const color = val > 0 ? 'text-green-600' : val < 0 ? 'text-red-600' : '';
+          return <span className={`font-medium ${color}`}>{fmtNum(val)}</span>;
+        },
+        size: 100,
+      }),
+      columnHelper.accessor((row) => (row as InventoryMovementDetailRow).quantityBefore, {
+        id: 'quantityBefore',
+        header: () => 'Antes',
+        cell: (info) => fmtNum(info.getValue() as number),
+        size: 90,
+      }),
+      columnHelper.accessor((row) => (row as InventoryMovementDetailRow).quantityAfter, {
+        id: 'quantityAfter',
+        header: () => 'Después',
+        cell: (info) => fmtNum(info.getValue() as number),
+        size: 100,
+      }),
+      columnHelper.accessor((row) => (row as InventoryMovementDetailRow).userName, {
+        id: 'userName',
+        header: () => 'Usuario',
+        cell: (info) => info.getValue(),
+        size: 160,
+      }),
+      columnHelper.accessor((row) => (row as InventoryMovementDetailRow).reason, {
+        id: 'reason',
+        header: () => 'Motivo',
+        cell: (info) => info.getValue() || '-',
+        size: 220,
+      }),
+      columnHelper.accessor((row) => (row as InventoryMovementDetailRow).saleId, {
+        id: 'saleId',
+        header: () => 'Venta',
+        cell: (info) => info.getValue() ? <span className="font-mono text-xs">{info.getValue() as string}</span> : '-',
+        size: 160,
+      }),
+      columnHelper.accessor((row) => (row as InventoryMovementDetailRow).returnId, {
+        id: 'returnId',
+        header: () => 'Devolución',
+        cell: (info) => info.getValue() ? <span className="font-mono text-xs">{info.getValue() as string}</span> : '-',
+        size: 160,
+      }),
     ],
-    [sort], // eslint-disable-line react-hooks/exhaustive-deps
+    [outputModel, sort], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const table = useReactTable({
@@ -213,7 +303,7 @@ export function InventoryMovementSummaryPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Resumen de Movimientos de Inventario</h1>
           <p className="text-muted-foreground">
-            Vista agregada de adiciones y sustracciones de inventario por producto
+            Vista resumida o detallada de movimientos de inventario
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -237,7 +327,7 @@ export function InventoryMovementSummaryPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
             <div className="space-y-2">
               <Label>Fecha Inicio *</Label>
               <Input
@@ -255,6 +345,21 @@ export function InventoryMovementSummaryPage() {
               />
             </div>
             <div className="space-y-2">
+              <Label>Modelo de salida</Label>
+              <Select
+                value={outputModel}
+                onValueChange={(v) => handleOutputModelChange(v as InventoryMovementOutputModel)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Resumen" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="summary">Resumen</SelectItem>
+                  <SelectItem value="detail">Detalle</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label>Punto de Venta</Label>
               <Select
                 value={pointOfSaleId || 'all'}
@@ -270,6 +375,14 @@ export function InventoryMovementSummaryPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Producto o SKU</Label>
+              <Input
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                placeholder="Nombre o SKU"
+              />
             </div>
             <div className="space-y-2">
               <Label>&nbsp;</Label>

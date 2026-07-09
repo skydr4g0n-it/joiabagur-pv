@@ -12,9 +12,11 @@ const ENDPOINTS = {
 
 function buildParams(filters: InventoryMovementReportFilter): Record<string, unknown> {
   const params: Record<string, unknown> = {};
+  if (filters.outputModel) params.outputModel = filters.outputModel;
   if (filters.startDate) params.startDate = filters.startDate;
   if (filters.endDate) params.endDate = filters.endDate;
   if (filters.pointOfSaleId) params.pointOfSaleId = filters.pointOfSaleId;
+  if (filters.productSearch) params.productSearch = filters.productSearch;
   if (filters.page) params.page = filters.page;
   if (filters.pageSize) params.pageSize = filters.pageSize;
   if (filters.sortBy) params.sortBy = filters.sortBy;
@@ -26,7 +28,7 @@ export const inventoryMovementReportService = {
   getReport: async (filters: InventoryMovementReportFilter): Promise<InventoryMovementReportResponse> => {
     const response = await apiClient.get<InventoryMovementReportResponse>(
       ENDPOINTS.REPORT,
-      { params: buildParams(filters) }
+      { params: buildParams(filters) },
     );
     return response.data;
   },
@@ -46,9 +48,9 @@ export const inventoryMovementReportService = {
           const text = await blob.text();
           try {
             const json = JSON.parse(text);
-            toast.warning(`Hay ${json.totalCount?.toLocaleString('es-ES')} productos. Ajuste los filtros.`);
+            toast.warning(json.message ?? `Hay ${json.totalCount?.toLocaleString('es-ES')} filas. Ajuste los filtros.`);
           } catch {
-            toast.warning('Más de 50.000 productos en el resultado. Ajuste los filtros para exportar.');
+            toast.warning('Más de 50.000 filas en el resultado. Ajuste los filtros para exportar.');
           }
         }
         throw error;

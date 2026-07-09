@@ -79,7 +79,8 @@ public class InventoryMovementRepository : Repository<InventoryMovement>, IInven
     public async Task<List<MovementSummaryProjection>> GetMovementSummaryByProductAsync(
         DateTime startDate,
         DateTime endDate,
-        Guid? pointOfSaleId = null)
+        Guid? pointOfSaleId = null,
+        string? productSearch = null)
     {
         var query = _dbSet
             .Where(m => m.MovementDate >= startDate && m.MovementDate <= endDate);
@@ -87,6 +88,14 @@ public class InventoryMovementRepository : Repository<InventoryMovement>, IInven
         if (pointOfSaleId.HasValue)
         {
             query = query.Where(m => m.Inventory.PointOfSaleId == pointOfSaleId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(productSearch))
+        {
+            var search = productSearch.Trim().ToLower();
+            query = query.Where(m =>
+                m.Inventory.Product.Name.ToLower().Contains(search)
+                || m.Inventory.Product.SKU.ToLower().Contains(search));
         }
 
         var rows = await query
@@ -114,6 +123,64 @@ public class InventoryMovementRepository : Repository<InventoryMovement>, IInven
                     additions - subtractions);
             })
             .ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<(List<MovementDetailProjection> Items, int TotalCount)> GetMovementDetailRowsAsync(
+        DateTime startDate,
+        DateTime endDate,
+        Guid? pointOfSaleId = null,
+        string? productSearch = null,
+        int? page = null,
+        int? pageSize = null)
+    {
+        var query = _dbSet
+            .Where(m => m.MovementDate >= startDate && m.MovementDate <= endDate);
+
+        if (pointOfSaleId.HasValue)
+        {
+            query = query.Where(m => m.Inventory.PointOfSaleId == pointOfSaleId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(productSearch))
+        {
+            var search = productSearch.Trim().ToLower();
+            query = query.Where(m =>
+                m.Inventory.Product.Name.ToLower().Contains(search)
+                || m.Inventory.Product.SKU.ToLower().Contains(search));
+        }
+
+        var ordered = query
+            .OrderByDescending(m => m.MovementDate)
+            .ThenByDescending(m => m.Id);
+
+        var totalCount = await ordered.CountAsync();
+        var paged = page.HasValue && pageSize.HasValue
+            ? ordered.Skip((page.Value - 1) * pageSize.Value).Take(pageSize.Value)
+            : ordered;
+
+        var items = await paged
+            .Select(m => new MovementDetailProjection(
+                m.Id,
+                m.InventoryId,
+                m.Inventory.ProductId,
+                m.Inventory.Product.Name,
+                m.Inventory.Product.SKU,
+                m.Inventory.PointOfSaleId,
+                m.Inventory.PointOfSale.Name,
+                m.MovementType,
+                m.QuantityChange,
+                m.QuantityBefore,
+                m.QuantityAfter,
+                m.UserId,
+                m.User.FullName,
+                m.Reason,
+                m.MovementDate,
+                m.SaleId,
+                m.ReturnId))
+            .ToListAsync();
+
+        return (items, totalCount);
     }
 }
 
