@@ -12,6 +12,14 @@ variable "domain_name" {
 variable "github_repo" {
   description = "GitHub repository in owner/name format used for OIDC trust (e.g. my-org/joiabagur-pv)"
   type        = string
+
+  validation {
+    condition = (
+      can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.github_repo)) &&
+      var.github_repo != "your-org/joiabagur-pv"
+    )
+    error_message = "github_repo must be the real GitHub repository in owner/name format, for example skydr4g0n-it/joiabagur-pv."
+  }
 }
 
 variable "db_password" {

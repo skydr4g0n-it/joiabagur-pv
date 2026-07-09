@@ -3,7 +3,7 @@
 
 aws_region  = "eu-west-3"
 domain_name = "pv.joiabagur.com"
-github_repo = "your-org/joiabagur-pv"
+github_repo = "skydr4g0n-it/joiabagur-pv"
 
 # Find latest Amazon Linux 2023 AMI:
 # aws ec2 describe-images --owners amazon \

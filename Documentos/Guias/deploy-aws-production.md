@@ -83,6 +83,28 @@ Disparadores habituales: `push` a `main` o `master` (y `workflow_dispatch` manua
 
 OIDC: el workflow usa `aws-actions/configure-aws-credentials` con `role-to-assume`; **no** hace falta `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` para este deploy.
 
+Si el deploy falla en `configure-aws-credentials` con:
+
+```text
+Could not assume role with OIDC: Not authorized to perform sts:AssumeRoleWithWebIdentity
+```
+
+la causa habitual es que el rol IAM no confía en el repo exacto que emite el token de GitHub. Comprueba en `terraform/terraform.tfvars`:
+
+```hcl
+github_repo = "skydr4g0n-it/joiabagur-pv"
+```
+
+y aplica de nuevo:
+
+```bash
+cd terraform
+terraform plan
+terraform apply
+```
+
+Después actualiza el secret `DEPLOY_ROLE_ARN` con `terraform output -raw github_actions_role_arn` si el ARN hubiera cambiado. El workflow activo ya declara `permissions: id-token: write`, que es el otro requisito para OIDC.
+
 ### Workflows desactivados en push (legado)
 
 | Archivo | Estado |
