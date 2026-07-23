@@ -85,7 +85,7 @@ export function ScanningPage() {
 
         serviceRef.current?.stopContinuousScan();
         navigate(ROUTES.SALES.NEW, {
-          state: { selectedProduct: exactMatch },
+          state: { productId: exactMatch.id },
         });
       } catch {
         toast.error('Producto no encontrado', {
@@ -126,7 +126,7 @@ export function ScanningPage() {
       });
 
       navigate(ROUTES.SALES.NEW, {
-        state: { selectedProduct: exactMatch },
+        state: { productId: exactMatch.id },
       });
     } catch {
       toast.error('Error al buscar producto');
