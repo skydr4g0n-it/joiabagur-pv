@@ -289,7 +289,7 @@ public class ProductsController : ControllerBase
             return NotFound(new { error = "Producto no encontrado" });
         }
 
-        var svg = _qrCodeService.GenerateSvg(product.Sku, $"{product.Sku} - {product.Name}");
+        var svg = _qrCodeService.GenerateSvg(product.SKU, $"{product.SKU} - {product.Name}");
         return Content(svg, "image/svg+xml");
     }
 
@@ -315,13 +315,13 @@ public class ProductsController : ControllerBase
             {
                 var product = await _productService.GetByIdAsync(id);
                 if (product != null)
-                    products.Add((product.Sku, product.Name));
+                    products.Add((product.SKU, product.Name));
             }
         }
         else
         {
             var allProducts = await _productService.GetAllAsync(includeInactive: false);
-            products = allProducts.Select(p => (p.Sku, p.Name)).ToList();
+            products = allProducts.Select(p => (p.SKU, p.Name)).ToList();
         }
 
         var pdf = _qrCodeService.GeneratePdf(products);

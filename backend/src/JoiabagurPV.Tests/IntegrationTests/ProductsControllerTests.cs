@@ -1324,7 +1324,7 @@ public class ProductsControllerTests : IAsyncLifetime
         response.Content.Headers.ContentType?.ToString().Should().Be("image/svg+xml");
         var svg = await response.Content.ReadAsStringAsync();
         svg.Should().Contain("<svg");
-        svg.Should().Contain(product.Sku);
+        svg.Should().Contain(product.SKU);
     }
 
     [Fact]
