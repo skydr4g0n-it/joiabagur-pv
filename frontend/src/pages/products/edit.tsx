@@ -8,7 +8,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ArrowLeft, Loader2, CheckCircle2, Package, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, CheckCircle2, Package, AlertCircle, QrCode, Barcode } from 'lucide-react';
 import { productService } from '@/services/product.service';
 import { Collection, Product } from '@/types/product.types';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,8 @@ import { ROUTES } from '@/routing/routes';
 import { ProductPhotoUpload } from './components/product-photo-upload';
 import { ComponentAssignmentSection } from './components/component-assignment-section';
 import { useAuth } from '@/providers/auth-provider';
+import { generateCode128Svg, downloadSvg } from '@/lib/code128';
+import apiClient from '@/services/api.service';
 
 // Validation schema - Note: SKU is not included as it's immutable
 const updateProductSchema = z.object({
@@ -77,6 +79,9 @@ export function ProductEditPage() {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [isLoadingCollections, setIsLoadingCollections] = useState(true);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [qrSvg, setQrSvg] = useState<string | null>(null);
+  const [code128Svg, setCode128Svg] = useState<string | null>(null);
+  const [isLoadingQr, setIsLoadingQr] = useState(false);
 
   const form = useForm<UpdateProductFormValues>({
     resolver: zodResolver(updateProductSchema),
@@ -147,6 +152,32 @@ export function ProductEditPage() {
 
     loadCollections();
   }, []);
+
+  useEffect(() => {
+    if (!product?.sku?.trim()) {
+      setQrSvg(null);
+      setCode128Svg(null);
+      return;
+    }
+
+    setIsLoadingQr(true);
+
+    const loadQr = async () => {
+      try {
+        const response = await apiClient.get(`/products/${productId}/qrcode`, {
+          responseType: 'text',
+        });
+        setQrSvg(response.data);
+      } catch {
+        setQrSvg(null);
+      } finally {
+        setIsLoadingQr(false);
+      }
+    };
+
+    loadQr();
+    setCode128Svg(generateCode128Svg(product.sku));
+  }, [product?.sku, productId]);
 
   const onSubmit = async (values: UpdateProductFormValues) => {
     if (!productId || !product) {
@@ -500,6 +531,93 @@ export function ProductEditPage() {
             form.setValue('price', suggestedPrice.toFixed(2), { shouldDirty: true });
           }}
         />
+      )}
+
+      {/* QR Code and Barcode Sections */}
+      {product.sku?.trim() ? (
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <QrCode className="size-5" />
+                Código QR
+              </CardTitle>
+              <CardDescription>
+                Escanea este código QR para identificar el producto
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center gap-4">
+              {isLoadingQr ? (
+                <Loader2 className="size-8 animate-spin text-muted-foreground" />
+              ) : qrSvg ? (
+                <>
+                  <div
+                    className="size-[150px]"
+                    dangerouslySetInnerHTML={{ __html: qrSvg }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const blob = new Blob([qrSvg], { type: 'image/svg+xml' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `qr-${product.sku}.svg`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    Descargar QR
+                  </Button>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">No se pudo generar el QR</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Barcode className="size-5" />
+                Código de Barras
+              </CardTitle>
+              <CardDescription>
+                Código Code128 generado desde el SKU
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center gap-4">
+              {code128Svg ? (
+                <>
+                  <div
+                    className="w-full max-w-[250px]"
+                    dangerouslySetInnerHTML={{ __html: code128Svg }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadSvg(code128Svg, `barcode-${product.sku}.svg`)}
+                  >
+                    Descargar código de barras
+                  </Button>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">No se pudo generar el código de barras</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center text-muted-foreground">
+              <p>Genere un SKU para ver los códigos</p>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Photo Upload Section */}

@@ -1,9 +1,5 @@
-/**
- * Sales Module - EP3
- * Main sales page with options for registration methods
- */
 import { Link } from 'react-router-dom';
-import { Camera, PenLine, History, ShoppingCart } from 'lucide-react';
+import { ScanLine, PenLine, History, ShoppingCart } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,6 +43,34 @@ export function SalesPage() {
 
       {/* Registration Options */}
       <div className="grid gap-6 md:grid-cols-2">
+        {/* Barcode/QR Scanning */}
+        <Card className="cursor-pointer transition-shadow hover:shadow-lg">
+          <Link to={ROUTES.SALES.NEW_SCAN}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ScanLine className="h-5 w-5 text-primary" />
+                Escanear Código
+              </CardTitle>
+              <CardDescription>
+                Escanea el código de barras o QR del producto para una selección instantánea
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="space-y-1 text-sm text-muted-foreground">
+                  <p>• Escanea código de barras o QR</p>
+                  <p>• Selección instantánea del producto</p>
+                  <p>• Ingreso manual como alternativa</p>
+                </div>
+                <ScanLine className="h-12 w-12 text-muted-foreground/50" />
+              </div>
+              <Button className="mt-4 w-full">
+                Escanear Código
+              </Button>
+            </CardContent>
+          </Link>
+        </Card>
+
         {/* Manual Registration */}
         <Card className="cursor-pointer transition-shadow hover:shadow-lg">
           <Link to={ROUTES.SALES.NEW}>
@@ -70,34 +94,6 @@ export function SalesPage() {
               </div>
               <Button className="mt-4 w-full">
                 Registrar Venta Manual
-              </Button>
-            </CardContent>
-          </Link>
-        </Card>
-
-        {/* Image Recognition */}
-        <Card className="cursor-pointer transition-shadow hover:shadow-lg">
-          <Link to={ROUTES.SALES.NEW_IMAGE}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Camera className="h-5 w-5 text-primary" />
-                Reconocimiento de Imagen
-              </CardTitle>
-              <CardDescription>
-                Toma una foto del producto y la IA sugerirá las opciones más probables
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="space-y-1 text-sm text-muted-foreground">
-                  <p>• Captura de foto desde cámara</p>
-                  <p>• Sugerencias con IA</p>
-                  <p>• Selección rápida</p>
-                </div>
-                <Camera className="h-12 w-12 text-muted-foreground/50" />
-              </div>
-              <Button className="mt-4 w-full" variant="secondary">
-                Usar Reconocimiento de Imagen
               </Button>
             </CardContent>
           </Link>

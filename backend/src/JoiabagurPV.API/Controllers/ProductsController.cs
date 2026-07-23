@@ -5,6 +5,7 @@ using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Domain.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace JoiabagurPV.API.Controllers;
 
@@ -20,6 +21,7 @@ public class ProductsController : ControllerBase
     private readonly IExcelImportService _excelImportService;
     private readonly IProductPhotoService _productPhotoService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IQrCodeService _qrCodeService;
     private readonly IValidator<CreateProductRequest> _createValidator;
     private readonly IValidator<UpdateProductRequest> _updateValidator;
     private readonly ILogger<ProductsController> _logger;
@@ -29,6 +31,7 @@ public class ProductsController : ControllerBase
         IExcelImportService excelImportService,
         IProductPhotoService productPhotoService,
         ICurrentUserService currentUserService,
+        IQrCodeService qrCodeService,
         IValidator<CreateProductRequest> createValidator,
         IValidator<UpdateProductRequest> updateValidator,
         ILogger<ProductsController> logger)
@@ -37,6 +40,7 @@ public class ProductsController : ControllerBase
         _excelImportService = excelImportService;
         _productPhotoService = productPhotoService;
         _currentUserService = currentUserService;
+        _qrCodeService = qrCodeService;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
         _logger = logger;
@@ -266,10 +270,68 @@ public class ProductsController : ControllerBase
     }
 
     /// <summary>
+    /// Generates a QR code SVG for a product, encoding its SKU.
+    /// Only administrators can generate QR codes.
+    /// </summary>
+    /// <param name="productId">The product ID.</param>
+    /// <returns>SVG image of the QR code.</returns>
+    [HttpGet("{productId:guid}/qrcode")]
+    [Authorize(Roles = "Administrator")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetQrCode(Guid productId)
+    {
+        var product = await _productService.GetByIdAsync(productId);
+        if (product == null)
+        {
+            return NotFound(new { error = "Producto no encontrado" });
+        }
+
+        var svg = _qrCodeService.GenerateSvg(product.Sku, $"{product.Sku} - {product.Name}");
+        return Content(svg, "image/svg+xml");
+    }
+
+    /// <summary>
+    /// Generates a printable PDF with QR code labels for multiple products.
+    /// Only administrators can generate batch QR codes.
+    /// </summary>
+    /// <param name="productIds">Optional list of product IDs to include. If empty, generates for all active products.</param>
+    /// <returns>PDF file with QR code labels.</returns>
+    [HttpGet("qrcodes/batch")]
+    [Authorize(Roles = "Administrator")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetQrCodeBatch([FromQuery] List<Guid>? productIds = null)
+    {
+        List<(string Sku, string Name)> products;
+
+        if (productIds != null && productIds.Count != 0)
+        {
+            products = new List<(string, string)>();
+            foreach (var id in productIds)
+            {
+                var product = await _productService.GetByIdAsync(id);
+                if (product != null)
+                    products.Add((product.Sku, product.Name));
+            }
+        }
+        else
+        {
+            var allProducts = await _productService.GetAllAsync(includeInactive: false);
+            products = allProducts.Select(p => (p.Sku, p.Name)).ToList();
+        }
+
+        var pdf = _qrCodeService.GeneratePdf(products);
+        return File(pdf, "application/pdf", "qr-labels.pdf");
+    }
+
+    /// <summary>
     /// Downloads an Excel template for product import.
     /// Only administrators can access this endpoint.
     /// </summary>
-    /// <returns>An Excel file template with headers and example data.</returns>
     [HttpGet("import-template")]
     [Authorize(Roles = "Administrator")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]

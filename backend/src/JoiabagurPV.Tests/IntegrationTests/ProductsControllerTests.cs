@@ -1304,6 +1304,78 @@ public class ProductsControllerTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    #region QR Code Tests
+
+    [Fact]
+    public async Task GetQrCode_AsAdmin_ReturnsSvg()
+    {
+        var createRequest = new CreateProductRequest
+        {
+            SKU = "QR-TEST-001",
+            Name = "QR Test Product",
+            Price = 100m
+        };
+        var createResponse = await _adminClient!.PostAsJsonAsync("/api/products", createRequest);
+        var product = await createResponse.Content.ReadFromJsonAsync<ProductDto>();
+
+        var response = await _adminClient.GetAsync($"/api/products/{product!.Id}/qrcode");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType?.ToString().Should().Be("image/svg+xml");
+        var svg = await response.Content.ReadAsStringAsync();
+        svg.Should().Contain("<svg");
+        svg.Should().Contain(product.Sku);
+    }
+
+    [Fact]
+    public async Task GetQrCode_AsOperator_Returns403()
+    {
+        var createRequest = new CreateProductRequest
+        {
+            SKU = "QR-AUTH-001",
+            Name = "QR Auth Test",
+            Price = 100m
+        };
+        var createResponse = await _adminClient!.PostAsJsonAsync("/api/products", createRequest);
+        var product = await createResponse.Content.ReadFromJsonAsync<ProductDto>();
+
+        var response = await _operatorClient!.GetAsync($"/api/products/{product!.Id}/qrcode");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task GetQrCodeBatch_AsAdmin_ReturnsPdf()
+    {
+        var createRequest1 = new CreateProductRequest
+        {
+            SKU = "QR-BATCH-001",
+            Name = "Batch Product 1",
+            Price = 50m
+        };
+        var createRequest2 = new CreateProductRequest
+        {
+            SKU = "QR-BATCH-002",
+            Name = "Batch Product 2",
+            Price = 75m
+        };
+        await _adminClient!.PostAsJsonAsync("/api/products", createRequest1);
+        await _adminClient.PostAsJsonAsync("/api/products", createRequest2);
+
+        var response = await _adminClient.GetAsync("/api/products/qrcodes/batch");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType?.ToString().Should().Be("application/pdf");
+        var pdf = await response.Content.ReadAsByteArrayAsync();
+        pdf.Should().HaveCountGreaterThan(0);
+        pdf[0].Should().Be(0x25);
+        pdf[1].Should().Be(0x50);
+        pdf[2].Should().Be(0x44);
+        pdf[3].Should().Be(0x46);
+    }
+
+    #endregion
+
     /// <summary>
     /// Helper method to create a minimal valid PNG image (1x1 pixel)
     /// </summary>

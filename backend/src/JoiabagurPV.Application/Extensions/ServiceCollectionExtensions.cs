@@ -73,6 +73,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IImageRecognitionService, ImageRecognitionService>();
         services.AddScoped<IModelHealthService, ModelHealthService>();
 
+        // Register QR code services
+        services.AddScoped<IQrCodeService, QrCodeService>();
+
         // Register background services
         services.AddHostedService<ModelTrainingBackgroundService>();
 

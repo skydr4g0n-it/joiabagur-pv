@@ -20,6 +20,7 @@ const InventoryMovementsPage = lazy(() => import('@/pages/inventory/movements'))
 const InventoryCentralizedPage = lazy(() => import('@/pages/inventory/centralized'));
 const SalesPage = lazy(() => import('@/pages/sales'));
 const ManualSalesPage = lazy(() => import('@/pages/sales/new'));
+const ScanSalesPage = lazy(() => import('@/pages/sales/scan'));
 const ImageRecognitionSalesPage = lazy(() => import('@/pages/sales/new-image'));
 const SalesCartPage = lazy(() => import('@/pages/sales/cart'));
 const SalesHistoryPage = lazy(() => import('@/pages/sales/history'));
@@ -74,6 +75,7 @@ export function AppRoutingSetup() {
             <Route path={ROUTES.INVENTORY.MOVEMENTS} element={<InventoryMovementsPage />} />
             <Route path={ROUTES.SALES.ROOT} element={<SalesPage />} />
             <Route path={ROUTES.SALES.NEW} element={<ManualSalesPage />} />
+            <Route path={ROUTES.SALES.NEW_SCAN} element={<ScanSalesPage />} />
             <Route path={ROUTES.SALES.NEW_IMAGE} element={<ImageRecognitionSalesPage />} />
             <Route path={ROUTES.SALES.CART} element={<SalesCartPage />} />
             <Route path={ROUTES.SALES.HISTORY} element={<SalesHistoryPage />} />

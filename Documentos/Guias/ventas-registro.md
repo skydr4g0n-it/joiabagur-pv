@@ -5,7 +5,7 @@
 El sistema ofrece tres métodos para registrar ventas:
 
 1. **Registro Manual**: Selección directa de productos por SKU o nombre
-2. **Reconocimiento de Imágenes con IA**: Captura de foto del producto para identificación automática
+2. **Escaneo de Código de Barras / QR**: Captura del código del producto mediante la cámara para identificación instantánea
 3. **Carrito de Ventas**: Composición de múltiples productos con checkout masivo atómico
 
 Los métodos individuales (1 y 2) comparten el mismo flujo de validación y confirmación. Desde el registro manual se puede añadir productos al carrito para luego confirmarlos todos juntos.
@@ -67,64 +67,59 @@ Esta advertencia es informativa y no bloquea la operación.
 
 ---
 
-## Registro con Reconocimiento de Imágenes
+## Registro con Escaneo de Código de Barras / QR
 
 ### Requisitos del Dispositivo
 
 - **Navegador**: Chrome 90+, Edge 90+, Safari 14+, Firefox 88+
-- **WebGL 2.0**: Requerido para aceleración GPU
-- **Memoria RAM**: 2GB mínimo, 4GB+ recomendado
-- **Cámara**: Acceso a cámara del dispositivo
+- **Cámara**: Acceso a cámara del dispositivo trasera
+- **Iluminación**: Iluminación suficiente para que la cámara enfoque el código
 
 ### Acceso
-- Navegue a **Ventas** → **Nueva Venta con IA** o directamente a `/sales/new/image`
+- Navegue a **Ventas** → **Escanear Código** o directamente a `/sales/new/scan`
 
 ### Flujo de Trabajo
 
-1. **Verificación de Compatibilidad**
-   - El sistema verifica automáticamente WebGL 2.0 y TensorFlow.js
-   - Si el dispositivo no es compatible, se redirige a registro manual
-
-2. **Captura de Foto**
+1. **Apertura de Cámara**
    - Otorgue permisos de cámara cuando se solicite
-   - Capture una foto clara del producto
-   - Puede retomar la foto si no está satisfecho
+   - La cámara trasera se activa automáticamente
+   - Se muestra un recuadro de escaneo en el centro de la pantalla
 
-3. **Validación de Imagen**
-   - Tamaño mínimo: 200x200 píxeles
-   - Proporción máxima: 5:1
-   - La imagen no debe ser completamente negra o blanca
+2. **Escaneo Continuo**
+   - Apunte la cámara al código de barras (Code128) o código QR del producto
+   - El sistema decodifica automáticamente el código
+   - El código QR simplemente contiene el SKU del producto
+   - Los códigos repetidos dentro de 2 segundos se ignoran
 
-4. **Procesamiento con IA**
-   - El modelo descarga automáticamente (primera vez ~14MB)
-   - Se muestra progreso de procesamiento
-   - Tiempo típico: 2-5 segundos
+3. **Búsqueda Automática**
+   - El SKU decodificado se busca automáticamente en el sistema
+   - Si se encuentra una coincidencia exacta, el producto se selecciona automáticamente
+   - El operador es redirigido al formulario de venta
 
-5. **Selección de Sugerencia**
-   - El sistema muestra 3-5 sugerencias ordenadas por confianza
-   - Cada sugerencia incluye: foto de referencia, SKU, nombre, % confianza
-   - Seleccione el producto correcto
+4. **Ingreso Manual como Alternativa**
+   - Si la cámara no puede leer el código, use el campo de texto debajo de la vista de cámara
+   - Ingrese el SKU manualmente y presione "Buscar"
 
-6. **Continuar con Registro**
-   - Una vez seleccionado el producto, continúa el flujo normal
-   - La foto capturada se adjunta automáticamente a la venta
+5. **Finalización**
+   - Complete la cantidad, método de pago y confirme la venta
 
-### Umbral de Confianza
+### Controles Disponibles
 
-- **Umbral predeterminado**: 40%
-- Si ninguna sugerencia alcanza el 40% de confianza:
-  - Se muestra mensaje: "No se encontró correspondencia fiable"
-  - Opciones: retomar foto o ir a registro manual
-  - La foto se preserva para uso en registro manual
+| Control | Descripción |
+|---------|-------------|
+| 🔦 Flash | Botón para encender/apagar el flash en dispositivos compatibles |
+| ❌ Cerrar | Botón para volver a la página principal de ventas |
+| Campo SKU | Ingreso manual del SKU como alternativa al escaneo |
 
 ### Escenarios de Error
 
 | Escenario | Comportamiento |
 |-----------|----------------|
-| Sin conexión a internet | "Se requiere conexión a internet" → Redirige a manual |
-| Modelo no disponible (404) | "Modelo no disponible aún, entrenar primero" → Manual |
-| Dispositivo incompatible | "Tu dispositivo no es compatible. Requisitos: iOS 12+, Android 8+, navegador moderno" |
-| Todas las confianzas <40% | "No se encontró correspondencia fiable" → Opción de retomar o manual |
+| Cámara no disponible | Mensaje "No se pudo acceder a la cámara" → Opción de reintentar o ir a registro manual |
+| Permiso de cámara denegado | "Permiso de cámara denegado" → Botón para ir a registro manual |
+| SKU escaneado no encontrado | Toast "Producto no encontrado: [SKU]" → El escáner continúa |
+| Producto no asignado al POS | Toast "Producto no asignado a este punto de venta" → El escáner continúa |
+| Flash no disponible | El botón de flash no tiene efecto (el dispositivo no soporta torch) |
 
 ---
 
@@ -136,7 +131,7 @@ El carrito permite componer una lista de productos para registrar múltiples ven
 
 ### Acceso
 - Desde **Ventas** → **Carrito** (visible cuando hay líneas en el carrito) o directamente en `/sales/cart`
-- El botón de carrito con badge de cantidad aparece en `/sales`, `/sales/new` y `/sales/new/image`
+- El botón de carrito con badge de cantidad aparece en `/sales`, `/sales/new` y `/sales/new/scan`
 
 ### Añadir Productos al Carrito
 
@@ -249,7 +244,7 @@ La transacción es atómica: si algún paso falla, toda la operación se reviert
 ## Preguntas Frecuentes
 
 ### ¿Puedo registrar ventas sin conexión a internet?
-El registro manual funciona sin conexión si ya tiene la sesión iniciada. El reconocimiento de imágenes requiere conexión para descargar/verificar el modelo.
+El registro manual funciona sin conexión si ya tiene la sesión iniciada. El escaneo de códigos requiere conexión para buscar el producto por SKU.
 
 ### ¿Qué pasa si dos operadores intentan vender el último producto?
 El sistema usa doble validación de stock:
@@ -268,8 +263,11 @@ Al abrir la página del carrito, el sistema revalida el stock de todos los produ
 ### ¿Puedo mezclar diferentes puntos de venta en el carrito?
 No. Todas las líneas deben pertenecer al mismo punto de venta y método de pago. Si añade una línea con un POS o método diferente, el carrito se vacía y comienza con la nueva configuración.
 
-### ¿Cómo mejoro la precisión del reconocimiento de imágenes?
-- Capture fotos con buena iluminación
-- Centre el producto en la imagen
-- Evite fondos muy saturados
-- Si el modelo tiene baja precisión, el administrador debe reentrenarlo
+### ¿Qué códigos de barras puedo escanear?
+El sistema soporta códigos Code128, EAN, UPC y Code39 para códigos de barras, así como códigos QR. El valor decodificado se busca como SKU en el sistema.
+
+### ¿Qué hago si la cámara no lee el código?
+Use el campo de ingreso manual de SKU debajo de la vista de cámara. También puede ir a "Registro Manual" para buscar por nombre del producto.
+
+### ¿El código QR es el mismo que el SKU?
+Sí. El código QR codifica el SKU del producto. No se requiere ningún campo adicional en la base de datos. También puede generar códigos QR y códigos de barras Code128 desde la página de edición del producto.
