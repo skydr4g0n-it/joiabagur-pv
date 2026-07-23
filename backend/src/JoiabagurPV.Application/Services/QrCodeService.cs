@@ -77,8 +77,7 @@ public class QrCodeService : Interfaces.IQrCodeService
                 using var png = new PngByteQRCode(qrData);
                 var pngBytes = png.GetGraphic(20);
 
-                using var ms = new MemoryStream(pngBytes);
-                var img = XImage.FromStream(ms);
+                var img = XImage.FromStream(() => new MemoryStream(pngBytes));
 
                 gfx.DrawImage(img, x, y, qrSize, qrSize);
 
