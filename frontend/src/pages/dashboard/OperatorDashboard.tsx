@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ShoppingCart, RotateCcw, Package, ExternalLink } from 'lucide-react';
+import { ShoppingCart, RotateCcw, ScanLine, Package, ExternalLink } from 'lucide-react';
 import {
   LineChart,
   Line,
@@ -329,11 +329,11 @@ export function OperatorDashboard() {
             <span className="text-xs font-medium">Venta manual</span>
           </Link>
           <Link
-            to={ROUTES.SALES.NEW_IMAGE}
+            to={ROUTES.SALES.NEW_SCAN}
             className="flex-1 flex flex-col items-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 px-2 text-center hover:bg-primary/90 transition-colors"
           >
-            <Package className="h-5 w-5" />
-            <span className="text-xs font-medium">Venta imagen</span>
+            <ScanLine className="h-5 w-5" />
+            <span className="text-xs font-medium">Escanear código</span>
           </Link>
           <Link
             to={ROUTES.RETURNS.NEW}

@@ -167,6 +167,13 @@ export function ScanningPage() {
   return (
     <div className="relative flex h-[calc(100vh-8rem)] flex-col">
       <canvas ref={canvasRef} className="hidden" />
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className={scanState === 'scanning' ? 'absolute inset-0 size-full object-cover' : 'hidden'}
+      />
 
       {scanState === 'initializing' && (
         <div className="flex flex-1 items-center justify-center">
@@ -202,14 +209,6 @@ export function ScanningPage() {
       {scanState === 'scanning' && (
         <>
           <div className="relative flex-1 overflow-hidden bg-black">
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="absolute inset-0 size-full object-cover"
-            />
-
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="relative size-64">
                 <div className="absolute left-0 top-0 size-8 border-l-2 border-t-2 border-white" />

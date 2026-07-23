@@ -59,16 +59,21 @@ public class QrCodeService : Interfaces.IQrCodeService
             using var gfx = XGraphics.FromPdfPage(page);
             var pageItems = items.Skip(pageIndex * labelsPerPage).Take(labelsPerPage).ToList();
 
-            var cellW = page.Width / cols;
-            var cellH = page.Height / rows;
+            const float margin = 20;
+            var printW = page.Width - 2 * margin;
+            var printH = page.Height - 2 * margin;
+            var cellW = printW / cols;
+            var cellH = printH / rows;
             var qrSize = Math.Min(cellW, cellH) * 0.6;
 
             for (var i = 0; i < pageItems.Count; i++)
             {
                 var col = i % cols;
                 var row = i / cols;
-                var x = col * cellW + (cellW - qrSize) / 2;
-                var y = row * cellH + 10;
+                var cellX = margin + col * cellW;
+                var cellY = margin + row * cellH;
+                var x = cellX + (cellW - qrSize) / 2;
+                var y = cellY + 10;
 
                 var (sku, name) = pageItems[i];
 
@@ -83,10 +88,10 @@ public class QrCodeService : Interfaces.IQrCodeService
 
                 var font = new XFont("Arial", 8);
                 gfx.DrawString(sku, font, XBrushes.Black,
-                    new XRect(x, y + qrSize + 2, cellW, 14),
+                    new XRect(cellX, y + qrSize + 2, cellW, 14),
                     XStringFormats.TopCenter);
                 gfx.DrawString(name, font, XBrushes.Black,
-                    new XRect(x, y + qrSize + 14, cellW, 14),
+                    new XRect(cellX, y + qrSize + 14, cellW, 14),
                     XStringFormats.TopCenter);
             }
 
