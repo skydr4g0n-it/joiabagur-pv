@@ -550,29 +550,23 @@ export function ProductEditPage() {
               {isLoadingQr ? (
                 <Loader2 className="size-8 animate-spin text-muted-foreground" />
               ) : qrSvg ? (
-                <>
-                  <div
-                    className="size-[150px]"
-                    dangerouslySetInnerHTML={{ __html: qrSvg }}
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const blob = new Blob([qrSvg], { type: 'image/svg+xml' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `qr-${product.sku}.svg`;
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                      URL.revokeObjectURL(url);
-                    }}
-                  >
-                    Descargar QR
-                  </Button>
-                </>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const blob = new Blob([qrSvg], { type: 'image/svg+xml' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `qr-${product.sku}.svg`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  }}
+                >
+                  Descargar QR
+                </Button>
               ) : (
                 <p className="text-sm text-muted-foreground">No se pudo generar el QR</p>
               )}

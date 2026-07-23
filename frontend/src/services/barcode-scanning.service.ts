@@ -57,17 +57,17 @@ export class BarcodeScanningService {
     const result = this.captureFrame(canvasElement, videoElement);
     if (!result) return null;
 
-    const { imageData } = result;
-
     try {
       const { default: Quagga } = await import('@ericblade/quagga2');
+
+      const dataUrl = canvasElement.toDataURL('image/jpeg', 0.8);
 
       return new Promise<DecodeResult | null>((resolve) => {
         Quagga.decodeSingle(
           {
             decoder: { readers: ['code_128_reader', 'ean_reader', 'ean_8_reader', 'upc_reader', 'code_39_reader'] },
             locate: true,
-            src: imageData as any,
+            src: dataUrl,
           },
           (result: any) => {
             if (result?.codeResult?.code) {
@@ -170,7 +170,7 @@ export class BarcodeScanningService {
     canvas.width = videoElement.videoWidth;
     canvas.height = videoElement.videoHeight;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return null;
 
     ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);

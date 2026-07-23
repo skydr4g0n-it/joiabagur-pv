@@ -167,13 +167,30 @@ export function ScanningPage() {
   return (
     <div className="relative flex h-[calc(100vh-8rem)] flex-col">
       <canvas ref={canvasRef} className="hidden" />
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className={scanState === 'scanning' ? 'absolute inset-0 size-full object-cover' : 'hidden'}
-      />
+
+      {/* Scan viewport — always mounted so videoRef is available from the start */}
+      <div className={scanState === 'scanning' ? 'relative flex-1 overflow-hidden bg-black' : 'hidden flex-1'}>
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="absolute inset-0 size-full object-cover"
+        />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="relative size-64">
+            <div className="absolute left-0 top-0 size-8 border-l-2 border-t-2 border-white" />
+            <div className="absolute right-0 top-0 size-8 border-r-2 border-t-2 border-white" />
+            <div className="absolute bottom-0 left-0 size-8 border-b-2 border-l-2 border-white" />
+            <div className="absolute bottom-0 right-0 size-8 border-b-2 border-r-2 border-white" />
+          </div>
+        </div>
+        <div className="absolute bottom-24 left-0 right-0 text-center">
+          <p className="text-white/80 text-sm bg-black/50 inline-block px-4 py-1 rounded-full">
+            Enfoca el código de barras o QR en el recuadro
+          </p>
+        </div>
+      </div>
 
       {scanState === 'initializing' && (
         <div className="flex flex-1 items-center justify-center">
@@ -206,41 +223,21 @@ export function ScanningPage() {
         </div>
       )}
 
-      {scanState === 'scanning' && (
-        <>
-          <div className="relative flex-1 overflow-hidden bg-black">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="relative size-64">
-                <div className="absolute left-0 top-0 size-8 border-l-2 border-t-2 border-white" />
-                <div className="absolute right-0 top-0 size-8 border-r-2 border-t-2 border-white" />
-                <div className="absolute bottom-0 left-0 size-8 border-b-2 border-l-2 border-white" />
-                <div className="absolute bottom-0 right-0 size-8 border-b-2 border-r-2 border-white" />
-              </div>
-            </div>
+      {/* Scan controls */}
+      <div className={scanState === 'scanning' ? 'flex items-center justify-center gap-4 p-4 bg-background border-t' : 'hidden'}>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleToggleFlash}
+          title={flashOn ? 'Apagar flash' : 'Encender flash'}
+        >
+          {flashOn ? <FlashlightOff className="size-5" /> : <Flashlight className="size-5" />}
+        </Button>
 
-            <div className="absolute bottom-24 left-0 right-0 text-center">
-              <p className="text-white/80 text-sm bg-black/50 inline-block px-4 py-1 rounded-full">
-                Enfoca el código de barras o QR en el recuadro
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-center gap-4 p-4 bg-background border-t">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleToggleFlash}
-              title={flashOn ? 'Apagar flash' : 'Encender flash'}
-            >
-              {flashOn ? <FlashlightOff className="size-5" /> : <Flashlight className="size-5" />}
-            </Button>
-
-            <Button variant="outline" size="icon" onClick={handleClose} title="Cerrar">
-              <X className="size-5" />
-            </Button>
-          </div>
-        </>
-      )}
+        <Button variant="outline" size="icon" onClick={handleClose} title="Cerrar">
+          <X className="size-5" />
+        </Button>
+      </div>
 
       {scanState !== 'initializing' && (
         <div className="p-4 border-t bg-background">

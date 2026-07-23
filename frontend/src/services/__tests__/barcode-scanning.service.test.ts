@@ -100,4 +100,15 @@ describe('BarcodeScanningService', () => {
       expect(result).toBeNull();
     });
   });
+
+  describe('scanBarcode', () => {
+    it('should return null when canvas context is unavailable', async () => {
+      const canvas = document.createElement('canvas');
+      const video = document.createElement('video');
+
+      const result = await service.scanBarcode(canvas, video);
+
+      expect(result).toBeNull();
+    });
+  });
 });
