@@ -45,7 +45,7 @@ Todo lo siguiente está comprobado en el código, no asumido.
 |---|---|---|
 | Backend | .NET 10, arquitectura en capas (Domain / Infrastructure / Application / API), EF Core, PostgreSQL, JWT, Serilog, 18 controllers | Base sólida; el servicio de IA se acopla por HTTP, no por código |
 | Modelo de dominio | `Product` (SKU, Name, Description, Price, CollectionId, IsActive), `Collection`, `Inventory` (Product×POS, Quantity, IsActive), `InventoryMovement`, `Sale` (precio congelado, POS, operador, método de pago), `PointOfSale`, `User`/`UserPointOfSale`, `Return`, `ProductPhoto` | Todas las señales que necesita el RAG (stock por POS, rotación, ventas) ya existen y son consultables |
-| Búsqueda actual | `GET /api/products/search` → SKU exacto + nombre parcial, máx. 50 resultados, filtrado por POS asignados para operadores ([ProductsController.cs:92](../backend/src/JoiabagurPV.API/Controllers/ProductsController.cs#L92)) | Es el **baseline léxico** contra el que mediremos, y el **fallback** cuando la IA no responda |
+| Búsqueda actual | `GET /api/products/search` → SKU exacto + nombre parcial, máx. 50 resultados, filtrado por POS asignados para operadores ([ProductsController.cs:92](../../backend/src/JoiabagurPV.API/Controllers/ProductsController.cs#L92)) | Es el **baseline léxico** contra el que mediremos, y el **fallback** cuando la IA no responda |
 | IA existente | Reconocimiento **visual** de producto: `ProductPhotoEmbedding` (MobileNetV2, 1280 dims, guardado como **JSON en texto**), inferencia con TensorFlow.js en el navegador, `ModelMetadata`/`ModelTrainingJob` | **No se toca.** Es otro problema (imagen) y otro espacio vectorial. Coexisten dos índices; el README explica por qué |
 | pgvector | **No instalado.** No hay ninguna referencia en el backend | Instalarlo es trabajo nuevo (extensión en RDS + esquema propio del servicio Python) |
 | Datos en el repo | El seeder solo crea el admin y los métodos de pago. **No hay datos de catálogo, inventario ni ventas versionados** | Sin export de producción anonimizado, **todo el corpus es sintético**. Ver §7 |
@@ -57,7 +57,7 @@ Todo lo siguiente está comprobado en el código, no asumido.
 
 ---
 
-## 2. Análisis crítico de `docs/joiabagur-ia-especificaciones-funcionales.md`
+## 2. Análisis crítico de [`joiabagur-ia-especificaciones-funcionales.md`](joiabagur-ia-especificaciones-funcionales.md)
 
 Esta sección precede deliberadamente al diseño porque lo condiciona.
 
