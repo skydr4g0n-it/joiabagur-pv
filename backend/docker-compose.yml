@@ -2,7 +2,12 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:15
+    # pgvector-enabled PG 15 so extension `vector` is available for C05.
+    # Image swap may require recreating the local volume:
+    #   docker compose down -v
+    # (destroys local DB data; acceptable for O0 / empty catalog).
+    # Do NOT create schema `ai` or run CREATE EXTENSION here — that is C05.
+    image: pgvector/pgvector:pg15
     container_name: jpv-pv-postgres
     environment:
       POSTGRES_DB: joiabagur_pv
@@ -26,6 +31,20 @@ services:
       - "8080:80"
     depends_on:
       - postgres
+    networks:
+      - jpv-network
+
+  jbg-ai:
+    build:
+      context: ../ai-service
+      dockerfile: Dockerfile
+    container_name: jpv-pv-jbg-ai
+    environment:
+      APP_ENV: local
+      SERVICE_VERSION: 0.1.0
+      LOG_LEVEL: INFO
+    ports:
+      - "8001:8000"
     networks:
       - jpv-network
 
