@@ -1,4 +1,5 @@
 > ⚠️ **VARIANTE PARA EQUIPO DE 3 DESARROLLADORES — NO ES EL PLAN VIGENTE.**
+> ⚠️ **DESACTUALIZADA desde la v3 (3 ago 2026):** no incorpora el consenso con la revisión de la PR #4 ni las especificaciones v2 (`materials[]`, `ProductFamily`, inventario asistido, prefiltro blando). Si el equipo creciera a tres personas, hay que rehacerla partiendo de la v3, no usarla tal cual.
 > El documento a seguir es [proyecto-final-diseno-rag-joiabagur.md](proyecto-final-diseno-rag-joiabagur.md), dimensionado para **2 desarrolladores**.
 > Esta variante se conserva por si el equipo creciera a tres personas. Su descomposición en changes es [proyecto-final-plan-changes-openspec-3devs.md](proyecto-final-plan-changes-openspec-3devs.md).
 > **Diferencias principales frente al plan vigente:** incluye argumentario por POS como servicio, agente de reposición opcional, medición del reranking, caché semántico, `AiUsageLog` como entidad .NET, trazado con LangSmith/Logfire, golden set de 80-100 consultas y despliegue en la semana 4 (no en la 2).

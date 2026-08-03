@@ -1,16 +1,16 @@
 # Proyecto Final — Descomposición en changes OpenSpec
 
+**Versión:** 3 — consenso tras la revisión de la [PR #4](https://github.com/skydr4g0n-it/joiabagur-pv/pull/4) y las [especificaciones funcionales v2](joiabagur-ia-especificaciones-funcionales-v2.md)
 **Documento hermano de:** [proyecto-final-diseno-rag-joiabagur.md](proyecto-final-diseno-rag-joiabagur.md)
-**Ventana de ejecución:** 1 de agosto → 3 de septiembre de 2026 — *sin margen asumido*
-**Equipo:** **2 desarrolladores** — **Dev A** (IA/Python) · **Dev B** (Backend .NET, frontend, infraestructura)
-**Total:** 29 changes · ~3 por persona y semana
-**Variante archivada:** [proyecto-final-plan-changes-openspec-3devs.md](proyecto-final-plan-changes-openspec-3devs.md) — 43 changes para 3 personas, **no vigente**
+**Ventana:** 3 de agosto → 3 de septiembre de 2026 — *sin margen asumido*
+**Equipo:** **2 desarrolladores sin roles fijos**, ambos trabajan en Python y en .NET/frontend
+**Total:** 39 changes (38 de construcción + 1 de entrega) · **~4,4 por persona y semana**
 
 ---
 
-## 1. Cómo se usa este documento
+## 1. Cómo se trabaja
 
-Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin en **una sesión de 2-3 horas**, siguiendo el ciclo del repositorio:
+Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin en **una sesión de 2-3 horas**:
 
 ```text
 /opsx:propose (proposal.md · design.md · tasks.md · specs/<capability>/spec.md)
@@ -19,373 +19,460 @@ Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin e
   → /opsx:archive (openspec/changes/archive/YYYY-MM-DD-<change-id>/)
 ```
 
-**Definition of Done común a los 29 changes** (no se repite en cada ficha):
+### Reglas de asignación (sustituyen a los roles)
+
+1. **Se coge el siguiente change desbloqueado**, sea Python o .NET. No hay dueño por zona.
+2. **Prioridad absoluta a la ruta crítica.** Si hay un change marcado 🔴 libre, se coge ese antes que cualquier otro. Los 🟢 son relleno: sirven para no quedarse parado, no para adelantar trabajo.
+3. **Antes de empezar se anuncia** (issue, tablero o mensaje) para que el otro no coja el mismo.
+4. **Una sola migración EF Core activa a la vez** (marcados 🗄️). Quien la abre lo anuncia y la mergea antes de que empiece otra.
+5. **Si un change se desborda de la sesión, se parte** y se entrega primero la mitad que desbloquea al otro desarrollador.
+6. **C24 (golden set) se hace entre los dos**, etiquetando por separado y conciliando.
+
+### Definition of Done común
 
 - [ ] Artefactos OpenSpec creados y `openspec validate` en verde
 - [ ] Código aplicado, `dotnet build` / `uv run pytest` / `npm run build` sin errores
-- [ ] **Tests unitarios nuevos, verdes**, con la nomenclatura de la zona (§2)
+- [ ] **Tests unitarios nuevos, verdes**
 - [ ] Tests existentes sin regresión
-- [ ] Documentación afectada actualizada (`Documentos/`, `docs/`, README del servicio)
+- [ ] Documentación afectada actualizada
 - [ ] Change archivado el mismo día
 
-**Reglas transversales de testing:**
+### Reglas transversales de testing
 
-- **Ninguna llamada real a un LLM ni a un proveedor de embeddings en tests unitarios.** Fakes inyectados + fixtures grabadas en `ai-service/tests/fixtures/`.
-- Tests que necesiten PostgreSQL: Testcontainers (.NET, ya en uso) o contenedor efímero con pgvector (Python).
-- Generadores de datos: tests de **propiedades** (invariantes), no de valores concretos — la semilla fija hace el resto.
-- Cobertura esperada: la lógica nueva de dominio/servicio, no los DTOs.
+- **Ninguna llamada real a un LLM ni a embeddings en tests unitarios.** Fakes inyectados + fixtures en `ai-service/tests/fixtures/`.
+- PostgreSQL: Testcontainers (.NET) o contenedor efímero con pgvector (Python).
+- Generadores: tests de **propiedades** (invariantes), no de valores concretos.
+- Nomenclatura: .NET `Method_Scenario_ExpectedResult` · frontend `should [behavior] when [condition]` · Python `test_<unidad>_<escenario>_<esperado>`.
 
-**Regla de oro con dos personas:** ningún change puede bloquear a más de dos posteriores. Si uno se alarga más de una sesión, se parte y se entrega la mitad que desbloquea al otro desarrollador.
+### Leyenda
 
----
-
-## 2. Convenciones y zonas de código
-
-| Elemento | Convención | Ejemplo |
-|---|---|---|
-| ID de change | kebab-case, verbo primero | `add-vector-retrieval-endpoint` |
-| Etiqueta de orden | `C01`…`C29` (solo en este documento) | `C14` |
-| Test .NET | `Method_Scenario_ExpectedResult` | `Search_WithPosFilter_ExcludesUnassigned` |
-| Test frontend | `should [behavior] when [condition]` | `should show variant warning when family has siblings` |
-| Test Python | `test_<unidad>_<escenario>_<esperado>` | `test_rrf_fuses_ranked_lists_preserving_top_hit` |
-
-Dos changes son **paralelizables** si (a) ninguno es prerequisito del otro y (b) sus zonas no se solapan. Con dos personas, la frontera es casi siempre limpia porque coincide con la frontera del servicio.
-
-| Zona | Ruta | Dueño |
-|---|---|---|
-| `PY-CORE` | `ai-service/src/jbg_ai/api/`, `config/` | Dev A |
-| `PY-DATA` | `ai-service/src/jbg_ai/data/generators/` | Dev A/B |
-| `PY-ENRICH` | `ai-service/src/jbg_ai/enrichment/` | Dev A |
-| `PY-INDEX` | `ai-service/src/jbg_ai/indexing/` | Dev A |
-| `PY-RETR` | `ai-service/src/jbg_ai/retrieval/` | Dev A |
-| `PY-ASSIST` | `ai-service/src/jbg_ai/assist/` | Dev A |
-| `PY-EVAL` | `ai-service/src/jbg_ai/evals/`, `ai-service/evals/` | Dev A/B |
-| `NET-DOM` | `backend/src/JoiabagurPV.Domain/`, `Infrastructure/Data/` | Dev B |
-| `NET-APP` | `backend/src/JoiabagurPV.Application/` | Dev B |
-| `NET-API` | `backend/src/JoiabagurPV.API/Controllers/` | Dev B |
-| `FE` | `frontend/src/` | Dev B |
-| `INFRA` | `docker-compose.yml`, `.github/workflows/`, `terraform/` | Dev B |
-| `DOCS` | `docs/`, `Documentos/`, `README.md` | ambos |
+🔴 ruta crítica · 🟢 paralelizable / relleno · 🗄️ incluye migración EF Core · 👥 se hace entre los dos · ⏳ pendiente de acuerdo con el compañero
 
 ---
 
-## 3. Tabla maestra (orden cronológico estricto)
+## 2. Tabla maestra
 
-| # | Change ID | Zona | Dev | Prerequisitos | Paralelo con |
+| # | Change ID | Zona | Prereq. | Ruta | Origen |
 |---|---|---|---|---|---|
-| **C01** | `init-ai-service-skeleton` | PY-CORE, INFRA | A | — | C03 |
-| **C02** | `add-ai-service-contracts-and-auth` | PY-CORE | A | C01 | C03 |
-| **C03** | `add-product-search-event-tracking` | NET-DOM, NET-API | B | — | C01, C02 |
-| **C04** | `add-dotnet-ai-gateway-client` | NET-APP | B | C02 | C05, C06 |
-| **C05** | `add-pgvector-schema-foundation` | PY-INDEX, INFRA | A | C01 | C04, C06 |
-| **C06** | `add-synthetic-catalog-generator` | PY-DATA | B | C01 | C04, C05 |
-| **C07** | `add-catalog-enrichment-pipeline` | PY-ENRICH | A | C06 | C08, C09 |
-| **C08** | `add-product-ai-profile-entity` | NET-DOM, NET-APP, NET-API | B | C04 | C07, C10 |
-| **C09** | `add-dotnet-index-feed-endpoints` | NET-API, NET-APP | B | C08 | C10 |
-| **C10** | `add-source-text-and-embedding-client` | PY-INDEX | A | C05, C07 | C08, C09 |
-| **C11** | `add-product-document-indexer` | PY-INDEX | A | C10 | C13 |
-| **C12** | `add-vector-retrieval-endpoint` | PY-RETR | A | C11 | C13 |
-| **C13** | `add-synthetic-world-simulator` | PY-DATA | B | C06 | C11, C12 |
-| **C14** | `add-dotnet-ai-search-endpoint` | NET-API, NET-APP | B | C04, C12 | C16 |
-| **C15** | `add-frontend-assisted-search-panel` | FE | B | C14 | C16, C17 |
-| **C16** | `add-ai-service-deployment` | INFRA | B | C14 | C17, C18 |
-| **C17** | `add-hybrid-search-rrf` | PY-RETR | A | C12 | C15, C16 |
-| **C18** | `add-pos-projection-and-hard-filters` | PY-RETR, PY-INDEX | A | C12, C09, C13 | C16, C19 |
-| **C19** | `add-knowledge-corpus-and-indexer` | PY-DATA, PY-INDEX | B | C10, C13 | C17, C18 |
-| **C20** | `add-eval-harness-golden-set-and-baselines` | PY-EVAL | **A+B** | C12, C17 | — |
-| **C21** | `add-business-signals-ranking` | PY-RETR | A | C17, C18, C20 | C22 |
-| **C22** | `add-substitutes-retrieval` | PY-RETR | B | C18, C21 | C23 |
-| **C23** | `add-assist-generation-with-citations` | PY-ASSIST | A | C17, C19 | C22, C24 |
-| **C24** | `add-guardrails-and-intent-router` | PY-ASSIST | A | C23 | C25 |
-| **C25** | `add-dotnet-assist-and-substitutes-endpoints` | NET-API, NET-APP | B | C22, C23, C14 | C24, C26 |
-| **C26** | `add-sales-assistant-agent-loop` | PY-ASSIST | A | C23, C24 | C25, C27 |
-| **C27** | `add-frontend-assist-card` | FE | B | C25, C15 | C26, C28 |
-| **C28** | `add-generation-and-agent-evals` | PY-EVAL, NET-APP | A | C20, C23, C25, C26 | C27 |
-| **C29** | `finalize-pf-readme-and-evidence` | DOCS | **A+B** | todos | — |
+| **C01** | `init-ai-service-skeleton` | Python, infra | — | 🔴 | — |
+| **C02** | `add-ai-service-contracts-and-auth` | Python | C01 | 🔴 | — |
+| **C03** | `add-dotnet-ai-gateway-client` | .NET | C02 | 🔴 | — |
+| **C04** | `add-product-search-event-tracking` | .NET 🗄️ | — | 🟢 | specs v2 §5.8 |
+| **C05** | `add-pgvector-schema-foundation` | Python, infra | C01 | 🔴 | — |
+| **C06** | `add-hybrid-catalog-corpus` | Python | C01 | 🔴 | rev. dec. 3 |
+| **C07** | `add-product-family-entity` | .NET 🗄️ | — | 🟢 | **rev. dec. 2** |
+| **C08** | `add-product-ai-profile-entity` | .NET 🗄️ | C03 | 🟢 | rev. dec. 3, 5 |
+| **C09** | `add-catalog-enrichment-pipeline` | Python | C06 | 🔴 | rev. dec. 3, 5 |
+| **C10** | `add-synthetic-world-simulator` | Python | C06 | 🟢 | rev. dec. 8 |
+| **C11** | `add-source-text-and-embedding-client` | Python | C05, C09 | 🔴 | — |
+| **C12** | `add-dotnet-index-feed-endpoints` | .NET | C07, C08 | 🔴 | **rev. dec. 10** |
+| **C13** | `add-product-document-indexer` | Python | C11, C12 | 🔴 | — |
+| **C14** | `add-vector-retrieval-endpoint` | Python | C13 | 🔴 | — |
+| **C15** | `add-dotnet-ai-search-endpoint` | .NET | C03, C14 | 🔴 | **rev. dec. 11** |
+| **C16** | `add-frontend-assisted-search-panel` | Frontend | C15 | 🔴 | — |
+| **C17** | `add-ai-service-deployment` | Infra | C15 | 🔴 | — |
+| **C18** | `add-family-suggestion-and-review` | Python + .NET + FE | C07, C13 | 🟢 | **rev. dec. 2** |
+| **C19** | `add-demand-signal-service` | .NET 🗄️ | C10 | 🟢 | **rev. dec. 6** |
+| **C20** | `add-synonym-dictionary` ⏳ | Python | C14 | 🟢 | **rev. dec. 4** |
+| **C21** | `add-hybrid-search-rrf` | Python | C14, C20 | 🔴 | — |
+| **C22** | `add-pos-projection-soft-prefilter` | Python | C10, C12, C14 | 🔴 | **rev. dec. 11** |
+| **C23** | `add-knowledge-corpus-and-indexer` | Python | C11 | 🟢 | — |
+| **C24** | `add-eval-harness-golden-set-and-baselines` | Python 👥 | C14, C21 | 🔴 | rev. dec. 12 |
+| **C25** | `add-business-signals-ranking` | Python | C21, C22, C24 | 🔴 | — |
+| **C26** | `add-substitutes-retrieval` | Python | C22, C25 | 🟢 | specs v2 §6.3.2 |
+| **C27** | `add-complementary-recommendations` | Python + .NET 🗄️ | C10, C25 | 🟢 | **rev. dec. 8** |
+| **C28** | `add-profile-review-ui-and-metrics` | Frontend + .NET | C08 | 🟢 | **rev. dec. 5** |
+| **C29** | `add-inventory-recommendation-entity` | .NET 🗄️ | C19 | 🟢 | **rev. dec. 6** |
+| **C30** | `add-assist-generation-with-rule-warnings` | Python | C07, C21, C23 | 🔴 | **rev. dec. 4** |
+| **C31** | `add-guardrails-and-intent-router` | Python | C30 | 🔴 | — |
+| **C32** | `add-sales-assistant-agent-loop` | Python | C30, C31 | 🔴 | — |
+| **C33** | `add-pos-sales-profile` | .NET + Python | C19 | 🟢 | **rev. dec. 7** |
+| **C34** | `add-dotnet-assist-and-recommendation-endpoints` | .NET | C15, C26, C27, C30 | 🔴 | — |
+| **C35** | `add-inventory-agent-proposals` | Python | C26, C29, C32, C33 | 🟢 | **rev. dec. 6** |
+| **C36** | `add-frontend-assist-card-and-family-disambiguation` | Frontend | C16, C34 | 🔴 | — |
+| **C37** | `add-frontend-inventory-review-and-print` | Frontend | C29, C35 | 🟢 | **rev. dec. 6** |
+| **C38** | `add-generation-and-agent-evals` | Python + .NET | C24, C30, C32, C34, C35 | 🔴 | — |
+| **C39** | `finalize-pf-readme-and-evidence` | Docs 👥 | todos | 🔴 | — |
+
+**Origen** indica de dónde sale el change: en **negrita**, los que existen por la revisión del compañero.
 
 ---
 
-## 4. Fichas de los changes
+## 3. Fichas
 
-### Ola 0 — Cimientos y contratos (1-3 ago)
-
----
-
-#### C01 · `init-ai-service-skeleton` — Dev A
-
-**Objetivo.** Crear el servicio Python `jbg-ai` vacío pero ejecutable: estructura con `uv`, FastAPI, configuración por entorno, `GET /health`, contenedor y entrada en `docker-compose`.
-**Prerequisitos.** ninguno · **Paralelo.** C03
-**Alcance.** `ai-service/` con `pyproject.toml`, `src/jbg_ai/api/main.py`, `config/settings.py` (pydantic-settings), logging estructurado con `trace_id`, `Dockerfile`, servicio en `docker-compose.yml` en red interna sin publicar puerto, `README.md` del servicio.
-**Tests.** `test_health_returns_ok_with_version`; `test_settings_fail_fast_when_required_env_missing`; smoke de arranque con `TestClient`.
-**Tarea extra obligatoria.** Verificar en la consola de AWS que RDS admite `CREATE EXTENSION vector` y dejarlo anotado. Si no lo admitiera, el plan B (contenedor Postgres+pgvector en la misma EC2) hay que saberlo hoy, no el 25 de agosto.
+### Ola 0 — Cimientos y contratos (3-5 ago)
 
 ---
 
-#### C02 · `add-ai-service-contracts-and-auth` — Dev A
+#### C01 · `init-ai-service-skeleton` 🔴
 
-**Objetivo.** **Congelar el contrato** de los 5 endpoints con modelos Pydantic, stubs deterministas y la autenticación de servicio. Es el change que permite que las dos personas trabajen sin esperarse durante un mes.
-**Prerequisitos.** C01 · **Paralelo.** C03
-**Alcance.** Routers `retrieval`, `assist`, `index`, `enrich`; modelos request/response completos (§6.8 del diseño); stubs tras flag `STUB_MODE`; dependencia FastAPI que valida el JWT interno HS256 y extrae `user_id`/`role`/`pos_id`/`trace_id`; OpenAPI exportado a `ai-service/openapi.json` versionado en git.
-**Tests.** `test_retrieval_stub_matches_response_schema`; `test_assist_stub_returns_citations_field`; `test_openapi_snapshot_is_stable` (rompe el build si alguien cambia el contrato sin avisar); `test_request_without_token_is_rejected`; `test_pos_id_from_token_overrides_body_value` (**el body no manda**); `test_health_is_public`.
-
----
-
-#### C03 · `add-product-search-event-tracking` — Dev B
-
-**Objetivo.** Telemetría consulta→selección desde el primer día. Se hace ahora porque no depende de nada y arranca a Dev B sin esperar al contrato.
-**Prerequisitos.** ninguno · **Paralelo.** C01, C02
-**Alcance.** Entidad `ProductSearchEvent` (consulta, filtros, resultados, seleccionado, rank, duración, POS, usuario), migración EF Core, `POST /api/ai/search-events`, índices por fecha y POS.
-**Tests.** `Create_WithValidPayload_PersistsEvent`; `Create_WhenPosNotAssignedToUser_Returns403`; `Create_WithOversizedResultsJson_Truncates`; test de migración con Testcontainers.
+**Objetivo.** Servicio Python `jbg-ai` vacío pero ejecutable: `uv`, FastAPI, configuración por entorno, `GET /health`, contenedor y entrada en `docker-compose`.
+**Prereq.** — · **Zona.** `ai-service/`, `docker-compose.yml`
+**Alcance.** `pyproject.toml`, `src/jbg_ai/api/main.py`, `config/settings.py` (pydantic-settings), logging estructurado con `trace_id`, `Dockerfile`, servicio en red interna sin publicar puerto.
+**Tests.** `test_health_returns_ok_with_version`; `test_settings_fail_fast_when_required_env_missing`; smoke con `TestClient`.
+**Tarea obligatoria fuera de código.** Verificar en la consola de AWS que **RDS admite `CREATE EXTENSION vector`**. Si no, el plan B (contenedor Postgres+pgvector en la misma EC2) hay que saberlo hoy, no el 25 de agosto.
 
 ---
 
-#### C04 · `add-dotnet-ai-gateway-client` — Dev B
+#### C02 · `add-ai-service-contracts-and-auth` 🔴
+
+**Objetivo.** **Congelar el contrato** de los endpoints con modelos Pydantic, stubs deterministas y autenticación de servicio. Es lo que permite que las dos personas no se esperen durante un mes.
+**Prereq.** C01 · **Zona.** `ai-service/src/jbg_ai/api/`
+**Alcance.** Routers `retrieval`, `assist`, `inventory`, `index`, `enrich`; modelos request/response completos (§6.8 del diseño), incluidos **`materials[]`**, `family_id`/`variant_label` y **sobre-recuperación** (`top_k` vs `candidates_returned`); stubs tras flag `STUB_MODE`; dependencia FastAPI que valida el JWT interno HS256 y extrae `user_id`/`role`/`pos_id`/`trace_id`; OpenAPI exportado a `ai-service/openapi.json` versionado.
+**Tests.** `test_retrieval_stub_matches_response_schema`; `test_openapi_snapshot_is_stable` (rompe el build si alguien cambia el contrato sin avisar); `test_request_without_token_is_rejected`; `test_pos_id_from_token_overrides_body_value` (**el body no manda**); `test_health_is_public`.
+
+---
+
+#### C03 · `add-dotnet-ai-gateway-client` 🔴
 
 **Objetivo.** Cliente tipado hacia `jbg-ai` con resiliencia desde el primer día, contra los stubs de C02.
-**Prerequisitos.** C02 · **Paralelo.** C05, C06
-**Alcance.** `IAiGatewayClient` + `AiGatewayClient` (typed `HttpClient`), políticas Polly (0,8 s retrieval / 5 s assist, reintento único, circuit breaker), emisión y firma del JWT interno, propagación de `trace_id`, configuración en `appsettings` + SSM.
-**Tests.** `SearchAsync_WhenServiceReturns200_MapsResponse`; `SearchAsync_WhenTimeout_ThrowsAiUnavailable`; `SearchAsync_WhenCircuitOpen_FailsFastWithoutCall`; `BuildToken_IncludesPosAndRoleClaims`. Con `HttpMessageHandler` falso, sin red.
+**Prereq.** C02 · **Zona.** `JoiabagurPV.Application/`
+**Alcance.** `IAiGatewayClient` + `AiGatewayClient` (typed `HttpClient`), Polly (0,8 s retrieval / 5 s assist, reintento único, circuit breaker), emisión y firma del JWT interno, propagación de `trace_id`, configuración en `appsettings` + SSM.
+**Tests.** `SearchAsync_WhenServiceReturns200_MapsResponse`; `SearchAsync_WhenTimeout_ThrowsAiUnavailable`; `SearchAsync_WhenCircuitOpen_FailsFastWithoutCall`; `BuildToken_IncludesPosAndRoleClaims`. Con `HttpMessageHandler` falso.
 
 ---
 
-### Ola 1 — Datos, esquema y perfil (4-10 ago)
+#### C04 · `add-product-search-event-tracking` 🟢 🗄️
+
+**Objetivo.** Telemetría consulta→selección desde el primer día. Sin dependencias: es el change que se coge si la ruta crítica está ocupada.
+**Prereq.** — · **Zona.** `Domain/`, `API/Controllers/`
+**Alcance.** Entidad `ProductSearchEvent` (consulta, filtros, resultados, seleccionado, rank, duración, POS, usuario), migración, `POST /api/ai/search-events`, índices por fecha y POS.
+**Tests.** `Create_WithValidPayload_PersistsEvent`; `Create_WhenPosNotAssignedToUser_Returns403`; `Create_WithOversizedResultsJson_Truncates`; test de migración.
 
 ---
 
-#### C05 · `add-pgvector-schema-foundation` — Dev A
-
-**Objetivo.** Persistencia lista: extensión `vector`, esquema `ai`, usuario dedicado, Alembic y tablas vacías con sus índices.
-**Prerequisitos.** C01 · **Paralelo.** C04, C06
-**Alcance.** `CREATE EXTENSION vector`; esquema `ai`; migración inicial con `ai.product_document`, `ai.knowledge_document`, `ai.knowledge_chunk`, `ai.pos_projection`; índices **HNSW `vector_cosine_ops`**, GIN sobre `tsv` y `metadata`, B-tree sobre `variant_group_key`/`piece_type`/`price_band`; pool acotado a 5 conexiones (restricción del proyecto).
-**Tests.** `test_migration_creates_vector_extension_and_ai_schema`; `test_hnsw_index_uses_cosine_operator_class` (consulta a `pg_indexes`; protege del antipatrón que desactiva el índice sin error); `test_upgrade_downgrade_is_reversible`.
+### Ola 1 — Datos y modelo (6-12 ago)
 
 ---
 
-#### C06 · `add-synthetic-catalog-generator` — Dev B
+#### C05 · `add-pgvector-schema-foundation` 🔴
 
-**Objetivo.** Catálogo sintético (D1) determinista y con el ruido dirigido que hace realista el problema. Lo hace Dev B porque es Python autocontenido, no bloquea a nadie y equilibra la carga de la semana.
-**Prerequisitos.** C01 · **Paralelo.** C04, C05
-**Alcance.** Generador con semilla → 900-1.200 productos, ~350 familias con variantes S/M/L, 8-12 colecciones, precios 15-450 €; ruido: ~30 % descripciones pobres, 3-4 convenciones de SKU, familias confundibles. Salida a JSONL versionado + carga vía API .NET.
-**Tests.** `test_generator_is_deterministic_for_same_seed`; `test_skus_are_unique`; `test_variant_families_share_group_key`; `test_price_distribution_within_expected_bands`; `test_poor_description_ratio_is_within_tolerance`.
-
----
-
-#### C07 · `add-catalog-enrichment-pipeline` — Dev A
-
-**Objetivo.** Convertir un producto crudo en un perfil IA propuesto: extracción estructurada, vocabularios cerrados, confianza por campo y puertas de calidad de lote.
-**Prerequisitos.** C06 · **Paralelo.** C08, C09
-**Alcance.** Normalización determinista previa (tallas por regex, unidades); prompt **v1 versionado** en `ai-service/prompts/enrichment/v1.md` + JSON schema estricto a temperatura 0; vocabularios cerrados; confianza **por campo**; validadores de lote (unicidad SKU, cobertura de tags ≥ 90 %, obligatorios); enrutado auto-aprobado / revisión / rechazado; `POST /v1/enrich/products` real.
-**Tests.** Con LLM falso y fixtures: `test_extraction_rejects_value_outside_closed_vocabulary`; `test_size_regex_extracts_label_before_llm_call`; `test_low_confidence_field_flags_review`; `test_malformed_llm_json_raises_domain_error_not_crash`; `test_batch_fails_when_tag_coverage_below_threshold`.
-**Nota de tamaño.** Es el change más denso de la ola. Si se desborda, se parte: pipeline + prompt en una sesión, puertas de calidad en otra.
+**Objetivo.** Persistencia lista: extensión `vector`, esquema `ai`, usuario dedicado, Alembic y tablas vacías con índices.
+**Prereq.** C01 · **Zona.** `ai-service/migrations/`
+**Alcance.** `CREATE EXTENSION vector`; esquema `ai`; migración inicial con `product_document` (**`materials text[]`**, `family_id`, `variant_label`, **`data_origin`**), `knowledge_document`/`knowledge_chunk`, `pos_projection`, `co_occurrence`, `sync_failure`; índices **HNSW `vector_cosine_ops`**, **GIN sobre `tsv` y sobre `materials`**, B-tree sobre `family_id`/`piece_type`/`price_band`/`data_origin`; pool acotado a 5 conexiones.
+**Tests.** `test_migration_creates_vector_extension_and_ai_schema`; `test_hnsw_index_uses_cosine_operator_class` (consulta a `pg_indexes`; protege del antipatrón que desactiva el índice sin dar error); `test_gin_index_exists_on_materials`; `test_upgrade_downgrade_is_reversible`.
 
 ---
 
-#### C08 · `add-product-ai-profile-entity` — Dev B
+#### C06 · `add-hybrid-catalog-corpus` 🔴
 
-**Objetivo.** Persistir en .NET el perfil IA revisable, con enriquecimiento por lote y revisión por excepción.
-**Prerequisitos.** C04 · **Paralelo.** C07, C10
-**Alcance.** Entidad `ProductAiProfile` (campos de §4.6 de las specs, recortados), migración EF Core, repositorio, `POST /api/ai/catalog/enrich-batch` (admin), auto-aprobación por umbral y marcado de pendientes de revisión.
-**Tests.** `EnrichBatch_AsOperator_Returns403`; `EnrichBatch_WhenGatewayUnavailable_ReturnsServiceUnavailable`; `AutoApprove_WhenConfidenceAboveThreshold_SkipsManualReview`; `Review_WhenApproved_SetsReviewerAndTimestamp`; test de migración.
-
----
-
-#### C09 · `add-dotnet-index-feed-endpoints` — Dev B
-
-**Objetivo.** Dar a Python su única vía de lectura de datos de negocio: feeds HTTP paginados con cursor.
-**Prerequisitos.** C08 · **Paralelo.** C10
-**Alcance.** `GET /api/ai/index-feed/catalog?since=` (productos + perfil aprobado) y `GET /api/ai/index-feed/pos-availability?since=` (asignación, `qty_bucket`, ventas 30/90 d); paginación obligatoria (máx. 50); solo autenticación de servicio.
-**Tests.** `CatalogFeed_WithSinceCursor_ReturnsOnlyChangedRows`; `CatalogFeed_ExcludesUnapprovedProfiles`; `PosAvailabilityFeed_ReturnsBucketNotExactQuantity`; `Feed_WithUserJwt_Returns403`.
+**Objetivo.** Ampliar el catálogo **real** hasta el volumen necesario con productos sintéticos **calibrados sobre él**, con el ruido dirigido que hace realista el problema.
+**Prereq.** C01 · **Zona.** `ai-service/src/jbg_ai/data/generators/`
+**Alcance.** Ingesta del export real anonimizado si está disponible, marcado **`data_origin: real`**; extracción de sus distribuciones (precio, longitud de descripción, convenciones de SKU, mezcla de materiales, tamaño de familia); generación sintética **reproduciendo esas distribuciones** hasta 900-1.200 productos, ~350 familias con variantes S/M/L, marcados `data_origin: synthetic`; **~35 % multi-material**; ~30 % descripciones pobres; **15 % de huérfanos de familia**; salida JSONL versionada.
+**Tests.** `test_generator_is_deterministic_for_same_seed`; `test_skus_are_unique_across_real_and_synthetic`; `test_synthetic_price_distribution_matches_real_seed`; `test_multi_material_ratio_within_tolerance`; `test_orphan_family_ratio_within_tolerance`; `test_every_product_has_data_origin`.
+**Si no hay export a tiempo.** El generador funciona con distribuciones por defecto y todo queda `data_origin: synthetic`; cuando llegue el export se re-ejecuta la calibración. No bloquea.
 
 ---
 
-#### C10 · `add-source-text-and-embedding-client` — Dev A
+#### C07 · `add-product-family-entity` 🟢 🗄️
 
-**Objetivo.** `SourceText` canónico, `SourceHash` e idempotencia de embeddings. Es lo que hace barato y determinista todo el reindexado posterior.
-**Prerequisitos.** C05, C07 · **Paralelo.** C08, C09
-**Alcance.** Constructor de `doc_text` con orden de campos fijo; `source_hash` SHA-256; cliente de embeddings con reintento, batching y caché por hash; columnas `embedding_model`/`embedding_version`.
-**Tests.** `test_source_text_is_stable_for_same_profile`; `test_hash_changes_when_any_indexed_field_changes`; `test_embedding_not_recomputed_when_hash_unchanged`; `test_batch_client_respects_max_batch_size`.
-
----
-
-### Ola 2 — Slice vertical desplegado (11-17 ago)
-
-> **Hito de la ola:** el 17 de agosto un operador busca en lenguaje natural desde `pv.joiabagur.com` y ve resultados con stock real. Con dos personas, integrar y desplegar pronto es la única defensa contra una sorpresa de infraestructura en la última semana.
+**Objetivo.** Familias como **entidad de negocio explícita y editable**, no como clave textual generada. Es la decisión 2 de la revisión.
+**Prereq.** — · **Zona.** `Domain/`, `Application/`, `API/Controllers/`
+**Alcance.** `ProductFamily` (Name, Description) y `ProductFamilyMember` (ProductId, VariantLabel, SortOrder), migración, repositorio, `POST /api/product-families`, `PUT /api/product-families/{id}/members`, `GET /api/products/{id}/family`. Un producto pertenece como máximo a una familia.
+**Tests.** `CreateFamily_WithMembers_PersistsOrder`; `AddMember_WhenProductAlreadyInAnotherFamily_ReturnsConflict`; `GetFamily_ReturnsSiblingsOrderedBySortOrder`; `RemoveMember_KeepsFamilyWhenOthersRemain`; test de migración.
 
 ---
 
-#### C11 · `add-product-document-indexer` — Dev A
+#### C08 · `add-product-ai-profile-entity` 🟢 🗄️
 
-**Objetivo.** Poblar `ai.product_document` y dejar el índice consultable y observable.
-**Prerequisitos.** C10 · **Paralelo.** C13
-**Alcance.** Upsert idempotente por `product_id` consumiendo el feed de C09; `tsvector` con configuración `'spanish'`; `POST /v1/index/sync` (cursor `since`) y `GET /v1/index/status` (documentos, vectores, drift, última sincronización).
-**Tests.** `test_upsert_is_idempotent_for_same_source_hash`; `test_tsvector_uses_spanish_configuration`; `test_status_reports_drift_when_documents_missing_embedding`; `test_deactivated_product_is_excluded_from_index`.
-
----
-
-#### C12 · `add-vector-retrieval-endpoint` — Dev A
-
-**Objetivo.** Primera recuperación real: vectorial pura con top-k, umbral y abstención explícita.
-**Prerequisitos.** C11 · **Paralelo.** C13
-**Alcance.** `POST /v1/retrieval/products` real (retira el stub): embedding de consulta, `<=>` sobre HNSW, `top_k` por defecto 10, umbral configurable, `low_confidence: true` con lista vacía cuando nada lo supera; log estructurado por etapa con `trace_id`.
-**Tests.** `test_returns_empty_with_low_confidence_when_all_above_threshold`; `test_respects_top_k_limit`; `test_results_ordered_by_ascending_distance`; `test_trace_id_from_header_appears_in_stage_logs`.
+**Objetivo.** Perfil IA revisable en .NET, con `materials[]` y **revisión híbrida por campo** (decisión 5).
+**Prereq.** C03 · **Zona.** `Domain/`, `Application/`, `API/Controllers/`
+**Alcance.** `ProductAiProfile` con `MaterialsJson`, `PieceType`, `StoneType`, `SizeLabel`, tags, `AiConfidence`, **`FieldConfidenceJson`**, **`FieldSourceJson`** (`rule` \| `inferred`), `ReviewStatus`, `SourceHash`; migración; `POST /api/ai/catalog/enrich-batch`; enrutado híbrido: campos sensibles inferidos → `Pending`, tags con confianza alta → `Approved`, resto → `Pending`. Marca `review_state = auto_bulk` para la vía masiva.
+**Tests.** `EnrichBatch_AsOperator_Returns403`; `Routing_WhenSensitiveFieldInferred_MarksPendingReview`; `Routing_WhenSensitiveFieldFromRule_DoesNotRequireReview`; `Routing_WhenTagConfidenceAboveThreshold_AutoApproves`; `Profile_StoresMultipleMaterials`; test de migración.
 
 ---
 
-#### C13 · `add-synthetic-world-simulator` — Dev B
+#### C09 · `add-catalog-enrichment-pipeline` 🔴
 
-**Objetivo.** Red de POS, inventario e histórico de ventas (D5, D6, D7), coherentes por construcción con el catálogo.
-**Prerequisitos.** C06 · **Paralelo.** C11, C12
-**Alcance.** 10-14 POS (1 central + hoteles) con perfil de clientela y estacionalidad; matriz de propensión producto×POS; 5.000-9.000 filas de inventario respetando `Inventory.IsActive`; simulación Poisson con estacionalidad → 15.000-25.000 ventas sobre 14-18 meses; movimientos de inventario derivados.
-**Tests.** `test_every_pos_has_assigned_products`; `test_inventory_quantity_never_negative`; `test_no_sale_without_stock_at_that_pos`; `test_seasonality_peaks_match_pos_profile`; `test_simulation_is_deterministic_for_same_seed`.
-**Nota de tamaño.** Sesión larga (3 h). Si se desborda: POS+inventario en una, simulación de ventas en otra.
-
----
-
-#### C14 · `add-dotnet-ai-search-endpoint` — Dev B
-
-**Objetivo.** El endpoint que consume el frontend, con **hidratación** de precio/stock y degradación al buscador léxico existente.
-**Prerequisitos.** C04, C12 · **Paralelo.** C16
-**Alcance.** `POST /api/ai/search`: llama al gateway, hidrata desde PostgreSQL (precio, stock exacto, foto, permisos), **descarta** candidatos que ya no cumplen, feature flag por POS, `ai_available: false` + resultados léxicos cuando el circuito está abierto.
-**Tests.** `Search_HydratesPriceAndStockFromDatabase_NotFromAiResponse`; `Search_WhenAiUnavailable_FallsBackToLexicalSearch`; `Search_DropsCandidateUnassignedToPos`; `Search_WhenFeatureFlagOff_UsesLegacySearch`; integración con Testcontainers.
+**Objetivo.** De producto crudo a perfil propuesto: extracción estructurada con **`materials[]`**, vocabulario cerrado, confianza por campo y puertas de calidad de lote.
+**Prereq.** C06 · **Zona.** `ai-service/src/jbg_ai/enrichment/`
+**Alcance.** Normalización determinista previa (talla por regex → `source: rule`); prompt **v1 versionado** en `ai-service/prompts/enrichment/v1.md`; JSON schema estricto a temperatura 0; **vocabulario cerrado de materiales** con normalización de sinónimos ("plata de ley", "925" → `plata`); `materials` como lista, `[]` si no hay evidencia; confianza **por campo**; puertas de lote (unicidad SKU, cobertura de tags ≥ 90 %, vocabulario respetado); `POST /v1/enrich/products` real.
+**Tests.** Con LLM falso: `test_extracts_multiple_materials_from_description`; `test_material_synonym_normalized_to_canonical_term`; `test_rejects_value_outside_closed_vocabulary`; `test_empty_materials_flags_review_not_default_value`; `test_size_regex_marks_field_source_as_rule`; `test_batch_fails_when_tag_coverage_below_threshold`.
+**Si se desborda:** partir en pipeline+prompt / puertas de calidad.
 
 ---
 
-#### C15 · `add-frontend-assisted-search-panel` — Dev B
+#### C10 · `add-synthetic-world-simulator` 🟢
 
-**Objetivo.** El punto de entrada del operador: panel "Buscar con ayuda" integrado en el flujo de venta.
-**Prerequisitos.** C14 · **Paralelo.** C16, C17
-**Alcance.** `ai-search.service.ts`; panel con input natural, filtros rápidos, POS preseleccionado; resultados con foto, SKU, nombre, talla, precio, stock y motivo; estados de carga, vacío y degradado (`ai_available: false`); envío de `ProductSearchEvent`; botón "Seleccionar para venta" que prellena el flujo existente (`productId` por state, patrón ya usado en `scan.tsx`).
-**Tests (Vitest + MSW).** `should render results with reason when search succeeds`; `should show legacy results banner when ai is unavailable`; `should emit search event when a result is selected`; `should navigate to sale page with productId when selecting`.
+**Objetivo.** POS, inventario, histórico de ventas y **co-ocurrencia**, coherentes por construcción con el catálogo.
+**Prereq.** C06 · **Zona.** `ai-service/src/jbg_ai/data/generators/`
+**Alcance.** 10-14 POS con perfil de clientela, estacionalidad y **marca de origen de suministro**; matriz de propensión producto×POS; 5.000-9.000 filas de inventario respetando `Inventory.IsActive`; simulación Poisson → 15.000-25.000 ventas sobre 14-18 meses; movimientos derivados; **co-ocurrencia por operación de venta** (`BulkOperationId` o mismo POS y día) para complementarios.
+**Tests.** `test_no_sale_without_stock_at_that_pos`; `test_seasonality_peaks_match_pos_profile`; `test_inventory_movements_reconcile_with_final_stock`; `test_co_occurrence_only_counts_same_operation`; `test_simulation_is_deterministic_for_same_seed`.
+**Si se desborda:** partir en POS+inventario / ventas+co-ocurrencia.
 
 ---
 
-#### C16 · `add-ai-service-deployment` — Dev B
+#### C11 · `add-source-text-and-embedding-client` 🔴
 
-**Objetivo.** Servicio en producción **el 17 de agosto**, accesible solo desde el backend, con salud visible.
-**Prerequisitos.** C14 · **Paralelo.** C17, C18
+**Objetivo.** `SourceText` canónico, `SourceHash` e idempotencia. Es lo que hace barato y determinista todo el reindexado.
+**Prereq.** C05, C09 · **Zona.** `ai-service/src/jbg_ai/indexing/`
+**Alcance.** Constructor de `doc_text` con orden fijo, **incluyendo materiales (ordenados alfabéticamente para estabilidad del hash), familia y variante**; `source_hash` SHA-256; cliente de embeddings con reintento, batching y caché por hash; `embedding_model`/`embedding_version`.
+**Tests.** `test_source_text_is_stable_for_same_profile`; `test_material_order_does_not_change_hash`; `test_hash_changes_when_family_changes`; `test_embedding_not_recomputed_when_hash_unchanged`.
+
+---
+
+#### C12 · `add-dotnet-index-feed-endpoints` 🔴
+
+**Objetivo.** La única vía de lectura de Python: feeds HTTP paginados con cursor, **con tombstones** (decisión 10).
+**Prereq.** C07, C08 · **Zona.** `API/Controllers/`, `Application/`
+**Alcance.** `GET /api/ai/index-feed/catalog?since=` (producto + perfil aprobado + familia) y `GET /api/ai/index-feed/pos-availability?since=` (asignación, `qty_bucket`, ventas 30/90 d); **tombstones** `{product_id, deleted_at|deactivated_at}`; hash agregado para detección de divergencia; paginación obligatoria (máx. 50); solo autenticación de servicio.
+**Tests.** `CatalogFeed_WithSinceCursor_ReturnsOnlyChangedRows`; `CatalogFeed_EmitsTombstoneWhenProductDeactivated`; `CatalogFeed_ExcludesUnapprovedProfiles`; `PosAvailabilityFeed_ReturnsBucketNotExactQuantity`; `Feed_WithUserJwt_Returns403`; `Feed_ReturnsAggregateHashForDriftDetection`.
+
+---
+
+### Ola 2 — Slice vertical desplegado (13-19 ago)
+
+> **Hito:** el 19 de agosto un operador busca en lenguaje natural desde `pv.joiabagur.com` y ve resultados con stock real. Con dos personas, integrar y desplegar pronto es la única defensa contra una sorpresa de infraestructura en la última semana.
+
+---
+
+#### C13 · `add-product-document-indexer` 🔴
+
+**Objetivo.** Poblar `ai.product_document` desde el feed y dejar el índice consultable y observable.
+**Prereq.** C11, C12 · **Zona.** `ai-service/src/jbg_ai/indexing/`
+**Alcance.** Upsert idempotente por `product_id`; **procesamiento de tombstones**; `tsvector` con configuración `'spanish'`; `POST /v1/index/sync` y `GET /v1/index/status` con `drift_count` y `last_full_sync_at`; fallos a `ai.sync_failure` con backoff.
+**Tests.** `test_upsert_is_idempotent_for_same_source_hash`; `test_tombstone_removes_document_from_index`; `test_tsvector_uses_spanish_configuration`; `test_status_reports_drift_when_counts_diverge`; `test_failed_batch_recorded_and_does_not_block_others`.
+
+---
+
+#### C14 · `add-vector-retrieval-endpoint` 🔴
+
+**Objetivo.** Primera recuperación real: vectorial con top-k, umbral, abstención y **sobre-recuperación**.
+**Prereq.** C13 · **Zona.** `ai-service/src/jbg_ai/retrieval/`
+**Alcance.** `POST /v1/retrieval/products` real: embedding de consulta, `<=>` sobre HNSW, umbral configurable, `low_confidence: true` con lista vacía; **devuelve `top_k × 3` candidatos (tope 60)** para que .NET tenga margen al hidratar; log estructurado por etapa con `trace_id`.
+**Tests.** `test_returns_empty_with_low_confidence_when_all_above_threshold`; `test_returns_overfetched_candidate_count`; `test_results_ordered_by_ascending_distance`; `test_trace_id_appears_in_stage_logs`.
+
+---
+
+#### C15 · `add-dotnet-ai-search-endpoint` 🔴
+
+**Objetivo.** El endpoint del frontend, con **hidratación autoritativa** y degradación. Implementa la decisión 11: la verdad la pone .NET.
+**Prereq.** C03, C14 · **Zona.** `API/Controllers/`, `Application/`
+**Alcance.** `POST /api/ai/search`: llama al gateway pidiendo sobre-recuperación, **hidrata desde PostgreSQL** (producto activo, `Inventory.IsActive` real, stock, precio, foto, permisos), descarta lo inválido, **trunca a `top_k`** y repide con `top_k` mayor si quedan pocos; feature flag por POS; `ai_available: false` + resultados léxicos si el circuito está abierto.
+**Tests.** `Search_HydratesPriceAndStockFromDatabase_NotFromAiResponse`; `Search_WhenCandidateNoLongerAssigned_DropsItAfterHydration`; `Search_WhenTooFewAfterHydration_RefetchesWithLargerTopK`; `Search_WhenAiUnavailable_FallsBackToLexicalSearch`; `Search_WhenFeatureFlagOff_UsesLegacySearch`; integración con Testcontainers.
+
+---
+
+#### C16 · `add-frontend-assisted-search-panel` 🔴
+
+**Objetivo.** Punto de entrada del operador: panel "Buscar con ayuda" en el flujo de venta.
+**Prereq.** C15 · **Zona.** `frontend/src/`
+**Alcance.** `ai-search.service.ts`; panel con input natural, **filtros rápidos incluyendo materiales (multi-selección)**, POS preseleccionado; resultados con foto, SKU, nombre, talla, precio, stock y motivo; estados de carga, vacío y degradado; envío de `ProductSearchEvent`; "Seleccionar para venta" que prellena el flujo existente (`productId` por state, patrón de `scan.tsx`).
+**Tests.** `should render results with reason when search succeeds`; `should show legacy results banner when ai is unavailable`; `should allow selecting multiple materials in quick filters`; `should emit search event when a result is selected`.
+
+---
+
+#### C17 · `add-ai-service-deployment` 🔴
+
+**Objetivo.** Servicio en producción **el 19 de agosto**, alcanzable solo desde el backend.
+**Prereq.** C15 · **Zona.** infra
 **Alcance.** Dockerfile de producción, workflow `deploy-ai-service.yml` (OIDC + ECR, patrón existente), secretos en SSM, `CREATE EXTENSION vector` en RDS, red interna sin exposición en nginx, `/health` enriquecido y tarjeta de estado en el dashboard de admin.
-**Tests.** Smoke post-deploy automatizado (`/health` con BD y proveedor OK); `Dashboard_ShowsAiServiceHealth`; validación del workflow en rama de prueba.
+**Tests.** Smoke post-deploy (`/health` con BD y proveedor OK); `Dashboard_ShowsAiServiceHealth`; validación del workflow en rama de prueba.
 
 ---
 
-### Ola 3 — Calidad de recuperación y medición (18-24 ago)
+#### C18 · `add-family-suggestion-and-review` 🟢
+
+**Objetivo.** Flujo mixto de familias: la IA propone, el admin aprueba. Resuelve la decisión abierta 4 de las specs v2 y hace viable la decisión 2 de la revisión.
+**Prereq.** C07, C13 · **Zona.** Python + .NET + frontend
+**Alcance.** Agrupación de candidatos por similitud de embedding (umbral alto) + mismo `piece_type` + raíz común de nombre; detección de `variant_label`; `POST /v1/families/suggest`; pantalla de revisión por lotes que crea `ProductFamily`/`ProductFamilyMember` reales al aprobar; **alerta de huérfanos** (producto muy similar a una familia sin pertenecer a ella).
+**Tests.** `test_suggests_family_for_same_piece_type_and_high_similarity`; `test_does_not_group_across_piece_types`; `test_detects_size_label_from_name`; `test_orphan_detection_lists_unassigned_similar_products`; frontend: `should create family when suggestion is approved`.
 
 ---
 
-#### C17 · `add-hybrid-search-rrf` — Dev A
+#### C19 · `add-demand-signal-service` 🟢 🗄️
 
-**Objetivo.** Añadir la rama léxica y fusionar con RRF, para que "ERIZO-M" deje de diluirse en el vector. Incluye la extracción de filtros por reglas.
-**Prerequisitos.** C12 · **Paralelo.** C15, C16
-**Alcance.** Búsqueda `ts_rank` en español sobre `tsv`, *boost* de coincidencia exacta de SKU y nombre, fusión Reciprocal Rank Fusion con `k` configurable, `match_reasons` por resultado; extracción **por reglas** de filtros estructurales de la consulta (`menos de 80`, `talla M`, tipo de pieza) con *fallback* a consulta cruda.
-**Tests.** `test_exact_sku_query_ranks_target_first`; `test_rrf_fuses_ranked_lists_preserving_top_hit`; `test_paraphrase_query_recovered_by_vector_branch_only`; `test_extracts_price_ceiling_from_natural_phrase`; `test_never_invents_filter_absent_from_query`.
-
----
-
-#### C18 · `add-pos-projection-and-hard-filters` — Dev A
-
-**Objetivo.** Aplicar los filtros duros **antes** del ranking (nunca como post-filtro) y mantener la proyección de disponibilidad por POS.
-**Prerequisitos.** C12, C09, C13 · **Paralelo.** C16, C19
-**Alcance.** Sincronización de `ai.pos_projection` desde el feed de C09 (`qty_bucket`, `sales_30d/90d`, `last_sale_at`); filtro pre-ranking por producto activo + asignado al POS + rol; marca de frescura en la respuesta.
-**Tests.** `test_products_not_assigned_to_pos_are_excluded_before_ranking`; `test_inactive_product_never_returned`; `test_projection_stores_bucket_not_exact_quantity`; `test_stale_projection_is_flagged_in_response`.
+**Objetivo.** Señales de demanda **en SQL, en .NET**, más el origen de suministro. Base de todo el inventario y señal de ranking para la búsqueda.
+**Prereq.** C10 · **Zona.** `Domain/`, `Application/`, `Infrastructure/`
+**Alcance.** **Migración: `IsSupplySource bool` en `PointOfSale`** (decidido: existe tienda central) con endpoint de administración para marcarlo. Señales por producto y POS: `sales_7d`, `sales_30d`, `sales_60d`, `current_stock`, `stock_in_other_pos`, `days_since_last_sale`, `avg_daily_sales_30d`, `estimated_days_to_stockout`, `is_top_seller_in_pos`. `GET /api/ai/inventory/demand-signals?pointOfSaleId=`. Sin LLM.
+**Tests.** `Signals_ComputeSalesWindowsCorrectly`; `Signals_EstimatedDaysToStockout_HandlesZeroVelocity`; `Signals_StockInOtherPos_ExcludesTargetPos`; `Signals_TopSeller_UsesPosScopedRanking`; `PointOfSale_IsSupplySource_DefaultsToFalse`; test de migración.
+**Nota de orden.** C10 genera los POS ya con la marca de origen de suministro; la importación de esos datos a la base debe ejecutarse **después** de esta migración, o repetirse tras ella.
 
 ---
 
-#### C19 · `add-knowledge-corpus-and-indexer` — Dev B
-
-**Objetivo.** Segundo índice: corpus de conocimiento comercial troceado — lo que permite generar con citas verificables — más las fichas estáticas por POS.
-**Prerequisitos.** C10, C13 · **Paralelo.** C17, C18
-**Alcance.** 40-60 documentos (cuidados, materiales, equivalencias de talla, guiones de venta, políticas, FAQ) generados y curados; **10-14 fichas por POS** derivadas de métricas calculadas sobre D7 (tipos y materiales top, banda de precio frecuente, ticket medio) — sustituyen al argumentario como servicio; chunking por secciones; indexación en `ai.knowledge_chunk` reutilizando el cliente de C10.
-**Tests.** `test_chunker_preserves_section_titles_in_metadata`; `test_chunk_size_within_bounds`; `test_every_chunk_has_traceable_document_id`; `test_pos_sheet_only_states_metrics_present_in_sales_data`.
-**Conflicto.** Toca `PY-INDEX` como C11/C18: usa `indexing/knowledge.py`, **no** modifica `indexing/products.py` ni `indexing/embeddings.py` (congelado en C10).
+### Ola 3 — Calidad, medición y base de inventario (20-26 ago)
 
 ---
 
-#### C20 · `add-eval-harness-golden-set-and-baselines` — **Dev A + Dev B**
+#### C20 · `add-synonym-dictionary` 🟢 ⏳
 
-**Objetivo.** La pieza que convierte "parece que va mejor" en números: golden set etiquetado por los dos, runner, métricas y las dos líneas base.
-**Prerequisitos.** C12, C17 · **Paralelo.** — (bloquea a C21 y C28; es el change más crítico del proyecto)
-**Alcance.** Tablas `ai.eval_run/case/result`; golden set de **60-70 consultas** en 7 categorías con relevancia graduada 0-2, construido por *pooling* y **etiquetado por separado por ambos con conciliación de discrepancias**; CLI `uv run evals run --config vX`; métricas Recall@5, nDCG@5, MRR, P@3, tasa de abstención, p50/p95, coste; configs `v0-lexico` (replica el buscador .NET actual) y `v0-cag` (catálogo del POS en contexto con *prompt caching*); informe markdown + JSON versionado en `ai-service/evals/results/`.
-**Tests.** `test_ndcg_matches_hand_computed_value_on_fixture`; `test_recall_at_k_counts_graded_relevance_correctly`; `test_run_is_reproducible_for_same_config_and_seed`; `test_lexical_baseline_matches_dotnet_search_semantics`; `test_cag_baseline_respects_context_budget`; `test_cost_per_query_is_recorded_for_each_config`.
-**Nota de planificación.** Se ejecuta en dos sesiones deliberadamente: una para el runner y las configs (Dev A), otra conjunta para el etiquetado (2 h a cuatro manos). Tope duro de 2 h por persona en etiquetado: antes se recorta a 45 consultas que renunciar al doble etiquetado.
+**Objetivo.** Sustituir `SearchAliases` sin persistir texto por producto (decisión 4, contrapropuesta **pendiente de acuerdo**). Se implementa **tras flag** precisamente para que la decisión se tome con la medición de C24 y no con argumentos.
+**Prereq.** C14 · **Zona.** `ai-service/src/jbg_ai/retrieval/`
+**Alcance.** Fichero YAML curado a mano (~40-60 entradas: sortija→anillo, gargantilla→collar, aro→pendiente…), versionado en el repo; expansión **en consulta, nunca en indexación**; flag para activarlo o desactivarlo y poder medir su efecto.
+**Tests.** `test_query_with_synonym_matches_canonical_term`; `test_expansion_does_not_modify_indexed_documents`; `test_unknown_term_passes_through_unchanged`; `test_disabled_flag_returns_original_query`.
 
 ---
 
-#### C21 · `add-business-signals-ranking` — Dev A
+#### C21 · `add-hybrid-search-rrf` 🔴
 
-**Objetivo.** Incorporar disponibilidad y rotación como reordenación suave, con pesos **calibrados contra el golden set**, no elegidos a ojo.
-**Prerequisitos.** C17, C18, C20 · **Paralelo.** C22
-**Alcance.** Señales `qty_bucket` y `sales_30d`; penalizaciones por stock cero y variante ambigua; barrido de pesos sobre el golden set y fijación del ganador; re-fijación del umbral de similitud con la distribución empírica observada; producción de la **tabla de ablations v0→v3** para el README.
+**Objetivo.** Rama léxica + fusión RRF + filtros estructurales por reglas, incluido el **filtro por solape de materiales**.
+**Prereq.** C14, C20 · **Zona.** `ai-service/src/jbg_ai/retrieval/`
+**Alcance.** `ts_rank` en español sobre `tsv` con expansión de sinónimos; *boost* de SKU y nombre exacto; fusión RRF con `k` configurable; `match_reasons` por resultado; extracción **por reglas** de filtros (`menos de 80`, `talla M`, materiales del vocabulario); **`materials && ARRAY[...]`** por defecto y **`@>`** cuando la consulta nombra varios.
+**Tests.** `test_exact_sku_query_ranks_target_first`; `test_rrf_fuses_ranked_lists_preserving_top_hit`; `test_material_filter_uses_overlap_by_default`; `test_multi_material_query_uses_contains_all`; `test_extracts_price_ceiling_from_natural_phrase`; `test_never_invents_filter_absent_from_query`.
+
+---
+
+#### C22 · `add-pos-projection-soft-prefilter` 🔴
+
+**Objetivo.** La proyección pondera pero **nunca excluye**. Es la decisión 11 de la revisión y la corrección técnica más importante de esta versión.
+**Prereq.** C10, C12, C14 · **Zona.** `ai-service/src/jbg_ai/retrieval/`, `indexing/`
+**Alcance.** Sincronización de `ai.pos_projection` desde el feed; el único filtro duro es el **`pos_id` del token**; `qty_bucket = 0` y `is_assigned_hint = false` **penalizan el score**, no eliminan; marca de frescura (`projection_age_seconds`) en la respuesta.
+**Tests.** `test_unassigned_product_is_penalised_not_removed`; `test_out_of_stock_product_still_present_in_candidates`; `test_pos_scope_from_token_is_hard_filter`; `test_projection_stores_bucket_not_exact_quantity`; `test_response_reports_projection_age`.
+
+---
+
+#### C23 · `add-knowledge-corpus-and-indexer` 🟢
+
+**Objetivo.** Segundo índice: conocimiento comercial **general, no por producto** — lo que permite citas verificables sin violar la decisión 4.
+**Prereq.** C11 · **Zona.** `ai-service/src/jbg_ai/data/`, `indexing/`
+**Alcance.** 30-45 documentos: **fichas por material** (cuidados, alergias, durabilidad), equivalencias de talla, guiones de venta, política de devoluciones, FAQ; chunking por secciones; indexación en `ai.knowledge_chunk` reutilizando el cliente de C11.
+**Tests.** `test_chunker_preserves_section_titles_in_metadata`; `test_every_chunk_has_traceable_document_id`; `test_material_sheet_is_not_product_scoped`; `test_knowledge_search_returns_chunk_with_citation_id`.
+**Conflicto de zona.** Usa `indexing/knowledge.py`; no toca `indexing/products.py` ni `indexing/embeddings.py` (congelado en C11).
+
+---
+
+#### C24 · `add-eval-harness-golden-set-and-baselines` 🔴 👥
+
+**Objetivo.** Convertir "parece que va mejor" en números. **Se hace entre los dos.**
+**Prereq.** C14, C21 · **Zona.** `ai-service/src/jbg_ai/evals/`
+**Alcance.** Tablas `ai.eval_run/case/result`; golden set de **60-70 consultas** en 9 categorías (incluidas **materiales multi-valor** y **sinónimos**), relevancia graduada 0-2, construido por *pooling* y **etiquetado por separado por ambos con conciliación**; **se etiqueta primero sobre productos reales** y solo se completa con sintéticos si no hay material para cubrir las categorías; CLI `uv run evals run --config vX`; métricas Recall@5, nDCG@5, MRR, P@3, abstención, p50/p95, coste, **reportadas por `data_origin` (real / sintético / global)**; configs `v0-lexico` (replica el buscador .NET actual — **es la comparación que pide la decisión 12**) y `v0-cag`; informe versionado en `ai-service/evals/results/`.
+**Tests.** `test_ndcg_matches_hand_computed_value_on_fixture`; `test_run_is_reproducible_for_same_config_and_seed`; `test_metrics_reported_per_data_origin`; `test_lexical_baseline_matches_dotnet_search_semantics`; `test_cag_baseline_respects_context_budget`; `test_cost_per_query_recorded_per_config`.
+**Planificación.** Dos sesiones: runner y configs (una persona), etiquetado a cuatro manos (2 h). **Tope de 2 h por persona en etiquetado**: antes se recorta a 45 consultas que renunciar al doble etiquetado.
+**Criterio de aceptación.** El umbral se aplica a **la porción real**. Si el global cumple y el real no, la conclusión es que el corpus sintético es demasiado fácil.
+
+---
+
+#### C25 · `add-business-signals-ranking` 🔴
+
+**Objetivo.** Disponibilidad, rotación y perfil de POS como reordenación suave, con pesos **calibrados contra el golden set**.
+**Prereq.** C21, C22, C24 · **Zona.** `ai-service/src/jbg_ai/retrieval/`
+**Alcance.** Señales `qty_bucket`, `sales_30d`; penalizaciones por stock cero y variante ambigua dentro de familia; barrido de pesos y fijación del ganador; re-fijación del umbral con la distribución empírica; producción de la **tabla de ablations v0→v3**.
 **Tests.** `test_out_of_stock_product_ranks_below_equivalent_in_stock`; `test_weights_load_from_config_not_hardcoded`; `test_ambiguous_variant_penalty_applies_only_within_family`; `test_calibration_sweep_is_reproducible`.
 
 ---
 
-#### C22 · `add-substitutes-retrieval` — Dev B
+#### C26 · `add-substitutes-retrieval` 🟢
 
-**Objetivo.** Sustitutos cuando no hay stock, reutilizando el retriever con filtro invertido y señales explicables.
-**Prerequisitos.** C18, C21 · **Paralelo.** C23
-**Alcance.** `POST /v1/retrieval/substitutes`: similitud sobre el documento del producto origen, misma familia primero, filtro de disponibilidad en el POS destino, banda de precio próxima, `similarity_signals` por candidato.
-**Tests.** `test_same_family_variant_ranks_first_when_available`; `test_excludes_out_of_stock_when_flag_enabled`; `test_price_difference_within_configured_band`; `test_source_product_never_returned_as_own_substitute`.
-**Primero en la línea de corte** (§6).
-
----
-
-### Ola 4 — Asistente, agente y evaluación (25-31 ago)
+**Objetivo.** Sustitutos por falta de stock, con señales explicables.
+**Prereq.** C22, C25 · **Zona.** `ai-service/src/jbg_ai/retrieval/`
+**Alcance.** `POST /v1/retrieval/substitutes`: **misma familia primero**, luego similitud sobre el documento; criterios de las specs v2 §6.3.2 (tipo, familia, **materiales coincidentes**, color, banda de precio, disponibilidad en POS destino); `similarity_signals` por candidato.
+**Tests.** `test_same_family_variant_ranks_first_when_available`; `test_material_overlap_increases_similarity_score`; `test_excludes_out_of_stock_when_flag_enabled`; `test_source_product_never_returned_as_own_substitute`.
 
 ---
 
-#### C23 · `add-assist-generation-with-citations` — Dev A
+#### C27 · `add-complementary-recommendations` 🟢 🗄️
 
-**Objetivo.** Capa de generación: agrupación por variantes, motivo por candidato, argumentario fundamentado con citas y **placeholders** para toda cifra.
-**Prerequisitos.** C17, C19 · **Paralelo.** C22, C24
-**Alcance.** `POST /v1/assist/sale` real; agrupación por `variant_group_key` con talla destacada; `pitch` anclado al perfil y a chunks de conocimiento con `citations[]`; `warnings[]`; **prohibición estructural de emitir números de precio/stock** (se emiten `{{price}}` / `{{stock}}`); prompt versionado en `ai-service/prompts/assist/v1.md`.
-**Tests.** `test_response_contains_no_literal_price_or_stock_number`; `test_citations_reference_retrieved_chunk_ids_only`; `test_variants_grouped_under_single_family_entry`; `test_returns_clarification_when_query_is_ambiguous`.
+**Objetivo.** Complementarios por reglas + co-ocurrencia, con curación manual. Decisión 8 de la revisión.
+**Prereq.** C10, C25 · **Zona.** Python + `Domain/`
+**Alcance.** Regla: **distinto `piece_type`**, solape de `color_tags`/`style_tags`, banda de precio compatible, disponible en el POS; señal adicional de **co-ocurrencia** desde `ai.co_occurrence`; entidad `ProductRecommendation` en .NET **solo para pares curados manualmente** (`GeneratedBy: Manual`), que tienen prioridad sobre la regla; `POST /v1/retrieval/complementary`. **Sin upsell ni downsell.**
+**Tests.** `test_complementary_never_returns_same_piece_type`; `test_co_occurrence_boosts_pair_score`; `test_manual_pair_overrides_rule_result`; `test_respects_price_band_compatibility`; .NET: test de migración.
 
 ---
 
-#### C24 · `add-guardrails-and-intent-router` — Dev A
+#### C28 · `add-profile-review-ui-and-metrics` 🟢
+
+**Objetivo.** Que la revisión híbrida (decisión 5) sea real y medible, no una promesa del documento.
+**Prereq.** C08 · **Zona.** frontend + `Application/`
+**Alcance.** Pantalla de revisión **por lotes** con tabla editable, atajos de teclado y aprobación masiva por campo; muestra confianza y `source` (`rule`/`inferred`) por campo; registra **quién revisó, cuándo y qué cambió**; endpoint de métricas que expone **tasa de corrección por campo** y **tiempo medio de revisión** para el README.
+**Tests.** `should highlight inferred sensitive fields pending review`; `should record correction when material list is edited`; `Metrics_CorrectionRate_ComputedPerField`; `Metrics_ExcludesAutoBulkProfiles`.
+
+---
+
+#### C29 · `add-inventory-recommendation-entity` 🟢 🗄️
+
+**Objetivo.** Recomendaciones de inventario como entidad con ciclo de aprobación, **generadas por reglas en .NET**. Base de la decisión 6.
+**Prereq.** C19 · **Zona.** `Domain/`, `Application/`, `API/Controllers/`
+**Alcance.** `InventoryRecommendation` (tipo `Replenish|Transfer|Substitute|Rotate|Review`, producto, POS origen/destino, cantidad, prioridad, motivo, `SignalsJson`, estado `Proposed|Approved|Rejected|Applied|Expired`, revisor, fechas), migración; **motor de reglas en .NET** para `Replenish`, `Transfer` y `Rotate` (§10.2 del diseño); endpoints `GET`, `approve`, `reject`. Sin LLM.
+**Tests.** `Rules_ReplenishWhenStockZeroAndRecentSales`; `Rules_TransferRequiresIdleSourceAndSellingTarget`; `Rules_RotateWhenIdleOverNinetyDays`; `Approve_SetsReviewerAndTimestamp`; `Reject_KeepsSignalsForAudit`; test de migración.
+**Dependencia resuelta.** El POS origen de suministro existe y `IsSupplySource` llega en C19, dos olas antes.
+
+---
+
+### Ola 4 — Agentes, inventario asistido y evaluación (27-31 ago)
+
+---
+
+#### C30 · `add-assist-generation-with-rule-warnings` 🔴
+
+**Objetivo.** Capa de generación: agrupación por **familia**, avisos **por reglas**, argumentario **no persistido** con citas. Implementa la decisión 4.
+**Prereq.** C07, C21, C23 · **Zona.** `ai-service/src/jbg_ai/assist/`
+**Alcance.** `POST /v1/assist/sale`: agrupación por `family_id` con `variant_label` destacado; `reason` construido desde datos; **`warnings[]` calculados por reglas** (existen variantes, falta talla, stock crítico, miembros sin stock) y nunca generados libremente; `pitch` generado en tiempo de consulta desde metadatos aprobados + chunks con `citations[]`, **sin persistir**; **placeholders `{{price}}`/`{{stock}}`** que el modelo no puede rellenar; prompt versionado.
+**Tests.** `test_response_contains_no_literal_price_or_stock_number`; `test_warnings_are_rule_derived_not_model_generated`; `test_variants_grouped_by_family_id`; `test_citations_reference_retrieved_chunk_ids_only`; `test_pitch_is_not_persisted_anywhere`.
+
+---
+
+#### C31 · `add-guardrails-and-intent-router` 🔴
 
 **Objetivo.** Que el sistema sepa cuándo no debe responder y no se deje instruir por la consulta.
-**Prerequisitos.** C23 · **Paralelo.** C25
-**Alcance.** Clasificador de intención (catálogo / conocimiento / ambos / fuera de dominio); rechazo cortés sin llamar al retriever; consulta tratada como dato; validación de la salida contra JSON schema con reintento único.
-**Tests.** `test_out_of_domain_query_short_circuits_before_retrieval`; `test_prompt_injection_in_query_does_not_change_system_behavior`; `test_invalid_model_output_triggers_single_retry_then_safe_error`; `test_intent_router_sends_care_question_to_knowledge_index`.
+**Prereq.** C30 · **Zona.** `ai-service/src/jbg_ai/assist/`
+**Alcance.** Clasificador de intención (catálogo / conocimiento / ambos / fuera de dominio); rechazo cortés sin llamar al retriever; consulta tratada como dato; validación de salida contra JSON schema con reintento único.
+**Tests.** `test_out_of_domain_query_short_circuits_before_retrieval`; `test_prompt_injection_does_not_change_system_behavior`; `test_invalid_model_output_triggers_single_retry_then_safe_error`; `test_care_question_routes_to_knowledge_index`.
 
 ---
 
-#### C25 · `add-dotnet-assist-and-substitutes-endpoints` — Dev B
+#### C32 · `add-sales-assistant-agent-loop` 🔴
 
-**Objetivo.** Exponer venta asistida y sustitutos con la misma disciplina de hidratación, resolviendo los placeholders.
-**Prerequisitos.** C22, C23, C14 · **Paralelo.** C24, C26
-**Alcance.** `GET /api/ai/products/{id}/sales-assist` y `GET /api/ai/products/{id}/substitutes?pointOfSaleId=`; **sustitución de `{{price}}` / `{{stock}}`** por valores reales del hidratador; **rechazo de la respuesta si queda algún placeholder sin resolver**.
-**Tests.** `SalesAssist_ReplacesPlaceholdersWithRealValues`; `SalesAssist_WhenPlaceholderUnresolved_ReturnsErrorInsteadOfRawTemplate`; `Substitutes_ExcludesProductsWithoutStockAtTargetPos`; `SalesAssist_AsOperatorOfAnotherPos_Returns403`.
-**Conflicto.** Mismo controlador que C14 → nunca simultáneos.
-
----
-
-#### C26 · `add-sales-assistant-agent-loop` — Dev A
-
-**Objetivo.** La capa de decisión: bucle con function calling, tools de solo lectura y presupuesto duro.
-**Prerequisitos.** C23, C24 · **Paralelo.** C25, C27
-**Alcance.** Tools `buscar_catalogo`, `consultar_disponibilidad`, `listar_variantes`, `buscar_sustitutos`, `consultar_conocimiento`, `pedir_aclaracion`; máximo 5 iteraciones / 6 llamadas; errores como datos; `partial: true` al agotar presupuesto; **ninguna tool escribe**; decorador de trazado que registra decisión, tools, tokens y coste por iteración.
+**Objetivo.** Capa de decisión: bucle con function calling, tools de solo lectura, presupuesto duro.
+**Prereq.** C30, C31 · **Zona.** `ai-service/src/jbg_ai/assist/`
+**Alcance.** Tools `buscar_catalogo`, `consultar_disponibilidad` (.NET), `listar_familia`, `buscar_sustitutos`, `buscar_complementarios`, `consultar_conocimiento`, `perfil_punto_venta`, `pedir_aclaracion`; máx. 5 iteraciones y 6 llamadas; errores como datos; `partial: true` al agotar presupuesto; **ninguna tool escribe**; decorador de trazado con tokens y coste por iteración.
 **Tests.** `test_loop_stops_at_iteration_budget_and_flags_partial`; `test_tool_error_is_returned_as_data_not_exception`; `test_out_of_stock_query_triggers_substitutes_tool`; `test_no_registered_tool_performs_writes` (introspección del registro); `test_token_usage_accumulated_across_iterations`.
 
 ---
 
-#### C27 · `add-frontend-assist-card` — Dev B
+#### C33 · `add-pos-sales-profile` 🟢
 
-**Objetivo.** Cerrar el flujo visible: card de venta asistida con desambiguación de variantes, citas y sustitutos.
-**Prerequisitos.** C25, C15 · **Paralelo.** C26, C28
-**Alcance.** Card con argumentario, avisos y citas desplegables; bloque de variantes con talla destacada y **confirmación explícita antes de vender**; bloque de sustitutos cuando `stock = 0`.
-**Tests.** `should require size confirmation when family has multiple variants`; `should show substitutes block when selected product is out of stock`; `should render citations when pitch has sources`; `should hide assist card when ai is unavailable`.
+**Objetivo.** Argumentario por POS como **perfil periódico calculado**, no como texto libre. Decisión 7.
+**Prereq.** C19 · **Zona.** `Application/` + `ai-service/src/jbg_ai/assist/`
+**Alcance.** Cálculo SQL en .NET de `top_piece_types`, `top_materials`, `top_price_ranges`, `top_collections`, `average_ticket`, `best_selling`, `slow_moving`; persistencia estructurada; el LLM **solo redacta el resumen a partir de ese payload**; `GET /api/ai/pos/{id}/sales-profile`; consumo como prior de ranking y por la tool `perfil_punto_venta`.
+**Tests.** `Profile_MetricsComputedFromSalesNotLlm`; `test_narrative_mentions_only_metrics_present_in_payload`; `Profile_PosWithoutSales_ProducesEmptyProfileNotHallucination`; `Profile_RegeneratedWhenPeriodChanges`.
 
 ---
 
-#### C28 · `add-generation-and-agent-evals` — Dev A
+#### C34 · `add-dotnet-assist-and-recommendation-endpoints` 🔴
 
-**Objetivo.** Cerrar la evaluación: el validador anti-alucinación (la pieza de mayor retorno del proyecto), RAGAS, escenarios de agente y casos adversarios.
-**Prerequisitos.** C20, C23, C25, C26 · **Paralelo.** C27
-**Alcance.** (1) **Validador determinista** que extrae toda cifra de precio/stock de la respuesta final y la contrasta con el hidratador, con umbral de **cero fallos**, más su equivalente en .NET antes de responder al cliente; (2) **RAGAS** (faithfulness, answer relevancy, context precision, context recall) sobre el subconjunto con citas; (3) **20-25 escenarios de agente** multi-turno con éxito definido; (4) **20-25 casos adversarios** con criterio de bloqueo por categoría. Todo integrado en el runner e informe de C20.
-**Tests.** `test_detects_injected_fake_price_in_response`; `test_passes_when_all_numbers_match_hydrator`; `test_ignores_numbers_that_are_sizes_or_skus`; `test_scenario_runner_replays_multi_turn_conversation`; `test_injection_cases_all_blocked`; .NET: `Response_WithUnverifiedNumber_IsRejected`.
-**Nota de tamaño.** Es el change más grande del plan. Orden obligatorio si hay que partirlo: validador → escenarios de agente → adversarios → RAGAS. RAGAS es lo primero que se cae.
+**Objetivo.** Exponer venta asistida, sustitutos y complementarios con hidratación y resolución de placeholders.
+**Prereq.** C15, C26, C27, C30 · **Zona.** `API/Controllers/`, `Application/`
+**Alcance.** `GET /api/ai/products/{id}/sales-assist`, `.../substitutes?pointOfSaleId=`, `.../recommendations?pointOfSaleId=`; **sustitución de `{{price}}`/`{{stock}}`** por valores reales; **rechazo de la respuesta si queda algún placeholder sin resolver**.
+**Tests.** `SalesAssist_ReplacesPlaceholdersWithRealValues`; `SalesAssist_WhenPlaceholderUnresolved_ReturnsErrorInsteadOfRawTemplate`; `Substitutes_ExcludeProductsWithoutStockAtTargetPos`; `Recommendations_ManualPairsRankedFirst`; `SalesAssist_AsOperatorOfAnotherPos_Returns403`.
+**Conflicto de zona.** Mismo controlador que C15 → nunca simultáneos.
+
+---
+
+#### C35 · `add-inventory-agent-proposals` 🟢
+
+**Objetivo.** Segundo agente: prioriza, elige sustituto y redacta el motivo. **Los números los calcula .NET.**
+**Prereq.** C26, C29, C32, C33 · **Zona.** `ai-service/src/jbg_ai/assist/`
+**Alcance.** `POST /v1/inventory/propose` batch por POS; tools `senales_demanda` (.NET), `stock_por_pos` (.NET), `buscar_sustitutos`, `perfil_punto_venta`; salida: lista priorizada con motivo redactado y sustituto cuando la reposición no es satisfacible; **todas las propuestas nacen `Proposed`** y se persisten vía .NET.
+**Tests.** `test_agent_never_computes_quantities_itself`; `test_unsatisfiable_replenishment_triggers_substitute_tool`; `test_reason_mentions_only_signals_from_payload`; `test_all_proposals_created_in_proposed_state`; `test_budget_exhausted_returns_partial`.
+**Degradación planificada.** Si este change no llega, C29 ya genera recomendaciones por reglas puras: se pierde la priorización y la redacción, no la funcionalidad.
+
+---
+
+#### C36 · `add-frontend-assist-card-and-family-disambiguation` 🔴
+
+**Objetivo.** Cerrar el flujo visible de venta: card con desambiguación por familia, citas, sustitutos y complementarios.
+**Prereq.** C16, C34 · **Zona.** `frontend/src/`
+**Alcance.** Card con argumentario, avisos calculados y citas desplegables; bloque de **variantes de la familia con `variant_label` destacado y confirmación explícita antes de vender**; bloque de sustitutos cuando `stock = 0`; bloque "También puede encajar" con complementarios.
+**Tests.** `should require variant confirmation when family has multiple members`; `should show substitutes block when selected product is out of stock`; `should render complementary block when recommendations exist`; `should render citations when pitch has sources`.
+
+---
+
+#### C37 · `add-frontend-inventory-review-and-print` 🟢
+
+**Objetivo.** Aprobación humana de recomendaciones y salida física. Sustituye a la packing list completa.
+**Prereq.** C29, C35 · **Zona.** `frontend/src/`
+**Alcance.** Pantalla de revisión con filtros por tipo y POS, señales visibles, motivo, y aprobar/rechazar por recomendación; desde las aprobadas, **vista imprimible agrupada por POS destino** (SKU, nombre, foto, cantidad, origen, motivo) usable en móvil. **Sin máquina de estados de packing list.**
+**Tests.** `should list proposals grouped by recommendation type`; `should approve recommendation and remove it from pending list`; `should render printable view grouped by destination pos`; `should show substitute origin when recommendation is a substitute`.
+
+---
+
+#### C38 · `add-generation-and-agent-evals` 🔴
+
+**Objetivo.** Cerrar la evaluación: validador anti-alucinación, RAGAS, escenarios de ambos agentes y casos adversarios.
+**Prereq.** C24, C30, C32, C34, C35 · **Zona.** `ai-service/src/jbg_ai/evals/` + `Application/`
+**Alcance.** (1) **Validador determinista** que extrae toda cifra de precio/stock de la respuesta final y la contrasta con el hidratador, umbral **cero fallos**, más su equivalente en .NET antes de responder; (2) **RAGAS** sobre el subconjunto con citas; (3) **20-25 escenarios de agente de venta + 8-10 de inventario**; (4) **20-25 casos adversarios**; (5) **test de fidelidad del perfil por POS**. Todo integrado en el runner e informe de C24.
+**Tests.** `test_detects_injected_fake_price_in_response`; `test_ignores_numbers_that_are_sizes_or_skus`; `test_scenario_runner_replays_multi_turn_conversation`; `test_inventory_scenario_checks_proposal_state_and_reason`; `test_injection_cases_all_blocked`; .NET: `Response_WithUnverifiedNumber_IsRejected`.
+**Orden obligatorio si hay que partirlo:** validador → escenarios de venta → adversarios → escenarios de inventario → RAGAS. **RAGAS es lo primero que se cae.**
 
 ---
 
@@ -393,113 +480,105 @@ Dos changes son **paralelizables** si (a) ninguno es prerequisito del otro y (b)
 
 ---
 
-#### C29 · `finalize-pf-readme-and-evidence` — **Dev A + Dev B**
+#### C39 · `finalize-pf-readme-and-evidence` 🔴 👥
 
 **Objetivo.** Empaquetar la entrega para que un evaluador externo entienda, reproduzca y pruebe el sistema.
-**Prerequisitos.** todos · **Paralelo.** —
-**Alcance.** README del PF (dominio y problema, diagrama, decisiones justificadas, CAG/RAG/agentes/evaluación/despliegue, arranque local, **los dos integrantes**, limitaciones y próximos pasos); **tabla final de ablations v0→v3**; sección sobre el reranking descartado con su protocolo de medición; progresión de prompts v1→v2 con impacto medido; guion y grabación del vídeo de 2-3 min; usuario demo de solo lectura; `docker compose up` verificado desde cero; rama `finalproject-[INICIALES]` y tag `v1.0-final-[INICIALES]`.
-**Reparto.** Dev A: secciones de IA, evaluación y tablas. Dev B: arquitectura, despliegue, arranque local, vídeo.
+**Prereq.** todos · **Zona.** docs
+**Alcance.** README del PF (dominio, arquitectura con la frontera .NET/Python justificada, CAG/RAG/agentes/evaluación/despliegue, arranque local, **los dos integrantes**, limitaciones, próximos pasos); **tabla de ablations v0→v3**; **métricas de revisión humana** (tasa de corrección y tiempo medio); sección del reranking descartado con su protocolo; progresión de prompts v1→v2 con impacto medido; **declaración explícita de lo que queda para fase posterior** (packing list, liquidación, upsell, políticas de inventario); vídeo de 2-3 min; usuario demo; `docker compose up` verificado desde cero; rama `finalproject-[INICIALES]` y tag `v1.0-final-[INICIALES]`.
 **Tests.** Ensayo de reproducibilidad en máquina limpia y `openspec validate --all`.
 
 ---
 
-## 5. Grafo de dependencias
+## 4. Grafo de dependencias
 
 ```mermaid
 flowchart LR
     C01 --> C02 & C05 & C06
-    C02 --> C04
-    C04 --> C08 & C14
-    C05 --> C10
-    C06 --> C07 & C13
-    C07 --> C10
-    C08 --> C09
-    C09 --> C11 & C18
-    C10 --> C11 & C19
-    C11 --> C12
-    C12 --> C14 & C17 & C18 & C20
-    C13 --> C18 & C19
-    C14 --> C15 & C16 & C25
-    C17 --> C20 & C21 & C23
-    C18 --> C21 & C22
-    C19 --> C23
-    C20 --> C21 & C28
-    C21 --> C22
-    C22 --> C25
-    C23 --> C24 & C25 & C26 & C28
-    C24 --> C26
-    C25 --> C27 & C28
-    C26 --> C28
-    C15 --> C27
+    C02 --> C03
+    C03 --> C08 & C15
+    C05 --> C11
+    C06 --> C09 & C10
+    C07 --> C12 & C18 & C30
+    C08 --> C12 & C28
+    C09 --> C11
+    C10 --> C19 & C22 & C27
+    C11 --> C13 & C23
+    C12 --> C13 & C22
+    C13 --> C14 & C18
+    C14 --> C15 & C20 & C21 & C22 & C24
+    C15 --> C16 & C17 & C34
+    C16 --> C36
+    C19 --> C29 & C33
+    C20 --> C21
+    C21 --> C24 & C25 & C30
+    C22 --> C25 & C26
+    C23 --> C30
+    C24 --> C25 & C38
+    C25 --> C26 & C27
+    C26 --> C34 & C35
+    C27 --> C34
+    C29 --> C35 & C37
+    C30 --> C31 & C34 & C38
+    C31 --> C32
+    C32 --> C35 & C38
+    C33 --> C35
+    C34 --> C36 & C38
+    C35 --> C37 & C38
 ```
 
 ---
 
-## 6. Calendario y paralelismo real
+## 5. Calendario por olas
 
-| Ola | Fechas | Dev A (IA/Python) | Dev B (Producto) |
+| Ola | Fechas | Changes | Ruta crítica de la ola |
 |---|---|---|---|
-| **0** | 1-3 ago | C01 → C02 | C03 → C04 |
-| **1** | 4-10 ago | C05 → C07 → C10 | C06 → C08 → C09 |
-| **2** | 11-17 ago | C11 → C12 → *(apoyo C14)* | C13 → C14 → C15 → C16 |
-| **3** | 18-24 ago | C17 → C18 → **C20** → C21 | C19 → **C20** → C22 |
-| **4** | 25-31 ago | C23 → C24 → C26 → C28 | C25 → C27 → *(apoyo C28)* |
-| **5** | 1-3 sep | C29 (IA, evals, tablas) | C29 (arquitectura, despliegue, vídeo) |
+| **O0** | 3-5 ago | C01-C04 (4) | C01 → C02 → C03 |
+| **O1** | 6-12 ago | C05-C12 (8) | C06 → C09 → C11 → C12 |
+| **O2** | 13-19 ago | C13-C19 (7) | C13 → C14 → C15 → C16, C17 |
+| **O3** | 20-26 ago | C20-C29 (10) | C21 → C22 → C24 → C25 |
+| **O4** | 27-31 ago | C30-C38 (9) | C30 → C31 → C32, C34 → C36, C38 |
+| **O5** | 1-3 sep | C39 (1) | C39 |
 
-**Puntos de sincronización obligatorios** (los únicos momentos en que una persona espera a la otra):
+**Carga:** 39 changes / 4,4 semanas / 2 personas = **~4,4 por persona y semana**. La ola 3 (10 changes) y la ola 4 (9, con los dos agentes) son las más cargadas; si algo se retrasa, será ahí.
 
-| Cuándo | Quién espera a quién | Qué se entrega |
-|---|---|---|
-| 3 ago | Dev B espera C02 | Contrato + stubs → desbloquea C04 |
-| 5-6 ago | Dev A espera C06 | Catálogo sintético → desbloquea C07 |
-| ~8 ago | Dev A espera C09 | Feeds → desbloquea C11 |
-| 13-14 ago | Dev B espera C12 | Recuperación real → desbloquea C14 |
-| ~19 ago | Dev A espera C13 | Mundo simulado → desbloquea C18 |
-| 21-22 ago | **ambos** | Sesión conjunta de etiquetado (C20) |
-| ~27 ago | Dev B espera C23 | Generación → desbloquea C25 |
-
-### Pares que NO deben ejecutarse en paralelo aunque no haya dependencia lógica
+### Pares que NO deben ejecutarse en paralelo
 
 | Par | Motivo |
 |---|---|
-| C14 ‖ C25 | Mismo controlador `AiController.cs` |
-| C15 ‖ C27 | Misma página y servicio del frontend |
-| C03 ‖ C08 | Dos migraciones EF Core simultáneas → colisión de orden |
-| C11 ‖ C10 | C11 depende del cliente de embeddings congelado en C10 |
-| C17 ‖ C21 | Ambos tocan el pipeline de ranking en `retrieval/` |
-| C19 ‖ C11 | Zona `PY-INDEX` compartida: separar por fichero (`knowledge.py` vs `products.py`) y no solapar en el tiempo si hay dudas |
-
-**Regla operativa para migraciones EF Core:** solo un change con migración activo a la vez; quien la crea avisa y la mergea antes de que empiece la siguiente. Con dos personas y cuatro migraciones en todo el proyecto (C03, C08), esto es trivial de cumplir.
+| C15 ‖ C34 | Mismo controlador `AiController.cs` |
+| C16 ‖ C36 | Misma página y servicio del frontend |
+| Cualquier par de 🗄️ (C04, C07, C08, C19, C27, C29) | Dos migraciones EF Core simultáneas colisionan en el orden |
+| C13 ‖ C11 | C13 depende del cliente de embeddings congelado en C11 |
+| C21 ‖ C22 ‖ C25 | Los tres tocan el pipeline de ranking en `retrieval/` |
+| C13 ‖ C23 | Zona `indexing/` compartida: separados por fichero, pero no solapar si hay dudas |
 
 ---
 
-## 7. Líneas de corte
+## 6. Orden de corte, fijado de antemano
 
-Si el **24 de agosto** el sistema no está desplegado y sin la tabla de ablations hecha, se abandona en este orden exacto:
+Si el **26 de agosto** (fin de O3) no están la tabla de ablations y el sistema desplegado:
 
-1. **C22** (sustitutos) → se documenta como próximo paso; el retriever ya lo soportaría
-2. **RAGAS dentro de C28** → se conservan validador anti-alucinación y métricas de recuperación
-3. **C27** (card de venta asistida) → se fusiona en C15 con una versión simplificada
-4. **C19** 40-60 → 20 documentos, manteniendo las citas y las fichas por POS
-5. **Golden set de C20** 70 → 45 consultas, sacrificando categorías, **nunca el etiquetado doble**
-6. **C24** (guardrails) → mínimo viable (clasificador de intención) dentro de C23
+1. **C27** complementarios → fase posterior; los sustitutos ya cubren el caso de venta
+2. **Tipo `Rotate` de C29** → el motor queda, se cae la regla de stock parado
+3. **RAGAS dentro de C38** → se conservan validador y métricas de recuperación
+4. **Tipo `Transfer` de C29** → solo reposición
+5. **Vista imprimible de C37** → se aprueba en pantalla y se exporta a CSV
+6. **C23** corpus 30-45 → 15 documentos, manteniendo las citas
+7. **Golden set de C24** 70 → 45 consultas, **nunca renunciando al doble etiquetado**
+8. **C35** agente de inventario → las recomendaciones se generan por reglas puras (C29), sin capa agéntica ni redacción LLM
 
-**Nunca se recortan:** C01, C02, C04, C05, C06, C07, C10, C11, C12, C14, C15, C16, C17, C18, C20, C23, C26, C28 (validador), C29. Son el conjunto mínimo que hace evaluable el Proyecto Final: corpus, índice, retriever híbrido con filtros, agente con tools, harness con ablations, validador anti-alucinación, despliegue y README.
-
-### Si apareciera margen (no se planifica con él)
-
-En orden de retorno por hora: (1) `evaluate-cross-encoder-reranking` — cierra el único hueco argumental; (2) `add-pos-sales-profile-service` — argumentario como servicio en vez de fichas estáticas; (3) `add-semantic-response-cache`; (4) `add-langsmith-tracing`; (5) `add-replenishment-agent-batch` + entidad `InventoryRecommendation`; (6) ampliar el golden set y extraer filtros con LLM.
+**Nunca se recortan:** C01, C02, C03, C05, C06, C07, C09, C11, C12, C13, C14, C15, C16, C17, C21, C22, C24, C30, C32, C34, C36, el validador de C38 y C39.
 
 ---
 
-## 8. Riesgos específicos de esta descomposición
+## 7. Riesgos de esta descomposición
 
 | Riesgo | Mitigación |
 |---|---|
-| **Una baja de una semana se lleva el 25 % de la capacidad** | Slice vertical desplegado el 17 ago (C16); a partir de ahí siempre hay algo demostrable. Cortes definidos de antemano, no improvisados |
-| C02 se queda corto y el contrato cambia en la ola 4, invalidando C04/C14/C15 | `test_openapi_snapshot_is_stable` (C02): cualquier cambio rompe el build y se negocia entre los dos, en vez de filtrarse |
-| C20 (golden set) se retrasa y bloquea C21 y C28 | Runner y configs (Dev A) van por delante; el etiquetado tiene tope de 2 h por persona y recorte definido a 45 consultas |
-| C07 (enriquecimiento) y C13 (simulador) son sesiones largas y pueden desbordarse | Punto de partición predefinido en cada ficha; se entrega la mitad que desbloquea al otro desarrollador |
-| C28 acumula cuatro suites de evaluación al final | Orden de ejecución obligatorio dentro del change; RAGAS es lo primero que se cae |
-| Cada change genera artefactos OpenSpec que consumen tiempo de sesión | `design.md` solo cuando hay decisión con alternativas reales (C02, C10, C17, C20, C26); en el resto, `proposal` + `tasks` + spec delta |
-| Los dos desarrolladores acaban tocando `PY-INDEX` (C11, C18, C19) | Separación por fichero declarada en las fichas y `indexing/embeddings.py` congelado tras C10 |
+| **Las olas 3 y 4 concentran 19 de los 39 changes** | C19, C29 y C33 (base de inventario, .NET y sin LLM) están adelantados a O3 precisamente para descargar O4 |
+| C02 se queda corto y el contrato cambia en O4, invalidando C03/C15/C16 | `test_openapi_snapshot_is_stable`: cualquier cambio rompe el build y se negocia entre los dos |
+| C24 (golden set) bloquea C25 y C38 | El runner y las configs van por delante; el etiquetado tiene tope de 2 h por persona y recorte definido a 45 consultas |
+| C09, C10 y C38 son sesiones largas | Punto de partición predefinido en cada ficha; se entrega primero la mitad que desbloquea |
+| C29 necesita saber cuál es el POS origen de suministro | **Resuelto:** existe tienda central y `IsSupplySource` se añade en C19, dos olas antes |
+| Seis migraciones EF Core (C04, C07, C08, C19, C27, C29) | Regla de migración única activa; están repartidas en cuatro olas distintas |
+| Artefactos OpenSpec consumen tiempo de sesión | `design.md` solo cuando hay decisión con alternativas reales (C02, C11, C21, C22, C24, C29, C32); en el resto, `proposal` + `tasks` + spec delta |
