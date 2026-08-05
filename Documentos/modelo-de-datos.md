@@ -81,14 +81,13 @@ erDiagram
     
     UserPointOfSale {
         uuid Id PK
-        uuid UserId FK
-        uuid PointOfSaleId FK
+        uuid UserId FK,UK
+        uuid PointOfSaleId FK,UK
         datetime AssignedAt
         datetime? UnassignedAt
-        bool IsActive
+        bool IsActive UK
         datetime CreatedAt
         datetime UpdatedAt
-        unique(UserId, PointOfSaleId, IsActive) "filtered: IsActive=true"
     }
     
     Collection {
@@ -119,12 +118,11 @@ erDiagram
         bool IsPrimary "foto principal"
         datetime CreatedAt
         datetime UpdatedAt
-        indexed(ProductId, DisplayOrder)
     }
 
     ProductPhotoEmbedding {
         uuid Id PK
-        uuid ProductPhotoId FK UK "unique - un embedding por foto"
+        uuid ProductPhotoId FK,UK "unique - un embedding por foto"
         uuid ProductId FK
         string ProductSku "desnormalizado para búsquedas sin JOIN"
         text EmbeddingVector "1280 floats como JSON"
@@ -144,12 +142,11 @@ erDiagram
     
     PointOfSalePaymentMethod {
         uuid Id PK
-        uuid PointOfSaleId FK
-        uuid PaymentMethodId FK
+        uuid PointOfSaleId FK,UK
+        uuid PaymentMethodId FK,UK
         bool IsActive
         datetime CreatedAt
         datetime? DeactivatedAt
-        unique(PointOfSaleId, PaymentMethodId)
     }
     
     Sale {
@@ -166,11 +163,6 @@ erDiagram
         uuid? BulkOperationId "agrupa ventas de un checkout masivo"
         datetime SaleDate
         datetime CreatedAt
-        indexed(PointOfSaleId, SaleDate)
-        indexed(ProductId, SaleDate)
-        indexed(UserId, SaleDate)
-        indexed(PaymentMethodId, SaleDate)
-        indexed(BulkOperationId)
     }
     
     SalePhoto {
@@ -194,20 +186,15 @@ erDiagram
         string? Reason "motivo libre opcional, max 500 chars"
         datetime ReturnDate
         datetime CreatedAt
-        indexed(PointOfSaleId, ReturnDate)
-        indexed(ProductId, ReturnDate)
     }
     
     ReturnSale {
         uuid Id PK
-        uuid ReturnId FK
-        uuid SaleId FK
+        uuid ReturnId FK,UK
+        uuid SaleId FK,UK
         int Quantity "cantidad de esta venta incluida en la devolución"
         decimal UnitPrice "precio unitario snapshot de Sale.Price"
         datetime CreatedAt
-        unique(ReturnId, SaleId)
-        indexed(SaleId)
-        indexed(ReturnId)
     }
     
     ReturnPhoto {
@@ -223,17 +210,13 @@ erDiagram
     
     Inventory {
         uuid Id PK
-        uuid ProductId FK
-        uuid PointOfSaleId FK
+        uuid ProductId FK,UK
+        uuid PointOfSaleId FK,UK
         int Quantity "stock actual"
         bool IsActive "true=asignado, false=desasignado"
         datetime LastUpdatedAt
         datetime CreatedAt
         datetime UpdatedAt
-        unique(ProductId, PointOfSaleId)
-        indexed(PointOfSaleId, Quantity)
-        indexed(ProductId)
-        indexed(PointOfSaleId, ProductId, IsActive)
     }
     
     InventoryMovement {
@@ -250,9 +233,6 @@ erDiagram
         datetime MovementDate
         datetime CreatedAt
         datetime UpdatedAt
-        indexed(InventoryId)
-        indexed(MovementDate)
-        indexed(InventoryId, MovementDate)
     }
 
     RefreshToken {
@@ -281,15 +261,14 @@ erDiagram
 
     ProductComponentAssignment {
         uuid Id PK
-        uuid ProductId FK
-        uuid ComponentId FK
+        uuid ProductId FK,UK
+        uuid ComponentId FK,UK
         decimal Quantity "precision 18,4"
         decimal CostPrice "precision 18,4"
         decimal SalePrice "precision 18,4"
         int DisplayOrder "default 0"
         datetime CreatedAt
         datetime UpdatedAt
-        unique(ProductId, ComponentId)
     }
 
     ComponentTemplate {
@@ -302,12 +281,11 @@ erDiagram
 
     ComponentTemplateItem {
         uuid Id PK
-        uuid TemplateId FK
-        uuid ComponentId FK
+        uuid TemplateId FK,UK
+        uuid ComponentId FK,UK
         decimal Quantity "precision 18,4"
         datetime CreatedAt
         datetime UpdatedAt
-        unique(TemplateId, ComponentId)
     }
 
     ModelMetadata {

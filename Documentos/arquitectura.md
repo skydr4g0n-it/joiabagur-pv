@@ -26,6 +26,21 @@ Arquitectura monolítica simple con backend y frontend separados, desplegados en
 - **ML Framework**: TensorFlow.js / ONNX.js (para reconocimiento de imágenes en cliente)
 - **Build Tool**: Vite / Webpack
 
+### Servicio de IA (`jbg-ai`)
+
+Microservicio añadido en el Proyecto Final de IA (change `init-ai-service-skeleton` / C01). Vive en `ai-service/` y es un contenedor independiente del backend .NET.
+
+- **Lenguaje**: Python 3.11
+- **Framework**: FastAPI (fábrica `create_app`, `docs_url` deshabilitado)
+- **Gestor de dependencias**: `uv` (`pyproject.toml` + `uv.lock`)
+- **Configuración**: pydantic-settings con *fail-fast* de variables obligatorias
+- **Servidor**: Uvicorn
+- **Base de datos**: la misma PostgreSQL, en el esquema `ai` con extensión **pgvector** (el esquema y la extensión llegan en C05; en C01 solo se garantiza que la imagen los admita)
+- **Contenedorización**: Docker (`python:3.11-slim-bookworm`)
+- **Observabilidad**: logging estructurado con `trace_id` propagado por middleware
+
+**Frontera de responsabilidad:** Python solo hace cálculo vectorial y generación con LLM; .NET conserva toda la regla de negocio y es la autoridad final sobre precio, stock y permisos. Python **nunca** lee ni escribe el esquema `public` por SQL, y el navegador nunca habla con Python: la SPA llama al backend .NET y este llama a `jbg-ai` con un JWT interno de servicio.
+
 ### Infraestructura
 - **Contenedores**: Docker
 - **Orquestación**: Docker Compose (desarrollo) / Cloud Services (producción)
@@ -62,16 +77,30 @@ flowchart TB
         end
     end
     
-    DB["PostgreSQL Database<br/>- Tablas: Products, Sales, Inventory, Users, etc.<br/>- Índices optimizados<br/>- Connection pooling"]
+    subgraph AI["SERVICIO DE IA (Python)"]
+        subgraph AIContainer["Contenedor Docker jbg-ai"]
+            FastAPI["FastAPI · uvicorn<br/>- /health público<br/>- /v1/* con JWT interno<br/>- Recuperación vectorial y generación"]
+        end
+    end
+    
+    DB["PostgreSQL Database<br/>- Esquema public: Products, Sales, Inventory, Users…<br/>- Esquema ai: vectores (pgvector)<br/>- Índices optimizados · Connection pooling"]
     
     Storage["Object Storage<br/>- Fotos de productos<br/>- Fotos de ventas<br/>- Archivos Excel importados"]
+    
+    LLM["Proveedor LLM + embeddings"]
     
     Cliente -->|HTTPS| NginxTLS
     NginxTLS --> Gateway
     Gateway -->|HTTP local| Backend
     Backend -->|PostgreSQL Protocol| DB
     Backend -->|S3 API / Blob Storage API| Storage
+    Backend -->|JWT interno HS256 · red Docker interna| AI
+    AI -->|solo esquema ai| DB
+    AI --> LLM
+    AI -.->|feed paginado since-cursor| Backend
 ```
+
+> El navegador **nunca** habla con `jbg-ai`: el puerto de Python no se publica en nginx. Toda llamada pasa por el backend .NET, que además actúa de *hidratador* — resuelve precio, stock y permisos reales y descarta los candidatos que ya no cumplan las reglas.
 
 ---
 
@@ -86,67 +115,35 @@ flowchart TB
         
         Backend["Backend API (.NET 10)<br/>- dotnet run (localhost:5000)<br/>- Desarrollo con hot reload<br/>- Logging detallado en consola<br/>- CORS habilitado para localhost:3000"]
         
-        Postgres["PostgreSQL (Docker Container)<br/>- Puerto: 5432<br/>- Volumen persistente local<br/>- Datos de prueba"]
+        Postgres["PostgreSQL con pgvector (Docker)<br/>- Imagen: pgvector/pgvector:pg15<br/>- Puerto: 5433 → 5432<br/>- Volumen persistente local"]
+        
+        JbgAi["jbg-ai (Docker)<br/>- FastAPI + uvicorn<br/>- Puerto: 8001 → 8000<br/>- STUB_MODE en local"]
         
         LocalStorage["Storage Local<br/>- Carpeta ./uploads/<br/>- Fotos de productos y ventas"]
         
         Frontend -->|"HTTP (sin HTTPS)"| Backend
         Backend -->|PostgreSQL| Postgres
         Backend -->|Local File System| LocalStorage
+        Backend -->|"JWT interno (red jpv-network)"| JbgAi
+        JbgAi -->|"esquema ai (desde C05)"| Postgres
     end
 ```
 
 ### Configuración de Desarrollo
 
-#### Docker Compose (docker-compose.dev.yml)
+#### Docker Compose (`backend/docker-compose.yml`)
 
-```yaml
-version: '3.8'
+El fichero real levanta la base de datos, pgAdmin y el servicio de IA. El backend .NET y el frontend se ejecutan fuera del Compose (`dotnet run` y `npm run dev`).
 
-services:
-  postgres-dev:
-    image: postgres:15-alpine
-    container_name: joyeria-postgres-dev
-    environment:
-      POSTGRES_DB: joyeria_dev
-      POSTGRES_USER: dev_user
-      POSTGRES_PASSWORD: dev_password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_dev_data:/var/lib/postgresql/data
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dev_user"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+| Servicio | Imagen / origen | Puerto local | Notas |
+|---|---|---|---|
+| `postgres` | `pgvector/pgvector:pg15` | `5433` → 5432 | Imagen con **pgvector** disponible (C01). El esquema `ai` y `CREATE EXTENSION vector` llegan en C05 |
+| `pgadmin` | `dpage/pgadmin4` | `8080` → 80 | Administración de la BD |
+| `jbg-ai` | build de `../ai-service` | `8001` → 8000 | Variables mínimas: `APP_ENV`, `SERVICE_VERSION`, `LOG_LEVEL` |
 
-  backend-dev:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.dev
-    container_name: joyeria-backend-dev
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Host=postgres-dev;Port=5432;Database=joyeria_dev;Username=dev_user;Password=dev_password
-      - JWT__SecretKey=dev-secret-key-change-in-production
-      - JWT__Issuer=JoyeriaAPI-Dev
-      - Storage__Type=Local
-      - Storage__LocalPath=./uploads
-    ports:
-      - "5000:8080"
-    volumes:
-      - ./backend:/app
-      - ./uploads:/app/uploads
-    depends_on:
-      postgres-dev:
-        condition: service_healthy
-    command: dotnet watch run --urls http://0.0.0.0:8080
+Todos comparten la red `jpv-network`, que es la que permitirá a `jbg-ai` alcanzar Postgres sin exponer puertos adicionales.
 
-volumes:
-  postgres_dev_data:
-```
+> **Aviso al actualizar desde una versión anterior:** el cambio de `postgres:15` a `pgvector/pgvector:pg15` puede exigir recrear el volumen local con `docker compose down -v`, lo que **destruye los datos de desarrollo**.
 
 #### Variables de Entorno - Desarrollo
 
@@ -367,42 +364,32 @@ VITE_ENABLE_DEV_TOOLS=false
 ## Estructura del Proyecto
 
 ```
-joyeria-pos/
+joiabagur-pv/
 ├── backend/
-│   ├── Joyeria.API/
-│   │   ├── Controllers/
-│   │   ├── Services/
-│   │   ├── Repositories/
-│   │   ├── Models/
-│   │   ├── Middleware/
-│   │   ├── Program.cs
-│   │   └── appsettings.json
-│   ├── Joyeria.Core/
-│   │   ├── Entities/
-│   │   ├── Interfaces/
-│   │   └── DTOs/
-│   ├── Joyeria.Infrastructure/
-│   │   ├── Data/
-│   │   ├── Repositories/
-│   │   └── Migrations/
-│   └── Dockerfile
-├── frontend/
 │   ├── src/
-│   │   ├── components/
-│   │   ├── services/
-│   │   ├── stores/
-│   │   ├── models/
-│   │   └── ml/ (modelo de reconocimiento)
-│   ├── public/
-│   ├── package.json
+│   │   ├── JoiabagurPV.API/             # Controllers, Middleware, Extensions, Program.cs
+│   │   ├── JoiabagurPV.Application/     # DTOs, Interfaces, Services, Validators
+│   │   ├── JoiabagurPV.Domain/          # Entities, Enums, Exceptions, Interfaces
+│   │   ├── JoiabagurPV.Infrastructure/  # Data (DbContext, Migrations), Services
+│   │   └── JoiabagurPV.Tests/           # UnitTests, IntegrationTests, TestHelpers
+│   ├── api-tests/
+│   ├── scripts/ml-training/
+│   └── docker-compose.yml               # postgres (pgvector), pgadmin, jbg-ai
+├── frontend/
+│   ├── src/                             # pages, components, services, hooks, providers, routing, types
+│   ├── e2e/                             # Playwright
+│   └── package.json
+├── ai-service/                          # Microservicio de IA (C01)
+│   ├── src/jbg_ai/
+│   │   ├── api/                         # main.py (create_app), middleware.py
+│   │   └── config/                      # settings.py (pydantic-settings)
+│   ├── tests/
+│   ├── pyproject.toml · uv.lock
 │   └── Dockerfile
-├── docker-compose.dev.yml
-├── docker-compose.prod.yml
-├── .github/
-│   └── workflows/
-│       └── ci-cd.yml
-└── documentation/
-    └── Arquitectura.md
+├── terraform/                           # IaC de producción (EC2, RDS, S3, ECR, SSM, IAM)
+├── openspec/                            # Contexto, specs vivas y changes
+├── Documentos/                          # Documentación funcional y de arquitectura
+└── .github/workflows/                   # CI/CD
 ```
 
 ---
@@ -680,7 +667,14 @@ Para instrucciones detalladas sobre el deploy en AWS, consultar:
 
 - **[Comparación AWS vs Azure](Propuestas/comparacion-aws-azure-deploy.md)**: Análisis detallado de pros y contras de ambas plataformas, costos estimados, y justificación de la elección de AWS.
 
-- **[OpenSpec Proposal](../openspec/changes/add-aws-production-deployment/proposal.md)**: Propuesta técnica formal para la implementación del deploy en AWS.
+- **[OpenSpec Proposal](../openspec/changes/archive/2026-01-18-add-aws-production-deployment/proposal.md)**: Propuesta técnica formal para la implementación del deploy en AWS (change archivado).
+
+### Servicio de IA (Proyecto Final AIEng)
+
+- **[Diseño del sistema de IA](Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md)**: arquitectura RAG, frontera de responsabilidad Python ↔ .NET (§6), diseño del sistema de recuperación (§7) y despliegue (§12).
+- **[Plan de changes OpenSpec](Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md)**: descomposición en 39 changes (C01–C39), olas y grafo de dependencias.
+- **[Especificaciones funcionales v2](Proyecto%20Final%20AIEng/joiabagur-ia-especificaciones-funcionales-v2.md)**: funcionalidades priorizadas y criterios de aceptación de negocio.
+- **Épicas asociadas**: EP11–EP17 en [epicas.md](epicas.md).
 
 ### Decisiones de Arquitectura
 
@@ -693,6 +687,9 @@ Para instrucciones detalladas sobre el deploy en AWS, consultar:
 | **Frontend estático** | Incluido en imagen (`wwwroot`) | Sin CloudFront dedicado en la pila nueva |
 | **Secrets / config** | SSM Parameter Store | Parámetros leídos por la API en producción |
 | **CI/CD** | GitHub Actions | Ya en uso, free-tier generoso, actions oficiales AWS |
+| **Servicio de IA** | Microservicio Python separado (`jbg-ai`) | Aísla el ecosistema vectorial/LLM sin contaminar el monolito .NET; se despliega y evoluciona por separado |
+| **Base vectorial** | pgvector sobre la misma RDS, esquema `ai` | Una sola base de datos, filtros SQL nativos y cero infraestructura nueva. La decisión no se justifica por escala (~1.500 vectores) sino por operación |
+| **Frontera Python ↔ .NET** | JWT interno HS256 sobre red Docker interna | Python nunca lee ni escribe `public`; el navegador nunca habla con Python; .NET es la autoridad final sobre precio, stock y permisos |
 | **Moneda** | Euro (EUR, €) | Mercado objetivo español/europeo |
 | **Locale** | es-ES | Formato español para números y fechas |
 

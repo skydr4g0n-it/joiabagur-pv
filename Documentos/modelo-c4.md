@@ -11,6 +11,7 @@ Este documento describe la arquitectura del sistema utilizando el modelo C4, pro
 3. [Nivel 3: Componentes](#nivel-3-componentes)
    - [3.1 Componentes del Backend](#31-componentes-del-backend)
    - [3.2 Componentes del Frontend](#32-componentes-del-frontend)
+   - [3.3 Componentes del Servicio de IA](#33-componentes-del-servicio-de-ia)
 4. [Notas sobre Desarrollo vs Producción](#notas-sobre-desarrollo-vs-producción)
 
 ---
@@ -55,7 +56,7 @@ El sistema permite a los administradores gestionar el catálogo de productos, in
 
 ## Nivel 2: Contenedores
 
-El sistema está compuesto por cuatro contenedores principales: una aplicación web frontend, una API backend, una base de datos PostgreSQL y un servicio de almacenamiento de objetos.
+El sistema está compuesto por cinco contenedores principales: una aplicación web frontend, una API backend, un servicio de IA, una base de datos PostgreSQL y un servicio de almacenamiento de objetos.
 
 ### Contenedores
 
@@ -78,13 +79,28 @@ El sistema está compuesto por cuatro contenedores principales: una aplicación 
   - Gestión de archivos y almacenamiento
 - **Despliegue**: Contenedor Docker en **EC2** (pila actual, imagen bundlada) u otros hosts (App Service en Azure, ECS/App Runner en variantes legado)
 
+#### AI Service (`jbg-ai`)
+- **Tecnología**: Python 3.11, FastAPI, uvicorn, `uv`, pydantic-settings
+- **Responsabilidades**:
+  - Recuperación vectorial e híbrida sobre el índice del catálogo (pgvector)
+  - Generación con LLM, atribución con citas y guardrails
+  - Enriquecimiento del catálogo e indexación (`/v1/enrich`, `/v1/index`)
+  - Bucles agénticos de asistencia a la venta y de inventario
+  - Evaluación offline (golden set, métricas de recuperación y generación)
+- **Lo que NO hace**: no calcula precio, stock ni permisos; no escribe ni lee el esquema `public` por SQL; no atiende al navegador
+- **Despliegue**: contenedor Docker en la misma EC2, en red interna; **el puerto no se publica en nginx**. En desarrollo, servicio `jbg-ai` del Compose (`8001` → 8000)
+- **Estado actual**: esqueleto ejecutable con `GET /health` (C01). Los routers `/v1/*` y la autenticación de servicio llegan en C02
+
+> **Regla de frontera (diseño §6.2):** *Python calcula parecidos y redacta; .NET calcula números y decide.* El backend .NET actúa de **hidratador** y es la autoridad final: descarta cualquier candidato que ya no cumpla las reglas de negocio.
+
 #### PostgreSQL Database
-- **Tecnología**: PostgreSQL 15+
+- **Tecnología**: PostgreSQL 15+ con extensión **pgvector**
 - **Responsabilidades**:
   - Almacenamiento persistente de todos los datos del sistema
-  - Gestión de productos, inventario, ventas, usuarios, puntos de venta
+  - Gestión de productos, inventario, ventas, usuarios, puntos de venta (esquema `public`, propiedad de .NET)
+  - Índice vectorial y documentos del corpus (esquema `ai`, propiedad de `jbg-ai`)
   - Índices optimizados para consultas frecuentes
-- **Despliegue**: RDS PostgreSQL (AWS) o Azure Database for PostgreSQL en producción, contenedor Docker en desarrollo
+- **Despliegue**: RDS PostgreSQL (AWS) en producción, contenedor `pgvector/pgvector:pg15` en desarrollo
 
 #### Object Storage
 - **Tecnología**: AWS S3 / Azure Blob Storage
@@ -104,18 +120,27 @@ C4Container
     Person(operador, "Operador")
 
     System_Boundary(sistema, "Sistema de Gestión de Puntos de Venta") {
-        Container(frontend, "Frontend Web Application", "React/Vue/Angular SPA", "Interfaz de usuario y reconocimiento de imágenes en cliente")
-        Container(api, "Backend API", "ASP.NET Core Web API (.NET 10)", "Lógica de negocio, autenticación y gestión de datos")
-        ContainerDb(db, "PostgreSQL Database", "PostgreSQL 15+", "Almacenamiento persistente de datos")
-        Container(storage, "Object Storage", "AWS S3 / Azure Blob Storage", "Almacenamiento de fotos y archivos")
+        Container(frontend, "Frontend Web Application", "React 19 + TypeScript (SPA)", "Interfaz de usuario y reconocimiento de imágenes en cliente")
+        Container(api, "Backend API", "ASP.NET Core Web API (.NET 10)", "Lógica de negocio, autenticación, hidratación y gestión de datos")
+        Container(ai, "AI Service (jbg-ai)", "Python 3.11 + FastAPI", "Recuperación vectorial, generación con LLM, enriquecimiento e indexación")
+        ContainerDb(db, "PostgreSQL Database", "PostgreSQL 15+ con pgvector", "Esquema public (negocio) y esquema ai (vectores)")
+        Container(storage, "Object Storage", "AWS S3", "Almacenamiento de fotos y archivos")
     }
+
+    System_Ext(llm, "Proveedor LLM", "Modelos de lenguaje y embeddings")
 
     Rel(admin, frontend, "Usa", "HTTPS")
     Rel(operador, frontend, "Usa", "HTTPS")
     Rel(frontend, api, "Realiza peticiones HTTP/REST", "HTTPS")
     Rel(api, db, "Lee y escribe", "PostgreSQL Protocol")
-    Rel(api, storage, "Lee y escribe", "S3 API / Blob Storage API")
+    Rel(api, storage, "Lee y escribe", "S3 API")
+    Rel(api, ai, "Consulta con JWT interno de servicio", "HTTP, red Docker interna")
+    Rel(ai, db, "Lee y escribe solo el esquema ai", "PostgreSQL Protocol")
+    Rel(ai, api, "Sincroniza el índice vía feed paginado", "HTTP")
+    Rel(ai, llm, "Genera texto y embeddings", "HTTPS")
 ```
+
+> El frontend **nunca** se comunica con `jbg-ai`. Si el servicio de IA no responde, el backend degrada al buscador léxico existente y marca `ai_available: false`: el sistema no se cae por culpa de la IA.
 
 ### Flujos Principales
 
@@ -356,6 +381,94 @@ C4Component
     Rel(apiClient, api, "Realiza peticiones HTTP/REST")
 ```
 
+### 3.3 Componentes del Servicio de IA
+
+El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y generación, y servicios transversales. **Estado actual (C01):** solo existen la fábrica de aplicación, el health y el middleware de trazas; el resto está planificado en los changes C02–C38.
+
+#### Routers de Dominio (`/v1/*`)
+
+- **Retrieval Router**: búsqueda de productos y sustitutos sobre el índice vectorial, con sobre-recuperación y abstención por umbral.
+- **Assist Router**: generación de respuesta estructurada agrupada por familia, con avisos calculados por reglas y citas verificables.
+- **Inventory Router**: propuestas de reposición, traslado y rotación generadas por el agente de inventario.
+- **Enrich Router**: extracción estructurada de perfiles de producto con confianza por campo.
+- **Index Router**: sincronización del índice mediante cursor `since` y consulta de deriva.
+- **Evals Router**: resultados del harness de evaluación (solo perfil de desarrollo).
+
+#### Capa de Recuperación y Generación
+
+- **Hybrid Retriever**: fusiona búsqueda vectorial (HNSW sobre pgvector) y léxica (`ts_rank` en español con expansión de sinónimos) mediante RRF.
+- **Query Analyzer**: extrae por reglas las restricciones estructurales de la consulta (banda de precio, tipo de pieza, talla, materiales).
+- **Embedding Client**: genera embeddings solo cuando cambia el `source_hash`, con versionado por modelo.
+- **Generation Service**: redacta el argumentario a partir de metadatos aprobados y chunks del corpus, emitiendo `{{price}}` y `{{stock}}` como placeholders que resuelve .NET.
+- **Guardrails / Intent Router**: clasifica la intención, detecta consultas fuera de dominio y aplica la política de abstención.
+- **Agent Loop**: bucles agénticos con *tools* de solo lectura y puntos de intervención humana.
+
+#### Servicios Transversales
+
+- **Settings**: configuración por entorno con pydantic-settings y *fail-fast* de variables obligatorias. **Existe (C01).**
+- **TraceId Middleware**: propaga `trace_id` desde la cabecera o el claim del JWT hacia los logs estructurados. **Existe (C01).**
+- **Service Auth Dependency**: valida el JWT interno HS256 y construye el `ServicePrincipal`; el scope del token prevalece sobre el body.
+- **Stub Layer**: respuestas deterministas bajo `STUB_MODE` para que .NET integre sin LLM ni base de datos.
+- **Eval Harness**: golden set, métricas de recuperación y validador anti-alucinación (ejecución offline).
+
+#### Diagrama de Componentes del Servicio de IA
+
+```mermaid
+C4Component
+    title Componentes del AI Service (jbg-ai)
+
+    Container_Boundary(ai, "AI Service (jbg-ai)") {
+        Component(retrievalRouter, "Retrieval Router", "FastAPI", "Productos y sustitutos")
+        Component(assistRouter, "Assist Router", "FastAPI", "Venta asistida con citas")
+        Component(inventoryRouter, "Inventory Router", "FastAPI", "Propuestas de inventario")
+        Component(enrichRouter, "Enrich Router", "FastAPI", "Enriquecimiento de catálogo")
+        Component(indexRouter, "Index Router", "FastAPI", "Sincronización del índice")
+        Component(evalsRouter, "Evals Router", "FastAPI", "Resultados de evaluación (dev)")
+
+        Component(auth, "Service Auth Dependency", "PyJWT", "Valida el JWT interno y fija el scope")
+        Component(stubs, "Stub Layer", "Python", "Respuestas deterministas bajo STUB_MODE")
+        Component(retriever, "Hybrid Retriever", "pgvector + tsvector", "Vectorial + léxico fusionados con RRF")
+        Component(analyzer, "Query Analyzer", "Python", "Restricciones estructurales por reglas")
+        Component(embeddings, "Embedding Client", "Proveedor LLM", "Embeddings con versionado")
+        Component(generation, "Generation Service", "LLM", "Argumentario con citas y placeholders")
+        Component(guardrails, "Guardrails / Intent Router", "Python", "Intención, abstención y seguridad")
+        Component(agent, "Agent Loop", "Python", "Bucles agénticos con tools de solo lectura")
+        Component(settings, "Settings", "pydantic-settings", "Configuración con fail-fast")
+        Component(trace, "TraceId Middleware", "Starlette", "Propagación de trace_id")
+    }
+
+    Container(api, "Backend API (.NET)")
+    ContainerDb(db, "PostgreSQL · esquema ai")
+    System_Ext(llm, "Proveedor LLM")
+
+    Rel(api, auth, "Bearer JWT interno")
+    Rel(auth, retrievalRouter, "Inyecta ServicePrincipal")
+    Rel(auth, assistRouter, "Inyecta ServicePrincipal")
+    Rel(auth, inventoryRouter, "Inyecta ServicePrincipal")
+    Rel(auth, enrichRouter, "Inyecta ServicePrincipal")
+    Rel(auth, indexRouter, "Inyecta ServicePrincipal")
+    Rel(auth, evalsRouter, "Inyecta ServicePrincipal")
+
+    Rel(retrievalRouter, stubs, "Usa si STUB_MODE")
+    Rel(retrievalRouter, analyzer, "Usa")
+    Rel(retrievalRouter, retriever, "Usa")
+    Rel(assistRouter, retriever, "Usa")
+    Rel(assistRouter, generation, "Usa")
+    Rel(assistRouter, guardrails, "Usa")
+    Rel(inventoryRouter, agent, "Usa")
+    Rel(enrichRouter, generation, "Usa")
+    Rel(indexRouter, embeddings, "Usa")
+
+    Rel(retriever, db, "Consulta vectorial y léxica")
+    Rel(embeddings, db, "Escribe documentos y vectores")
+    Rel(indexRouter, api, "Feed paginado since-cursor")
+    Rel(generation, llm, "Genera texto")
+    Rel(embeddings, llm, "Genera embeddings")
+    Rel(trace, settings, "Usa")
+```
+
+---
+
 ### Relaciones entre Componentes Backend y Frontend
 
 #### Flujo de Autenticación
@@ -378,6 +491,15 @@ C4Component
 2. **Product Module** → **API Client** → **Backend API** → **Product Service**
 3. **Product Service** usa **Excel Import Service** para procesar archivo
 4. **Product Service** → **Repositories** → **PostgreSQL Database**
+
+#### Flujo de Búsqueda Asistida por IA
+1. El operador escribe una consulta en lenguaje natural en el **Assisted Search Panel** (Frontend)
+2. **API Client** → **Backend API** (JWT de usuario) → **AI Gateway Client**
+3. **AI Gateway Client** firma un **JWT interno de servicio** con `user_id`, `role`, `pos_id` y `trace_id`, y llama a **Retrieval Router** de `jbg-ai`
+4. **Query Analyzer** extrae restricciones estructurales; **Hybrid Retriever** consulta el esquema `ai` y devuelve candidatos sobre-recuperados con sus razones
+5. El **hidratador** del Backend API resuelve precio, stock y permisos reales contra el esquema `public`, descarta lo inválido y trunca al `top_k` pedido
+6. Si se pide asistencia, **Assist Router** genera el argumentario con citas y placeholders, que el Backend API sustituye antes de responder
+7. Si `jbg-ai` no responde dentro del timeout, el **circuit breaker** degrada al buscador léxico y marca `ai_available: false`
 
 ---
 
@@ -464,6 +586,21 @@ C4Component
 - Modelo optimizado y comprimido
 - Versionado del modelo para actualizaciones sin interrupciones
 
+### Servicio de IA (`jbg-ai`)
+
+**Desarrollo:**
+- Servicio `jbg-ai` del Compose, puerto `8001` publicado solo en local
+- PostgreSQL con imagen `pgvector/pgvector:pg15` en el puerto `5433`
+- `STUB_MODE` activo: respuestas deterministas sin LLM ni base de datos
+- Secreto del JWT interno definido en el Compose, nunca reutilizable en producción
+
+**Producción:**
+- Contenedor en la misma EC2, en red Docker interna; **el puerto no se publica en nginx**
+- Índice vectorial en el esquema `ai` de la RDS compartida
+- Secretos (JWT interno, claves del proveedor LLM) en SSM Parameter Store
+- Timeouts, reintento único y circuit breaker aplicados desde el backend .NET
+- Degradación explícita: si el circuito se abre, el sistema responde con el buscador léxico
+
 ---
 
 ## Resumen de Componentes por Épica
@@ -508,6 +645,39 @@ C4Component
 - **Backend**: Component Service, Component Assignment Service, Component Template Service
 - **Frontend**: Product Module (subsección de componentes, reportes de márgenes), API Client
 
+### EP11: Plataforma del Servicio de IA
+- **AI Service**: Settings, TraceId Middleware, Service Auth Dependency, Stub Layer
+- **Backend**: AI Gateway Client (cliente tipado con Polly, emisión del JWT interno)
+- **Base de datos**: esquema `ai` con pgvector
+
+### EP12: Corpus y Enriquecimiento del Catálogo
+- **AI Service**: Enrich Router, Generation Service, Embedding Client
+- **Backend**: ProductAiProfile (entidad y ciclo de revisión), endpoints de feed de indexación
+
+### EP13: Familias de Producto y Desambiguación
+- **AI Service**: Hybrid Retriever (propuesta de familias por similitud)
+- **Backend**: ProductFamily, ProductFamilyMember
+- **Frontend**: pantalla de revisión y aprobación por lotes
+
+### EP14: Búsqueda Semántica Híbrida
+- **AI Service**: Retrieval Router, Query Analyzer, Hybrid Retriever, Index Router
+- **Backend**: AI Search Endpoint, hidratador, circuit breaker y fallback léxico
+- **Frontend**: Assisted Search Panel
+
+### EP15: Venta Asistida, Sustitutos y Agentes
+- **AI Service**: Assist Router, Generation Service, Guardrails / Intent Router, Agent Loop
+- **Backend**: endpoints de asistencia y recomendaciones
+- **Frontend**: tarjeta de asistencia y desambiguación por familia
+
+### EP16: Inventario Asistido y Señales de Demanda
+- **AI Service**: Inventory Router, Agent Loop
+- **Backend**: Demand Signal Service, InventoryRecommendation, perfil comercial por POS
+- **Frontend**: revisión de recomendaciones y vista imprimible
+
+### EP17: Evaluación y Observabilidad de IA
+- **AI Service**: Eval Harness, Evals Router
+- **Backend**: ProductSearchEvent (telemetría consulta → selección)
+
 ---
 
 ## Consideraciones de Arquitectura
@@ -542,6 +712,8 @@ El modelo está preparado para escalar:
 
 - [Arquitectura del Sistema](arquitectura.md)
 - [Modelo de Datos](modelo-de-datos.md)
-- [Épicas del MVP](epicas.md)
+- [Épicas del MVP y del Proyecto Final de IA](epicas.md)
 - [README del Proyecto](../README.md)
+- [Diseño del sistema de IA](Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) — frontera de responsabilidad (§6) y diseño RAG (§7)
+- [Plan de changes OpenSpec del PF](Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) — C01–C39
 
