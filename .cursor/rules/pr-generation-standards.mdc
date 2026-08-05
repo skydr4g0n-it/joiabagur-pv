@@ -1,9 +1,9 @@
 ---
-description: Estándares de generación y redacción de Pull Requests en Adresles (análisis del diff por chunks, cero alucinación, lenguaje técnico senior). Cárgala al preparar, redactar o revisar el cuerpo de una PR.
+description: Estándares de generación y redacción de Pull Requests en joiabagur-pv (análisis del diff por chunks, cero alucinación, lenguaje técnico senior). Cárgala al preparar, redactar o revisar el cuerpo de una PR.
 alwaysApply: false
 ---
 
-# Estándares de generación de Pull Requests — Adresles
+# Estándares de generación de Pull Requests — joiabagur-pv
 
 Estas reglas rigen cualquier redacción del cuerpo de una PR, ya sea con la skill
 `generate-pr` (recomendado) o de forma manual.
@@ -46,24 +46,39 @@ No se mezclan: no se redacta mientras se analiza, no se analiza sin contexto rec
 - Conciso: una idea por frase; sin duplicar entre secciones.
 - Agrupa "Cambios realizados" por dominio, no por archivo suelto.
 
-## 5. Plantillas especializadas por repo
+## 5. Prioridades de contenido por componente
 
-- `adresles-platform-2.0`: prioriza API, contratos, modelo de datos MongoDB,
-  multi-tenancy, seguridad, rendimiento, observabilidad, despliegue ECS.
-- `adresles-woocommerce`: prioriza flujo de checkout, WooCommerce Blocks,
-  hooks/filtros, compatibilidad hacia atrás, ecosistema WordPress, impacto para el
-  comerciante.
-- La plantilla canónica vive en `ai-config/<repo>/pr-template.md` y se sincroniza
-  a la skill. No se usa una plantilla genérica si existe la del repo.
+`joiabagur-pv` es un monorepo. Según los dominios que toque el diff, prioriza:
 
-## 6. Breaking changes y multi-repo
+- **`backend/`** (.NET 10, EF Core, PostgreSQL): contratos de API y DTOs, modelo
+  de datos y migraciones, control de acceso por rol y punto de venta, seguridad,
+  rendimiento con las restricciones de free-tier, observabilidad con Serilog.
+- **`frontend/`** (React 19 + Vite + Metronic): componentes Metronic reutilizados,
+  servicios y tipos alineados con los DTOs del backend, accesibilidad, tamaño del
+  bundle, es-ES y moneda EUR.
+- **`ai-service/`** (`jbg_ai`, FastAPI): contratos `/v1/*`, snapshot
+  `openapi.json`, JWT interno y `STUB_MODE`, determinismo de los stubs.
+- **`terraform/` y `.github/workflows/`**: recursos AWS afectados, parámetros SSM,
+  impacto en el pipeline de despliegue.
+- **`openspec/` y `Documentos/`**: qué capability se especifica o modifica y qué
+  documentación queda alineada.
+
+La plantilla del cuerpo vive en `templates/pr-template.base.md` dentro de la skill.
+
+## 6. Breaking changes y cambios entre componentes
 
 - Un cambio es *breaking* solo con evidencia de ruptura de un consumidor (contrato
-  de API, esquema de datos, hook, env var obligatoria). Un añadido opcional no lo es.
-- Un cambio full-stack son dos PRs coordinadas (una por repo). Si existe rama
-  hermana, el cuerpo lo indica y especifica el orden de despliegue.
+  de API, DTO, esquema de datos, claim del JWT interno, variable obligatoria). Un
+  añadido opcional no lo es.
+- Un cambio full-stack es **una sola PR** que cruza componentes: el cuerpo debe
+  indicar el acoplamiento (backend ↔ frontend, .NET ↔ `jbg-ai`) y el orden de
+  despliegue cuando importe.
 
-## 7. Publicación
+## 7. Decisiones que son del usuario, no del agente
 
-- La PR no se crea en GitHub sin confirmación explícita del usuario.
-- La integración con `gh` es opcional; la solución no depende de ella.
+- **Rama base**: nunca se asume ni se deduce en silencio. Si el usuario no la ha
+  indicado, se le pregunta antes de generar nada, ofreciéndole la rama actual, la
+  sugerida por `origin/HEAD` y las demás candidatas. `pr-context.ps1` se detiene
+  con código 2 si no recibe `-BaseBranch`.
+- **Publicación**: la PR no se crea en GitHub sin confirmación explícita. La
+  integración con `gh` es opcional; la solución no depende de ella.

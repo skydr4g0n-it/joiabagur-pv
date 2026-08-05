@@ -1,152 +1,146 @@
 {
-  "$comment": "Clasificacion de archivos en dominios para el troceo (chunking) del diff. ARTEFACTO CANONICO: adresles-workspace/ai-config/. Editar aqui y re-sincronizar con scripts/sync-ai-config.ps1. El orden de 'domains' importa: gana la primera coincidencia. Globs: '*' = un segmento, '**' = cualquier ruta, '**/' = prefijo opcional.",
+  "$comment": "Clasificacion de archivos en dominios para el troceo (chunking) del diff de joiabagur-pv. Este fichero esta replicado en .agent/, .claude/, .codex/, .cursor/ y .opencode/skills/generate-pr/config/: editar uno y copiarlo a los otros cuatro. El orden de 'domains' importa: gana la primera coincidencia. Globs: '*' = un segmento, '**' = cualquier ruta, '**/' = prefijo opcional.",
   "chunking": {
     "maxChunkLines": 1200,
     "maxFileLines": 600,
     "summarizeOversizedFiles": true
   },
   "repoMarkers": {
-    "platform": ["backend/server.py", "backend"],
-    "woo": ["adresles.php"]
+    "joiabagur-pv": ["openspec/project.md", "backend/src/JoiabagurPV.API"]
   },
+  "siblingRepos": [],
   "domains": [
     {
       "name": "ai-tooling",
       "repo": "any",
       "priority": "high",
-      "globs": [".cursor/**", ".claude/**", "ai-config/**", "openspec/**", "**/CLAUDE.md", "**/CLAUDE.local.md", "**/AGENTS.md", "**/*.mdc"]
+      "globs": [".claude/**", ".cursor/**", ".agent/**", ".codex/**", ".opencode/**", ".github/skills/**", ".github/prompts/**", "**/CLAUDE.md", "**/CLAUDE.local.md", "**/AGENTS.md", "**/*.mdc"]
+    },
+    {
+      "name": "openspec",
+      "repo": "any",
+      "priority": "high",
+      "globs": ["openspec/**"]
     },
     {
       "name": "ci",
       "repo": "any",
       "priority": "low",
-      "globs": [".github/**", "**/buildspec*.yml", "**/.gitlab-ci.yml"]
-    },
-    {
-      "name": "docs",
-      "repo": "any",
-      "priority": "low",
-      "globs": ["**/*.md", "**/*.mdc", "memory-bank/**", "docs/**", "**/Prompts/**"]
-    },
-    {
-      "name": "deps",
-      "repo": "any",
-      "priority": "high",
-      "globs": ["**/requirements*.txt", "**/package.json", "**/package-lock.json", "**/yarn.lock", "**/composer.json", "**/composer.lock", "**/pyproject.toml"]
-    },
-    {
-      "name": "config",
-      "repo": "any",
-      "priority": "high",
-      "globs": ["**/.env.example", "**/*.ini", "**/*.cfg", "**/*.toml", "**/*.yaml", "**/*.yml", "**/*.json"]
-    },
-    {
-      "name": "tests",
-      "repo": "any",
-      "priority": "normal",
-      "globs": ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/*.test.js", "**/*.test.jsx", "**/__tests__/**", "**/*Test.php", "**/phpunit*.xml"]
+      "globs": [".github/workflows/**", ".github/**", "**/buildspec*.yml"]
     },
     {
       "name": "infra",
       "repo": "any",
       "priority": "high",
-      "globs": ["**/Dockerfile*", "**/docker-compose*.yml", "**/*.tf", "aws-migration/**", "**/deploy*.sh", "**/build-client-zip.ps1", "**/webpack.config.js"]
+      "globs": ["terraform/**", "**/Dockerfile*", "**/docker-compose*.yml", "**/.dockerignore", "**/nginx*.conf", "**/deploy*.sh", "**/*.tf"]
+    },
+    {
+      "name": "deps",
+      "repo": "any",
+      "priority": "high",
+      "globs": ["**/*.csproj", "**/*.sln", "**/packages.lock.json", "**/package.json", "**/package-lock.json", "**/yarn.lock", "**/pnpm-lock.yaml", "**/pyproject.toml", "**/uv.lock", "**/requirements*.txt"]
+    },
+    {
+      "name": "config",
+      "repo": "any",
+      "priority": "high",
+      "globs": ["**/appsettings*.json", "**/.env", "**/.env.*", "**/*.tfvars*", "**/global.json", "**/.python-version"]
+    },
+    {
+      "name": "docs",
+      "repo": "any",
+      "priority": "low",
+      "globs": ["Documentos/**", "docs/**", "**/*.md"]
+    },
+    {
+      "name": "tests",
+      "repo": "any",
+      "priority": "normal",
+      "globs": ["backend/src/JoiabagurPV.Tests/**", "backend/api-tests/**", "frontend/e2e/**", "frontend/src/test/**", "ai-service/tests/**", "**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx", "**/*Tests.cs", "**/test_*.py", "**/conftest.py", "**/playwright.config.ts", "**/vitest.config.ts"]
+    },
+    {
+      "name": "ai-contracts",
+      "repo": "any",
+      "priority": "high",
+      "globs": ["ai-service/openapi.json", "ai-service/src/jbg_ai/api/schemas/**", "ai-service/src/jbg_ai/api/auth.py", "ai-service/src/jbg_ai/api/deps.py"]
+    },
+    {
+      "name": "ai-service",
+      "repo": "any",
+      "priority": "high",
+      "globs": ["ai-service/**"]
+    },
+    {
+      "name": "ml",
+      "repo": "any",
+      "priority": "normal",
+      "globs": ["backend/scripts/ml-training/**", "**/*Embedding*", "**/*embedding*", "**/*recognition*"]
+    },
+    {
+      "name": "backend-auth",
+      "repo": "any",
+      "priority": "high",
+      "globs": ["**/JoiabagurPV.*/**/Auth*.cs", "**/JoiabagurPV.*/**/*Jwt*.cs", "**/JoiabagurPV.*/**/RefreshToken*.cs", "backend/src/JoiabagurPV.API/Middleware/**"]
+    },
+    {
+      "name": "backend-data",
+      "repo": "any",
+      "priority": "high",
+      "globs": ["backend/src/JoiabagurPV.Infrastructure/Data/**", "**/Migrations/**", "backend/src/JoiabagurPV.Domain/Entities/**"]
+    },
+    {
+      "name": "backend-domain",
+      "repo": "any",
+      "priority": "high",
+      "globs": ["backend/src/JoiabagurPV.Domain/**"]
+    },
+    {
+      "name": "backend-api",
+      "repo": "any",
+      "priority": "high",
+      "globs": ["backend/src/JoiabagurPV.API/Controllers/**", "backend/src/JoiabagurPV.Application/DTOs/**"]
+    },
+    {
+      "name": "backend-application",
+      "repo": "any",
+      "priority": "normal",
+      "globs": ["backend/src/JoiabagurPV.Application/**"]
+    },
+    {
+      "name": "backend-infrastructure",
+      "repo": "any",
+      "priority": "normal",
+      "globs": ["backend/src/JoiabagurPV.Infrastructure/**"]
+    },
+    {
+      "name": "backend-misc",
+      "repo": "any",
+      "priority": "normal",
+      "globs": ["backend/**"]
+    },
+    {
+      "name": "frontend-services",
+      "repo": "any",
+      "priority": "high",
+      "globs": ["frontend/src/services/**", "frontend/src/types/**", "frontend/src/config/**"]
+    },
+    {
+      "name": "frontend-pages",
+      "repo": "any",
+      "priority": "normal",
+      "globs": ["frontend/src/pages/**", "frontend/src/routing/**", "frontend/src/providers/**"]
+    },
+    {
+      "name": "frontend",
+      "repo": "any",
+      "priority": "normal",
+      "globs": ["frontend/**"]
     },
     {
       "name": "scripts",
       "repo": "any",
       "priority": "normal",
-      "globs": ["**/*.ps1", "**/*.sh", "**/*.bat"]
-    },
-    {
-      "name": "backend-auth",
-      "repo": "platform",
-      "priority": "high",
-      "globs": ["backend/auth.py", "backend/controllers/auth/**", "backend/services/auth_service.py", "backend/routes/auth*", "backend/utils/audit*"]
-    },
-    {
-      "name": "backend-data",
-      "repo": "platform",
-      "priority": "high",
-      "globs": ["backend/models.py", "backend/database.py"]
-    },
-    {
-      "name": "backend-core",
-      "repo": "platform",
-      "priority": "high",
-      "globs": ["backend/server.py", "backend/config*.py"]
-    },
-    {
-      "name": "backend-webhooks",
-      "repo": "platform",
-      "priority": "normal",
-      "globs": ["backend/controllers/webhooks/**", "backend/routes/webhook*"]
-    },
-    {
-      "name": "backend-api",
-      "repo": "platform",
-      "priority": "normal",
-      "globs": ["backend/controllers/**", "backend/routes/**"]
-    },
-    {
-      "name": "backend-services",
-      "repo": "platform",
-      "priority": "normal",
-      "globs": ["backend/services/**"]
-    },
-    {
-      "name": "backend-misc",
-      "repo": "platform",
-      "priority": "normal",
-      "globs": ["backend/**"]
-    },
-    {
-      "name": "frontend",
-      "repo": "platform",
-      "priority": "normal",
-      "globs": ["frontend/**"]
-    },
-    {
-      "name": "checkout",
-      "repo": "woo",
-      "priority": "high",
-      "globs": ["**/*checkout*", "includes/**checkout**", "assets/**checkout**"]
-    },
-    {
-      "name": "woo-blocks",
-      "repo": "woo",
-      "priority": "high",
-      "globs": ["**/*block*", "includes/**block**", "assets/js/**block**"]
-    },
-    {
-      "name": "plugin-bootstrap",
-      "repo": "woo",
-      "priority": "high",
-      "globs": ["adresles.php", "adresles-config.php", "uninstall.php"]
-    },
-    {
-      "name": "plugin-php",
-      "repo": "woo",
-      "priority": "normal",
-      "globs": ["includes/**"]
-    },
-    {
-      "name": "plugin-js",
-      "repo": "woo",
-      "priority": "normal",
-      "globs": ["assets/js/**", "assets/src/**/*.js", "assets/src/**/*.jsx"]
-    },
-    {
-      "name": "plugin-assets",
-      "repo": "woo",
-      "priority": "low",
-      "globs": ["assets/css/**", "assets/scss/**", "assets/img/**", "assets/**"]
-    },
-    {
-      "name": "i18n",
-      "repo": "woo",
-      "priority": "low",
-      "globs": ["languages/**", "**/*.po", "**/*.pot", "**/*.mo"]
+      "globs": ["**/*.ps1", "**/*.sh", "**/*.bat", "**/*.sql"]
     }
   ],
   "fallbackDomain": "misc"

@@ -8,17 +8,25 @@ modelos de datos, permisos o variables de entorno. Cubre dos capacidades:
 
 Un cambio es *breaking* solo si rompe un consumidor existente. Busca evidencia:
 
-- **Contrato de API**: endpoint eliminado o renombrado; campo de
-  request/response eliminado, renombrado o con tipo cambiado; parámetro
-  obligatorio nuevo; código de estado distinto.
-- **Modelo de datos**: campo eliminado o renombrado en `models.py` / esquema;
-  cambio de tipo; índice nuevo que exige migración.
-- **Configuración**: variable de entorno **nueva y obligatoria** (sin default), o
-  variable renombrada/eliminada.
-- **Comportamiento**: cambio en el resultado esperado de una función pública con
-  el mismo input.
-- **Plugin WooCommerce**: hook/filtro eliminado o con firma cambiada; cambio en
-  un parámetro de shortcode o en el contrato de un endpoint AJAX/REST.
+- **Contrato de API (.NET)**: endpoint eliminado o renombrado en
+  `JoiabagurPV.API/Controllers/**`; propiedad de un DTO
+  (`JoiabagurPV.Application/DTOs/**`) eliminada, renombrada o con tipo cambiado;
+  parámetro obligatorio nuevo; código de estado distinto. El consumidor es el
+  frontend (`frontend/src/services/**` + `frontend/src/types/**`).
+- **Contrato de `jbg-ai`**: cambio en los schemas Pydantic de `/v1/*` o en los
+  claims del JWT interno (`user_id`, `role`, `pos_id`, `trace_id`). Si
+  `ai-service/openapi.json` no se actualiza en el mismo diff, el test de snapshot
+  falla — es breaking de facto.
+- **Modelo de datos**: propiedad eliminada o renombrada en
+  `JoiabagurPV.Domain/Entities/**`, cambio de tipo, o migración de EF Core que
+  exige backfill o no es reversible.
+- **Configuración**: variable de entorno o clave de `appsettings*.json` **nueva y
+  obligatoria** (sin default), renombrada o eliminada; parámetro nuevo en SSM
+  (`/jpv/prod/*`).
+- **Comportamiento**: cambio en el resultado esperado de un método público con el
+  mismo input; cambio en una regla de negocio documentada en
+  `openspec/project.md` (validación de stock, snapshot de precio, ventana de
+  devolución, atomicidad del checkout masivo).
 
 Si no hay evidencia de ruptura, **no** marques breaking change. Un campo nuevo
 *opcional* o un endpoint *nuevo* no son breaking.
@@ -29,18 +37,25 @@ Clasifica el riesgo del conjunto y justifícalo:
 
 | Nivel | Señales |
 |---|---|
-| **Alto** | Toca `auth.py`, `database.py`, `server.py`, `models.py`; breaking change confirmado; migración de datos. |
-| **Medio** | Lógica de negocio nueva en services/controllers; cambio en flujo de checkout; dependencia nueva. |
+| **Alto** | Toca autenticación/JWT, `JoiabagurPVDbContext`, entidades de dominio, `Program.cs`, migraciones de EF Core, `terraform/`, `ai-service/openapi.json`; breaking change confirmado; migración de datos. |
+| **Medio** | Lógica de negocio nueva en `JoiabagurPV.Application/Services/**`; cambios en el flujo de venta, carrito/checkout masivo o devoluciones; dependencia nueva; cambios en inferencia de imagen (embeddings/umbrales). |
 | **Bajo** | Docs, tests, formateo, cambios aislados sin efecto en contratos. |
 
 Revisa además, si el diff lo evidencia:
 
-- **Seguridad**: manejo de secrets, validación/sanitización de inputs, cambios en
-  RBAC/permisos, escape de salida (XSS), nonces de WordPress.
-- **Multi-tenancy** (backend): toda query a recursos de ecommerce debe filtrar por
-  `ecommerce_account_id`. Señala si un cambio lo omite.
-- **Performance**: queries nuevas a BD, posible N+1, llamadas a APIs externas sin
-  timeout, procesamiento síncrono pesado.
+- **Seguridad**: manejo de secretos (nunca en el repo; van a SSM), validación de
+  entrada con FluentValidation / Zod, cambios en RBAC y en los atributos
+  `[Authorize]`, hashing BCrypt, configuración de CORS.
+- **Control de acceso por punto de venta**: un Operador solo puede ver y operar
+  sobre sus POS asignados (`UserPointOfSale`). Toda consulta de inventario,
+  ventas o devoluciones debe filtrar por el POS del usuario. En `jbg-ai`, el
+  `pos_id` del token manda sobre el body. **Señala si un cambio lo omite.**
+- **Integridad de datos**: stock que pueda quedar negativo, precio de venta que
+  deje de ser snapshot, pérdida de atomicidad en venta/devolución/importación,
+  idempotencia del checkout masivo.
+- **Performance y free-tier**: queries nuevas sin índice, posible N+1 en EF Core,
+  listados sin paginación (máx. 50/página), llamadas externas sin timeout,
+  crecimiento del bundle del frontend (< 500 KB inicial).
 - **Deuda técnica**: `TODO`/`FIXME` introducidos, atajos, falta de tests.
 
 ## Salida

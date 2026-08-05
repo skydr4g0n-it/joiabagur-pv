@@ -14,7 +14,7 @@ Cada frase del body debe poder rastrearse a una línea de un chunk del diff.
 ## Estilo
 
 - **Técnico y específico**: nombres reales de archivos, funciones, clases, endpoints.
-  Usa la forma `archivo.py:función()` o `archivo.php:42`.
+  Usa la forma `Archivo.cs:Método()`, `archivo.tsx:componente` o `archivo.py:42`.
 - **Objetivo**: sin adjetivos de marketing ("potente", "robusto", "increíble").
 - **Conciso**: una idea por frase; sin repetir lo que ya dice otra sección.
 - **Idioma**: prosa en español; identificadores de código en su idioma original.
@@ -22,18 +22,20 @@ Cada frase del body debe poder rastrearse a una línea de un chunk del diff.
 ### Bien vs mal
 
 ❌ "Se mejoró la autenticación para hacerla más robusta y segura."
-✅ "Se añadió verificación del claim `exp` en `backend/auth.py:verify_token()`;
-   todas las rutas protegidas rechazan ahora tokens expirados con HTTP 401."
+✅ "Se añadió validación del claim `exp` en
+   `JoiabagurPV.Application/Services/AuthService.cs:ValidateToken()`; los
+   endpoints con `[Authorize]` rechazan ahora tokens expirados con HTTP 401."
 
 ❌ "Se actualizó la documentación."
 ✅ "Se documentó el flujo de renovación de tokens en
-   `memory-bank/domains/key-flows.md` (sección 'Autenticación')."
+   `Documentos/arquitectura.md` (sección 'Flujo de Autenticación')."
 
 ## Agrupación de cambios
 
 Agrupa la sección "Cambios realizados" **por dominio** (los del `manifest.json`:
-`backend-auth`, `frontend`, `checkout`, `infra`, `docs`...), no por archivo suelto.
-Cada grupo: qué cambió y por qué, con referencias concretas.
+`backend-auth`, `backend-api`, `frontend-services`, `ai-service`, `infra`,
+`openspec`, `docs`...), no por archivo suelto. Cada grupo: qué cambió y por qué,
+con referencias concretas.
 
 ## Checklist
 

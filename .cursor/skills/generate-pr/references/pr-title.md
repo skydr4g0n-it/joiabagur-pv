@@ -11,9 +11,9 @@ Conventional Commits, en minúscula, sin punto final, ≤ 72 caracteres:
 ```
 
 - **tipo**: `feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `chore`, `ci`, `build`.
-- **ámbito**: el dominio dominante del `manifest.json` (`auth`, `orders`,
-  `checkout`, `webhooks`, `frontend`, `infra`...). Omítelo si el cambio es
-  transversal.
+- **ámbito**: el dominio dominante del `manifest.json`, abreviado (`auth`,
+  `sales`, `inventory`, `products`, `returns`, `frontend`, `ai-service`,
+  `openspec`, `infra`...). Omítelo si el cambio es transversal.
 - **resumen**: qué hace el cambio, en imperativo y en español.
 - Si hay un breaking change confirmado, añade `!` tras el ámbito: `feat(api)!: ...`.
 
@@ -29,8 +29,9 @@ Conventional Commits, en minúscula, sin punto final, ≤ 72 caracteres:
 ## Ejemplos
 
 - `feat(auth): añadir refresh tokens con rotación`
-- `fix(webhooks): evitar procesamiento duplicado de webhooks de WooCommerce`
-- `refactor(checkout): extraer validación de dirección a un helper`
-- `chore(deps): actualizar FastAPI a 0.110.1`
+- `fix(inventory): evitar stock negativo en la importación de Excel`
+- `refactor(sales): extraer validación de stock a un servicio compartido`
+- `feat(ai-service): congelar contratos /v1 con stubs deterministas`
+- `chore(deps): actualizar Metronic a la última versión de Radix UI`
 
 Evita títulos genéricos ("varios cambios", "mejoras", "actualización").

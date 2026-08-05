@@ -247,3 +247,6 @@ models/
 *~
 .cache/
 
+# Contexto generado por la skill generate-pr (manifest, chunks del diff, body)
+.pr/
+

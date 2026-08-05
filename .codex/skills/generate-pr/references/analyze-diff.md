@@ -4,7 +4,7 @@ Módulo cargado por `generate-pr` en la Fase B. Se aplica **a un chunk cada vez*
 
 ## Entrada
 
-Un archivo `.pr/chunks/NN-<dominio>.diff` y su entrada en `manifest.json`
+Un archivo `.pr/<rama>/chunks/NN-<dominio>.diff` y su entrada en `manifest.json`
 (dominio, archivos, líneas, `truncated`).
 
 ## Procedimiento
@@ -19,10 +19,12 @@ Para el chunk en curso, extrae y anota:
 3. **Impacto** — qué otras partes del sistema dependen de lo que cambió
    (contrato de API, esquema de datos, comportamiento observable).
 4. **Señales** que disparan otros módulos:
-   - auth / permisos / validación / contratos de API / `models.py` / env vars
-     → marca el chunk para `breaking-and-risk.md`.
-   - Docker / deps / infra / `.env.example` / migraciones
+   - auth / permisos / DTOs / entidades de dominio / schemas de `jbg-ai` /
+     `appsettings*.json` → marca el chunk para `breaking-and-risk.md`.
+   - Docker / Terraform / deps / migraciones de EF Core / workflows de CI
      → marca el chunk para `deployment-impact.md`.
+   - dominios de más de un componente (`backend-*` + `frontend-*` + `ai-*`)
+     → marca la PR para `cross-component.md`.
 5. **Ruido a descartar** — reordenado de imports, formato, espacios: menciónalo de
    forma agregada ("formateo automático en N archivos"), no archivo por archivo.
 

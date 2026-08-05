@@ -13,17 +13,23 @@
 # Cada rama tiene su subcarpeta (slug de la rama). Las subcarpetas de ramas que
 # ya no existen se podan automaticamente en cada ejecucion (autolimpieza).
 #
+# La rama base NUNCA se asume: hay que pasarla con -BaseBranch. Si falta, el
+# script se detiene, sugiere la que detectaria (origin/HEAD) y lista candidatas,
+# para que quien lo invoca pregunte al usuario. -AutoBase acepta la sugerencia de
+# forma explicita (uso desatendido).
+#
 # Por defecto refresca la rama base con `git fetch origin <base>` para no
 # comparar contra una copia local desactualizada (-NoFetch lo desactiva).
 #
 # La skill `generate-pr` consume manifest.json y analiza los chunks de uno en
 # uno (contexto incremental). Ver SKILL.md.
 #
-# ARTEFACTO CANONICO: adresles-workspace/ai-config/. Editar alli y re-sincronizar
-# con scripts/sync-ai-config.ps1.
+# Este script esta replicado en .agent/, .claude/, .codex/, .cursor/ y
+# .opencode/skills/generate-pr/scripts/. Editar una copia y replicarla al resto.
 #
 # Uso:
-#   ./pr-context.ps1 [-BaseBranch main] [-OutDir .pr] [-NoFetch]
+#   ./pr-context.ps1 -BaseBranch <rama> [-OutDir .pr] [-NoFetch]
+#   ./pr-context.ps1 -AutoBase              # acepta la base detectada, sin preguntar
 # =============================================================================
 
 [CmdletBinding()]
@@ -32,7 +38,8 @@ param(
     [string]$OutDir = ".pr",
     [int]$MaxChunkLines = 0,
     [int]$MaxFileLines = 0,
-    [switch]$NoFetch
+    [switch]$NoFetch,
+    [switch]$AutoBase
 )
 
 $ErrorActionPreference = "Stop"
@@ -84,7 +91,7 @@ $config = Get-Content -Raw -LiteralPath $configPath | ConvertFrom-Json
 if ($MaxChunkLines -le 0) { $MaxChunkLines = [int]$config.chunking.maxChunkLines }
 if ($MaxFileLines  -le 0) { $MaxFileLines  = [int]$config.chunking.maxFileLines }
 
-# --- Deteccion del repo (platform / woo) --------------------------------------
+# --- Deteccion del repo (via repoMarkers de domains.json) ---------------------
 
 $repoKey = "_default"
 foreach ($prop in $config.repoMarkers.PSObject.Properties) {
@@ -98,16 +105,55 @@ foreach ($prop in $config.repoMarkers.PSObject.Properties) {
 
 $currentBranch = (Invoke-Git @("rev-parse", "--abbrev-ref", "HEAD")).Trim()
 
-if (-not $BaseBranch) {
+# Base SUGERIDA. Ojo: es solo una sugerencia, no se aplica sola (ver bloque
+# siguiente). La rama base la decide siempre una persona.
+function Get-SuggestedBase {
     $head = (Invoke-Git @("rev-parse", "--abbrev-ref", "origin/HEAD") -AllowFail).Trim()
-    if ($head -and $head -notmatch "fatal") {
-        $BaseBranch = ($head -replace "^origin/", "")
-    } elseif ((Invoke-Git @("rev-parse", "--verify", "origin/main") -AllowFail) -notmatch "fatal") {
-        $BaseBranch = "main"
-    } elseif ((Invoke-Git @("rev-parse", "--verify", "origin/master") -AllowFail) -notmatch "fatal") {
-        $BaseBranch = "master"
+    if ($head -and $head -notmatch "fatal") { return ($head -replace "^origin/", "") }
+    if ((Invoke-Git @("rev-parse", "--verify", "origin/main")   -AllowFail) -notmatch "fatal") { return "main" }
+    if ((Invoke-Git @("rev-parse", "--verify", "origin/master") -AllowFail) -notmatch "fatal") { return "master" }
+    return ""
+}
+
+# REGLA: la rama base NUNCA se da por sentada.
+# Sin -BaseBranch explicito (o -AutoBase como consentimiento explicito a la
+# deteccion), el script se detiene sin generar nada: quien lo invoca debe
+# preguntar antes al usuario contra que rama quiere abrir la PR.
+if (-not $BaseBranch) {
+    $suggested = Get-SuggestedBase
+    if ($AutoBase) {
+        if (-not $suggested) { throw "No se pudo detectar ninguna rama base y no se indico -BaseBranch." }
+        $BaseBranch = $suggested
+        Write-Host "pr-context :: -AutoBase: se usa la base detectada '$BaseBranch'." -ForegroundColor Yellow
     } else {
-        $BaseBranch = "main"
+        Write-Host ""
+        Write-Host "pr-context :: falta la rama base. No se asume ninguna." -ForegroundColor Yellow
+        Write-Host "  Rama actual (origen de la PR): $currentBranch" -ForegroundColor DarkGray
+        if ($suggested) {
+            Write-Host "  Sugerencia (origin/HEAD):      $suggested" -ForegroundColor Cyan
+        } else {
+            Write-Host "  Sin sugerencia: 'origin/HEAD' no esta definido en este clon." -ForegroundColor DarkGray
+        }
+        $cands = @()
+        $remoteRaw = Invoke-Git @("branch", "-r", "--format=%(refname:short)") -AllowFail
+        if ($LASTEXITCODE -eq 0) {
+            # Solo refs con '<remoto>/<rama>'. Descarta la abreviatura del
+            # simbolico refs/remotes/origin/HEAD, que git muestra como 'origin'.
+            $cands = @($remoteRaw -split "`n" |
+                ForEach-Object { $_.Trim() } |
+                Where-Object { $_ -match '/' } |
+                ForEach-Object { ($_ -split '/', 2)[1] } |
+                Where-Object { $_ -and $_ -ne 'HEAD' -and $_ -ne $currentBranch } |
+                Select-Object -Unique)
+        }
+        if ($cands.Count -gt 0) {
+            Write-Host "  Candidatas:                    $($cands -join ', ')" -ForegroundColor Cyan
+        }
+        Write-Host ""
+        Write-Host "  Reejecuta indicando la base:   -BaseBranch <rama>" -ForegroundColor Green
+        Write-Host "  (o -AutoBase para aceptar explicitamente la sugerencia)" -ForegroundColor DarkGray
+        Write-Host ""
+        exit 2
     }
 }
 
@@ -358,12 +404,17 @@ $dirty = (Invoke-Git @("status", "--porcelain")).Trim()
 $hasUncommitted = [bool]$dirty
 
 # --- Awareness multi-repo: buscar la misma rama en repos hermanos -------------
+#
+# joiabagur-pv es un monorepo (backend + frontend + ai-service + terraform), asi
+# que 'siblingRepos' en domains.json esta vacio y este bloque no hace nada. Se
+# conserva por si en el futuro se extrae algun componente a su propio repo:
+# basta con anadir el nombre de la carpeta hermana a esa lista.
 
 $siblingRepos = @()
 $parent = Split-Path -Parent $repoRoot
 $repoLeaf = Split-Path -Leaf $repoRoot
-foreach ($sibName in @("adresles-platform-2.0", "adresles-woocommerce")) {
-    if ($sibName -eq $repoLeaf) { continue }
+foreach ($sibName in @($config.siblingRepos)) {
+    if (-not $sibName -or $sibName -eq $repoLeaf) { continue }
     $sibPath = Join-Path $parent $sibName
     if (Test-Path (Join-Path $sibPath ".git")) {
         $match = & git -C $sibPath rev-parse --verify $currentBranch 2>$null
