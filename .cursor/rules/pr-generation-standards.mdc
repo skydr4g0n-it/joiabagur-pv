@@ -1,0 +1,69 @@
+---
+description: Estándares de generación y redacción de Pull Requests en Adresles (análisis del diff por chunks, cero alucinación, lenguaje técnico senior). Cárgala al preparar, redactar o revisar el cuerpo de una PR.
+alwaysApply: false
+---
+
+# Estándares de generación de Pull Requests — Adresles
+
+Estas reglas rigen cualquier redacción del cuerpo de una PR, ya sea con la skill
+`generate-pr` (recomendado) o de forma manual.
+
+## 1. La evidencia manda
+
+- El cuerpo de una PR describe **únicamente** los cambios reales del diff entre la
+  rama y su base. La fuente de verdad es el diff, no los mensajes de commit ni la
+  intención declarada.
+- ❌ Nunca inventes cambios, archivos, efectos, métricas ni resultados de test.
+- ❌ Nunca describas archivos que no estén en el diff.
+- Lo que no se pueda verificar en el código → `UNKNOWN` o ítem de checklist sin
+  marcar. No se asume.
+
+## 2. Análisis por chunks (anti-alucinación, bajo contexto)
+
+- El diff **no se pasa entero** a un modelo. Se trocea por dominios con el script
+  determinista `pr-context.ps1` y se analiza **un chunk cada vez**.
+- Un archivo cuyo diff supera el umbral se resume a cabeceras de hunk; su análisis
+  se limita a "se modificaron N regiones" y se indica que está resumido.
+- La recopilación de contexto Git (ramas, commits, stats, troceo) es responsabilidad
+  del script, sin IA. La inferencia técnica es responsabilidad del modelo, acotada
+  a cada chunk.
+
+## 3. Separación de fases
+
+| Fase | Qué produce | Quién |
+|---|---|---|
+| Recopilación | `manifest.json` + `chunks/*.diff` | script (determinista) |
+| Análisis | intención, impacto, riesgo, breaking changes por dominio | modelo, chunk a chunk |
+| Redacción | título + cuerpo según plantilla del repo | modelo |
+
+No se mezclan: no se redacta mientras se analiza, no se analiza sin contexto recopilado.
+
+## 4. Estilo de redacción
+
+- Lenguaje técnico senior, en **español**, para personas que conocen el proyecto.
+- Específico: nombres reales de archivos, funciones, clases, endpoints (`archivo:símbolo`).
+- Objetivo: sin adjetivos de marketing ni PRs genéricos.
+- Conciso: una idea por frase; sin duplicar entre secciones.
+- Agrupa "Cambios realizados" por dominio, no por archivo suelto.
+
+## 5. Plantillas especializadas por repo
+
+- `adresles-platform-2.0`: prioriza API, contratos, modelo de datos MongoDB,
+  multi-tenancy, seguridad, rendimiento, observabilidad, despliegue ECS.
+- `adresles-woocommerce`: prioriza flujo de checkout, WooCommerce Blocks,
+  hooks/filtros, compatibilidad hacia atrás, ecosistema WordPress, impacto para el
+  comerciante.
+- La plantilla canónica vive en `ai-config/<repo>/pr-template.md` y se sincroniza
+  a la skill. No se usa una plantilla genérica si existe la del repo.
+
+## 6. Breaking changes y multi-repo
+
+- Un cambio es *breaking* solo con evidencia de ruptura de un consumidor (contrato
+  de API, esquema de datos, hook, env var obligatoria). Un añadido opcional no lo es.
+- Un cambio full-stack son dos PRs coordinadas (una por repo). Si existe rama
+  hermana, el cuerpo lo indica y especifica el orden de despliegue.
+
+## 7. Publicación
+
+- La PR no se crea en GitHub sin confirmación explícita del usuario.
+- La integración con `gh` es opcional; la solución no depende de ella.
