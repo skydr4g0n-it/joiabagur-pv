@@ -52,6 +52,14 @@
 - **State Management**: Context API (or Zustand if needed)
 - **ML Framework**: TensorFlow.js / ONNX.js (client-side image recognition)
 
+### AI Service (`jbg-ai`)
+- **Runtime**: Python 3.11+
+- **Framework**: FastAPI + Uvicorn (app factory, `docs_url` disabled)
+- **Package Manager**: uv (`pyproject.toml` + `uv.lock`)
+- **Configuration**: pydantic-settings with fail-fast on required env
+- **Service Auth**: internal HS256 JWT (PyJWT); the .NET API is the only issuer
+- **Contract**: frozen `/v1` surface versioned in `ai-service/openapi.json`
+
 ### Infrastructure
 - **Containers**: Docker, Docker Compose (development)
 - **CI/CD**: GitHub Actions
@@ -70,12 +78,17 @@
 - Integration Tests: Testcontainers 4.x (PostgreSQL)
 
 **Frontend:**
-- Test Runner: Vitest 2.x
+- Test Runner: Vitest 4.x
 - Component Testing: React Testing Library 16.x
 - User Events: @testing-library/user-event 14.x
 - API Mocking: MSW (Mock Service Worker) 2.x
 - E2E Testing: Playwright 1.x
 - DOM Environment: jsdom 25.x
+
+**AI Service (`jbg-ai`):**
+- Test Framework: pytest 9.x
+- HTTP Client: httpx (FastAPI `TestClient`)
+- No real LLM, embedding or RDS calls; stub tests block socket connections
 
 ---
 
@@ -145,8 +158,8 @@
 
 ### Git Workflow
 
-- **Main branch**: `main` (production-ready)
-- **Development branch**: `develop` (integration)
+- **Main branch**: `master` (production-ready)
+- **Integration branch**: `ai-eng` (AI final project work)
 - **Feature branches**: `feature/[epic]-[description]`
 - **Commits**: Conventional commits format
 - **CI/CD**: GitHub Actions for build, test, and deploy

@@ -89,7 +89,7 @@ El sistema está compuesto por cinco contenedores principales: una aplicación w
   - Evaluación offline (golden set, métricas de recuperación y generación)
 - **Lo que NO hace**: no calcula precio, stock ni permisos; no escribe ni lee el esquema `public` por SQL; no atiende al navegador
 - **Despliegue**: contenedor Docker en la misma EC2, en red interna; **el puerto no se publica en nginx**. En desarrollo, servicio `jbg-ai` del Compose (`8001` → 8000)
-- **Estado actual**: esqueleto ejecutable con `GET /health` (C01). Los routers `/v1/*` y la autenticación de servicio llegan en C02
+- **Estado actual**: contrato congelado (C02) — 8 endpoints `/v1` con modelos Pydantic completos, JWT interno HS256 y `openapi.json` versionado. Las respuestas son stubs deterministas bajo `STUB_MODE`; la lógica real llega change a change (C09, C13, C14, C24, C26, C30, C35)
 
 > **Regla de frontera (diseño §6.2):** *Python calcula parecidos y redacta; .NET calcula números y decide.* El backend .NET actúa de **hidratador** y es la autoridad final: descarta cualquier candidato que ya no cumpla las reglas de negocio.
 
@@ -383,7 +383,7 @@ C4Component
 
 ### 3.3 Componentes del Servicio de IA
 
-El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y generación, y servicios transversales. **Estado actual (C01):** solo existen la fábrica de aplicación, el health y el middleware de trazas; el resto está planificado en los changes C02–C38.
+El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y generación, y servicios transversales. **Estado actual (C02):** existen la fábrica de aplicación, el health, el middleware de trazas, los seis routers de dominio con sus esquemas congelados, la capa de stubs deterministas y la dependencia de autenticación de servicio. La capa de recuperación y generación sigue planificada en los changes C09–C38.
 
 #### Routers de Dominio (`/v1/*`)
 
@@ -407,6 +407,8 @@ El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y 
 
 - **Settings**: configuración por entorno con pydantic-settings y *fail-fast* de variables obligatorias. **Existe (C01).**
 - **TraceId Middleware**: propaga `trace_id` desde la cabecera o el claim del JWT hacia los logs estructurados. **Existe (C01).**
+- **Service Auth Dependency**: valida el JWT interno HS256 y construye el `ServicePrincipal`; el scope del token prevalece sobre el body. **Existe (C02).**
+- **Stub Layer**: respuestas deterministas bajo `STUB_MODE`; con el flag desactivado, la ruta sin implementación real responde 501. **Existe (C02).**
 - **Service Auth Dependency**: valida el JWT interno HS256 y construye el `ServicePrincipal`; el scope del token prevalece sobre el body.
 - **Stub Layer**: respuestas deterministas bajo `STUB_MODE` para que .NET integre sin LLM ni base de datos.
 - **Eval Harness**: golden set, métricas de recuperación y validador anti-alucinación (ejecución offline).

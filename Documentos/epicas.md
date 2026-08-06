@@ -366,7 +366,7 @@ Cimientos del microservicio `jbg-ai`: esqueleto ejecutable, contratos HTTP conge
 
 **User Stories:**
 - [HU-AIENG-001: Esqueleto ejecutable del servicio de IA](Historias/AI-Eng/HU-AIENG-001.md) *(C01 — hecho)*
-- [HU-AIENG-002: Contratos congelados y autenticación de servicio](Historias/AI-Eng/HU-AIENG-002.md) *(C02)*
+- [HU-AIENG-002: Contratos congelados y autenticación de servicio](Historias/AI-Eng/HU-AIENG-002.md) *(C02 — hecho)*
 
 ---
 

@@ -28,7 +28,7 @@ Arquitectura monolítica simple con backend y frontend separados, desplegados en
 
 ### Servicio de IA (`jbg-ai`)
 
-Microservicio añadido en el Proyecto Final de IA (change `init-ai-service-skeleton` / C01). Vive en `ai-service/` y es un contenedor independiente del backend .NET.
+Microservicio añadido en el Proyecto Final de IA (changes `init-ai-service-skeleton` / C01 y `add-ai-service-contracts-and-auth` / C02). Vive en `ai-service/` y es un contenedor independiente del backend .NET.
 
 - **Lenguaje**: Python 3.11
 - **Framework**: FastAPI (fábrica `create_app`, `docs_url` deshabilitado)
@@ -38,6 +38,8 @@ Microservicio añadido en el Proyecto Final de IA (change `init-ai-service-skele
 - **Base de datos**: la misma PostgreSQL, en el esquema `ai` con extensión **pgvector** (el esquema y la extensión llegan en C05; en C01 solo se garantiza que la imagen los admita)
 - **Contenedorización**: Docker (`python:3.11-slim-bookworm`)
 - **Observabilidad**: logging estructurado con `trace_id` propagado por middleware
+- **Autenticación entre servicios**: JWT interno HS256 con `PyJWT`; claims obligatorios `user_id`, `role`, `pos_id` y `trace_id` (C02)
+- **Contrato**: 8 endpoints `/v1` congelados en `ai-service/openapi.json`, con test de snapshot; `STUB_MODE` sirve respuestas deterministas mientras la lógica real no existe (C02)
 
 **Frontera de responsabilidad:** Python solo hace cálculo vectorial y generación con LLM; .NET conserva toda la regla de negocio y es la autoridad final sobre precio, stock y permisos. Python **nunca** lee ni escribe el esquema `public` por SQL, y el navegador nunca habla con Python: la SPA llama al backend .NET y este llama a `jbg-ai` con un JWT interno de servicio.
 
@@ -139,7 +141,7 @@ El fichero real levanta la base de datos, pgAdmin y el servicio de IA. El backen
 |---|---|---|---|
 | `postgres` | `pgvector/pgvector:pg15` | `5433` → 5432 | Imagen con **pgvector** disponible (C01). El esquema `ai` y `CREATE EXTENSION vector` llegan en C05 |
 | `pgadmin` | `dpage/pgadmin4` | `8080` → 80 | Administración de la BD |
-| `jbg-ai` | build de `../ai-service` | `8001` → 8000 | Variables mínimas: `APP_ENV`, `SERVICE_VERSION`, `LOG_LEVEL` |
+| `jbg-ai` | build de `../ai-service` | `8001` → 8000 | Variables: `APP_ENV`, `SERVICE_VERSION`, `LOG_LEVEL`, `JWT_SECRET` (placeholder local; en producción desde SSM en C17) y `STUB_MODE` |
 
 Todos comparten la red `jpv-network`, que es la que permitirá a `jbg-ai` alcanzar Postgres sin exponer puertos adicionales.
 
@@ -379,10 +381,12 @@ joiabagur-pv/
 │   ├── src/                             # pages, components, services, hooks, providers, routing, types
 │   ├── e2e/                             # Playwright
 │   └── package.json
-├── ai-service/                          # Microservicio de IA (C01)
+├── ai-service/                          # Microservicio de IA (C01-C02)
 │   ├── src/jbg_ai/
-│   │   ├── api/                         # main.py (create_app), middleware.py
+│   │   ├── api/                         # main.py (create_app), auth.py, deps.py, middleware.py, routers/, schemas/
+│   │   ├── stubs/                       # respuestas deterministas bajo STUB_MODE
 │   │   └── config/                      # settings.py (pydantic-settings)
+│   ├── openapi.json                     # snapshot versionado del contrato
 │   ├── tests/
 │   ├── pyproject.toml · uv.lock
 │   └── Dockerfile
