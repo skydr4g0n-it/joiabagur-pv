@@ -172,6 +172,14 @@ After completing an OpenSpec change implementation (e.g., via `openspec-apply`),
 | `Documentos/modelo-c4.md` | New components, containers, or integration points added |
 | `Documentos/arquitectura.md` | Architectural patterns, layers, or cross-cutting concerns changed |
 | `Documentos/Guias/*.md` | User-facing flows, validations, or FAQ entries affected |
+| `README.md` (root) | Installation steps, architecture, data model, or documented API endpoints changed — technical sections only; the deliverable sections (0, 1.1–1.3, 5, 6) are frozen |
+| `backend/README.md` | Endpoints, authorization matrix, environment variables, migrations, or test setup changed |
+| `frontend/README.md` | Tech stack versions, npm scripts, or test setup changed |
+| `ai-service/README.md` | `jbg-ai` contract, settings, layout, non-goals, or the change marker (C01, C02…) changed |
+| `terraform/README.md` | AWS resources, variables, outputs, or `/jpv/prod/*` parameters changed |
+| `openspec/config.yaml` | A fact restated in the condensed `context` block changed |
+
+Run the `update-docs` command (skill replicated in `.agent/`, `.claude/`, `.codex/`, `.cursor/` and `.opencode/skills/update-docs/`) to detect which of these are affected by the latest committed and uncommitted changes, review them against the real code, and apply the updates after confirmation.
 
 ---
 

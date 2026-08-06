@@ -250,3 +250,6 @@ models/
 # Contexto generado por la skill generate-pr (manifest, chunks del diff, body)
 .pr/
 
+# Contexto generado por la skill update-docs (manifest, resumen, plan)
+.docs-update/
+
