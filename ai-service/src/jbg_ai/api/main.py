@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import FastAPI
 
 from jbg_ai.api.middleware import TraceIdMiddleware
+from jbg_ai.api.routers import DOMAIN_ROUTERS, evals
 from jbg_ai.config import Settings, get_settings
 
 
@@ -49,11 +50,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = resolved
     app.add_middleware(TraceIdMiddleware)
 
-    @app.get("/health")
+    @app.get("/health", tags=["health"], summary="Public liveness probe")
     def health() -> dict[str, Any]:
         return {
             "status": "OK",
             "version": resolved.service_version,
         }
+
+    for router in DOMAIN_ROUTERS:
+        app.include_router(router)
+
+    # Evals is a development tool: under a production profile the path must not
+    # exist at all, rather than answer a documented but misleading 404.
+    if resolved.enable_dev_endpoints:
+        app.include_router(evals.router)
 
     return app

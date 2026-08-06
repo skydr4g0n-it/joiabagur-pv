@@ -1,0 +1,1867 @@
+{
+  "components": {
+    "schemas": {
+      "AssistContext": {
+        "description": "Optional hints the operator can pass along with the query.",
+        "properties": {
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "occasion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occasion"
+          },
+          "preferred_materials": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Preferred Materials",
+            "type": "array"
+          },
+          "recipient": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipient"
+          }
+        },
+        "title": "AssistContext",
+        "type": "object"
+      },
+      "AssistGroup": {
+        "description": "One product family; members are the variants the operator can disambiguate.",
+        "properties": {
+          "family_id": {
+            "title": "Family Id",
+            "type": "string"
+          },
+          "family_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Family Label"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/AssistGroupMember"
+            },
+            "title": "Members",
+            "type": "array"
+          }
+        },
+        "required": [
+          "family_id",
+          "members"
+        ],
+        "title": "AssistGroup",
+        "type": "object"
+      },
+      "AssistGroupMember": {
+        "properties": {
+          "materials": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Materials",
+            "type": "array"
+          },
+          "product_id": {
+            "title": "Product Id",
+            "type": "string"
+          },
+          "score": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "type": "number"
+          },
+          "sku": {
+            "title": "Sku",
+            "type": "string"
+          },
+          "variant_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the variant is unknown",
+            "title": "Variant Label"
+          }
+        },
+        "required": [
+          "product_id",
+          "sku",
+          "score"
+        ],
+        "title": "AssistGroupMember",
+        "type": "object"
+      },
+      "AssistRequest": {
+        "properties": {
+          "context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssistContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "locale": {
+            "default": "es-ES",
+            "title": "Locale",
+            "type": "string"
+          },
+          "pos_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Accepted for client compatibility and ignored; scope comes from the token",
+            "title": "Pos Id"
+          },
+          "query": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          },
+          "top_k": {
+            "default": 5,
+            "description": "Families wanted after hydration",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Top K",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "AssistRequest",
+        "type": "object"
+      },
+      "AssistResponse": {
+        "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "clarification_question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clarification Question"
+          },
+          "effective_pos_id": {
+            "description": "Scope applied by the handler; always the token claim, never the body value",
+            "title": "Effective Pos Id",
+            "type": "string"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/AssistGroup"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "intent": {
+            "description": "Detected intent, open vocabulary while stubbed",
+            "title": "Intent",
+            "type": "string"
+          },
+          "pitch": {
+            "description": "Generated prose with unresolved {{price}} / {{stock}} placeholders",
+            "title": "Pitch",
+            "type": "string"
+          },
+          "trace_id": {
+            "description": "Correlation id, from the token claim when present",
+            "title": "Trace Id",
+            "type": "string"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "trace_id",
+          "effective_pos_id",
+          "intent",
+          "groups",
+          "pitch",
+          "usage"
+        ],
+        "title": "AssistResponse",
+        "type": "object"
+      },
+      "Citation": {
+        "properties": {
+          "product_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Id"
+          },
+          "snippet": {
+            "title": "Snippet",
+            "type": "string"
+          },
+          "source": {
+            "description": "Corpus document or product the claim comes from",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "snippet"
+        ],
+        "title": "Citation",
+        "type": "object"
+      },
+      "DebugInfo": {
+        "description": "Optional retrieval diagnostics; minimally filled by the stubs.",
+        "properties": {
+          "lexical_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lexical Score"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "rerank_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rerank Score"
+          },
+          "vector_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vector Score"
+          }
+        },
+        "title": "DebugInfo",
+        "type": "object"
+      },
+      "EnrichProductInput": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "product_id": {
+            "minLength": 1,
+            "title": "Product Id",
+            "type": "string"
+          },
+          "raw_attributes": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Raw Attributes",
+            "type": "object"
+          },
+          "sku": {
+            "minLength": 1,
+            "title": "Sku",
+            "type": "string"
+          }
+        },
+        "required": [
+          "product_id",
+          "sku"
+        ],
+        "title": "EnrichProductInput",
+        "type": "object"
+      },
+      "EnrichRequest": {
+        "properties": {
+          "locale": {
+            "default": "es-ES",
+            "title": "Locale",
+            "type": "string"
+          },
+          "products": {
+            "items": {
+              "$ref": "#/components/schemas/EnrichProductInput"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Products",
+            "type": "array"
+          }
+        },
+        "required": [
+          "products"
+        ],
+        "title": "EnrichRequest",
+        "type": "object"
+      },
+      "EnrichResponse": {
+        "properties": {
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedProfile"
+            },
+            "title": "Profiles",
+            "type": "array"
+          },
+          "trace_id": {
+            "description": "Correlation id, from the token claim when present",
+            "title": "Trace Id",
+            "type": "string"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          }
+        },
+        "required": [
+          "trace_id",
+          "profiles",
+          "usage"
+        ],
+        "title": "EnrichResponse",
+        "type": "object"
+      },
+      "EvalMetric": {
+        "properties": {
+          "name": {
+            "description": "Metric key, e.g. recall_at_10",
+            "title": "Name",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "value"
+        ],
+        "title": "EvalMetric",
+        "type": "object"
+      },
+      "EvalRun": {
+        "properties": {
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/EvalMetric"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "status": {
+            "description": "Run outcome, e.g. passed or failed",
+            "title": "Status",
+            "type": "string"
+          },
+          "suite": {
+            "title": "Suite",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "suite",
+          "status",
+          "started_at"
+        ],
+        "title": "EvalRun",
+        "type": "object"
+      },
+      "EvalRunsResponse": {
+        "properties": {
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/EvalRun"
+            },
+            "title": "Runs",
+            "type": "array"
+          },
+          "trace_id": {
+            "description": "Correlation id, from the token claim when present",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trace_id",
+          "runs"
+        ],
+        "title": "EvalRunsResponse",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "IndexStatusResponse": {
+        "properties": {
+          "drift_count": {
+            "description": "Documents known to be stale",
+            "minimum": 0.0,
+            "title": "Drift Count",
+            "type": "integer"
+          },
+          "indexed_documents": {
+            "minimum": 0.0,
+            "title": "Indexed Documents",
+            "type": "integer"
+          },
+          "last_full_sync_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Full Sync At"
+          },
+          "last_incremental_sync_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Incremental Sync At"
+          },
+          "trace_id": {
+            "description": "Correlation id, from the token claim when present",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trace_id",
+          "indexed_documents",
+          "drift_count"
+        ],
+        "title": "IndexStatusResponse",
+        "type": "object"
+      },
+      "IndexSyncRequest": {
+        "properties": {
+          "batch_size": {
+            "default": 100,
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Batch Size",
+            "type": "integer"
+          },
+          "full": {
+            "default": false,
+            "description": "Force a full re-index",
+            "title": "Full",
+            "type": "boolean"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor of the previous sync; null requests a full pass",
+            "title": "Since"
+          }
+        },
+        "title": "IndexSyncRequest",
+        "type": "object"
+      },
+      "IndexSyncResponse": {
+        "properties": {
+          "cursor": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor to send on the next sync",
+            "title": "Cursor"
+          },
+          "deleted": {
+            "minimum": 0.0,
+            "title": "Deleted",
+            "type": "integer"
+          },
+          "failed": {
+            "minimum": 0.0,
+            "title": "Failed",
+            "type": "integer"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor the run started from",
+            "title": "Since"
+          },
+          "skipped": {
+            "minimum": 0.0,
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "trace_id": {
+            "description": "Correlation id, from the token claim when present",
+            "title": "Trace Id",
+            "type": "string"
+          },
+          "upserted": {
+            "minimum": 0.0,
+            "title": "Upserted",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "trace_id",
+          "upserted",
+          "skipped",
+          "deleted",
+          "failed"
+        ],
+        "title": "IndexSyncResponse",
+        "type": "object"
+      },
+      "InventoryFilters": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "family_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Family Id"
+          },
+          "materials": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Materials",
+            "type": "array"
+          }
+        },
+        "title": "InventoryFilters",
+        "type": "object"
+      },
+      "InventoryProposal": {
+        "properties": {
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "family_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the family is unknown",
+            "title": "Family Id"
+          },
+          "priority": {
+            "description": "1 is the most urgent proposal",
+            "minimum": 1.0,
+            "title": "Priority",
+            "type": "integer"
+          },
+          "product_id": {
+            "title": "Product Id",
+            "type": "string"
+          },
+          "rationale": {
+            "description": "Prose rationale; stock figures stay as {{stock}} placeholders",
+            "title": "Rationale",
+            "type": "string"
+          },
+          "signal": {
+            "description": "What triggered the proposal, e.g. coverage_gap",
+            "title": "Signal",
+            "type": "string"
+          },
+          "sku": {
+            "title": "Sku",
+            "type": "string"
+          },
+          "variant_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the variant is unknown",
+            "title": "Variant Label"
+          }
+        },
+        "required": [
+          "product_id",
+          "sku",
+          "priority",
+          "signal",
+          "rationale",
+          "confidence"
+        ],
+        "title": "InventoryProposal",
+        "type": "object"
+      },
+      "InventoryProposeRequest": {
+        "properties": {
+          "filters": {
+            "$ref": "#/components/schemas/InventoryFilters"
+          },
+          "horizon_days": {
+            "default": 30,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Horizon Days",
+            "type": "integer"
+          },
+          "limit": {
+            "default": 10,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "pos_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Accepted for client compatibility and ignored; scope comes from the token",
+            "title": "Pos Id"
+          }
+        },
+        "title": "InventoryProposeRequest",
+        "type": "object"
+      },
+      "InventoryProposeResponse": {
+        "properties": {
+          "effective_pos_id": {
+            "description": "Scope applied by the handler; always the token claim, never the body value",
+            "title": "Effective Pos Id",
+            "type": "string"
+          },
+          "horizon_days": {
+            "minimum": 1.0,
+            "title": "Horizon Days",
+            "type": "integer"
+          },
+          "proposals": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryProposal"
+            },
+            "title": "Proposals",
+            "type": "array"
+          },
+          "trace_id": {
+            "description": "Correlation id, from the token claim when present",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trace_id",
+          "effective_pos_id",
+          "proposals",
+          "horizon_days"
+        ],
+        "title": "InventoryProposeResponse",
+        "type": "object"
+      },
+      "ProposedList": {
+        "properties": {
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "value": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Value",
+            "type": "array"
+          }
+        },
+        "required": [
+          "confidence"
+        ],
+        "title": "ProposedList",
+        "type": "object"
+      },
+      "ProposedProfile": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposedText"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "family_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposedText"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "materials": {
+            "$ref": "#/components/schemas/ProposedList"
+          },
+          "product_id": {
+            "title": "Product Id",
+            "type": "string"
+          },
+          "sku": {
+            "title": "Sku",
+            "type": "string"
+          },
+          "tags": {
+            "$ref": "#/components/schemas/ProposedList"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposedText"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "variant_label": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposedText"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "product_id",
+          "sku",
+          "materials",
+          "tags"
+        ],
+        "title": "ProposedProfile",
+        "type": "object"
+      },
+      "ProposedText": {
+        "properties": {
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "confidence"
+        ],
+        "title": "ProposedText",
+        "type": "object"
+      },
+      "RetrievalFilters": {
+        "description": "Catalog-side filters only. Price and stock filtering stays on the .NET side.",
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "exclude_product_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Exclude Product Ids",
+            "type": "array"
+          },
+          "family_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Family Id"
+          },
+          "materials": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Materials",
+            "type": "array"
+          }
+        },
+        "title": "RetrievalFilters",
+        "type": "object"
+      },
+      "RetrievalMode": {
+        "enum": [
+          "hybrid",
+          "vector",
+          "lexical"
+        ],
+        "title": "RetrievalMode",
+        "type": "string"
+      },
+      "RetrievalRequest": {
+        "properties": {
+          "filters": {
+            "$ref": "#/components/schemas/RetrievalFilters"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/RetrievalMode",
+            "default": "hybrid"
+          },
+          "pos_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Accepted for client compatibility and ignored; scope comes from the token",
+            "title": "Pos Id"
+          },
+          "query": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          },
+          "top_k": {
+            "default": 10,
+            "description": "Page size wanted after hydration",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Top K",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "RetrievalRequest",
+        "type": "object"
+      },
+      "RetrievalResponse": {
+        "properties": {
+          "candidates_returned": {
+            "description": "Candidates the retriever produced",
+            "minimum": 0.0,
+            "title": "Candidates Returned",
+            "type": "integer"
+          },
+          "effective_pos_id": {
+            "description": "Scope applied by the handler; always the token claim, never the body value",
+            "title": "Effective Pos Id",
+            "type": "string"
+          },
+          "low_confidence": {
+            "default": false,
+            "title": "Low Confidence",
+            "type": "boolean"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/RetrievalResult"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "trace_id": {
+            "description": "Correlation id, from the token claim when present",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trace_id",
+          "effective_pos_id",
+          "results",
+          "candidates_returned"
+        ],
+        "title": "RetrievalResponse",
+        "type": "object"
+      },
+      "RetrievalResult": {
+        "properties": {
+          "debug": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DebugInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "family_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the family is unknown",
+            "title": "Family Id"
+          },
+          "match_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Match Reasons",
+            "type": "array"
+          },
+          "materials": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Materials",
+            "type": "array"
+          },
+          "product_id": {
+            "title": "Product Id",
+            "type": "string"
+          },
+          "score": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "type": "number"
+          },
+          "sku": {
+            "title": "Sku",
+            "type": "string"
+          },
+          "variant_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the variant is unknown",
+            "title": "Variant Label"
+          }
+        },
+        "required": [
+          "product_id",
+          "sku",
+          "score"
+        ],
+        "title": "RetrievalResult",
+        "type": "object"
+      },
+      "SimilaritySignals": {
+        "description": "Why two products are considered interchangeable. No price signal by design.",
+        "properties": {
+          "family_match": {
+            "default": false,
+            "title": "Family Match",
+            "type": "boolean"
+          },
+          "material_overlap": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Material Overlap",
+            "type": "number"
+          },
+          "style_similarity": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Style Similarity",
+            "type": "number"
+          },
+          "visual_similarity": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visual Similarity"
+          }
+        },
+        "required": [
+          "material_overlap",
+          "style_similarity"
+        ],
+        "title": "SimilaritySignals",
+        "type": "object"
+      },
+      "SubstituteResult": {
+        "properties": {
+          "debug": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DebugInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "family_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the family is unknown",
+            "title": "Family Id"
+          },
+          "match_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Match Reasons",
+            "type": "array"
+          },
+          "materials": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Materials",
+            "type": "array"
+          },
+          "product_id": {
+            "title": "Product Id",
+            "type": "string"
+          },
+          "score": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "type": "number"
+          },
+          "similarity_signals": {
+            "$ref": "#/components/schemas/SimilaritySignals"
+          },
+          "sku": {
+            "title": "Sku",
+            "type": "string"
+          },
+          "variant_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the variant is unknown",
+            "title": "Variant Label"
+          }
+        },
+        "required": [
+          "product_id",
+          "sku",
+          "score",
+          "similarity_signals"
+        ],
+        "title": "SubstituteResult",
+        "type": "object"
+      },
+      "SubstitutesRequest": {
+        "properties": {
+          "filters": {
+            "$ref": "#/components/schemas/RetrievalFilters"
+          },
+          "pos_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Accepted for client compatibility and ignored; scope comes from the token",
+            "title": "Pos Id"
+          },
+          "product_id": {
+            "minLength": 1,
+            "title": "Product Id",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why a substitute is needed, e.g. out of stock",
+            "title": "Reason"
+          },
+          "top_k": {
+            "default": 10,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Top K",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "product_id"
+        ],
+        "title": "SubstitutesRequest",
+        "type": "object"
+      },
+      "SubstitutesResponse": {
+        "properties": {
+          "candidates_returned": {
+            "minimum": 0.0,
+            "title": "Candidates Returned",
+            "type": "integer"
+          },
+          "effective_pos_id": {
+            "description": "Scope applied by the handler; always the token claim, never the body value",
+            "title": "Effective Pos Id",
+            "type": "string"
+          },
+          "low_confidence": {
+            "default": false,
+            "title": "Low Confidence",
+            "type": "boolean"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SubstituteResult"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "trace_id": {
+            "description": "Correlation id, from the token claim when present",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trace_id",
+          "effective_pos_id",
+          "results",
+          "candidates_returned"
+        ],
+        "title": "SubstitutesResponse",
+        "type": "object"
+      },
+      "Usage": {
+        "description": "Model usage reported by generative routes; zeroed while stubs are served.",
+        "properties": {
+          "completion_tokens": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Provider model identifier, null while stubbed",
+            "title": "Model"
+          },
+          "prompt_tokens": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "total_tokens": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Total Tokens",
+            "type": "integer"
+          }
+        },
+        "title": "Usage",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "description": "Internal HS256 service token",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "title": "jbg-ai",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Public liveness probe",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/v1/assist/sale": {
+      "post": {
+        "description": "Group candidates by family; the pitch keeps price and stock as placeholders.",
+        "operationId": "assist_sale_v1_assist_sale_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Invalid or missing internal service token"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "description": "Not implemented yet; delivered in a later change"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Assist a sale with family-grouped candidates and a pitch",
+        "tags": [
+          "assist"
+        ]
+      }
+    },
+    "/v1/enrich/products": {
+      "post": {
+        "description": "Every proposed field carries its own confidence; nothing is written anywhere.",
+        "operationId": "enrich_products_v1_enrich_products_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrichRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrichResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Invalid or missing internal service token"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "description": "Not implemented yet; delivered in a later change"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Propose enriched profiles for a batch of products",
+        "tags": [
+          "enrich"
+        ]
+      }
+    },
+    "/v1/evals/runs": {
+      "get": {
+        "operationId": "list_eval_runs_v1_evals_runs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvalRunsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Invalid or missing internal service token"
+          },
+          "501": {
+            "description": "Not implemented yet; delivered in a later change"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List evaluation runs (development profile only)",
+        "tags": [
+          "evals"
+        ]
+      }
+    },
+    "/v1/index/status": {
+      "get": {
+        "operationId": "index_status_v1_index_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Invalid or missing internal service token"
+          },
+          "501": {
+            "description": "Not implemented yet; delivered in a later change"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Report index size and drift",
+        "tags": [
+          "index"
+        ]
+      }
+    },
+    "/v1/index/sync": {
+      "post": {
+        "operationId": "sync_index_v1_index_sync_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IndexSyncRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexSyncResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Invalid or missing internal service token"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "description": "Not implemented yet; delivered in a later change"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Synchronise the vector index from a cursor",
+        "tags": [
+          "index"
+        ]
+      }
+    },
+    "/v1/inventory/propose": {
+      "post": {
+        "description": "Proposals carry priority and rationale; .NET decides quantities.",
+        "operationId": "propose_inventory_v1_inventory_propose_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryProposeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryProposeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Invalid or missing internal service token"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "description": "Not implemented yet; delivered in a later change"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Propose what deserves inventory attention, in priority order",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/v1/retrieval/products": {
+      "post": {
+        "description": "Over-fetch candidates so .NET can filter and still fill a page of `top_k`.\n\n`payload.pos_id` is ignored on purpose: the scope comes from the token.",
+        "operationId": "retrieve_products_v1_retrieval_products_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetrievalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetrievalResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Invalid or missing internal service token"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "description": "Not implemented yet; delivered in a later change"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retrieve catalog candidates for a query",
+        "tags": [
+          "retrieval"
+        ]
+      }
+    },
+    "/v1/retrieval/substitutes": {
+      "post": {
+        "operationId": "retrieve_substitutes_v1_retrieval_substitutes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubstitutesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubstitutesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Invalid or missing internal service token"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "description": "Not implemented yet; delivered in a later change"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retrieve interchangeable products for a reference product",
+        "tags": [
+          "retrieval"
+        ]
+      }
+    }
+  }
+}
