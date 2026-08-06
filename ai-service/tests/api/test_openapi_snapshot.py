@@ -3,16 +3,14 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from jbg_ai.api.main import create_app
 from jbg_ai.config import canonical_openapi_settings
-
-SNAPSHOT_PATH = Path(__file__).resolve().parents[1] / "openapi.json"
+from support.paths import OPENAPI_SNAPSHOT
 
 
 def _committed() -> dict:
-    return json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
+    return json.loads(OPENAPI_SNAPSHOT.read_text(encoding="utf-8"))
 
 
 def _live() -> dict:

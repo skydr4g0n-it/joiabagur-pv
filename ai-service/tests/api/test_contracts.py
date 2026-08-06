@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from sample_requests import RESPONSE_MODELS, V1_REQUESTS
+from support.sample_requests import RESPONSE_MODELS, V1_REQUESTS
 
 
 @pytest.mark.parametrize(("method", "path", "body"), V1_REQUESTS)

@@ -155,6 +155,10 @@ uv run --system-certs pytest
 
 Tests inject required env / settings in-process, sign their own tokens, and never call LLM providers, embedding APIs, or production RDS. The stub tests additionally block socket connections to prove it.
 
+The suite mirrors the `src/jbg_ai/` package — `tests/api/`, `tests/config/`, and a
+`tests/support/` for shared helpers. [`tests/README.md`](tests/README.md) explains where a new test
+goes and which folder each upcoming change lands in.
+
 ## Explicit non-goals (C02)
 
 - No real retrieval, enrichment, indexing or agent loops — stubs are replaced route by route in later changes
@@ -178,7 +182,10 @@ ai-service/
       schemas/      # frozen request/response contracts
     config/         # pydantic-settings + canonical OpenAPI profile
     stubs/          # deterministic fixtures
-  tests/
+  tests/            # mirrors src/jbg_ai — see tests/README.md
+    api/            # contract, auth, stubs, OpenAPI snapshot
+    config/         # settings and fail-fast validation
+    support/        # shared helpers and injectable fakes
   openapi.json      # versioned contract snapshot
   Dockerfile
   pyproject.toml

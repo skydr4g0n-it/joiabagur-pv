@@ -387,7 +387,7 @@ joiabagur-pv/
 │   │   ├── stubs/                       # respuestas deterministas bajo STUB_MODE
 │   │   └── config/                      # settings.py (pydantic-settings)
 │   ├── openapi.json                     # snapshot versionado del contrato
-│   ├── tests/
+│   ├── tests/                           # api, config, support — espeja src/jbg_ai
 │   ├── pyproject.toml · uv.lock
 │   └── Dockerfile
 ├── terraform/                           # IaC de producción (EC2, RDS, S3, ECR, SSM, IAM)

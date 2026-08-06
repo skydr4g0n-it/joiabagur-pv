@@ -9,9 +9,9 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from conftest import TEST_JWT_SECRET
 from jbg_ai.api.auth import decode_service_token
-from sample_requests import V1_REQUESTS
+from support.sample_requests import V1_REQUESTS
+from support.settings import TEST_JWT_SECRET
 
 
 def _call(

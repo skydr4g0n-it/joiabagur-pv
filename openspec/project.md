@@ -156,6 +156,12 @@
 - Playwright for E2E flows (authentication, CRUD operations)
 - Minimum coverage target: 70%
 
+**AI Service (`jbg-ai`) Tests:**
+- Nomenclature: `test_<unit>_<scenario>_<expected>` (e.g., `test_health_returns_ok_with_version`)
+- Test tree mirrors the `src/jbg_ai/` package; see `ai-service/tests/README.md`
+- Injected fakes for LLM and embedding clients — never a real provider, API or RDS
+- Markers: `db` (needs PostgreSQL with pgvector), `slow` (evaluation sweeps)
+
 ### Git Workflow
 
 - **Main branch**: `master` (production-ready)
@@ -195,6 +201,7 @@ After completing an OpenSpec change implementation (e.g., via `openspec-apply`),
 | `backend/README.md` | Endpoints, authorization matrix, environment variables, migrations, or test setup changed |
 | `frontend/README.md` | Tech stack versions, npm scripts, or test setup changed |
 | `ai-service/README.md` | `jbg-ai` contract, settings, layout, non-goals, or the change marker (C01, C02…) changed |
+| `ai-service/tests/README.md` | The test tree gains a folder, a marker, or a shared helper in `tests/support/` |
 | `terraform/README.md` | AWS resources, variables, outputs, or `/jpv/prod/*` parameters changed |
 | `openspec/config.yaml` | A fact restated in the condensed `context` block changed |
 

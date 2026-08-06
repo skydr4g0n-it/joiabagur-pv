@@ -16,6 +16,7 @@ context: |
   ML: TensorFlow.js client-side inference (MobileNetV2 transfer learning).
 
   AI service: jbg-ai — Python 3.11, FastAPI, uv, pydantic-settings (ai-service/).
+  Testing: pytest + FastAPI TestClient; test tree mirrors src/jbg_ai (see ai-service/tests/README.md).
   Separate container; Python does vector search and LLM only, .NET owns all business
   logic and is the final authority on price, stock and permissions. Browser never
   calls Python: .NET → jbg-ai over an internal HS256 service JWT on the Docker network.

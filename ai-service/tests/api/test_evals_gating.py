@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from conftest import build_settings
 from jbg_ai.api.main import create_app
 from jbg_ai.api.schemas.evals import EvalRunsResponse
+from support.settings import build_settings
 
 
 def test_evals_route_returns_runs_in_dev_profile(

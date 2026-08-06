@@ -8,9 +8,9 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from conftest import build_settings
 from jbg_ai.api.main import create_app
-from sample_requests import V1_REQUESTS
+from support.sample_requests import V1_REQUESTS
+from support.settings import build_settings
 
 
 @pytest.fixture

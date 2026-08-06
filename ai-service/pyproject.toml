@@ -26,5 +26,13 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+# `tests` on the path makes `support/` importable from every subfolder.
+pythonpath = ["src", "tests"]
+# importlib keeps same-named test modules in different folders from colliding
+# (e.g. retrieval/test_ranking.py and assist/test_ranking.py).
+addopts = "--import-mode=importlib"
+markers = [
+    "db: needs a PostgreSQL instance with pgvector",
+    "slow: evaluation sweeps and calibration runs",
+]
 

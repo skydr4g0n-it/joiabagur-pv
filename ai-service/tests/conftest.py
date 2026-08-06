@@ -16,23 +16,7 @@ from fastapi.testclient import TestClient
 
 from jbg_ai.api.main import create_app
 from jbg_ai.config.settings import Settings, get_settings
-
-# HS256 keys shorter than 32 bytes make PyJWT warn; keep fixtures above the bar.
-TEST_JWT_SECRET = "test-jwt-secret-0123456789abcdefghij"
-TOKEN_POS_ID = "POS-B"
-TOKEN_TRACE_ID = "trace-from-token"
-
-
-def build_settings(**overrides: Any) -> Settings:
-    """In-process settings — no external services."""
-    values: dict[str, Any] = {
-        "app_env": "test",
-        "service_version": "0.1.0-test",
-        "log_level": "WARNING",
-        "jwt_secret": TEST_JWT_SECRET,
-    }
-    values.update(overrides)
-    return Settings(**values)
+from support.settings import TEST_JWT_SECRET, TOKEN_POS_ID, TOKEN_TRACE_ID, build_settings
 
 
 @pytest.fixture(autouse=True)
