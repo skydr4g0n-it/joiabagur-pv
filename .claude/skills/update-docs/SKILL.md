@@ -51,8 +51,10 @@ esta skill:
 - **`openspec/`** — `project.md` y `config.yaml` (contexto), `specs/` (specs
   vivas, **fuera del alcance de escritura**) y `changes/`.
 
-`CLAUDE.md` y `AGENTS.md` están vacíos en este repo: no los uses como contexto
-ni los rellenes desde aquí.
+`CLAUDE.md` documenta las reglas operativas del repo para agentes (formas de
+`openspec validate`, spec viva vs spec delta, particularidades de `ai-service`):
+úsalo como contexto, pero **no lo actualices desde aquí** — no es documentación
+funcional. `AGENTS.md` sigue vacío.
 
 ## Paso 1 — Confirmar el alcance (obligatorio, antes de ejecutar nada)
 
