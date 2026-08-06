@@ -52,6 +52,14 @@
 - **State Management**: Context API (or Zustand if needed)
 - **ML Framework**: TensorFlow.js / ONNX.js (client-side image recognition)
 
+### AI Service (`jbg-ai`)
+- **Runtime**: Python 3.11+
+- **Framework**: FastAPI + Uvicorn (app factory, `docs_url` disabled)
+- **Package Manager**: uv (`pyproject.toml` + `uv.lock`)
+- **Configuration**: pydantic-settings with fail-fast on required env
+- **Service Auth**: internal HS256 JWT (PyJWT); the .NET API is the only issuer
+- **Contract**: frozen `/v1` surface versioned in `ai-service/openapi.json`
+
 ### Infrastructure
 - **Containers**: Docker, Docker Compose (development)
 - **CI/CD**: GitHub Actions
@@ -70,12 +78,17 @@
 - Integration Tests: Testcontainers 4.x (PostgreSQL)
 
 **Frontend:**
-- Test Runner: Vitest 2.x
+- Test Runner: Vitest 4.x
 - Component Testing: React Testing Library 16.x
 - User Events: @testing-library/user-event 14.x
 - API Mocking: MSW (Mock Service Worker) 2.x
 - E2E Testing: Playwright 1.x
 - DOM Environment: jsdom 25.x
+
+**AI Service (`jbg-ai`):**
+- Test Framework: pytest 9.x
+- HTTP Client: httpx (FastAPI `TestClient`)
+- No real LLM, embedding or RDS calls; stub tests block socket connections
 
 ---
 
@@ -143,13 +156,25 @@
 - Playwright for E2E flows (authentication, CRUD operations)
 - Minimum coverage target: 70%
 
+**AI Service (`jbg-ai`) Tests:**
+- Nomenclature: `test_<unit>_<scenario>_<expected>` (e.g., `test_health_returns_ok_with_version`)
+- Test tree mirrors the `src/jbg_ai/` package; see `ai-service/tests/README.md`
+- Injected fakes for LLM and embedding clients — never a real provider, API or RDS
+- Markers: `db` (needs PostgreSQL with pgvector), `slow` (evaluation sweeps)
+
 ### Git Workflow
 
-- **Main branch**: `main` (production-ready)
-- **Development branch**: `develop` (integration)
+- **Main branch**: `master` (production-ready)
+- **Integration branch**: `ai-eng` (AI final project work)
 - **Feature branches**: `feature/[epic]-[description]`
 - **Commits**: Conventional commits format
 - **CI/CD**: GitHub Actions for build, test, and deploy
+
+### OpenSpec Validation
+
+- **Project gate**: `openspec validate --all --strict` must report `0 failed`. Use this exact form in Definition-of-Done items.
+- **Single change in progress**: `openspec validate <change-name> --strict`.
+- The bare form (`openspec validate`, with or without `--strict`) validates nothing and exits 1 — it is not a pass.
 
 ### Documentation
 
@@ -172,6 +197,15 @@ After completing an OpenSpec change implementation (e.g., via `openspec-apply`),
 | `Documentos/modelo-c4.md` | New components, containers, or integration points added |
 | `Documentos/arquitectura.md` | Architectural patterns, layers, or cross-cutting concerns changed |
 | `Documentos/Guias/*.md` | User-facing flows, validations, or FAQ entries affected |
+| `README.md` (root) | Installation steps, architecture, data model, or documented API endpoints changed — technical sections only; the deliverable sections (0, 1.1–1.3, 5, 6) are frozen |
+| `backend/README.md` | Endpoints, authorization matrix, environment variables, migrations, or test setup changed |
+| `frontend/README.md` | Tech stack versions, npm scripts, or test setup changed |
+| `ai-service/README.md` | `jbg-ai` contract, settings, layout, non-goals, or the change marker (C01, C02…) changed |
+| `ai-service/tests/README.md` | The test tree gains a folder, a marker, or a shared helper in `tests/support/` |
+| `terraform/README.md` | AWS resources, variables, outputs, or `/jpv/prod/*` parameters changed |
+| `openspec/config.yaml` | A fact restated in the condensed `context` block changed |
+
+Run the `update-docs` command (skill replicated in `.agent/`, `.claude/`, `.codex/`, `.cursor/` and `.opencode/skills/update-docs/`) to detect which of these are affected by the latest committed and uncommitted changes, review them against the real code, and apply the updates after confirmation.
 
 ---
 

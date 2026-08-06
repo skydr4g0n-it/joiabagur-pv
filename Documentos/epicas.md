@@ -1,6 +1,15 @@
-# Épicas del MVP - Sistema de Gestión de Puntos de Venta para Joyería
+# Épicas - Sistema de Gestión de Puntos de Venta para Joyería
 
-Este documento describe las épicas principales del MVP (Fase 1) del sistema de gestión de puntos de venta para joyería. Cada épica agrupa funcionalidades relacionadas y contiene referencias a las User Stories que se desarrollarán en la carpeta `Documentos/Historias`.
+Este documento describe las épicas del proyecto, agrupadas en dos bloques:
+
+- **EP1–EP10 — MVP (Fase 1):** el sistema de gestión de puntos de venta. Sus User Stories viven en `Documentos/Historias/` con el formato `HU-EP[X]-[NNN].md`.
+- **EP11–EP17 — Proyecto Final de IA:** búsqueda semántica, venta asistida y agentes sobre el catálogo existente. Sus User Stories viven en `Documentos/Historias/AI-Eng/` con el formato `HU-AIENG-[NNN].md`.
+
+Cada épica agrupa funcionalidades relacionadas y contiene referencias a las User Stories correspondientes.
+
+---
+
+## Bloque 1 — MVP (EP1–EP10)
 
 ---
 
@@ -330,6 +339,141 @@ Permite gestionar los componentes que constituyen las joyas (materiales, mano de
 
 ---
 
+## Bloque 2 — Proyecto Final de IA (EP11–EP17)
+
+> Las épicas EP1–EP10 cubren el MVP del sistema de punto de venta. Las siguientes cubren el **Proyecto Final del Máster de IA**: incorporan búsqueda semántica, venta asistida y agentes sobre el catálogo existente, mediante el microservicio `jbg-ai`.
+>
+> **Convención de nomenclatura.** A diferencia del MVP, las historias del PF **no** se numeran por épica: siguen una serie plana `HU-AIENG-[NNN]` en `Documentos/Historias/AI-Eng/`, porque el trabajo se organiza por *change* de OpenSpec (C01–C39) y una misma historia puede atravesar varias épicas. Cada épica indica abajo qué changes agrupa.
+>
+> **Fuentes:** [diseño del sistema de IA](Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) (§4 alcance acordado, §6 frontera, §7 diseño RAG) y [plan de changes](Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (tabla maestra C01–C39).
+
+---
+
+## Épica 11: Plataforma del Servicio de IA
+
+**Descripción:**
+Cimientos del microservicio `jbg-ai`: esqueleto ejecutable, contratos HTTP congelados, autenticación entre servicios, esquema vectorial y despliegue. Es la épica habilitadora: sin ella ninguna de las siguientes puede empezar.
+
+**Alcance:**
+- Servicio Python con FastAPI, `uv`, configuración por entorno y `GET /health`
+- Contratos `/v1/*` congelados con modelos Pydantic, stubs deterministas y snapshot OpenAPI versionado
+- JWT interno HS256 entre .NET y Python, con scope por usuario, rol y punto de venta
+- Cliente tipado `IAiGatewayClient` en .NET con timeouts, reintento y circuit breaker
+- Esquema `ai` con pgvector, migraciones y rol de base de datos dedicado
+- Despliegue del contenedor en EC2, secretos en SSM y health enriquecido
+
+**Changes asociados:** C01, C02, C03, C05, C17
+
+**User Stories:**
+- [HU-AIENG-001: Esqueleto ejecutable del servicio de IA](Historias/AI-Eng/HU-AIENG-001.md) *(C01 — hecho)*
+- [HU-AIENG-002: Contratos congelados y autenticación de servicio](Historias/AI-Eng/HU-AIENG-002.md) *(C02 — hecho)*
+
+---
+
+## Épica 12: Corpus y Enriquecimiento del Catálogo
+
+**Descripción:**
+Construcción del corpus sobre el que opera todo el sistema RAG: perfiles de producto extraídos con LLM contra vocabularios cerrados, confianza por campo y revisión humana híbrida, más el corpus de conocimiento comercial que permite responder con citas verificables.
+
+**Alcance:**
+- Pipeline de enriquecimiento: normalización determinista → extracción estructurada → validación → confianza por campo
+- `materials[]` como lista contra vocabulario cerrado; nunca se inventa un material por defecto
+- Entidad `ProductAiProfile` en .NET con su ciclo de aprobación
+- Texto canónico (`SourceText`) y `source_hash`: solo se recalcula el embedding si cambia el hash
+- Corpus de conocimiento comercial (materiales, tallas, cuidados, políticas), troceado y citable
+- Generador de mundo sintético con semilla fija para disponer de catálogo, inventario y ventas coherentes
+
+**Changes asociados:** C06, C08, C09, C10, C11, C23
+
+---
+
+## Épica 13: Familias de Producto y Desambiguación de Variantes
+
+**Descripción:**
+Resuelve el caso de negocio crítico: variantes visualmente casi idénticas que provocan errores de venta. La IA propone agrupaciones y el administrador las aprueba, edita o rechaza; la familia resultante es una entidad de negocio editable sin tocar nada de IA.
+
+**Alcance:**
+- Entidades `ProductFamily` y `ProductFamilyMember` en .NET
+- Propuesta asistida de familias por similitud de embedding, tipo de pieza y raíz común de nombre
+- Pantalla de revisión y aprobación por lotes (segundo caso de intervención humana del PF)
+- Alerta de huérfanos: productos con similitud alta a una familia a la que no pertenecen
+- Pantalla de revisión de perfiles de IA con métricas de calidad
+
+**Changes asociados:** C07, C18, C28
+
+---
+
+## Épica 14: Búsqueda Semántica Híbrida
+
+**Descripción:**
+El corazón del Proyecto Final. Búsqueda que combina la rama vectorial y la léxica, filtra por punto de venta, entiende restricciones estructurales de la consulta y se abstiene cuando no hay confianza suficiente.
+
+**Alcance:**
+- Indexación del catálogo en el esquema `ai` mediante feed paginado con cursor `since` y *tombstones*
+- Recuperación vectorial sobre HNSW y léxica con `ts_rank` en español, fusionadas con RRF
+- Diccionario de sinónimos del dominio aplicado en expansión de consulta, nunca en indexación
+- Prefiltro blando: la disponibilidad penaliza el score pero **nunca excluye** un candidato
+- Sobre-recuperación (`top_k × 3`, tope 60) para que .NET tenga margen tras hidratar
+- Abstención por umbral: devolver cero resultados es información válida
+- Endpoint de búsqueda en .NET con hidratación, circuit breaker y fallback léxico
+- Panel de búsqueda asistida en el frontend
+
+**Changes asociados:** C12, C13, C14, C15, C16, C20, C21, C22, C25
+
+---
+
+## Épica 15: Venta Asistida, Sustitutos y Agentes
+
+**Descripción:**
+Capa de generación y agéntica. Convierte un conjunto de candidatos en una respuesta útil para el operador: agrupada por familia, con avisos calculados por reglas, argumentario con citas y sugerencias de sustitutos o complementarios.
+
+**Alcance:**
+- Respuesta estructurada con `groups[]` por familia y `variant_label` destacado
+- Avisos calculados por reglas (variantes en la familia, talla ausente, stock crítico), nunca generados libremente
+- Argumentario generado en tiempo de consulta con `citations[]`, no persistido
+- **Toda cifra de precio o stock se emite como placeholder** que resuelve .NET; si alguno queda sin resolver, la respuesta se rechaza
+- Guardrails, enrutado de intención y pregunta de aclaración ante consultas ambiguas
+- Agente asistente de venta con *tools* de solo lectura e intervención humana
+- Sustitutos por falta de stock y complementarios por reglas y co-ocurrencia
+- Tarjeta de asistencia y desambiguación por familia en el frontend
+
+**Changes asociados:** C26, C27, C30, C31, C32, C34, C36
+
+---
+
+## Épica 16: Inventario Asistido y Señales de Demanda
+
+**Descripción:**
+Segundo agente del proyecto. Propone reposiciones, traslados entre puntos de venta y acciones sobre stock parado, siempre con aprobación humana. Las señales numéricas se calculan en SQL en .NET; el LLM solo redacta y prioriza.
+
+**Alcance:**
+- Señales de demanda calculadas en SQL: ventas a 7/30/60 días, cobertura, días sin venta, stock en otros puntos de venta
+- Perfil comercial por punto de venta, calculado periódicamente
+- Entidad `InventoryRecommendation` con ciclo de aprobación y auditoría
+- Agente de inventario con propuestas priorizadas y justificadas
+- Pantalla de revisión de recomendaciones y vista imprimible por punto de venta
+
+**Changes asociados:** C19, C29, C33, C35, C37
+
+---
+
+## Épica 17: Evaluación y Observabilidad de IA
+
+**Descripción:**
+Sin medición no hay proyecto de IA defendible. Cubre la telemetría de uso real, el conjunto de evaluación etiquetado a mano, las métricas de recuperación y generación, y los escenarios adversarios.
+
+**Alcance:**
+- Telemetría consulta → selección (`ProductSearchEvent`) desde el primer día
+- Golden set de consultas etiquetadas y línea base de métricas de recuperación
+- Ablations para medir el efecto de cada componente (sinónimos, híbrido, señales de negocio)
+- Validador anti-alucinación y escenarios de agente
+- Casos adversarios: fuera de dominio, inyección, stock cero, consulta imposible, PII
+- Documentación final del proyecto con evidencias y limitaciones declaradas
+
+**Changes asociados:** C04, C24, C38, C39
+
+---
+
 ## Resumen de Épicas
 
 | Épica | Descripción Breve | User Stories Estimadas |
@@ -344,7 +488,22 @@ Permite gestionar los componentes que constituyen las joyas (materiales, mano de
 | **EP8** | Gestión de Puntos de Venta | 5 |
 | **EP9** | Consultas y Reportes | 4 |
 | **EP10** | Gestión de Componentes de Joyas | 8 |
-| **TOTAL** | | **47** |
+| **TOTAL MVP** | | **47** |
+
+### Épicas del Proyecto Final de IA
+
+Se miden por *changes* de OpenSpec, no por número de historias: la serie `HU-AIENG-[NNN]` es plana y se genera a demanda por change.
+
+| Épica | Descripción Breve | Changes | Ruta crítica |
+|-------|-------------------|---------|--------------|
+| **EP11** | Plataforma del Servicio de IA | C01, C02, C03, C05, C17 | 🔴 completa |
+| **EP12** | Corpus y Enriquecimiento del Catálogo | C06, C08, C09, C10, C11, C23 | 🔴 parcial |
+| **EP13** | Familias de Producto y Desambiguación | C07, C18, C28 | 🟢 |
+| **EP14** | Búsqueda Semántica Híbrida | C12, C13, C14, C15, C16, C20, C21, C22, C25 | 🔴 mayoritaria |
+| **EP15** | Venta Asistida, Sustitutos y Agentes | C26, C27, C30, C31, C32, C34, C36 | 🔴 parcial |
+| **EP16** | Inventario Asistido y Señales de Demanda | C19, C29, C33, C35, C37 | 🟢 |
+| **EP17** | Evaluación y Observabilidad de IA | C04, C24, C38, C39 | 🔴 parcial |
+| **TOTAL PF** | | **39 changes** | |
 
 ---
 
@@ -398,6 +557,20 @@ Este orden de implementación ha sido definido considerando las dependencias ent
    - Orden interno de EP10: HU-EP10-001 → HU-EP10-002 → HU-EP10-003 → HU-EP10-004 → HU-EP10-005 → HU-EP10-006 → HU-EP10-007 → HU-EP10-008
 
 > **Nota importante:** Este orden debe respetarse al generar los tickets de trabajo para asegurar que las dependencias estén resueltas antes de implementar funcionalidades que las requieren.
+
+### Orden de Implementación del Proyecto Final (EP11–EP17)
+
+Las épicas del PF **presuponen el MVP terminado**: operan sobre el catálogo, el inventario y los puntos de venta que ya existen. Su orden no es estrictamente secuencial por épica, sino por olas de trabajo con dependencias cruzadas entre changes:
+
+1. **EP11** (cimientos) — sin el esqueleto, los contratos y el esquema vectorial no arranca nada.
+2. **EP12** en paralelo con el resto de EP11 — el corpus es el insumo de la búsqueda.
+3. **EP14** — requiere corpus indexado (EP12) y contratos (EP11). Es la ruta crítica principal.
+4. **EP13** — puede avanzar en paralelo desde que existe el índice; su aprobación humana alimenta la desambiguación de EP15.
+5. **EP15** — requiere recuperación funcionando (EP14) y familias (EP13).
+6. **EP16** — requiere señales de demanda sobre histórico de ventas (EP12) y el patrón agéntico de EP15.
+7. **EP17** — la telemetría (C04) se implanta desde el primer día; la evaluación formal necesita recuperación (EP14) y generación (EP15).
+
+> El orden fino, con olas fechadas, dependencias exactas y pares que no deben ejecutarse en paralelo, está en el [plan de changes](Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (§4 grafo de dependencias y §5 calendario). Ese documento manda sobre este resumen.
 
 ---
 

@@ -1,5 +1,8 @@
-## ADDED Requirements
+# inventory-movement-report Specification
 
+## Purpose
+Administrator-only inventory movement reporting: additions, subtractions and net difference per product over a date and point-of-sale range, in summary or detail form, with sorting, a paginated page and Excel export bounded by a row limit.
+## Requirements
 ### Requirement: Inventory Movement Summary API with Date and POS Filters
 
 The system SHALL provide a REST API endpoint at `GET /api/reports/inventory-movements` that returns a paginated inventory movement report for the selected output model. The `outputModel` query parameter SHALL accept `summary` and `detail`, defaulting to `summary` when omitted. Summary mode SHALL return inventory movements aggregated by product. Each summary row SHALL contain the total additions (sum of positive `QuantityChange`), total subtractions (sum of absolute value of negative `QuantityChange`), and the difference (additions minus subtractions) for a product within the filtered date range. Detail mode SHALL return each matching inventory movement transaction separately. Only administrators SHALL access this endpoint.

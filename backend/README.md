@@ -37,11 +37,13 @@ backend/
 
 ## Getting Started
 
-### 1. Start PostgreSQL
+### 1. Start the local services
 
 ```bash
 docker-compose up -d
 ```
+
+This starts three services: `postgres` (image `pgvector/pgvector:pg15`, published on **5433**), `pgadmin` (8080) and `jbg-ai`, the Python AI microservice (8001) — see [`ai-service/README.md`](../ai-service/README.md). To start only the database, run `docker-compose up -d postgres`.
 
 ### 2. Install Dependencies
 
@@ -57,7 +59,7 @@ Create `appsettings.Development.json` in `src/JoiabagurPV.API/`:
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Port=5432;Database=joiabagurpv;Username=postgres;Password=postgres"
+    "DefaultConnection": "Host=localhost;Port=5433;Database=joiabagur_pv;Username=postgres;Password=password"
   },
   "Jwt": {
     "SecretKey": "YourSuperSecretKeyThatIsAtLeast32CharactersLong!",
@@ -88,7 +90,8 @@ dotnet run --launch-profile https
 
 The API will be available at:
 - **API**: `https://localhost:7169`
-- **Swagger UI**: `https://localhost:7169/swagger`
+- **Scalar API Reference**: `https://localhost:7169/scalar/v1`
+- **OpenAPI document**: `https://localhost:7169/openapi/v1.json`
 
 ## Authentication
 
@@ -372,7 +375,7 @@ dotnet test --filter "FullyQualifiedName~IntegrationTests"
 
 ## API Documentation
 
-Swagger/OpenAPI documentation is available at `/swagger` when running in development mode.
+OpenAPI documentation is served with Scalar (not Swagger UI) at `/scalar/v1` when running in development mode; the raw document is at `/openapi/v1.json`.
 
 ### Response Codes
 

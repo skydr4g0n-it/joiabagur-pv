@@ -15,7 +15,17 @@ context: |
   Testing: Vitest, React Testing Library, MSW, Playwright.
   ML: TensorFlow.js client-side inference (MobileNetV2 transfer learning).
 
-  Infra: Docker Compose (dev), AWS App Runner + RDS + S3 + CloudFront (prod).
+  AI service: jbg-ai — Python 3.11, FastAPI, uv, pydantic-settings (ai-service/).
+  Testing: pytest + FastAPI TestClient; test tree mirrors src/jbg_ai (see ai-service/tests/README.md).
+  Separate container; Python does vector search and LLM only, .NET owns all business
+  logic and is the final authority on price, stock and permissions. Browser never
+  calls Python: .NET → jbg-ai over an internal HS256 service JWT on the Docker network.
+  Vector index lives in schema `ai` (pgvector) of the same PostgreSQL database.
+
+  Infra: Docker Compose (dev), AWS EC2 + Docker + nginx (TLS via Let's Encrypt),
+  RDS PostgreSQL, S3 prod-jpv-files, ECR, SSM Parameter Store /jpv/prod/*,
+  GitHub OIDC for deploy (prod). Defined in terraform/. The App Runner + CloudFront
+  workflows are deprecated and manual-only.
   Storage: IFileStorageService abstraction (local dev, S3 prod).
 
   Roles: Admin (full access), Operator (restricted to assigned POS).
@@ -35,8 +45,14 @@ context: |
   - Backend naming: Microsoft C# conventions, async/await for I/O, Repository + Service patterns.
   - Frontend naming: functional components, hooks, colocated tests.
 
-  Epics: EP1-Products, EP2-Inventory, EP3-Sales, EP4-AI Recognition, EP5-Returns,
+  Epics (MVP): EP1-Products, EP2-Inventory, EP3-Sales, EP4-AI Recognition, EP5-Returns,
   EP6-Payment Methods, EP7-Auth/Users, EP8-POS, EP9-Reports, EP10-Jewelry Components.
+
+  Epics (AI final project): EP11-AI Service Platform, EP12-Catalog Corpus & Enrichment,
+  EP13-Product Families, EP14-Hybrid Semantic Search, EP15-Assisted Sales & Agents,
+  EP16-Assisted Inventory & Demand Signals, EP17-AI Evaluation & Observability.
+  Their user stories use a flat HU-AIENG-[NNN] series under Documentos/Historias/AI-Eng/,
+  organised by OpenSpec change (C01-C39), not per epic.
 
   Reference docs: Documentos/epicas.md, Documentos/modelo-de-datos.md,
   Documentos/arquitectura.md, Documentos/Guias/*.md, Documentos/Historias/*.md.

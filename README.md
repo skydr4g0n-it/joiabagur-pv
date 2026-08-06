@@ -51,6 +51,7 @@ El producto tiene como propósito ofrecer una solución integral de gestión par
 - **Gestión de métodos de pago:** Lista general (Efectivo, Bizum, Transferencia, Tarjeta TPV propio/punto de venta, PayPal), asignación por punto de venta y registro del método en cada venta.
 - **Gestión de usuarios:** Roles Administrador y Operador, autenticación con usuario y contraseña, operadores asociados a puntos de venta concretos.
 - **Otras funcionalidades:** Devoluciones, ajustes manuales de inventario, historial de ventas y movimientos de stock, dashboard con estadísticas y stock crítico.
+- **Búsqueda semántica y venta asistida (en desarrollo):** Proyecto Final del Máster de IA. Añade búsqueda semántica sobre el catálogo, sugerencia de sustitutos y argumentario de venta asistido, mediante el microservicio `jbg-ai`. A día de hoy están congelados el contrato HTTP y la autenticación entre servicios; la lógica de recuperación y generación se entrega en changes posteriores.
 
 ### 1.3. Diseño y experiencia de usuario
 
@@ -81,7 +82,7 @@ El usuario aterriza en la pantalla de login; tras autenticarse, accede al dashbo
    npm install --legacy-peer-deps
    npm run dev
    ```
-   La UI queda disponible en `http://localhost:5173`. Configurar `VITE_API_BASE_URL` si la API no está en `http://localhost:5000/api`.
+   La UI queda disponible en `http://localhost:3000`. Configurar `VITE_API_BASE_URL` si la API no está en `http://localhost:5000/api`.
 
 3. **Usuario por defecto (desarrollo)**  
    Usuario: `admin`. Contraseña: `Admin123!`. Cambiar la contraseña tras el primer acceso.
@@ -118,11 +119,13 @@ flowchart TB
     end
     DB["PostgreSQL"]
     Storage["Object Storage S3/Blob"]
+    AI["jbg-ai (Python/FastAPI)<br/>red interna, no expuesto en nginx"]
     Cliente -->|HTTPS| Nginx
     Nginx --> Gateway
     Gateway -->|HTTP interno| Backend
     Backend --> DB
     Backend --> Storage
+    Backend -->|JWT interno HS256| AI
 ```
 
 ### 2.2. Descripción de componentes principales
@@ -131,6 +134,7 @@ flowchart TB
 - **Frontend:** React 19, TypeScript, Vite, Metronic React (Layout 8), Radix UI, Tailwind CSS, React Hook Form + Zod, TensorFlow.js para inferencia y entrenamiento en el navegador.
 - **Base de datos:** PostgreSQL con índices para ventas, inventario y productos; connection pooling y paginación (máx. 50 ítems por página).
 - **Almacenamiento:** Servicio de ficheros abstracto (local en desarrollo, S3/Blob en producción) para fotos de productos, ventas y devoluciones.
+- **Servicio de IA (`jbg-ai`):** Microservicio Python 3.11 con FastAPI en contenedor propio, para recuperación vectorial y generación con LLM. El navegador nunca lo llama: solo el backend .NET, con un JWT interno HS256 sobre la red Docker. .NET conserva la autoridad sobre precio, stock y permisos.
 
 ### 2.3. Descripción de alto nivel del proyecto y estructura de ficheros
 
@@ -138,6 +142,8 @@ flowchart TB
 - `frontend/`: SPA React; `src/pages` por módulo (dashboard, sales, products, inventory, etc.), `src/services` para llamadas API, `src/components` para UI y layouts.
 - `Documentos/`: Arquitectura, modelo de datos, épicas, historias de usuario, guías de deploy y testing.
 - `openspec/`: Especificaciones (specs) y cambios (changes) según metodología OpenSpec (spec-driven development).
+- `ai-service/`: Microservicio Python `jbg-ai` (FastAPI) del Proyecto Final de IA. Contenedor independiente, alcanzable solo desde el backend .NET.
+- `terraform/`: Pila de infraestructura AWS de producción (EC2, RDS, S3, ECR, SSM, OIDC).
 
 ### 2.4. Infraestructura y despliegue
 
@@ -156,6 +162,7 @@ En producción (AWS): EC2 con nginx (TLS) y un contenedor Docker con API .NET + 
 
 - **Backend:** xUnit, Moq, FluentAssertions; tests unitarios de servicios y validadores; tests de integración con Testcontainers (PostgreSQL). Nomenclatura tipo `Method_Scenario_ExpectedResult`. Los controladores críticos (por ejemplo ventas) tienen tests de integración que cubren creación, validación de stock, método de pago y permisos.
 - **Frontend:** Vitest, React Testing Library, MSW para simular API; pruebas de componentes y de flujos; E2E con Playwright (en progreso). Documentación en [Documentos/testing-backend.md](Documentos/testing-backend.md) y [Documentos/testing-frontend.md](Documentos/testing-frontend.md).
+- **Servicio de IA (`jbg-ai`):** pytest con el `TestClient` de FastAPI (`uv run pytest`); cubre autenticación de servicio, conformidad de los contratos, respuestas stub y estabilidad del snapshot OpenAPI. Los tests no llaman a proveedores LLM, APIs de embeddings ni RDS.
 
 ---
 
@@ -391,4 +398,6 @@ Se documentan tres tickets principales a partir de las especificaciones OpenSpec
 - [Modelo C4](Documentos/modelo-c4.md): niveles de contexto y componentes.
 - [Testing Backend](Documentos/testing-backend.md) y [Testing Frontend](Documentos/testing-frontend.md).
 - [Guía de deploy AWS](Documentos/Guias/deploy-aws-production.md).
+- [README del backend](backend/README.md), [del frontend](frontend/README.md), [del servicio de IA `jbg-ai`](ai-service/README.md) y [de la pila Terraform](terraform/README.md).
+- [Plan de changes del Proyecto Final de IA](Documentos/Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) y [especificaciones funcionales v2](Documentos/Proyecto%20Final%20AIEng/joiabagur-ia-especificaciones-funcionales-v2.md).
 - [Procedimiento de User Stories](Documentos/Procedimientos/Procedimiento-UserStories.md) y [Procedimiento de Tickets de Trabajo](Documentos/Procedimientos/Procedimiento-TicketsTrabajo.md).

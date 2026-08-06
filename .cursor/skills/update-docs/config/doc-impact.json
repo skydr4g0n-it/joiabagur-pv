@@ -1,0 +1,350 @@
+{
+  "$comment": "Matriz de impacto documental de joiabagur-pv: mapea rutas de codigo/infra/spec a los documentos de contexto de largo plazo que hay que revisar. Este fichero esta replicado en .agent/, .claude/, .codex/, .cursor/ y .opencode/skills/update-docs/config/: editar uno y copiarlo a los otros cuatro. El orden de 'areas' importa: gana la primera coincidencia. Globs: '*' = un segmento, '**' = cualquier ruta, '**/' = prefijo opcional.",
+
+  "options": {
+    "recentArchiveDays": 45,
+    "maxEvidenceFiles": 12
+  },
+
+  "ignoreGlobs": [
+    "**/bin/**",
+    "**/obj/**",
+    "**/node_modules/**",
+    "**/__pycache__/**",
+    "**/*.pyc",
+    "**/*.tsbuildinfo",
+    ".pr/**",
+    ".docs-update/**",
+    "**/.DS_Store"
+  ],
+
+  "docs": {
+    "readme-root": {
+      "path": "README.md",
+      "title": "README raiz — entregable del master (es-ES)",
+      "language": "es",
+      "alwaysReview": true,
+      "policy": "frozen-sections",
+      "editableSections": ["1.4 Instrucciones de instalacion", "2. Arquitectura del sistema", "3. Modelo de datos", "4. Especificacion de la API", "Documentacion adicional"],
+      "frozenSections": ["0. Ficha del proyecto", "5. Historias de usuario", "6. Tickets de trabajo"],
+      "reference": "references/readmes.md"
+    },
+    "readme-backend": {
+      "path": "backend/README.md",
+      "title": "README del backend .NET (en)",
+      "language": "en",
+      "alwaysReview": true,
+      "policy": "editable",
+      "reference": "references/readmes.md"
+    },
+    "readme-frontend": {
+      "path": "frontend/README.md",
+      "title": "README del frontend React (en)",
+      "language": "en",
+      "alwaysReview": true,
+      "policy": "editable",
+      "reference": "references/readmes.md"
+    },
+    "readme-ai-service": {
+      "path": "ai-service/README.md",
+      "title": "README de jbg-ai (en)",
+      "language": "en",
+      "alwaysReview": true,
+      "policy": "editable",
+      "reference": "references/readmes.md"
+    },
+    "readme-ai-service-tests": {
+      "path": "ai-service/tests/README.md",
+      "title": "Guia de la suite de tests de jbg-ai (en)",
+      "language": "en",
+      "policy": "editable",
+      "note": "No es uno de los cinco README de componente: no lleva alwaysReview, se revisa solo cuando lo dispara un area.",
+      "reference": "references/readmes.md"
+    },
+    "readme-terraform": {
+      "path": "terraform/README.md",
+      "title": "README de la pila Terraform (en)",
+      "language": "en",
+      "alwaysReview": true,
+      "policy": "editable",
+      "reference": "references/readmes.md"
+    },
+
+    "doc-arquitectura": {
+      "path": "Documentos/arquitectura.md",
+      "title": "Arquitectura del sistema",
+      "language": "es",
+      "policy": "editable",
+      "reference": "references/documentos-funcionales.md"
+    },
+    "doc-modelo-c4": {
+      "path": "Documentos/modelo-c4.md",
+      "title": "Modelo C4 (niveles 1-3)",
+      "language": "es",
+      "policy": "editable",
+      "reference": "references/documentos-funcionales.md"
+    },
+    "doc-modelo-datos": {
+      "path": "Documentos/modelo-de-datos.md",
+      "title": "Modelo de datos",
+      "language": "es",
+      "policy": "editable",
+      "reference": "references/documentos-funcionales.md"
+    },
+    "doc-epicas": {
+      "path": "Documentos/epicas.md",
+      "title": "Epicas EP1-EP17",
+      "language": "es",
+      "policy": "editable",
+      "reference": "references/documentos-funcionales.md"
+    },
+    "doc-historias": {
+      "path": "Documentos/Historias/",
+      "title": "Historias de usuario (HU-EPx-NNN)",
+      "language": "es",
+      "policy": "report-only",
+      "note": "Crear o enriquecer HU es trabajo del comando enrich-us. update-docs solo senala la HU que falta o quedo desalineada.",
+      "reference": "references/documentos-funcionales.md"
+    },
+    "doc-historias-ai": {
+      "path": "Documentos/Historias/AI-Eng/",
+      "title": "Historias del Proyecto Final de IA (HU-AIENG-NNN)",
+      "language": "es",
+      "policy": "report-only",
+      "note": "Crear o enriquecer HU es trabajo del comando enrich-us. update-docs solo senala la HU que falta o quedo desalineada.",
+      "reference": "references/documentos-funcionales.md"
+    },
+    "doc-guias-deploy": {
+      "path": "Documentos/Guias/deploy-aws-production.md",
+      "title": "Guia de produccion en AWS (EC2 + Terraform)",
+      "language": "es",
+      "policy": "editable",
+      "reference": "references/documentos-funcionales.md"
+    },
+    "doc-guias-ia": {
+      "path": "Documentos/Guias/admin-modelo-ia.md",
+      "title": "Guia de administracion del modelo de IA",
+      "language": "es",
+      "policy": "editable",
+      "reference": "references/documentos-funcionales.md"
+    },
+    "doc-guias-ventas": {
+      "path": "Documentos/Guias/ventas-registro.md",
+      "title": "Guia de registro de ventas",
+      "language": "es",
+      "policy": "editable",
+      "reference": "references/documentos-funcionales.md"
+    },
+    "doc-testing-backend": {
+      "path": "Documentos/testing-backend.md",
+      "title": "Testing backend (+ Documentos/Testing/Backend/)",
+      "language": "es",
+      "policy": "editable",
+      "reference": "references/documentos-funcionales.md"
+    },
+    "doc-testing-frontend": {
+      "path": "Documentos/testing-frontend.md",
+      "title": "Testing frontend (+ Documentos/Testing/Frontend/)",
+      "language": "es",
+      "policy": "editable",
+      "reference": "references/documentos-funcionales.md"
+    },
+    "doc-pf-especificaciones": {
+      "path": "Documentos/Proyecto Final AIEng/joiabagur-ia-especificaciones-funcionales-v2.md",
+      "title": "Especificaciones funcionales del Proyecto Final de IA (v2)",
+      "language": "es",
+      "policy": "editable",
+      "reference": "references/documentos-funcionales.md"
+    },
+    "doc-pf-plan": {
+      "path": "Documentos/Proyecto Final AIEng/proyecto-final-plan-changes-openspec.md",
+      "title": "Plan de changes OpenSpec del Proyecto Final (C01-C39)",
+      "language": "es",
+      "policy": "editable",
+      "note": "Existe tambien la variante -3devs.md: si el cambio afecta al reparto por desarrollador, revisa las dos.",
+      "reference": "references/documentos-funcionales.md"
+    },
+
+    "openspec-project": {
+      "path": "openspec/project.md",
+      "title": "Contexto de proyecto de OpenSpec",
+      "language": "en",
+      "policy": "editable",
+      "reference": "references/openspec-context.md"
+    },
+    "openspec-config": {
+      "path": "openspec/config.yaml",
+      "title": "Contexto condensado y reglas de OpenSpec",
+      "language": "en",
+      "policy": "editable",
+      "reference": "references/openspec-context.md"
+    }
+  },
+
+  "areas": [
+    {
+      "name": "docs-themselves",
+      "globs": ["README.md", "backend/README.md", "frontend/README.md", "ai-service/README.md", "ai-service/tests/README.md", "terraform/README.md", "Documentos/**", "openspec/project.md", "openspec/config.yaml"],
+      "docs": [],
+      "reason": "El propio cambio ya toca documentacion: comprueba coherencia con el resto, no lo cuentes como disparador nuevo."
+    },
+    {
+      "name": "ai-tooling",
+      "globs": [".claude/**", ".cursor/**", ".agent/**", ".codex/**", ".opencode/**", ".github/skills/**", ".github/prompts/**", "**/CLAUDE.md", "**/AGENTS.md", "**/*.mdc"],
+      "docs": [],
+      "reason": "Comandos y skills de agentes: sin impacto en documentacion funcional. Verifica que la skill este replicada en los cinco harnesses."
+    },
+    {
+      "name": "repo-meta",
+      "globs": [".gitignore", ".gitattributes", ".editorconfig", "LICENSE", ".github/CODEOWNERS", ".github/ISSUE_TEMPLATE/**", ".github/PULL_REQUEST_TEMPLATE*"],
+      "docs": [],
+      "reason": "Metaficheros del repositorio: sin impacto en la documentacion funcional."
+    },
+    {
+      "name": "backend-data",
+      "globs": ["backend/src/JoiabagurPV.Domain/Entities/**", "backend/src/JoiabagurPV.Domain/Enums/**", "backend/src/JoiabagurPV.Infrastructure/Data/**", "**/Migrations/**"],
+      "docs": ["doc-modelo-datos", "openspec-project", "readme-backend", "doc-modelo-c4"],
+      "reason": "Entidades, enums, configuracion EF Core o migraciones: cambia el modelo de datos y la lista de entidades clave."
+    },
+    {
+      "name": "backend-auth",
+      "globs": ["**/JoiabagurPV.*/**/Auth*.cs", "**/JoiabagurPV.*/**/*Jwt*.cs", "**/JoiabagurPV.*/**/RefreshToken*.cs", "backend/src/JoiabagurPV.API/Middleware/**"],
+      "docs": ["readme-backend", "doc-arquitectura", "readme-root", "openspec-project"],
+      "reason": "Autenticacion, JWT o middleware: afecta a las secciones de seguridad y a la matriz de autorizacion."
+    },
+    {
+      "name": "backend-api",
+      "globs": ["backend/src/JoiabagurPV.API/Controllers/**", "backend/src/JoiabagurPV.Application/DTOs/**"],
+      "docs": ["readme-backend", "readme-root", "doc-modelo-c4"],
+      "reason": "Endpoints o DTOs: cambia el contrato REST publicado en los README y los componentes de API del C4."
+    },
+    {
+      "name": "backend-application",
+      "globs": ["backend/src/JoiabagurPV.Application/**", "backend/src/JoiabagurPV.Domain/**"],
+      "docs": ["doc-modelo-c4", "readme-backend", "openspec-project"],
+      "reason": "Servicios de aplicacion o reglas de dominio: revisa componentes del C4 y reglas de negocio."
+    },
+    {
+      "name": "backend-infrastructure",
+      "globs": ["backend/src/JoiabagurPV.Infrastructure/**"],
+      "docs": ["doc-modelo-c4", "doc-arquitectura", "readme-backend"],
+      "reason": "Repositorios, almacenamiento de ficheros o integraciones: revisa capas y servicios compartidos."
+    },
+    {
+      "name": "backend-tests",
+      "globs": ["backend/src/JoiabagurPV.Tests/**", "backend/api-tests/**"],
+      "docs": ["doc-testing-backend", "readme-backend"],
+      "reason": "Suite de tests del backend: stack, nomenclatura o cobertura documentados."
+    },
+    {
+      "name": "backend-misc",
+      "globs": ["backend/**"],
+      "docs": ["readme-backend"],
+      "reason": "Resto del backend: revisa si el README del componente sigue siendo exacto."
+    },
+    {
+      "name": "frontend-tests",
+      "globs": ["frontend/e2e/**", "frontend/src/test/**", "frontend/playwright.config.ts", "frontend/vite.config.ts"],
+      "docs": ["doc-testing-frontend", "readme-frontend"],
+      "reason": "Tests o configuracion de test del frontend: stack, estructura y convenciones documentadas."
+    },
+    {
+      "name": "frontend-services",
+      "globs": ["frontend/src/services/**", "frontend/src/types/**", "frontend/src/config/**"],
+      "docs": ["readme-frontend", "doc-modelo-c4"],
+      "reason": "Servicios, tipos o configuracion del frontend: consumo de la API y modulos del C4."
+    },
+    {
+      "name": "frontend-app",
+      "globs": ["frontend/src/**", "frontend/index.html"],
+      "docs": ["readme-frontend", "doc-modelo-c4"],
+      "reason": "Paginas, componentes o rutas: modulos del frontend descritos en el C4 y en el README."
+    },
+    {
+      "name": "frontend-misc",
+      "globs": ["frontend/**"],
+      "docs": ["readme-frontend"],
+      "reason": "Resto del frontend: revisa si el README del componente sigue siendo exacto."
+    },
+    {
+      "name": "ai-contracts",
+      "globs": ["ai-service/openapi.json", "ai-service/src/jbg_ai/api/schemas/**", "ai-service/src/jbg_ai/api/auth.py", "ai-service/src/jbg_ai/api/deps.py", "ai-service/src/jbg_ai/api/main.py", "ai-service/src/jbg_ai/api/middleware.py"],
+      "docs": ["readme-ai-service", "doc-pf-especificaciones", "doc-arquitectura", "doc-modelo-c4", "openspec-project", "openspec-config"],
+      "reason": "Contrato de jbg-ai (endpoints, esquemas, JWT interno): frontera .NET <-> Python documentada en varios sitios."
+    },
+    {
+      "name": "ai-service-config",
+      "globs": ["ai-service/src/jbg_ai/config/**", "ai-service/pyproject.toml", "ai-service/uv.lock", "ai-service/Dockerfile"],
+      "docs": ["readme-ai-service", "doc-arquitectura", "openspec-config"],
+      "reason": "Settings, dependencias o imagen de jbg-ai: variables de entorno y stack documentados."
+    },
+    {
+      "name": "ai-service-tests",
+      "globs": ["ai-service/tests/**"],
+      "docs": ["readme-ai-service-tests", "readme-ai-service"],
+      "reason": "Tests de jbg-ai: guia de la suite (carpetas, markers, helpers de support/) y seccion Tests del README del servicio."
+    },
+    {
+      "name": "ai-service",
+      "globs": ["ai-service/**"],
+      "docs": ["readme-ai-service", "doc-pf-especificaciones", "readme-ai-service-tests"],
+      "reason": "Resto de jbg-ai: revisa el README del servicio y las especificaciones del Proyecto Final. Un modulo nuevo en src/jbg_ai/ implica carpeta nueva en tests/."
+    },
+    {
+      "name": "ml",
+      "globs": ["backend/scripts/ml-training/**", "**/*Embedding*", "**/*embedding*", "**/*recognition*", "**/*Recognition*"],
+      "docs": ["doc-guias-ia", "doc-modelo-c4", "doc-modelo-datos"],
+      "reason": "Modelo de IA, embeddings o reconocimiento: guia de administracion del modelo y componentes implicados."
+    },
+    {
+      "name": "infra-terraform",
+      "globs": ["terraform/**", "**/*.tf", "**/*.tfvars*"],
+      "docs": ["readme-terraform", "doc-guias-deploy", "doc-arquitectura", "readme-root", "openspec-config"],
+      "reason": "Pila de infraestructura AWS: recursos, variables, outputs y procedimiento de despliegue."
+    },
+    {
+      "name": "infra-docker",
+      "globs": ["**/Dockerfile*", "**/docker-compose*.yml", "**/.dockerignore", "**/nginx*.conf", "**/deploy*.sh"],
+      "docs": ["doc-arquitectura", "readme-root", "doc-guias-deploy"],
+      "reason": "Contenedores o proxy: entorno de desarrollo/produccion e instrucciones de instalacion."
+    },
+    {
+      "name": "ci",
+      "globs": [".github/workflows/**"],
+      "docs": ["doc-guias-deploy", "doc-arquitectura", "doc-testing-backend", "doc-testing-frontend"],
+      "reason": "Pipelines de CI/CD: pasos de despliegue, secretos requeridos y ejecucion de tests."
+    },
+    {
+      "name": "deps",
+      "globs": ["**/*.csproj", "**/*.sln", "**/package.json", "**/package-lock.json", "**/global.json"],
+      "docs": ["readme-backend", "readme-frontend", "doc-arquitectura", "openspec-project"],
+      "reason": "Dependencias o versiones del stack: tablas de stack tecnologico y scripts documentados."
+    },
+    {
+      "name": "config-app",
+      "globs": ["**/appsettings*.json", "**/.env", "**/.env.*"],
+      "docs": ["readme-backend", "doc-guias-deploy"],
+      "reason": "Configuracion de la aplicacion: tablas de variables de entorno."
+    },
+    {
+      "name": "openspec-specs",
+      "globs": ["openspec/specs/**"],
+      "docs": ["doc-epicas", "openspec-project", "doc-historias"],
+      "reason": "Specs vivas sincronizadas: la capability cambio de comportamiento y la documentacion funcional debe reflejarlo."
+    },
+    {
+      "name": "openspec-changes",
+      "globs": ["openspec/changes/**"],
+      "docs": ["doc-epicas", "doc-pf-plan", "doc-historias-ai", "openspec-project"],
+      "reason": "Change activo o recien archivado: alcance de la epica, plan de changes e historias asociadas."
+    },
+    {
+      "name": "scripts",
+      "globs": ["**/*.ps1", "**/*.sh", "**/*.sql"],
+      "docs": ["readme-backend"],
+      "reason": "Scripts operativos: comprueba si estan documentados donde se usan."
+    }
+  ],
+
+  "fallbackArea": "sin-clasificar"
+}

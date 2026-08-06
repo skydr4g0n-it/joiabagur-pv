@@ -81,14 +81,13 @@ erDiagram
     
     UserPointOfSale {
         uuid Id PK
-        uuid UserId FK
-        uuid PointOfSaleId FK
+        uuid UserId FK,UK
+        uuid PointOfSaleId FK,UK
         datetime AssignedAt
         datetime? UnassignedAt
-        bool IsActive
+        bool IsActive UK
         datetime CreatedAt
         datetime UpdatedAt
-        unique(UserId, PointOfSaleId, IsActive) "filtered: IsActive=true"
     }
     
     Collection {
@@ -119,12 +118,11 @@ erDiagram
         bool IsPrimary "foto principal"
         datetime CreatedAt
         datetime UpdatedAt
-        indexed(ProductId, DisplayOrder)
     }
 
     ProductPhotoEmbedding {
         uuid Id PK
-        uuid ProductPhotoId FK UK "unique - un embedding por foto"
+        uuid ProductPhotoId FK,UK "unique - un embedding por foto"
         uuid ProductId FK
         string ProductSku "desnormalizado para búsquedas sin JOIN"
         text EmbeddingVector "1280 floats como JSON"
@@ -144,12 +142,11 @@ erDiagram
     
     PointOfSalePaymentMethod {
         uuid Id PK
-        uuid PointOfSaleId FK
-        uuid PaymentMethodId FK
+        uuid PointOfSaleId FK,UK
+        uuid PaymentMethodId FK,UK
         bool IsActive
         datetime CreatedAt
         datetime? DeactivatedAt
-        unique(PointOfSaleId, PaymentMethodId)
     }
     
     Sale {
@@ -166,11 +163,6 @@ erDiagram
         uuid? BulkOperationId "agrupa ventas de un checkout masivo"
         datetime SaleDate
         datetime CreatedAt
-        indexed(PointOfSaleId, SaleDate)
-        indexed(ProductId, SaleDate)
-        indexed(UserId, SaleDate)
-        indexed(PaymentMethodId, SaleDate)
-        indexed(BulkOperationId)
     }
     
     SalePhoto {
@@ -194,20 +186,15 @@ erDiagram
         string? Reason "motivo libre opcional, max 500 chars"
         datetime ReturnDate
         datetime CreatedAt
-        indexed(PointOfSaleId, ReturnDate)
-        indexed(ProductId, ReturnDate)
     }
     
     ReturnSale {
         uuid Id PK
-        uuid ReturnId FK
-        uuid SaleId FK
+        uuid ReturnId FK,UK
+        uuid SaleId FK,UK
         int Quantity "cantidad de esta venta incluida en la devolución"
         decimal UnitPrice "precio unitario snapshot de Sale.Price"
         datetime CreatedAt
-        unique(ReturnId, SaleId)
-        indexed(SaleId)
-        indexed(ReturnId)
     }
     
     ReturnPhoto {
@@ -223,17 +210,13 @@ erDiagram
     
     Inventory {
         uuid Id PK
-        uuid ProductId FK
-        uuid PointOfSaleId FK
+        uuid ProductId FK,UK
+        uuid PointOfSaleId FK,UK
         int Quantity "stock actual"
         bool IsActive "true=asignado, false=desasignado"
         datetime LastUpdatedAt
         datetime CreatedAt
         datetime UpdatedAt
-        unique(ProductId, PointOfSaleId)
-        indexed(PointOfSaleId, Quantity)
-        indexed(ProductId)
-        indexed(PointOfSaleId, ProductId, IsActive)
     }
     
     InventoryMovement {
@@ -250,9 +233,6 @@ erDiagram
         datetime MovementDate
         datetime CreatedAt
         datetime UpdatedAt
-        indexed(InventoryId)
-        indexed(MovementDate)
-        indexed(InventoryId, MovementDate)
     }
 
     RefreshToken {
@@ -281,15 +261,14 @@ erDiagram
 
     ProductComponentAssignment {
         uuid Id PK
-        uuid ProductId FK
-        uuid ComponentId FK
+        uuid ProductId FK,UK
+        uuid ComponentId FK,UK
         decimal Quantity "precision 18,4"
         decimal CostPrice "precision 18,4"
         decimal SalePrice "precision 18,4"
         int DisplayOrder "default 0"
         datetime CreatedAt
         datetime UpdatedAt
-        unique(ProductId, ComponentId)
     }
 
     ComponentTemplate {
@@ -302,12 +281,11 @@ erDiagram
 
     ComponentTemplateItem {
         uuid Id PK
-        uuid TemplateId FK
-        uuid ComponentId FK
+        uuid TemplateId FK,UK
+        uuid ComponentId FK,UK
         decimal Quantity "precision 18,4"
         datetime CreatedAt
         datetime UpdatedAt
-        unique(TemplateId, ComponentId)
     }
 
     ModelMetadata {
@@ -339,6 +317,15 @@ erDiagram
         datetime UpdatedAt
     }
 ```
+
+> **Notación del diagrama.** El `erDiagram` usa solo marcas Mermaid válidas: `PK`,
+> `FK` y `UK` (esta última sobre cada columna que participa en una restricción
+> única, incluidas las compuestas — p. ej. `Inventory.ProductId FK,UK` +
+> `Inventory.PointOfSaleId FK,UK` es la única `(ProductId, PointOfSaleId)`).
+> Los índices no únicos, los índices compuestos y los filtros de las restricciones
+> únicas **no caben en esa notación** y se documentan en
+> [Índices y Optimizaciones](#índices-y-optimizaciones), que es la referencia
+> completa: campos, orden, propósito y casos de uso.
 
 ---
 
@@ -891,8 +878,9 @@ Todas las entidades utilizan `Id` (UUID) como clave primaria con índice automá
 | `IX_Sale_Product_SaleDate` | `(ProductId, SaleDate DESC)` | Consultas de ventas por producto | Productos más vendidos, historial por producto |
 | `IX_Sale_User_SaleDate` | `(UserId, SaleDate DESC)` | Consultas de ventas por operador | Rendimiento por operador |
 | `IX_Sale_PaymentMethod_SaleDate` | `(PaymentMethodId, SaleDate DESC)` | Consultas de ventas por método de pago | Reportes por método de pago |
+| `IX_Sale_BulkOperation` | `(BulkOperationId)` | Recuperar todas las ventas de un checkout masivo | Detalle y devolución de una operación masiva |
 
-**Justificación:** Las consultas de historial de ventas (caso de uso #10) requieren filtrado por múltiples criterios y ordenamiento por fecha. Estos índices optimizan las consultas más comunes.
+**Justificación:** Las consultas de historial de ventas (caso de uso #10) requieren filtrado por múltiples criterios y ordenamiento por fecha. Estos índices optimizan las consultas más comunes. `IX_Sale_BulkOperation` agrupa las ventas creadas en un mismo checkout masivo, que se consultan y anulan como una unidad.
 
 #### Tabla: InventoryMovement
 
@@ -910,8 +898,9 @@ Todas las entidades utilizan `Id` (UUID) como clave primaria con índice automá
 |--------|--------|-----------|--------------|
 | `IX_Inventory_PointOfSale_Quantity` | `(PointOfSaleId, Quantity)` | Consultas de stock bajo por punto de venta | Alertas de stock bajo (Fase 2) |
 | `IX_Inventory_Product` | `(ProductId)` | Consultas de stock total por producto | Vista centralizada de stock |
+| `IX_Inventory_PointOfSale_Product_IsActive` | `(PointOfSaleId, ProductId, IsActive)` | Resolver el registro de stock vigente de un producto en un punto de venta sin leer los desasignados | Venta, devolución y ajuste de inventario |
 
-**Justificación:** Optimiza las consultas de inventario por punto de venta y producto, esenciales para el caso de uso #11.
+**Justificación:** Optimiza las consultas de inventario por punto de venta y producto, esenciales para el caso de uso #11. El índice con `IsActive` cubre el camino más caliente: localizar la asignación activa de un producto en un punto de venta durante la venta.
 
 #### Tabla: ProductPhoto
 

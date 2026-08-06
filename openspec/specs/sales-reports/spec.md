@@ -1,5 +1,8 @@
-# Sales Reports
+# sales-reports Specification
 
+## Purpose
+Paginated sales reporting with extended filters and global aggregates computed over the whole filtered set, scoped by role (administrators see every point of sale, operators only their assigned ones), plus a multi-sheet Excel export bounded by a row limit.
+## Requirements
 ### Requirement: Sales Report API with Extended Filters and Global Aggregates
 
 The system SHALL provide a REST API endpoint at `GET /api/reports/sales` that returns paginated sales data with extended filtering and global aggregate totals computed over the entire filtered result set (not just the current page). Only authenticated users can access this endpoint; administrators see all POS, operators see only assigned POS.

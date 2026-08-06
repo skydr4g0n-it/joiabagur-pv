@@ -43,6 +43,10 @@ services:
       APP_ENV: local
       SERVICE_VERSION: 0.1.0
       LOG_LEVEL: INFO
+      # Local development placeholder only. Production reads it from SSM (C17)
+      # and shares the same value with the .NET API, which signs the token.
+      JWT_SECRET: local-dev-jwt-secret-0123456789abcdef
+      STUB_MODE: "true"
     ports:
       - "8001:8000"
     networks:
