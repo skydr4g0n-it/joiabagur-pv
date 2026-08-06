@@ -41,8 +41,9 @@ Los archivos de apoyo están **junto a este SKILL.md**: `scripts/`, `config/`,
 `frontend/` (React 19 + Vite + Metronic), `ai-service/` (microservicio Python
 `jbg_ai`, FastAPI), `terraform/` y `.github/workflows/`.
 
-Lee `openspec/project.md` para las convenciones (stack, capas, reglas de negocio);
-`CLAUDE.md` y `AGENTS.md` están vacíos en este repo, no los uses como contexto.
+Lee `openspec/project.md` para las convenciones (stack, capas, reglas de negocio) y
+`CLAUDE.md` para las reglas operativas del repo (formas de `openspec validate`,
+spec viva vs spec delta, particularidades de `ai-service`). `AGENTS.md` sigue vacío.
 Si la rama tiene relación con un change OpenSpec, ojea `openspec/changes/<slug>/`
 (`proposal.md`, `tasks.md`) para el WHY, y `Documentos/Historias/` si el change
 cita una HU. No leas el código completo: el diff es la fuente de verdad de *qué*
