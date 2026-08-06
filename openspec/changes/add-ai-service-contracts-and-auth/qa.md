@@ -22,11 +22,11 @@
 
 ## 1. Suite automática
 
-**Resultado: 74 tests, 74 en verde, 0 fallos, ~1,3 s.**
+**Resultado: 77 tests, 77 en verde, 0 fallos, ~1,3 s.**
 
 | Fichero | Tests | Cubre |
 |---|---|---|
-| `tests/test_auth.py` | 21 | 401 sin token en los ocho endpoints, siete variantes de token inválido, cabecera mal formada, `alg=none`, token válido, `pos_id` del token, `trace_id` del claim |
+| `tests/test_auth.py` | 24 | 401 sin token en los ocho endpoints, siete variantes de token inválido, cabecera mal formada, `alg=none`, token válido, `pos_id` del token, `trace_id` del claim, los cuatro claims en el `ServicePrincipal`, `role` del body inerte, `trace_id` en los logs estructurados |
 | `tests/test_contracts.py` | 12 | Los ocho endpoints validan contra su modelo declarado; inventory priorizado; enrich con confianza por campo; index counters y drift; eco de scope |
 | `tests/test_stub_mode.py` | 10 | 501 en los ocho endpoints con `STUB_MODE=false`, mensaje con el change entregador, auth antes que el guard |
 | `tests/test_retrieval_stub.py` | 9 | Schema de recuperación, sobre-recuperación en seis puntos, determinismo, substitutes con `similarity_signals`, 422 por `top_k` fuera de rango |
@@ -117,7 +117,22 @@ El perfil canónico vive en `canonical_openapi_settings()`, invocado tanto por e
 
 ---
 
-## 6. Cómo se comprueba «sin LLM, sin embeddings y sin base de datos»
+## 6. Huecos detectados en el verify y cerrados
+
+El `/opsx:verify` sobre esta implementación no encontró ningún problema crítico, pero sí dos escenarios de spec sin cobertura y dos matices de coherencia. Los cuatro se corrigieron en el commit de seguimiento:
+
+| Hueco | Cierre |
+|---|---|
+| `ai-service-auth` · «Role cannot be escalated from the body»: ninguna ruta lee `principal.role`, así que el escenario era cierto por vacío y sin test | `test_role_in_body_is_inert` compara byte a byte la respuesta con y sin `role` en el body |
+| `ai-service-auth` · «Principal carries the token claims»: `user_id` y `role` se exigían (401 si faltan) pero nadie asertaba sus valores | `test_decode_service_token_exposes_every_claim`, test unitario sobre `decode_service_token`, sin pasar por HTTP |
+| `ai-service-runtime` · la precedencia del `trace_id` se comprobaba en cuerpo y cabecera, no en los logs | `test_token_trace_id_reaches_structured_logs` con `caplog` |
+| `design.md` decisión 10 no mencionaba `canonical_openapi_settings()` | Frase añadida: es el guard contra deriva de perfil que la propia decisión pide, no el script que rechaza |
+
+Queda vivo, como matiz consciente: el escenario de Compose «falta el secreto y falla rápido» se comprueba por los tests unitarios de settings, no arrancando el contenedor sin `JWT_SECRET`.
+
+---
+
+## 7. Cómo se comprueba «sin LLM, sin embeddings y sin base de datos»
 
 No basta con no escribir la llamada, así que hay dos capas:
 
@@ -128,7 +143,7 @@ Los stubs además no llaman al reloj: las fechas de `index/status` y `evals/runs
 
 ---
 
-## 7. Lo que **no** se ha comprobado
+## 8. Lo que **no** se ha comprobado
 
 Se deja explícito para que nadie lo dé por hecho:
 
@@ -141,7 +156,7 @@ Se deja explícito para que nadie lo dé por hecho:
 
 ---
 
-## 8. Riesgos vivos tras la verificación
+## 9. Riesgos vivos tras la verificación
 
 | Riesgo | Estado |
 |---|---|

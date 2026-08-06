@@ -87,7 +87,7 @@ This change is Ola 0 / C02 / HU-AIENG-002 / T-AIENG-002. Its job is to **freeze 
 
 ### 10. Snapshot equality test, manual regeneration — no export script in this change
 
-- **Choice:** `test_openapi_snapshot_is_stable` compares the live `create_app(...).openapi()` against the committed file; the README documents a one-liner to regenerate. No `jbg_ai.tools.export_openapi` module.
+- **Choice:** `test_openapi_snapshot_is_stable` compares the live `create_app(...).openapi()` against the committed file; the README documents a one-liner to regenerate. No `jbg_ai.tools.export_openapi` module. The single shared piece is `canonical_openapi_settings()` in `config/settings.py` — a settings constant both the test and the README one-liner call, so the two can never build the app with different profiles; it is the profile-drift guard this decision asks for, not the tooling it rejects (no entrypoint, no CLI, no file writing).
 - **Why:** The value of the snapshot is the CI failure, not the ergonomics of regenerating — which happens only when the contract is deliberately renegotiated. A dedicated script adds an entrypoint to maintain and a real risk that script and test build the app with different profiles, which would silently defeat the whole mechanism.
 - **Revisit:** If regeneration becomes frequent in Ola 4, extract the one-liner into a script without touching the contract.
 

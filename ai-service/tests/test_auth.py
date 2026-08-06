@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
+from conftest import TEST_JWT_SECRET
+from jbg_ai.api.auth import decode_service_token
 from sample_requests import V1_REQUESTS
 
 
@@ -100,6 +103,18 @@ def test_valid_token_is_accepted(client: TestClient, auth_headers: dict[str, str
     assert response.status_code == 200
 
 
+def test_decode_service_token_exposes_every_claim(issue_token: Callable[..., str]) -> None:
+    """The principal is the seam: user_id and role reach it even if no route reads them yet."""
+    token = issue_token(user_id="u-42", role="Admin", pos_id="POS-Z", trace_id="t-9")
+
+    principal = decode_service_token(token, TEST_JWT_SECRET)
+
+    assert principal.user_id == "u-42"
+    assert principal.role == "Admin"
+    assert principal.pos_id == "POS-Z"
+    assert principal.trace_id == "t-9"
+
+
 def test_pos_id_from_token_overrides_body_value(
     client: TestClient, issue_token: Callable[..., str]
 ) -> None:
@@ -113,6 +128,19 @@ def test_pos_id_from_token_overrides_body_value(
 
     assert response.status_code == 200
     assert response.json()["effective_pos_id"] == "POS-B"
+
+
+def test_role_in_body_is_inert(client: TestClient, auth_headers: dict[str, str]) -> None:
+    """A body role cannot escalate anything: the response is byte-identical without it."""
+    payload = {"query": "anillo", "top_k": 1}
+
+    baseline = client.post("/v1/retrieval/products", json=payload, headers=auth_headers)
+    with_role = client.post(
+        "/v1/retrieval/products", json={**payload, "role": "Admin"}, headers=auth_headers
+    )
+
+    assert with_role.status_code == 200
+    assert with_role.content == baseline.content
 
 
 def test_token_trace_id_wins_over_header(
@@ -132,6 +160,28 @@ def test_token_trace_id_wins_over_header(
     assert response.status_code == 200
     assert response.json()["trace_id"] == "trace-from-token"
     assert response.headers["X-Trace-Id"] == "trace-from-token"
+
+
+def test_token_trace_id_reaches_structured_logs(
+    client: TestClient,
+    issue_token: Callable[..., str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    token = issue_token(trace_id="trace-in-logs")
+
+    with caplog.at_level(logging.INFO, logger="jbg_ai"):
+        response = client.post(
+            "/v1/retrieval/products",
+            json={"query": "anillo", "top_k": 1},
+            headers={
+                "Authorization": f"Bearer {token}",
+                "X-Trace-Id": "trace-from-header",
+            },
+        )
+
+    assert response.status_code == 200
+    logged = [getattr(record, "trace_id", None) for record in caplog.records]
+    assert "trace-in-logs" in logged
 
 
 def test_rejected_request_still_carries_a_trace_id(client: TestClient) -> None:
