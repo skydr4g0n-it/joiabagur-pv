@@ -318,6 +318,15 @@ erDiagram
     }
 ```
 
+> **Notación del diagrama.** El `erDiagram` usa solo marcas Mermaid válidas: `PK`,
+> `FK` y `UK` (esta última sobre cada columna que participa en una restricción
+> única, incluidas las compuestas — p. ej. `Inventory.ProductId FK,UK` +
+> `Inventory.PointOfSaleId FK,UK` es la única `(ProductId, PointOfSaleId)`).
+> Los índices no únicos, los índices compuestos y los filtros de las restricciones
+> únicas **no caben en esa notación** y se documentan en
+> [Índices y Optimizaciones](#índices-y-optimizaciones), que es la referencia
+> completa: campos, orden, propósito y casos de uso.
+
 ---
 
 ## Descripción de Entidades Principales
@@ -869,8 +878,9 @@ Todas las entidades utilizan `Id` (UUID) como clave primaria con índice automá
 | `IX_Sale_Product_SaleDate` | `(ProductId, SaleDate DESC)` | Consultas de ventas por producto | Productos más vendidos, historial por producto |
 | `IX_Sale_User_SaleDate` | `(UserId, SaleDate DESC)` | Consultas de ventas por operador | Rendimiento por operador |
 | `IX_Sale_PaymentMethod_SaleDate` | `(PaymentMethodId, SaleDate DESC)` | Consultas de ventas por método de pago | Reportes por método de pago |
+| `IX_Sale_BulkOperation` | `(BulkOperationId)` | Recuperar todas las ventas de un checkout masivo | Detalle y devolución de una operación masiva |
 
-**Justificación:** Las consultas de historial de ventas (caso de uso #10) requieren filtrado por múltiples criterios y ordenamiento por fecha. Estos índices optimizan las consultas más comunes.
+**Justificación:** Las consultas de historial de ventas (caso de uso #10) requieren filtrado por múltiples criterios y ordenamiento por fecha. Estos índices optimizan las consultas más comunes. `IX_Sale_BulkOperation` agrupa las ventas creadas en un mismo checkout masivo, que se consultan y anulan como una unidad.
 
 #### Tabla: InventoryMovement
 
@@ -888,8 +898,9 @@ Todas las entidades utilizan `Id` (UUID) como clave primaria con índice automá
 |--------|--------|-----------|--------------|
 | `IX_Inventory_PointOfSale_Quantity` | `(PointOfSaleId, Quantity)` | Consultas de stock bajo por punto de venta | Alertas de stock bajo (Fase 2) |
 | `IX_Inventory_Product` | `(ProductId)` | Consultas de stock total por producto | Vista centralizada de stock |
+| `IX_Inventory_PointOfSale_Product_IsActive` | `(PointOfSaleId, ProductId, IsActive)` | Resolver el registro de stock vigente de un producto en un punto de venta sin leer los desasignados | Venta, devolución y ajuste de inventario |
 
-**Justificación:** Optimiza las consultas de inventario por punto de venta y producto, esenciales para el caso de uso #11.
+**Justificación:** Optimiza las consultas de inventario por punto de venta y producto, esenciales para el caso de uso #11. El índice con `IsActive` cubre el camino más caliente: localizar la asignación activa de un producto en un punto de venta durante la venta.
 
 #### Tabla: ProductPhoto
 
