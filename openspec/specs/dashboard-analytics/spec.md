@@ -1,5 +1,8 @@
-## ADDED Requirements
+# dashboard-analytics Specification
 
+## Purpose
+Role-aware landing dashboards: KPIs, trend and distribution charts, critical stock alerts and recent sales, served from pre-aggregated endpoints. Administrators see the whole business; operators see only their assigned point of sale.
+## Requirements
 ### Requirement: Administrator Dashboard KPIs
 
 The system SHALL provide an Administrator dashboard displaying today's sales count and total, monthly net revenue (gross sales minus returns for the same month) with year-over-year comparison, and monthly return count and total, sourced from a single pre-aggregated API endpoint.

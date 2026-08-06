@@ -151,6 +151,12 @@
 - **Commits**: Conventional commits format
 - **CI/CD**: GitHub Actions for build, test, and deploy
 
+### OpenSpec Validation
+
+- **Project gate**: `openspec validate --all --strict` must report `0 failed`. Use this exact form in Definition-of-Done items.
+- **Single change in progress**: `openspec validate <change-name> --strict`.
+- The bare form (`openspec validate`, with or without `--strict`) validates nothing and exits 1 — it is not a pass.
+
 ### Documentation
 
 - **Language**: Technical documentation in English, User Stories and user-facing guides in Spanish
