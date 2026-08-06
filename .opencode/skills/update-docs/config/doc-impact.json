@@ -53,6 +53,14 @@
       "policy": "editable",
       "reference": "references/readmes.md"
     },
+    "readme-ai-service-tests": {
+      "path": "ai-service/tests/README.md",
+      "title": "Guia de la suite de tests de jbg-ai (en)",
+      "language": "en",
+      "policy": "editable",
+      "note": "No es uno de los cinco README de componente: no lleva alwaysReview, se revisa solo cuando lo dispara un area.",
+      "reference": "references/readmes.md"
+    },
     "readme-terraform": {
       "path": "terraform/README.md",
       "title": "README de la pila Terraform (en)",
@@ -176,7 +184,7 @@
   "areas": [
     {
       "name": "docs-themselves",
-      "globs": ["README.md", "backend/README.md", "frontend/README.md", "ai-service/README.md", "terraform/README.md", "Documentos/**", "openspec/project.md", "openspec/config.yaml"],
+      "globs": ["README.md", "backend/README.md", "frontend/README.md", "ai-service/README.md", "ai-service/tests/README.md", "terraform/README.md", "Documentos/**", "openspec/project.md", "openspec/config.yaml"],
       "docs": [],
       "reason": "El propio cambio ya toca documentacion: comprueba coherencia con el resto, no lo cuentes como disparador nuevo."
     },
@@ -273,14 +281,14 @@
     {
       "name": "ai-service-tests",
       "globs": ["ai-service/tests/**"],
-      "docs": ["readme-ai-service"],
-      "reason": "Tests de jbg-ai: seccion Tests del README del servicio."
+      "docs": ["readme-ai-service-tests", "readme-ai-service"],
+      "reason": "Tests de jbg-ai: guia de la suite (carpetas, markers, helpers de support/) y seccion Tests del README del servicio."
     },
     {
       "name": "ai-service",
       "globs": ["ai-service/**"],
-      "docs": ["readme-ai-service", "doc-pf-especificaciones"],
-      "reason": "Resto de jbg-ai: revisa el README del servicio y las especificaciones del Proyecto Final."
+      "docs": ["readme-ai-service", "doc-pf-especificaciones", "readme-ai-service-tests"],
+      "reason": "Resto de jbg-ai: revisa el README del servicio y las especificaciones del Proyecto Final. Un modulo nuevo en src/jbg_ai/ implica carpeta nueva en tests/."
     },
     {
       "name": "ml",

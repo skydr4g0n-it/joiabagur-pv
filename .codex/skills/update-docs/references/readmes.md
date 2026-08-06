@@ -104,6 +104,28 @@ enlaza.
 
 ---
 
+## `ai-service/tests/README.md` — inglés · política `editable`
+
+**No es uno de los cinco.** No lleva `alwaysReview`: solo se revisa cuando lo
+dispara un área, y no necesita veredicto en el plan si nadie lo ha disparado.
+
+Guía de la suite de `jbg-ai`. Su tesis es que el árbol de tests **espeja
+`src/jbg_ai/`**: un test vive en la carpeta del módulo dueño del comportamiento,
+no en una carpeta por change. Se actualiza cuando:
+
+- aparece un módulo nuevo en `src/jbg_ai/` y con él una carpeta de tests (la tabla
+  «which folder for which change» debe cuadrar con el plan C01–C39);
+- se añade un marker a `[tool.pytest.ini_options]` de `ai-service/pyproject.toml`
+  — hoy `db` y `slow`;
+- se añade un helper compartido a `tests/support/`.
+
+Dos invariantes que el documento defiende y conviene no romper al editarlo:
+`conftest.py` no es un módulo importable (los símbolos compartidos viven en
+`tests/support/`), y ningún test ancla rutas con `Path(__file__).parents[N]` —
+para eso está `tests/support/paths.py`.
+
+---
+
 ## `terraform/README.md` — inglés · política `editable`
 
 README de la pila de infraestructura AWS. Fuente de verdad: los propios `.tf`.
