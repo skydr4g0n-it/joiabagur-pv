@@ -145,6 +145,15 @@ El fichero real levanta la base de datos, pgAdmin y el servicio de IA. El backen
 
 Todos comparten la red `jpv-network`, que es la que permitirá a `jbg-ai` alcanzar Postgres sin exponer puertos adicionales.
 
+**Configuración que el backend .NET necesita para hablar con `jbg-ai` (C03).** Como el backend se ejecuta fuera del Compose, no ve los nombres de contenedor: alcanza el servicio por el puerto publicado. La sección `AiGateway` de `appsettings.json` lo refleja y se valida **en el arranque**, de modo que la API no levanta si falta algo:
+
+| Clave | Desarrollo | Producción |
+|---|---|---|
+| `AiGateway:BaseUrl` | `http://localhost:8001` (puerto publicado) | `http://jbg-ai:8000`, previsto para C17 |
+| `AiGateway:JwtSecret` | Placeholder local, **idéntico** al `JWT_SECRET` del contenedor | Desde SSM en C17 |
+
+> El valor de producción presupone una **red Docker definida por el usuario**, que hoy no existe: el despliegue arranca los contenedores en la red *bridge* por defecto, donde Docker no resuelve nombres de contenedor. Crearla, unir ambos contenedores y dejar el puerto de `jbg-ai` sin publicar es prerrequisito de C17, junto con los parámetros `/jpv/prod/AiGateway__BaseUrl` y `/jpv/prod/AiGateway__JwtSecret`.
+
 > **Aviso al actualizar desde una versión anterior:** el cambio de `postgres:15` a `pgvector/pgvector:pg15` puede exigir recrear el volumen local con `docker compose down -v`, lo que **destruye los datos de desarrollo**.
 
 #### Variables de Entorno - Desarrollo

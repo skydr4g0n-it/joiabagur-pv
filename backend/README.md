@@ -14,6 +14,7 @@ Backend API for the JoiabagurPV jewelry point of sale management system.
 | **Logging** | Serilog | Latest |
 | **Authentication** | JWT Bearer | Built-in |
 | **Validation** | FluentValidation | 11.x |
+| **HTTP resilience** | Microsoft.Extensions.Http.Resilience (Polly v8) | 10.8.0 |
 
 ## Project Structure
 
@@ -54,22 +55,19 @@ dotnet restore
 
 ### 3. Configure Application
 
-Create `appsettings.Development.json` in `src/JoiabagurPV.API/`:
+**Nothing to create.** `appsettings.json` already ships working development defaults — database on port 5433, a development JWT key, and the `AiGateway` section pointing at the port Compose publishes for `jbg-ai`. `appsettings.Development.json` also exists and is versioned: it carries the readable console logging profile, so do not overwrite it.
+
+To change something on your own machine, create `appsettings.Local.json` in `src/JoiabagurPV.API/` — it is gitignored — and override only what you need:
 
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Port=5433;Database=joiabagur_pv;Username=postgres;Password=password"
-  },
-  "Jwt": {
-    "SecretKey": "YourSuperSecretKeyThatIsAtLeast32CharactersLong!",
-    "Issuer": "JoiabagurPV",
-    "Audience": "JoiabagurPV",
-    "AccessTokenExpirationMinutes": "60",
-    "RefreshTokenExpirationHours": "8"
+    "DefaultConnection": "Host=localhost;Port=5433;Database=joiabagur_pv;Username=postgres;Password=yours"
   }
 }
 ```
+
+For anything genuinely secret, prefer .NET user-secrets (`dotnet user-secrets set`), which stores values in your user profile instead of the working tree. See [Configuration](#configuration).
 
 ### 4. Setup HTTPS Certificates (Development)
 
@@ -404,6 +402,23 @@ OpenAPI documentation is served with Scalar (not Swagger UI) at `/scalar/v1` whe
 | `Jwt__Audience` | JWT audience | JoiabagurPV |
 | `Jwt__AccessTokenExpirationMinutes` | Access token expiry | 60 |
 | `Jwt__RefreshTokenExpirationHours` | Refresh token expiry | 8 |
+| `AiGateway__BaseUrl` | Address of the `jbg-ai` service | Required |
+| `AiGateway__JwtSecret` | HS256 secret for the internal service token — must match the service's `JWT_SECRET` literally | Required |
+
+`AiGateway` is validated at start-up, not on first use: if the base address is missing or is not an absolute http/https URI, or the secret is absent or shorter than 32 characters, **the API does not start** and the error names the offending key. That is deliberate — a mismatched secret makes `jbg-ai` answer 401 without disclosing why, so the fault is caught at boot instead of during a request. Set `AiGateway__Enabled=false` to skip registering the client altogether.
+
+The address differs by environment and neither value is the obvious one: `http://localhost:8001` in development, because the API runs on the host and only sees the port Compose publishes, and `http://jbg-ai:8000` in production, where both containers share a Docker network.
+
+### Configuration files and secrets
+
+| File | Tracked | Purpose |
+|------|---------|---------|
+| `appsettings.json` | yes | Configuration and development placeholders |
+| `appsettings.Development.json` | yes | Readable console logging profile |
+| `appsettings.Production.json` | yes | JSON logging profile |
+| `appsettings.Local.json`, `appsettings.*.Local.json` | **no** | Your machine-specific overrides |
+
+`appsettings*.json` are **configuration** and belong in version control, development placeholders included. Real secrets never live in the repository: use .NET user-secrets locally, and SSM Parameter Store (`/jpv/prod/*`) in production, where the deploy script injects them as `__`-separated environment variables.
 
 ### Rate Limiting
 
@@ -429,11 +444,14 @@ dotnet ef migrations add MigrationName --project ../JoiabagurPV.Infrastructure
 
 ## Production Deployment
 
-### Docker
+Production does **not** use Docker Compose. The active path is `.github/workflows/deploy-aws-ec2.yml`: it builds the bundled image (API + SPA) from `src/JoiabagurPV.API/Dockerfile.bundled`, pushes it to ECR, and triggers `jpv-deploy.sh` on the EC2 instance through SSM. That script reads configuration from SSM Parameter Store and starts the container with `docker run`, injecting each value as a `__`-separated environment variable. The database is RDS, outside the instance.
 
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+# Deployment is triggered by pushing to main/master, or manually:
+gh workflow run deploy-aws-ec2.yml
 ```
+
+> `docker-compose.prod.yml` is **not** the production deployment: no workflow, terraform template or script invokes it, it builds the wrong Dockerfile, and it declares its own Postgres container where production uses RDS. It survived the move to the bundled-image path and is pending removal.
 
 ### Security Checklist
 

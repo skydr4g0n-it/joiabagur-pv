@@ -147,6 +147,19 @@ public async Task NombreDelTest()
 }
 ```
 
+### Helpers compartidos
+
+Viven en `backend/src/JoiabagurPV.Tests/TestHelpers/` y están pensados para reutilizarse, no para copiarse:
+
+| Helper | Para qué sirve |
+|---|---|
+| `Mothers/` | Constructores de entidades de prueba (patrón *object mother*) |
+| `FakeHttpMessageHandler` | Programa respuestas de un servicio externo y **cuenta las peticiones emitidas**, sin red ni contenedor |
+| `RecordingLoggerProvider` | Captura eventos de log con su plantilla, propiedades nombradas y *scopes*, para afirmar sobre la traza |
+| `RepositoryRoot` | Localiza la raíz del repositorio para leer artefactos externos al backend, como `ai-service/openapi.json` |
+
+Sobre los dos primeros conviene una precisión que ahorra tests engañosos. Al probar un cliente HTTP, **el tipo de excepción no distingue** una condición permanente bien tratada de una mal reintentada: un predicado que reintenta todo acaba lanzando la misma excepción, solo que más tarde. Lo que sí discrimina es el **número de peticiones emitidas**, y por eso `FakeHttpMessageHandler` lo expone. De forma equivalente, una regla que solo vive en el código —por ejemplo, que un texto libre no rebase el nivel `Debug`— desaparece en el primer refactor si nada la afirma: para eso está `RecordingLoggerProvider`.
+
 ---
 
 ## 🔗 Recursos Externos
