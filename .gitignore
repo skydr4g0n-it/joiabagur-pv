@@ -225,10 +225,18 @@ $RECYCLE.BIN/
 *.pfx
 *.jks
 secrets.json
-appsettings.Development.json
-appsettings.Production.json
 *.secrets.json
 Documentos/Guias/aws-production-credentials.md
+
+# Local developer overrides — personal, never committed.
+# The dividing line in this repository: `appsettings*.json` are CONFIGURATION and are versioned,
+# including the development placeholders they already carry (local database password, local JWT
+# key). Real secrets never live in the repository: in production they arrive as environment
+# variables from SSM Parameter Store, and for local work the right home is .NET user-secrets
+# (`dotnet user-secrets set`), which stores them in the user profile, outside the working tree.
+# Anything you need to override on your own machine goes in one of these files.
+appsettings.Local.json
+appsettings.*.Local.json
 
 # Azure / AWS
 .azure/

@@ -20,6 +20,12 @@ builder.Host.UseSerilog((context, configuration) =>
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplication();
 
+// Outbound integration with the jbg-ai service. Its own line rather than a parameter on
+// AddApplication(), whose signature the integration tests already depend on. Configuration is
+// validated during start-up: a missing secret stops the host instead of surfacing later as a
+// 401 the AI service is required not to explain.
+builder.Services.AddAiGateway(builder.Configuration);
+
 // Add API services
 builder.Services.AddApiServices(builder.Configuration);
 

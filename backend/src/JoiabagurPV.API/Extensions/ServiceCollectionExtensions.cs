@@ -44,6 +44,10 @@ public static class ServiceCollectionExtensions
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
 
+        // Correlation identifier for outbound calls (AI gateway). Same layering as
+        // CurrentUserService: interface in Application, implementation here.
+        services.AddScoped<ITraceContextAccessor, TraceContextAccessor>();
+
         // Add JWT Authentication
         var jwtSecretKey = configuration["Jwt:SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured");
         var jwtIssuer = configuration["Jwt:Issuer"] ?? "JoiabagurPV";
