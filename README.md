@@ -51,7 +51,7 @@ El producto tiene como propósito ofrecer una solución integral de gestión par
 - **Gestión de métodos de pago:** Lista general (Efectivo, Bizum, Transferencia, Tarjeta TPV propio/punto de venta, PayPal), asignación por punto de venta y registro del método en cada venta.
 - **Gestión de usuarios:** Roles Administrador y Operador, autenticación con usuario y contraseña, operadores asociados a puntos de venta concretos.
 - **Otras funcionalidades:** Devoluciones, ajustes manuales de inventario, historial de ventas y movimientos de stock, dashboard con estadísticas y stock crítico.
-- **Búsqueda semántica y venta asistida (en desarrollo):** Proyecto Final del Máster de IA. Añade búsqueda semántica sobre el catálogo, sugerencia de sustitutos y argumentario de venta asistido, mediante el microservicio `jbg-ai`. A día de hoy están congelados el contrato HTTP y la autenticación entre servicios; la lógica de recuperación y generación se entrega en changes posteriores.
+- **Búsqueda semántica y venta asistida (en desarrollo):** Proyecto Final del Máster de IA. Añade búsqueda semántica sobre el catálogo, sugerencia de sustitutos y argumentario de venta asistido, mediante el microservicio `jbg-ai`. A día de hoy están congelados el contrato HTTP y la autenticación entre servicios, y el backend .NET ya dispone del cliente tipado que los consume, con timeouts, reintento único y cortacircuitos; la lógica de recuperación y generación se entrega en changes posteriores.
 
 ### 1.3. Diseño y experiencia de usuario
 
@@ -74,7 +74,7 @@ El usuario aterriza en la pantalla de login; tras autenticarse, accede al dashbo
    dotnet restore
    dotnet run
    ```
-   La API queda disponible en `http://localhost:5000`. Configurar la cadena de conexión a PostgreSQL (por ejemplo en `appsettings.Development.json` o variables de entorno). Si se usan migraciones EF Core, ejecutar `dotnet ef database update` desde el proyecto API o el de Infrastructure según la estructura del proyecto.
+   La API queda disponible en `http://localhost:5000`. Los ficheros `appsettings*.json` ya vienen versionados con valores de desarrollo que funcionan tal cual; para ajustar algo en tu máquina, crea `appsettings.Local.json` (ignorado por git) o usa user-secrets, en lugar de editar los ficheros versionados. Si se usan migraciones EF Core, ejecutar `dotnet ef database update` desde el proyecto API o el de Infrastructure según la estructura del proyecto.
 
 2. **Frontend**
    ```bash

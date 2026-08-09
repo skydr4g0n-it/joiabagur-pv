@@ -37,7 +37,8 @@
 - **Database**: PostgreSQL 15+
 - **Authentication**: JWT (JSON Web Tokens)
 - **API Documentation**: Scalar (modern alternative to Swagger)
-- **Logging**: Serilog
+- **Logging**: Serilog — structured events, human-readable console in development and JSON under the production profile
+- **Outbound HTTP**: typed `HttpClient` with `Microsoft.Extensions.Http.Resilience` (Polly v8). The AI gateway client (`IAiGatewayClient`, capability `ai-gateway-client`) is the reference implementation: named client per route family with its own circuit breaker, explicit pipeline rather than the standard preset, whitelist retry predicate, internal HS256 service token, and options validated at start-up
 - **Architecture**: Monolithic with layered separation (Domain → Infrastructure → Application → API)
 
 ### Frontend
