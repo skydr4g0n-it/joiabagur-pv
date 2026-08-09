@@ -4,7 +4,7 @@ using JoiabagurPV.Application.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 
 namespace JoiabagurPV.Tests.TestHelpers;
 
@@ -34,7 +34,8 @@ public static class AiGatewayTestHost
         double breakerFailureRatio = 0.1,
         int breakerSamplingDurationSeconds = 10,
         int breakerBreakDurationSeconds = 30,
-        string? traceId = null)
+        string? traceId = null,
+        RecordingLoggerProvider? logs = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -51,7 +52,15 @@ public static class AiGatewayTestHost
             .Build();
 
         var services = new ServiceCollection();
-        services.AddLogging();
+        services.AddLogging(builder =>
+        {
+            if (logs is not null)
+            {
+                // Trace level so the debug-only query event is observable, which is exactly what
+                // the privacy assertion needs to see in order to prove it stays down there.
+                builder.SetMinimumLevel(LogLevel.Trace).AddProvider(logs);
+            }
+        });
         services.AddSingleton<ITraceContextAccessor>(new StubTraceContextAccessor(traceId ?? "trace-test-0001"));
         services.AddAiGateway(configuration);
 

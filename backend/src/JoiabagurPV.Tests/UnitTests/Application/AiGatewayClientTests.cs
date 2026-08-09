@@ -6,6 +6,7 @@ using JoiabagurPV.Application.Exceptions;
 using JoiabagurPV.Application.Services;
 using JoiabagurPV.Tests.TestHelpers;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace JoiabagurPV.Tests.UnitTests.Application;
 
@@ -224,5 +225,94 @@ public class AiGatewayClientTests
 
         await act.Should().ThrowAsync<AiUnavailableException>();
         handler.RequestCount.Should().Be(2);
+    }
+
+    /// <summary>
+    /// The completion event is what answers "how long did it take and how many attempts did it
+    /// cost" when someone asks why a search felt slow. A log line that cannot answer that is
+    /// close to useless.
+    /// </summary>
+    [Fact]
+    public async Task SearchAsync_WhenCallCompletes_EmitsCompletionEventWithLatencyAndCounts()
+    {
+        var logs = new RecordingLoggerProvider();
+        var handler = new FakeHttpMessageHandler().EnqueueResponse(HttpStatusCode.OK, SuccessBody);
+        await using var provider = AiGatewayTestHost.Build(handler, traceId: "trace-log-001", logs: logs);
+
+        await provider.Client().SearchAsync(AnyRequest(), AnyScope());
+
+        logs.Has("ai_gateway_call_started").Should().BeTrue();
+
+        var completed = logs.Single("ai_gateway_call_completed");
+        completed.Level.Should().Be(LogLevel.Information);
+        completed.Property("StatusCode").Should().Be(200);
+        completed.Property("Attempts").Should().Be(1);
+        completed.Property("CandidatesReturned").Should().Be(2);
+        completed.Property("ResultsCount").Should().Be(2);
+        completed.Property("LowConfidence").Should().Be(false);
+        completed.Property("LatencyMs").Should().NotBeNull();
+
+        // The correlation identifier and the endpoint are bound once per call, not repeated.
+        completed.ScopeValue("trace_id").Should().Be("trace-log-001");
+        completed.ScopeValue("endpoint").Should().Be("/v1/retrieval/products");
+
+        logs.Has("ai_gateway_call_failed").Should().BeFalse();
+    }
+
+    /// <summary>
+    /// base_url rides on the failure event alone. Start-up validation catches a key that is
+    /// absent or malformed, never one that is present and stale, so when a call fails the first
+    /// useful question is where it was pointing.
+    /// </summary>
+    [Fact]
+    public async Task SearchAsync_WhenCallFails_EmitsFailureEventWithOutcomeAndBaseUrl()
+    {
+        var logs = new RecordingLoggerProvider();
+        var handler = new FakeHttpMessageHandler().AlwaysRespond(HttpStatusCode.Unauthorized);
+        await using var provider = AiGatewayTestHost.Build(handler, traceId: "trace-log-002", logs: logs);
+
+        await Assert.ThrowsAsync<AiGatewayConfigurationException>(
+            () => provider.Client().SearchAsync(AnyRequest(), AnyScope()));
+
+        var failed = logs.Single("ai_gateway_call_failed");
+        failed.Property("Outcome").Should().Be("unauthorized");
+        failed.Property("BaseUrl").Should().Be("http://localhost:8001");
+        failed.Property("Attempts").Should().Be(1);
+        failed.Property("LatencyMs").Should().NotBeNull();
+        failed.ScopeValue("trace_id").Should().Be("trace-log-002");
+
+        // A rejected token is configuration, and configuration faults deserve error level.
+        failed.Level.Should().Be(LogLevel.Error);
+
+        logs.Has("ai_gateway_call_completed").Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Privacy rule from the design: the operator's query is free text that may accidentally
+    /// carry personal data, and production logs are not the place to discover that. It is
+    /// recorded at debug level and must never surface above it — a constraint that survives
+    /// only if something asserts it.
+    /// </summary>
+    [Fact]
+    public async Task SearchAsync_QueryTextNeverRisesAboveDebug()
+    {
+        var logs = new RecordingLoggerProvider();
+        var handler = new FakeHttpMessageHandler().EnqueueResponse(HttpStatusCode.OK, SuccessBody);
+        await using var provider = AiGatewayTestHost.Build(handler, logs: logs);
+
+        var request = AnyRequest();
+        await provider.Client().SearchAsync(request, AnyScope());
+
+        logs.At(LogLevel.Debug).Should().Contain(e => e.Mentions(request.Query),
+            "the query is still recorded, just where it belongs");
+
+        logs.Entries
+            .Where(e => e.Level >= LogLevel.Information)
+            .Should().NotContain(e => e.Mentions(request.Query),
+                "no event at information level or above may carry the operator's query text");
+
+        // What does travel upwards is its length, which is diagnostic without being personal.
+        logs.Single("ai_gateway_call_started").Property("QueryLength")
+            .Should().Be(request.Query.Length);
     }
 }
