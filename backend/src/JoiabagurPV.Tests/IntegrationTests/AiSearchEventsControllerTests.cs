@@ -144,18 +144,75 @@ public class AiSearchEventsControllerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task DeletingSearchEvent_NullsSaleAttribution_WithoutDeletingSale()
+    public async Task RecordSelection_WithAnEmptyProductId_Returns400AndPersistsNothing()
     {
         var eventId = await RecordSearchAsync(_owner.Id, [_product.Id]);
 
-        using var mother = new TestDataMother(_factory.Services);
-        var paymentMethod = await mother.Context.PaymentMethods.FirstAsync();
-        var sale = await mother.Sale()
-            .WithProduct(_product.Id)
-            .WithPointOfSale(_pos.Id)
-            .WithUser(_owner.Id)
-            .WithPaymentMethod(paymentMethod.Id)
-            .CreateAsync();
+        var response = await _ownerClient.PostAsJsonAsync(
+            $"/api/ai/search-events/{eventId}/selection",
+            new RecordSearchSelectionRequest { ProductId = Guid.Empty });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "an empty identifier would otherwise persist a junk row carrying a null rank");
+        (await LoadEventAsync(eventId)).SelectedProductId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Sale_CanCarryOrOmitItsOriginatingSearch()
+    {
+        var eventId = await RecordSearchAsync(_owner.Id, [_product.Id]);
+
+        var attributed = await CreateSaleAsync();
+        var organic = await CreateSaleAsync();
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var tracked = await context.Sales.FirstAsync(s => s.Id == attributed.Id);
+            tracked.SearchEventId = eventId;
+            await context.SaveChangesAsync();
+        }
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            (await context.Sales.AsNoTracking().FirstAsync(s => s.Id == attributed.Id))
+                .SearchEventId.Should().Be(eventId);
+
+            (await context.Sales.AsNoTracking().FirstAsync(s => s.Id == organic.Id))
+                .SearchEventId.Should().BeNull("a sale with no assisted search behind it stays valid");
+
+            // The KPI reads off the sales table alone — no join against the event table.
+            var attributedCount = await context.Sales.CountAsync(s => s.SearchEventId != null);
+            attributedCount.Should().Be(1);
+        }
+    }
+
+    [Fact]
+    public async Task Capability_ExposesNoRouteThatReadsSearchEvents()
+    {
+        var eventId = await RecordSearchAsync(_owner.Id, [_product.Id]);
+
+        // Analysis of these events is done with SQL, outside the application. Every plausible
+        // read route must be absent, not merely undocumented.
+        foreach (var route in new[]
+                 {
+                     $"/api/ai/search-events/{eventId}",
+                     "/api/ai/search-events",
+                     "/api/ai/search-events/stats"
+                 })
+        {
+            var response = await _ownerClient.GetAsync(route);
+            response.StatusCode.Should().Be(HttpStatusCode.NotFound, $"{route} must not exist");
+        }
+    }
+
+    [Fact]
+    public async Task DeletingSearchEvent_NullsSaleAttribution_WithoutDeletingSale()
+    {
+        var eventId = await RecordSearchAsync(_owner.Id, [_product.Id]);
+        var sale = await CreateSaleAsync();
 
         using (var scope = _factory.Services.CreateScope())
         {
@@ -264,6 +321,22 @@ public class AiSearchEventsControllerTests : IAsyncLifetime
 
         id.Should().NotBeNull();
         return id!.Value;
+    }
+
+    /// <summary>
+    /// Creates a sale with no attribution, so a test can then set one and observe the effect.
+    /// </summary>
+    private async Task<Sale> CreateSaleAsync()
+    {
+        using var mother = new TestDataMother(_factory.Services);
+        var paymentMethod = await mother.Context.PaymentMethods.FirstAsync();
+
+        return await mother.Sale()
+            .WithProduct(_product.Id)
+            .WithPointOfSale(_pos.Id)
+            .WithUser(_owner.Id)
+            .WithPaymentMethod(paymentMethod.Id)
+            .CreateAsync();
     }
 
     private async Task<ProductSearchEvent> LoadEventAsync(Guid id)

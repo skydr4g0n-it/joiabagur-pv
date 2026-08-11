@@ -23,10 +23,19 @@ public interface IProductSearchEventService
     /// The identifier of the persisted event, or <c>null</c> when it could not be persisted.
     /// </returns>
     /// <remarks>
+    /// <para>
     /// <strong>This method never throws.</strong> A telemetry problem must not be able to
     /// surface as a failed search, and making that a guarantee of the callee rather than an
     /// obligation on every caller is the only way it survives. Callers only have to tolerate a
     /// null.
+    /// </para>
+    /// <para>
+    /// <strong>Call it while serving the search, not afterwards.</strong> The recorded instant
+    /// is taken when the event is built, so deferring the call to background work would shift
+    /// every timestamp by however long that work was queued — and it would shift them most under
+    /// load, which is exactly when the time series is worth reading. Deferring the write inside
+    /// this method would be fine; deferring the call is not.
+    /// </para>
     /// </remarks>
     Task<Guid?> RecordSearchAsync(RecordSearchRequest request);
 

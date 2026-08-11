@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FluentAssertions;
 using JoiabagurPV.Application.DTOs.Ai;
+using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Application.Services;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Enums;
@@ -192,6 +193,71 @@ public class ProductSearchEventServiceTests
 
         _added.Should().OnlyContain(e => e.SearchSessionId == session,
             "the reformulations of one episode have to group together");
+        _added.Should().OnlyContain(e => e.SelectedProductId == null,
+            "a selection only appears on the query it was made from");
+    }
+
+    [Fact]
+    public async Task RecordSearch_GroupedByEpisode_TellsReformulationFromAbandonment()
+    {
+        // The whole justification for SearchSessionId. Without grouping, the two refinements
+        // below are indistinguishable from genuine abandonments and the "searches with no
+        // result" KPI counts two false positives for an operator who refined and then bought.
+        var service = CreateService();
+        var converted = Guid.NewGuid();
+        var abandoned = Guid.NewGuid();
+        var chosen = Guid.NewGuid();
+
+        await service.RecordSearchAsync(Request([], sessionId: converted));
+        await service.RecordSearchAsync(Request([], sessionId: converted));
+        await service.RecordSearchAsync(Request([Result("SKU-1", chosen)], sessionId: converted));
+        await service.RecordSearchAsync(Request([], sessionId: abandoned));
+
+        var last = _added.Last(e => e.SearchSessionId == converted);
+        _events.Setup(r => r.GetByIdAsync(last.Id)).ReturnsAsync(last);
+        await service.RecordSelectionAsync(last.Id, UserId, chosen);
+
+        // Reformulation: no selection of its own, but a later sibling in the same episode.
+        // Ordered by position rather than by timestamp: consecutive calls can land on the same
+        // clock tick, and a test that depends on them not doing so is flaky by construction.
+        var reformulations = _added
+            .Where((e, index) => e.SelectedProductId is null
+                                 && _added.Skip(index + 1).Any(s => s.SearchSessionId == e.SearchSessionId))
+            .ToList();
+
+        _added.Should().BeInAscendingOrder(e => e.CreatedAt,
+            "the derivation in SQL orders an episode by its timestamps");
+
+        // Abandonment: an episode where nothing was ever selected.
+        var abandonedEpisodes = _added
+            .GroupBy(e => e.SearchSessionId)
+            .Where(episode => episode.All(e => e.SelectedProductId is null))
+            .Select(episode => episode.Key)
+            .ToList();
+
+        reformulations.Should().HaveCount(2, "the two queries preceding the selection were refinements");
+        abandonedEpisodes.Should().Equal([abandoned], "only the episode with no selection at all was abandoned");
+    }
+
+    [Fact]
+    public void RecordSearchAsync_HasNoOverloadTakingABarePointOfSaleIdentifier()
+    {
+        // The point-of-sale guarantee rests on the signature: the request carries an
+        // AiCallScope, whose only factory demands a validated point of sale, so a search cannot
+        // be recorded outside an authorised scope. A guarantee that lives only in the code
+        // disappears in the first refactor unless something asserts it — the same reason C03
+        // asserts that its scope type has no public constructor.
+        var overloads = typeof(IProductSearchEventService)
+            .GetMethods()
+            .Where(m => m.Name == nameof(IProductSearchEventService.RecordSearchAsync))
+            .ToList();
+
+        overloads.Should().ContainSingle();
+        overloads[0].GetParameters().Should().ContainSingle()
+            .Which.ParameterType.Should().Be<RecordSearchRequest>();
+
+        typeof(RecordSearchRequest).GetProperty(nameof(RecordSearchRequest.Scope))!
+            .PropertyType.Should().Be<AiCallScope>("a bare Guid would bypass the validated scope");
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+using FluentValidation;
 using JoiabagurPV.Application.DTOs.Ai;
 using JoiabagurPV.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -34,13 +35,16 @@ public class AiSearchEventsController : ControllerBase
 {
     private readonly IProductSearchEventService _searchEventService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IValidator<RecordSearchSelectionRequest> _selectionValidator;
 
     public AiSearchEventsController(
         IProductSearchEventService searchEventService,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IValidator<RecordSearchSelectionRequest> selectionValidator)
     {
         _searchEventService = searchEventService;
         _currentUserService = currentUserService;
+        _selectionValidator = selectionValidator;
     }
 
     /// <summary>
@@ -51,6 +55,7 @@ public class AiSearchEventsController : ControllerBase
     /// <returns>No content on success.</returns>
     [HttpPost("{id:guid}/selection")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -61,6 +66,15 @@ public class AiSearchEventsController : ControllerBase
         if (!_currentUserService.UserId.HasValue)
         {
             return Unauthorized(new { message = "User not authenticated." });
+        }
+
+        // Validated explicitly: this project registers validators but wires no automatic
+        // pipeline, so an uninvoked validator is worse than none — it looks like validation.
+        // Without it an empty product identifier would persist a junk row with a null rank.
+        var validationResult = await _selectionValidator.ValidateAsync(request);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(new { errors = validationResult.Errors.Select(e => e.ErrorMessage) });
         }
 
         var outcome = await _searchEventService.RecordSelectionAsync(

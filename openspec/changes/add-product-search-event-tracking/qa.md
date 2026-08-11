@@ -24,19 +24,22 @@
 |---|---|---|
 | **Línea base** (`git stash push -u`, sin código de C04) | 585 | **52** |
 | Tras la implementación | 628 | **46** |
+| Tras cerrar los huecos del verify | **633** | **51** |
 
-**43 tests nuevos, todos en verde.** `dotnet build`: **0 errores**.
+**48 tests nuevos, todos en verde** (43 en la implementación, 5 más al cerrar el verify). `dotnet build`: **0 errores**. Comprobado además que **ninguna clase de C04 aparece entre los fallos**, no solo que el total cuadre.
 
-La línea base se **midió**, no se supuso: se guardó el árbol completo con `git stash push -u`, se ejecutó la suite sobre `e107c1a` y se recuperó con `git stash pop`. Los fallos bajaron de 52 a 46 al añadir el change, lo que por sí solo descarta una regresión y revela que parte del conjunto es no determinista.
+La línea base se **midió**, no se supuso: se guardó el árbol completo con `git stash push -u`, se ejecutó la suite sobre `e107c1a` y se recuperó con `git stash pop`.
 
-### Desglose de los 43 tests nuevos
+Las tres cifras de fallos —52, 46, 51— son la mejor demostración de por qué **el recuento no sirve como señal**: 633 − 48 = 585, exactamente el total de la línea base, y las tres ejecuciones se mueven en una banda de cinco por la familia de datos generados. Comparar nombres es la única lectura fiable, y por eso es la regla que se llevó a `CLAUDE.md`.
+
+### Desglose de los 48 tests nuevos
 
 | Fichero | Nº | Qué cubre |
 |---|---|---|
-| `UnitTests/Application/ProductSearchEventServiceTests` | 15 | Proyección, truncado, contador real, origen degradado, episodio, derivación de rank, producto ausente, última escritura, propiedad, no propagación de fallos, confidencialidad del texto |
+| `UnitTests/Application/ProductSearchEventServiceTests` | 17 | Proyección, truncado, contador real, origen degradado, episodio, reformulación frente a abandono, ausencia de sobrecarga sin ámbito, derivación de rank, producto ausente, última escritura, propiedad, no propagación de fallos, confidencialidad del texto |
 | `IntegrationTests/ProductSearchEventSchemaTests` | 20 | Tipos `jsonb`, longitud del texto, orden del índice compuesto, nulabilidad de doce columnas, las cuatro reglas de borrado |
 | `UnitTests/Persistence/MigrationModelDriftTests` | 1 | Desfase entre el modelo y el snapshot de migraciones, **sin base de datos** |
-| `IntegrationTests/AiSearchEventsControllerTests` | 7 | 204 con rank derivado, 403 ajeno, 403 administrador, 404, 401, `SET NULL` real, ciclo completo |
+| `IntegrationTests/AiSearchEventsControllerTests` | 10 | 204 con rank derivado, 400 con identificador vacío, 403 ajeno, 403 administrador, 404, 401, atribución de venta, ausencia de rutas de lectura, `SET NULL` real, ciclo completo |
 
 ### Los escenarios del spec, uno a uno
 
@@ -174,7 +177,45 @@ No son teoría: aparecieron escribiendo los tests nuevos y se corrigieron en ell
 
 ---
 
-## 8. Riesgos vivos tras la verificación
+## 8. Huecos detectados en el `/opsx:verify` y cerrados
+
+La verificación no fue un trámite: encontró un defecto crítico **en los propios artefactos** y dos huecos de cobertura. Todos cerrados antes de archivar.
+
+### Crítico — el spec prometía comportamiento que este change no implementa
+
+El requisito *«A sale declares the search it originated from»* afirmaba que la referencia *«MUST be recordable per line»* y describía un escenario *«WHEN a sale is created naming the search event it originated from»*. **Ninguna de las dos cosas existe**: `CreateSaleRequest` y `BulkSaleLineRequest` no tienen ese campo y `SalesService` no lo asigna — verificado, cero referencias. Lo mismo con el párrafo de *«A telemetry failure never propagates»* sobre tolerar un identificador desconocido.
+
+Es exactamente la trampa que la exploración había señalado —*«un requisito especificado y no implementado haría fallar la verificación»*— y que se coló igualmente. Al archivar, esas frases se habrían fundido en una spec viva afirmando comportamiento que el sistema no tiene, que es la clase de defecto contra la que avisa `CLAUDE.md`.
+
+**Corrección:** el requisito se reescribió como *«Sale attribution is carried by the sale, not by the event»*, acotado a lo que el change entrega de verdad —la columna opcional, que el evento no apunta a la venta, y que el KPI sale de la tabla de ventas sola—, y sus escenarios pasaron de *«a sale is created naming…»* a *«a sale is stored with a reference…»*, que sí es cierto y comprobable hoy. El párrafo sobrante se eliminó. **Nada se perdió**: las reglas retiradas ya vivían en el proposal como obligaciones B5 y C1.
+
+### El validador estaba registrado y nadie lo invocaba
+
+Este proyecto **no tiene pipeline de validación automática**: los validadores se inyectan a mano como `IValidator<T>` (patrón de `AuthController`). `RecordSearchSelectionRequestValidator` estaba registrado por el escaneo de ensamblado y ningún código lo llamaba, así que un `productId` vacío llegaba al servicio, no casaba con ningún resultado y persistía una fila basura con rank nulo — justo lo que el diseño quería evitar. Registrado y no invocado es peor que ausente, porque aparenta validación.
+
+**Corrección:** inyectado y validado en el controlador, con `400` como respuesta. Cubierto por `RecordSelection_WithAnEmptyProductId_Returns400AndPersistsNothing`.
+
+### Tres escenarios sin test, y uno a medias
+
+| Escenario | Test añadido |
+|---|---|
+| *The point-of-sale scope cannot be bypassed* | `RecordSearchAsync_HasNoOverloadTakingABarePointOfSaleIdentifier` — por reflexión, siguiendo el precedente de C03 |
+| *Reformulation and abandonment are distinguishable* | `RecordSearch_GroupedByEpisode_TellsReformulationFromAbandonment` |
+| *No read route exists* | `Capability_ExposesNoRouteThatReadsSearchEvents` — 404 en las tres rutas de lectura plausibles |
+| *A sale can carry its originating search* | `Sale_CanCarryOrOmitItsOriginatingSearch` |
+| *«at most the last one carries a selection»* (cláusula suelta) | Aserción añadida a `RecordSearch_WithSessionId_KeepsTheCallerEpisode` |
+
+Al escribir el de reformulación apareció una fragilidad propia: la derivación por `CreatedAt` puede fallar si dos llamadas consecutivas caen en el mismo tic de reloj. Se reescribió por posición en la lista, y se añadió aparte una aserción de orden ascendente de `CreatedAt`, que sí es determinista. Un test flaky nuevo habría sido especialmente irónico en este change.
+
+### Requisito sin test, resuelto donde se puede romper
+
+*«Timestamps and durations MUST be captured while the search is being served, even when persistence is deferred»* no es comprobable aquí, porque nada difiere todavía la escritura. En vez de dejarlo solo declarado, el aviso se puso **en el XML doc del método**, que es donde lo verá quien algún día mueva la llamada a trabajo de fondo: diferir la escritura dentro del método es correcto, diferir la llamada desplaza todas las marcas de tiempo, y más cuanto más cargado esté el sistema.
+
+**Resultado tras cerrar los huecos: 48 tests, 0 fallos.**
+
+---
+
+## 9. Riesgos vivos tras la verificación
 
 | Riesgo | Estado |
 |---|---|

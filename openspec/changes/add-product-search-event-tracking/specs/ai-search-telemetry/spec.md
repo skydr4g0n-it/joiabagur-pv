@@ -132,30 +132,26 @@ This check MUST NOT grant an exception to the administrator role. Unlike point-o
 
 The search recording operation SHALL absorb any persistence failure, log it at error level, and return an absent event identifier. It MUST NOT throw, so that a caller cannot let a telemetry problem surface as a failed search.
 
-Attributing a sale to a search event MUST tolerate an unknown event identifier by storing no attribution, and MUST NOT cause the sale to fail.
-
 #### Scenario: A failed write does not break the caller
 - **WHEN** persisting a search event fails
 - **THEN** the recording operation returns without throwing
 - **AND** the returned event identifier is absent
 - **AND** the failure is logged at error level
 
-### Requirement: A sale declares the search it originated from
+### Requirement: Sale attribution is carried by the sale, not by the event
 
-The sales table SHALL carry an optional reference to the search event that originated the sale, and the search event MUST NOT carry a reference to the sale. Attribution is declared by the sale at the moment it is created, so it requires no follow-up call and cannot be lost between the selection and the till.
+The sales table SHALL carry an optional reference to the search event a sale originated from, and the search event MUST NOT carry a reference to the sale. Attribution belongs to the derived fact so that it can be declared in the same write that creates the sale, rather than by a follow-up call that could be lost between the selection and the till.
 
-The reference MUST be optional, so that sales not originating from an assisted search remain valid, and MUST be recordable per line, so that a bulk checkout whose lines came from different searches attributes each line to its own search.
+The reference MUST be optional, so that sales with no assisted search behind them remain valid, and the proportion of sales carrying one MUST be computable from the sales table alone, without joining the event table.
 
-The proportion of sales initiated from assisted search MUST be computable from the sales table alone.
-
-#### Scenario: A sale records its originating search
-- **WHEN** a sale is created naming the search event it originated from
+#### Scenario: A sale can carry its originating search
+- **WHEN** a sale is stored with a reference to an existing search event
 - **THEN** the sale carries that reference
-- **AND** the proportion of sales carrying a reference is computable without joining another table
+- **AND** counting the sales that carry one requires no join against the event table
 
 #### Scenario: A sale without an originating search remains valid
-- **WHEN** a sale is created without naming any search event
-- **THEN** the sale is created with no attribution
+- **WHEN** a sale is stored with no search event reference
+- **THEN** the sale is stored with no attribution
 - **AND** no validation error is raised
 
 ### Requirement: Deletion rules are declared, not inherited
