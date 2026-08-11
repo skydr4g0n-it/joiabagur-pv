@@ -221,9 +221,10 @@ Run the `update-docs` command (skill replicated in `.agent/`, `.claude/`, `.code
 ### Key Entities
 - **Product**: SKU (unique), name, description, price, collection (optional)
 - **ProductPhoto**: Multiple reference photos per product for ML training
+- **ProductPhotoEmbedding**: MobileNetV2 feature vector (1280 dims) per product photo, stored as JSON `text`. Backs cosine-similarity recognition, which runs in the browser — hence no `pgvector` here
 - **PointOfSale**: Store locations with assigned operators, payment methods, and manual price edit policy (`AllowManualPriceEdit`)
 - **User**: Admin (full access) or Operator (restricted to assigned locations)
-- **Sale**: Transaction with price snapshot (official or manual override), payment method, optional photo, override audit fields (`PriceWasOverridden`, `OriginalProductPrice`), optional `BulkOperationId` for cart checkout grouping
+- **Sale**: Transaction with price snapshot (official or manual override), payment method, optional photo, override audit fields (`PriceWasOverridden`, `OriginalProductPrice`), optional `BulkOperationId` for cart checkout grouping, optional `SearchEventId` attributing the sale to the assisted search it came from (`ON DELETE SET NULL`)
 - **SalePhoto**: Optional photo attached to a sale (image recognition or manual)
 - **Inventory**: Stock quantity per product per location. `IsActive` flag = product assigned to POS (soft delete)
 - **InventoryMovement**: Full audit trail (Sale, Return, Adjustment, Import) with `QuantityBefore`/`QuantityAfter`
@@ -238,6 +239,7 @@ Run the `update-docs` command (skill replicated in `.agent/`, `.claude/`, `.code
 - **ComponentTemplateItem**: Component within a template with quantity
 - **ModelMetadata**: AI model versions with accuracy metrics, only one active at a time
 - **ModelTrainingJob**: Training job status tracking (Queued, InProgress, Completed, Failed) with progress
+- **ProductSearchEvent**: One executed assisted search and, if it happened, the selection made on it. Written in two steps by whoever can observe each half: the backend records the search while serving it — origin, trace id, retrieval latency and the list actually returned exist nowhere else — and the browser reports only the chosen product, from which the server derives the rank. `SearchSessionId` groups the queries of one episode, so a reformulation is distinguishable from an abandonment; `SearchOrigin` separates the assisted path from the degraded lexical one; `jsonb` for the effective filters and the displayed results. No read surface: analysed with SQL (capability `ai-search-telemetry`)
 
 ### Business Rules
 1. Operators can only access assigned points of sale

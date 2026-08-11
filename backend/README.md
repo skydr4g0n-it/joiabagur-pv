@@ -205,6 +205,7 @@ Operators are assigned to specific points of sale. When accessing data:
 
 1. **Admin**: Access to all points of sale
 2. **Operator**: Filtered to assigned points of sale only
+3. **Ownership is a separate axis**: the admin bypass covers point-of-sale access, not ownership of a record. Recording the selection on a search event (`POST /api/ai/search-events/{id}/selection`) answers 403 to anyone who does not own that event, administrators included — the row is the record of what one specific person did, and letting anyone else complete it would corrupt the data without leaving a trace.
 
 ## User Management
 
@@ -315,6 +316,18 @@ On first run, a default admin user is created:
 cd src/JoiabagurPV.Tests
 dotnet test
 ```
+
+> **The suite comes back red, and it is not you.** Around fifty failures predate any
+> given change. They are defects in the tests and dependency drift, not in the
+> application — and most went unnoticed for weeks because the integration tree only
+> runs when Docker is up, while CI only fires on `main` and `develop`.
+>
+> Judge a change by the failing test **names** against a stashed baseline
+> (`git stash push -u`, run, `git stash pop`), never by the count: a handful of the
+> failures are order-dependent, so two runs of identical code disagree.
+>
+> Inventory, root causes and what it would take to close them: *Estado de la suite:
+> fallos conocidos* in [../Documentos/testing-backend.md](../Documentos/testing-backend.md).
 
 ### Run with Coverage
 

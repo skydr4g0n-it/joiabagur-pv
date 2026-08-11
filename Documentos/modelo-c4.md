@@ -678,7 +678,7 @@ C4Component
 
 ### EP17: Evaluación y Observabilidad de IA
 - **AI Service**: Eval Harness, Evals Router
-- **Backend**: ProductSearchEvent (telemetría consulta → selección)
+- **Backend**: ProductSearchEvent (telemetría consulta → selección), Product Search Event Service (registro en dos escrituras: la búsqueda la escribe el servidor, la selección la reporta el cliente), AI Search Events Controller (`POST /api/ai/search-events/{id}/selection`)
 
 ---
 
