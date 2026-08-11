@@ -505,6 +505,8 @@ Métricas: Recall@5, nDCG@5, MRR, P@3, abstención correcta, % sin resultado, p5
 
 **Cada métrica se reporta tres veces: sobre la porción real, sobre la sintética y global** (§8.1.1). El umbral de aceptación se aplica a **la porción real**; si el global cumple y el real no, la conclusión es que el corpus sintético es demasiado fácil, no que el sistema funcione.
 
+> **Añadido el 2026-08-10, al diseñar C04.** Esta tabla es offline, sobre el golden set. Al decidir que `ProductSearchEvent` registre también las búsquedas **degradadas** —las que responde el buscador léxico existente cuando el circuito abre, §6.4— aparece de regalo una comparación **online** entre `v0-lexico` y la configuración en producción: mismo operador, mismas consultas reales, dos rutas distinguidas por la columna `SearchOrigin`. No sustituye a la tabla —no hay relevancia etiquetada— pero sí aporta lo que ninguna ablación offline puede: qué elige de verdad una persona con un cliente delante. El `p95` de recuperación queda además medido en producción y no solo en el harness, gracias a `RetrievalMs`. Sin esa columna, además, un periodo con el cortacircuitos abriéndose se leería como una degradación del ranking cuando la IA sencillamente no corrió.
+
 **Reranking:** no se implementa. El README documenta la hipótesis (con ~1.500 entidades el cuello de botella es el corpus y el filtrado, no el orden dentro del top-20), el protocolo con el que se mediría (dos filas más en esta tabla, delta de nDCG@5 contra delta de p95) y el criterio de decisión.
 
 ### 11.3. Generación
@@ -624,6 +626,7 @@ Si el **26 de agosto** (fin de O3) no está la tabla de ablations y el sistema d
 7. **Dos espacios vectoriales conviven** (visual MobileNetV2 y textual): no se fusionan.
 8. **Ningún agente escribe.** Toda acción con efecto pasa por el operador o el admin.
 9. **La proyección de disponibilidad puede desfasarse minutos**; por eso solo pondera el ranking y nunca excluye.
+10. **La telemetría de búsqueda no tiene política de retención** *(añadido el 2026-08-10, al diseñar C04)*. `ProductSearchEvent.SearchText` es texto libre escrito por un operador y se conserva indefinidamente; en un punto de venta de hotel puede recoger incidentalmente una referencia a un huésped. Las medidas adoptadas son proporcionadas al riesgo real —tope de 500 caracteres, el texto confinado a nivel `Debug` en los logs, y **ninguna ruta de lectura por API**: solo se consulta con SQL—, y no se aplica anonimización porque este texto nunca entra en el espacio vectorial ni se recupera semánticamente. La supresión por usuario queda operable: el enlace `Sale.SearchEventId` es `ON DELETE SET NULL`, así que borrar eventos no destruye ni bloquea ventas.
 
 **Próximos pasos:** packing list completa; liquidación y políticas de inventario; prioridad comercial por margen (los datos existen en `ProductComponentAssignment`); reranking medido; reranking aprendido con `ProductSearchEvent` reales; fusión de señal visual y textual; evaluación online con A/B por POS.
 

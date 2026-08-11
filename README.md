@@ -203,11 +203,11 @@ Descripción completa y resto de entidades (Return, ReturnSale, Collection, etc.
 - **User:** Id (UUID), Username (único), Email (opcional), PasswordHash (BCrypt), Role (Admin/Operator), IsActive. Relación con UserPointOfSale (asignación a POS) y con Sale.
 - **PointOfSale:** Id, Name, Code (único), Address/Phone/Email opcionales, IsActive, AllowManualPriceEdit. Relación con Inventory, Sale, UserPointOfSale, PointOfSalePaymentMethod.
 - **Product:** Id, SKU (único, indexado), Name, Description, Price, CollectionId (opcional), IsActive. Relación con ProductPhoto, Sale, Inventory, InventoryMovement.
-- **Sale:** Id, ProductId, PointOfSaleId, UserId (operador), PaymentMethodId, Price (snapshot), Quantity, Notes, PriceWasOverridden, OriginalProductPrice, BulkOperationId (opcional), SaleDate. Índices por POS, producto, usuario, fecha. Relación con SalePhoto e InventoryMovement.
+- **Sale:** Id, ProductId, PointOfSaleId, UserId (operador), PaymentMethodId, Price (snapshot), Quantity, Notes, PriceWasOverridden, OriginalProductPrice, BulkOperationId (opcional), SearchEventId (opcional, búsqueda asistida de la que procede la venta), SaleDate. Índices por POS, producto, usuario, fecha. Relación con SalePhoto e InventoryMovement.
 - **Inventory:** Id, ProductId, PointOfSaleId, Quantity, IsActive (asignado/desasignado). Unique(ProductId, PointOfSaleId). La presencia de registro activo determina visibilidad del producto para operadores en ese POS.
 - **InventoryMovement:** Id, InventoryId, SaleId/ReturnId (opcionales), UserId, MovementType (Sale, Return, Adjustment, Import), QuantityChange, QuantityBefore, QuantityAfter, Reason (ajustes), MovementDate. Trazabilidad completa de movimientos.
 
-Otras entidades (ProductPhoto, PaymentMethod, PointOfSalePaymentMethod, Return, ReturnSale, Collection, etc.) se describen con detalle en [Documentos/modelo-de-datos.md](Documentos/modelo-de-datos.md).
+Otras entidades (ProductPhoto, PaymentMethod, PointOfSalePaymentMethod, Return, ReturnSale, Collection, ProductSearchEvent, etc.) se describen con detalle en [Documentos/modelo-de-datos.md](Documentos/modelo-de-datos.md).
 
 ---
 

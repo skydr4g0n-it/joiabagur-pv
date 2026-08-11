@@ -30,6 +30,22 @@
 | `CareInstructions` | Ficha ampliada de producto | Se elimina de esta fase. No afecta al flujo interno de POS. Puede recuperarse en una fase futura si hay e-commerce o comunicación al cliente. |
 | `SearchAliases` | Búsqueda semántica | La búsqueda usará nombre, descripción, colección, tipo, materiales, piedra, colores, estilos, ocasiones, talla y familia. No se guarda lista de sinónimos. |
 
+### Revisiones posteriores, durante la implementación
+
+Este documento es funcional y se escribió **antes** de que existieran la arquitectura de dos servicios (§6 del diseño v3) y el flujo de carrito con checkout masivo. Cuando el diseño detallado de un change corrige algo de aquí, se anota en esta lista y la sección afectada se marca en el sitio.
+
+**2026-08-10 — §5.8 y §5.9, al diseñar el change C04 (`add-product-search-event-tracking`).** Tres correcciones sobre `ProductSearchEvent`, todas con el mismo motivo de fondo: el modelo original suponía que el evento lo escribía el frontend de una sola vez.
+
+| Corrección | Motivo |
+|---|---|
+| El endpoint pasa de `POST /api/products/search-events` a **`POST /api/ai/search-events/{id}/selection`** | Un evento sin resultados y sin selección no pertenece a ningún producto; anidarlo bajo `/products` miente sobre la propiedad del recurso |
+| `CreatedSaleId` sale del evento y el enlace pasa a **`Sale.SearchEventId`** | La atribución la declara la venta en el instante en que nace, en el mismo `INSERT`. Con el checkout masivo, la alternativa exigía N llamadas de seguimiento tras la caja |
+| `SearchDurationMs` se desdobla en **`RetrievalMs`**, **`TotalMs`** y **`SelectedAt`** | Un solo campo era ambiguo entre la latencia de recuperación y el tiempo hasta la selección, que son magnitudes distintas y ambas necesarias. La diferencia de los dos primeros mide además el coste de la hidratación |
+
+Y cuatro columnas nuevas que el modelo original no tenía: `SearchSessionId` (agrupa las reformulaciones de un mismo episodio; sin ella cada refinamiento cuenta como un falso «consulta sin resultado»), `SearchOrigin` (distingue la búsqueda asistida de la degradada al buscador léxico de §6.4 del diseño; sin ella, una semana de cortacircuitos se lee como que la IA rankea peor), `TraceId` (correlaciona el evento con los logs del salto .NET↔Python) y `ResultsCount` (permite calcular `% consultas sin resultado` sin abrir el JSON).
+
+Detalle completo en [HU-AIENG-004](../Historias/AI-Eng/HU-AIENG-004.md) y en el ticket del change.
+
 ---
 
 ## 1. Contexto y objetivos
@@ -375,19 +391,31 @@ Confirma talla antes de vender:
 
 ### `ProductSearchEvent`
 
+> **Corregido el 2026-08-10** al diseñar C04. El modelo de abajo es el vigente; el original suponía que el evento lo escribía el frontend de una sola vez, y eso no se sostiene: origen de los resultados, `trace_id`, latencia real y la lista realmente devuelta solo los conoce el servidor. Ver [§0 · Revisiones posteriores](#revisiones-posteriores-durante-la-implementación).
+
 ```text
 Id uuid PK
-UserId uuid FK
+UserId uuid FK                  del ámbito validado, nunca del cuerpo de la petición
 PointOfSaleId uuid FK
-SearchText text
-FiltersJson text
-ResultsJson text
+SearchSessionId uuid            NUEVO · agrupa las reformulaciones de un episodio
+SearchText varchar(500)         longitud tomada del contrato congelado de jbg-ai
+FiltersJson jsonb               filtros EFECTIVOS, no el estado de la UI · {} si no hubo
+ResultsJson jsonb               lista MOSTRADA, proyectada a lo irrecuperable:
+                                { productId, sku, rank, score, matchReasons } · [] si vacía
+ResultsCount int                NUEVO · mostrados de verdad; > longitud del array ⇒ hubo truncado
+SearchOrigin int                NUEVO · Assisted = 1 | LexicalFallback = 2
+TraceId varchar(64) nullable    NUEVO · correlación con los logs del salto .NET↔Python
+RetrievalMs int nullable        SUSTITUYE a SearchDurationMs · obtener candidatos, agnóstico del origen
+TotalMs int nullable            SUSTITUYE a SearchDurationMs · TotalMs − RetrievalMs ≈ coste de hidratación
 SelectedProductId uuid nullable
-SelectedFromRank int nullable
-CreatedSaleId uuid nullable
-SearchDurationMs int nullable
-CreatedAt timestamp
+SelectedFromRank int nullable   derivado en el SERVIDOR desde ResultsJson, 1-based
+SelectedAt timestamp nullable   NUEVO · sellado por el servidor al recibir la selección
+CreatedAt timestamp             instante de la consulta
 ```
+
+**Fuera del modelo:** `CreatedSaleId` se sustituye por `Sale.SearchEventId` (uuid nullable, `ON DELETE SET NULL`). La atribución la declara la venta al nacer, en el mismo `INSERT`; en el checkout masivo cada línea lleva la suya. Un `SearchEventId` desconocido degrada la atribución a nula y **nunca hace fallar la venta**.
+
+**Quién escribe qué:** el backend escribe todo lo anterior salvo las tres columnas de selección, en el propio `POST /api/ai/search`. El cliente solo reporta el producto elegido.
 
 ### `ProductRecommendation`
 
@@ -411,8 +439,10 @@ POST /api/products/search/semantic
 GET  /api/products/{productId}/sales-assist
 GET  /api/products/{productId}/recommendations?pointOfSaleId={id}
 GET  /api/products/{productId}/family
-POST /api/products/search-events
+POST /api/ai/search-events/{id}/selection     ← corregido el 2026-08-10 (C04)
 ```
+
+> **Sobre la última ruta.** Sustituye a `POST /api/products/search-events`, por dos motivos. Primero, un evento sin resultados y sin selección no pertenece a ningún producto, así que anidarlo bajo `/products` miente sobre la propiedad del recurso; `api/ai/*` es además el namespace que ya usan la búsqueda asistida, las señales de demanda y la venta asistida. Segundo, y más importante, **el evento no se crea por HTTP**: lo escribe el propio `POST /api/ai/search` cuando sirve la búsqueda. Lo único que el cliente aporta es la selección, con un cuerpo de un solo campo (`{ productId }`) y respuesta `204`. **No existe ninguna ruta de lectura** sobre estos eventos: el análisis se hace con SQL.
 
 ## 5.10. Criterios de aceptación
 

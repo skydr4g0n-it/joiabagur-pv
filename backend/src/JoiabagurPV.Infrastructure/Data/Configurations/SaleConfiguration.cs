@@ -92,5 +92,15 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
             .WithOne()
             .HasForeignKey<InventoryMovement>(m => m.SaleId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Attribution to the assisted search this sale came from. SetNull, and stated
+        // explicitly: telemetry is expendable, so purging it must neither block nor destroy a
+        // sale. Cascade here would mean deleting telemetry deletes sales; Restrict would make
+        // any future retention policy impossible. EF also generates an index on the column,
+        // which serves the event-to-sale direction and is meant to stay.
+        builder.HasOne<ProductSearchEvent>()
+            .WithMany()
+            .HasForeignKey(s => s.SearchEventId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

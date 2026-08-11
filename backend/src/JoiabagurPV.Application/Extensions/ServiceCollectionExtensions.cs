@@ -76,6 +76,9 @@ public static class ServiceCollectionExtensions
         // Register QR code services
         services.AddScoped<IQrCodeService, QrCodeService>();
 
+        // Register assisted-search telemetry
+        services.AddScoped<IProductSearchEventService, ProductSearchEventService>();
+
         // Register background services
         services.AddHostedService<ModelTrainingBackgroundService>();
 

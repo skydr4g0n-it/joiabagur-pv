@@ -157,8 +157,67 @@ Viven en `backend/src/JoiabagurPV.Tests/TestHelpers/` y están pensados para reu
 | `FakeHttpMessageHandler` | Programa respuestas de un servicio externo y **cuenta las peticiones emitidas**, sin red ni contenedor |
 | `RecordingLoggerProvider` | Captura eventos de log con su plantilla, propiedades nombradas y *scopes*, para afirmar sobre la traza |
 | `RepositoryRoot` | Localiza la raíz del repositorio para leer artefactos externos al backend, como `ai-service/openapi.json` |
+| `SchemaAssert` | Lee del catálogo de PostgreSQL la forma que una migración produjo de verdad: tipo y nulabilidad de una columna, longitud máxima, columnas de un índice **en orden**, y regla de borrado de una clave foránea |
 
 Sobre los dos primeros conviene una precisión que ahorra tests engañosos. Al probar un cliente HTTP, **el tipo de excepción no distingue** una condición permanente bien tratada de una mal reintentada: un predicado que reintenta todo acaba lanzando la misma excepción, solo que más tarde. Lo que sí discrimina es el **número de peticiones emitidas**, y por eso `FakeHttpMessageHandler` lo expone. De forma equivalente, una regla que solo vive en el código —por ejemplo, que un texto libre no rebase el nivel `Debug`— desaparece en el primer refactor si nada la afirma: para eso está `RecordingLoggerProvider`.
+
+`SchemaAssert` responde a la misma lógica una capa más abajo. Un test que solo comprueba que *la migración aplica* es teatro: el `TestDatabaseFixture` ya migra antes de cada test de integración, así que no descarta ninguna hipótesis. Lo que merece afirmarse es lo que **falla sin dar error**: una columna que nace `text` en lugar de `jsonb` y no se nota hasta que alguien la consulta meses después, un índice compuesto con las columnas invertidas que sigue existiendo y simplemente deja de servir a su consulta, o una regla de borrado que se quedó en el valor por defecto —que para relaciones obligatorias es en cascada— y el día de la primera purga se lleva por delante datos de negocio. Introducido por C04 y pensado para que las migraciones pendientes escriban sus aserciones en unas pocas líneas: solo contiene las preguntas que hicieron falta, y se amplía cuando haga falta otra.
+
+---
+
+## ⚠️ Estado de la suite: fallos conocidos
+
+*Medido el 2026-08-11 sobre `c04-add-product-search-event-tracking`, con la rama guardada en `git stash` para aislar la línea base. .NET 10, Docker levantado.*
+
+**585 tests, 52 fallos.** Ninguno tiene que ver con el código de aplicación en producción: son defectos de los propios tests y desajustes de dependencias. Se documentan aquí porque, sin este registro, cada persona que ejecuta la suite pierde una hora concluyendo que ha roto algo.
+
+### Por qué se acumularon sin que nadie los viera
+
+Los dos árboles se comportan de forma muy distinta, y esa es la clave:
+
+| Árbol | Tests | Fallos | Desde cuándo se sabe |
+|---|---|---|---|
+| `UnitTests/` | 315 | **10** | Registrados en el QA de C03 (2026-08-09), **idénticos nombre por nombre** |
+| `IntegrationTests/` | 270 | **~42** | **Nunca se habían medido** |
+
+Los de integración necesitan Docker: sin él no se ejecutan, y quien corre la suite en una máquina sin Docker ve 315 tests y 10 fallos, que es exactamente lo que registró C03. En CI sí hay Docker, pero [`test-backend.yml`](../.github/workflows/test-backend.yml) solo se dispara en `push`/`pull_request` a `main` y `develop`, y **todo el Proyecto Final de IA se está construyendo en `ai-eng` y sus ramas de change**. El resultado es un árbol de 270 tests que no se ejecuta ni en local ni en CI durante semanas.
+
+### Los 10 fallos unitarios (estables desde C03)
+
+| Clase | Nº | Causa raíz |
+|---|---|---|
+| `ImageCompressionServiceTests` | 5 | Umbrales de tamaño comprimido escritos a mano contra una versión anterior de ImageSharp; la actual codifica distinto y produce bytes de más |
+| `QrCodeServiceTests` | 2 | `MissingMethodException` sobre `ImageSharp.Image.Load` — **incompatibilidad binaria**: `PdfSharpCore` se compiló contra otra API. Y `PdfSharpCore` rechaza guardar un PDF sin páginas |
+| `InventoryServiceTests` | 2 | Expectativas de Moq sobre `BeginTransactionAsync` / `RollbackTransactionAsync` que el servicio ya no invoca |
+| `ExcelImportServiceTests` | 1 | La validación devuelve `false` donde el test espera `true` |
+
+Los dos primeros grupos son **deriva de dependencias**, no lógica rota; los dos últimos son tests que se quedaron atrás respecto al código.
+
+### Los ~42 fallos de integración
+
+| Familia | Nº aprox. | Causa raíz |
+|---|---|---|
+| «Se esperaba 401 y llegó 200 / 403 / 201» | 16 | El `HttpClient` compartido de la clase de test es el que hace los `login`, así que **arrastra sus cookies**: la llamada «anónima» no lo es. Se arregla pidiendo un cliente nuevo a la factoría |
+| `Cannot create a DbSet for 'TestEntity'` | 4 | `RepositoryTests` usa una entidad que no está en el modelo del contexto |
+| `22001: value too long for character varying(20)` | 4 | Las *object mothers* generan datos con Bogus y el teléfono generado no siempre cabe en `PointOfSale.Phone`. **Es la única familia genuinamente no determinista**, y explica que dos ejecuciones del mismo código den recuentos distintos |
+| Varios | resto | Concurrencia en venta de última unidad, validaciones de importación, un 500 y un 400 puntuales |
+
+### Cómo distinguir una regresión propia
+
+**Por nombres, no por número.** El recuento varía entre ejecuciones por la familia de Bogus:
+
+```bash
+git stash push -u          # guardar el trabajo en curso
+dotnet test JoiabagurPV.Tests/JoiabagurPV.Tests.csproj
+git stash pop              # recuperarlo
+# el cambio está limpio si el CONJUNTO DE NOMBRES que falla es el mismo
+```
+
+### Qué haría falta para cerrarlo
+
+No es trabajo de un change de funcionalidad y **merece uno propio**. En orden de rentabilidad: extender el disparador de CI a las ramas de trabajo, para que esto deje de crecer en silencio; arreglar la familia de las cookies, que son 16 tests con una sola corrección; fijar los datos generados que chocan con límites de columna; y alinear ImageSharp con lo que `PdfSharpCore` espera.
+
+Dos de estas familias se toparon y se corrigieron **dentro de los tests nuevos** de C04, así que el patrón de arreglo ya está escrito en `AiSearchEventsControllerTests`.
 
 ---
 

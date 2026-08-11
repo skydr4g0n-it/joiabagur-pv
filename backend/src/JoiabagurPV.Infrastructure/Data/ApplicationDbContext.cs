@@ -133,6 +133,11 @@ public class ApplicationDbContext : DbContext
     public DbSet<ProductPhotoEmbedding> ProductPhotoEmbeddings { get; set; }
 
     /// <summary>
+    /// Gets or sets the ProductSearchEvents DbSet.
+    /// </summary>
+    public DbSet<ProductSearchEvent> ProductSearchEvents { get; set; }
+
+    /// <summary>
     /// Configures the model that was discovered by convention from the entity types
     /// exposed in Microsoft.EntityFrameworkCore.DbSet`1 properties on your derived context.
     /// </summary>

@@ -473,6 +473,9 @@ Sin medición no hay proyecto de IA defendible. Cubre la telemetría de uso real
 
 **Changes asociados:** C04, C24, C38, C39
 
+**User Stories:**
+- [HU-AIENG-004: Telemetría de búsqueda asistida — evento consulta→selección](Historias/AI-Eng/HU-AIENG-004.md) *(C04 — hecho)*
+
 ---
 
 ## Resumen de Épicas

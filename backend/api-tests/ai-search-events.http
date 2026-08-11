@@ -1,0 +1,84 @@
+### Assisted Search Telemetry API Testing
+### Query-to-selection tracking (EP17 / C04)
+
+### Variables
+@baseUrl = http://localhost:5056/api
+
+### ===========================================
+### AUTHENTICATION (Run first to get token)
+### ===========================================
+
+### Login as Operator
+### The selection endpoint checks ownership of the event, with no administrator bypass, so
+### these calls must run as the same user the search event belongs to.
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "operator",
+  "password": "Operator123!"
+}
+
+### ===========================================
+### RECORD A SELECTION
+### ===========================================
+
+### Record the product the operator picked from a search
+### The event id comes from the `searchEventId` that POST /api/ai/search returns (C15).
+### Until C15 exists, take an id straight from the ProductSearchEvents table.
+### Note there is no endpoint to CREATE the event: the backend writes it while serving the
+### search, because only it knows the result origin, the trace id and the real latency.
+POST {{baseUrl}}/ai/search-events/YOUR_SEARCH_EVENT_ID/selection
+Content-Type: application/json
+Authorization: Bearer {{login.response.body.accessToken}}
+
+{
+  "productId": "YOUR_PRODUCT_ID"
+}
+
+### Expected: 204 No Content
+
+### ===========================================
+### ERROR CASES
+### ===========================================
+
+### Unknown event -> 404 Not Found
+POST {{baseUrl}}/ai/search-events/00000000-0000-0000-0000-000000000000/selection
+Content-Type: application/json
+Authorization: Bearer {{login.response.body.accessToken}}
+
+{
+  "productId": "YOUR_PRODUCT_ID"
+}
+
+### Event owned by somebody else -> 403 Forbidden
+### Log in as a DIFFERENT user than the one who ran the search and repeat the first call.
+### An administrator gets 403 here too: this is an ownership check, not a point-of-sale one.
+
+### Product absent from the stored result list -> still 204
+### The selection is recorded with a null rank and a warning in the log, rather than rejected:
+### rejecting would leave the event looking abandoned and would corrupt the conversion KPI.
+POST {{baseUrl}}/ai/search-events/YOUR_SEARCH_EVENT_ID/selection
+Content-Type: application/json
+Authorization: Bearer {{login.response.body.accessToken}}
+
+{
+  "productId": "A_PRODUCT_NOT_IN_THE_RESULTS"
+}
+
+### ===========================================
+### THERE IS NO READ ROUTE
+### ===========================================
+
+### By design there is no GET, no listing and no aggregation over search events.
+### Analysis is done with SQL. Two examples:
+###
+###   -- share of searches that returned nothing, without opening the JSON
+###   SELECT count(*) FILTER (WHERE "ResultsCount" = 0)::float / count(*)
+###   FROM "ProductSearchEvents";
+###
+###   -- assisted (1) versus degraded lexical (2), with their retrieval latency
+###   SELECT "SearchOrigin", count(*), percentile_cont(0.95)
+###          WITHIN GROUP (ORDER BY "RetrievalMs")
+###   FROM "ProductSearchEvents" GROUP BY "SearchOrigin";
