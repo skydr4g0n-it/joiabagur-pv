@@ -15,6 +15,7 @@ This directory contains HTTP request files for testing the Joiabagur PV API endp
 - `payment-methods.http` - Payment method CRUD operations
 - `inventory.http` - Inventory management (assignment, import, adjustment, movements)
 - `returns.http` - Returns management (create return, eligible sales, history)
+- `ai-search-events.http` - Assisted search telemetry (record a selection; no read routes)
 
 ## How to Use
 

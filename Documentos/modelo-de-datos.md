@@ -456,6 +456,41 @@ Almacena el vector de características MobileNetV2 (1280 dimensiones) de cada fo
 
 ---
 
+### ProductSearchEvent (Telemetría de Búsqueda Asistida)
+
+Registra cada búsqueda asistida ejecutada y, si la hubo, la selección que el operador hizo sobre ella. Añadida por el change C04 (`add-product-search-event-tracking`, EP17) para que los KPIs de adopción y de calidad de recuperación de las especificaciones funcionales v2 §5.11 estén instrumentados desde antes de que exista el panel que los produce.
+
+**Campos Clave:**
+- `UserId`, `PointOfSaleId`: operador y punto de venta, tomados del ámbito ya validado, nunca del cuerpo de la petición
+- `SearchSessionId`: agrupa las consultas de un mismo episodio de búsqueda
+- `SearchText`: consulta en lenguaje natural, `varchar(500)` — la longitud viene del contrato congelado `ai-service/openapi.json`
+- `FiltersJson`: `jsonb` con los filtros **efectivos** enviados a recuperación, `{}` si no hubo
+- `ResultsJson`: `jsonb` con la lista **mostrada**, proyectada a `{ productId, sku, rank, score, matchReasons }`, `[]` si vacía
+- `ResultsCount`: resultados realmente mostrados, con independencia de cuántos se almacenaron
+- `SearchOrigin`: `Assisted = 1` | `LexicalFallback = 2` — distingue la ruta asistida de la degradada al buscador léxico
+- `TraceId`: correlación con los logs del salto .NET↔Python
+- `RetrievalMs`, `TotalMs`: obtener candidatos y servir la petición completa; su diferencia mide la hidratación
+- `SelectedProductId`, `SelectedFromRank`, `SelectedAt`: la selección, todos nullable
+
+**Ciclo de Vida:**
+- La mitad de búsqueda la escribe el backend al servir `POST /api/ai/search` (C15), porque es el único que conoce el origen, la traza, la latencia real y la lista devuelta
+- La mitad de selección llega por `POST /api/ai/search-events/{id}/selection` con un único campo; el rank lo **deriva el servidor** desde la lista guardada
+- Una fila por consulta ejecutada; las reformulaciones de un episodio comparten `SearchSessionId`
+
+**Decisiones de Diseño:**
+- `jsonb` y no `text`: la columna existe para agregarse en SQL, y además hace imposible almacenar un JSON truncado a medias
+- Solo se guarda lo **irrecuperable**: `score` y `matchReasons` dependían del índice y los pesos de ese día — misma lógica que el snapshot de `Sale.Price`. Materiales, familia y variante se reconstruyen con un `JOIN`
+- Truncado por número de entradas (tope 50) y nunca por bytes: es un guardarraíl contra un defecto propio, no una funcionalidad
+- Sin propiedades de navegación y **sin ninguna ruta de lectura**: el análisis se hace con SQL directo
+- El enlace con la venta vive en `Sale.SearchEventId`, no aquí: la atribución la declara la venta en su propio `INSERT`
+
+**Optimizaciones:**
+- Índice compuesto `(PointOfSaleId, CreatedAt)` en ese orden — punto de venta primero porque es el predicado de igualdad de la consulta dominante
+- Índice sobre `CreatedAt` para la serie temporal global
+- Reglas de borrado declaradas a mano: `RESTRICT` hacia usuario, punto de venta y producto seleccionado; `SET NULL` desde `Sale`. La telemetría es prescindible, así que nada que dependa de ella se rompe al desaparecer, y nada de lo que ella depende desaparece arrastrándola
+
+---
+
 ### PaymentMethod (Métodos de Pago)
 
 Lista general de métodos de pago disponibles en el sistema.
@@ -508,6 +543,7 @@ Registro de todas las ventas realizadas en el sistema.
 - `PriceWasOverridden`: Indica si el precio fue modificado manualmente por el operador (default `false`)
 - `OriginalProductPrice`: Precio oficial del producto al momento de la venta, solo se almacena cuando `PriceWasOverridden = true` (nullable)
 - `BulkOperationId`: UUID que agrupa ventas creadas juntas en un checkout masivo (nullable). Las ventas individuales tienen este campo en `null`
+- `SearchEventId`: FK al `ProductSearchEvent` del que procede la venta (nullable). Regla de borrado **`SET NULL`**. La columna existe desde C04; el camino de escritura lo aporta el change que conecte el flujo de venta
 
 **Consideraciones:**
 - `Price` es un snapshot para mantener integridad histórica; puede ser el precio oficial del producto o un precio manual si el POS lo permite

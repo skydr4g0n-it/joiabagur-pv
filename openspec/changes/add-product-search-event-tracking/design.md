@@ -251,6 +251,8 @@ A ~200 filas al día —~3.000 en la fecha de entrega, ~70.000 en un año de ope
 
 El motivo queda escrito en el spec para que nadie añada cuatro más «porque es barato». La configuración de la relación desde `Sale` genera además un índice sobre la columna nueva, que sirve a la dirección evento→venta y **no se elimina**.
 
+*Precisión añadida al aplicar el change:* «dos índices» se refiere a los **índices analíticos declarados a mano**. El generador crea además, por convención, un índice por cada clave foránea —usuario y producto seleccionado—, igual que en el resto de tablas del repositorio. No se suprimen, y no por inercia: las tres reglas de borrado restrictivas obligan a la base de datos a comprobar las filas referenciadas antes de permitir borrar un usuario o un producto, y sin esos índices esa comprobación sería un recorrido secuencial. Son índices estructurales, no decisiones de analítica.
+
 ### 13. El arnés de test de migración
 
 Un test que solo afirma *«la migración aplica»* es teatro: el fixture de integración ya ejecuta las migraciones en cada test. El valor está exclusivamente en **lo que falla sin dar error**:

@@ -61,6 +61,20 @@ public class Sale : BaseEntity
     public Guid? BulkOperationId { get; set; }
 
     /// <summary>
+    /// The assisted search this sale originated from, when it originated from one.
+    /// </summary>
+    /// <remarks>
+    /// Attribution lives here rather than on the search event because the sale can declare its
+    /// origin in the same insert that creates it: no follow-up call, nothing to lose between the
+    /// selection and the till, and a bulk checkout attributes each line to its own search.
+    ///
+    /// An unknown identifier must degrade to null rather than propagate: a stale value from the
+    /// client would otherwise violate the foreign key and stop the operator from selling. This
+    /// change adds the column but no write path — the rule is specified for whoever wires it.
+    /// </remarks>
+    public Guid? SearchEventId { get; set; }
+
+    /// <summary>
     /// When the sale occurred.
     /// </summary>
     public DateTime SaleDate { get; set; }
