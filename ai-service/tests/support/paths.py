@@ -20,3 +20,7 @@ ALEMBIC_INI = AI_SERVICE_ROOT / "alembic.ini"
 
 #: Revision scripts and the migration environment.
 MIGRATIONS_DIR = AI_SERVICE_ROOT / "migrations"
+
+#: One-off provisioning: extension, schema, dedicated role and grants. Executed
+#: with psql rather than a driver, because it uses psql meta-commands.
+BOOTSTRAP_SQL = MIGRATIONS_DIR / "bootstrap.sql"

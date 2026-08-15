@@ -99,6 +99,81 @@ def test_co_occurrence_rejects_reversed_pair(migrated: sa.Engine) -> None:
         )
 
 
+def test_co_occurrence_rejects_the_same_pair_twice(migrated: sa.Engine) -> None:
+    """The orientation rule alone is not enough: the pair must also be unique."""
+    low, high = sorted([uuid.uuid4(), uuid.uuid4()], key=str)
+
+    with migrated.begin() as connection:
+        connection.execute(
+            sa.text(
+                "INSERT INTO ai.co_occurrence (product_a, product_b) VALUES (:a, :b)"
+            ),
+            {"a": low, "b": high},
+        )
+
+    with migrated.begin() as connection, pytest.raises(IntegrityError):
+        connection.execute(
+            sa.text(
+                "INSERT INTO ai.co_occurrence (product_a, product_b) VALUES (:a, :b)"
+            ),
+            {"a": low, "b": high},
+        )
+
+
+def test_pos_projection_records_its_own_refresh_instant(migrated: sa.Engine) -> None:
+    """C22 reports `projection_age_seconds`, so freshness travels with the row."""
+    with migrated.begin() as connection:
+        connection.execute(
+            sa.text(
+                """
+                INSERT INTO ai.pos_projection (pos_id, product_id, qty_bucket)
+                VALUES (:pos_id, :product_id, '1-2')
+                """
+            ),
+            {"pos_id": uuid.uuid4(), "product_id": uuid.uuid4()},
+        )
+
+    with migrated.connect() as connection:
+        refreshed_at = connection.execute(
+            sa.text("SELECT refreshed_at FROM ai.pos_projection")
+        ).scalar()
+
+    assert refreshed_at is not None
+    assert refreshed_at.tzinfo is not None, "freshness must be timezone-aware"
+
+
+def test_sync_failure_records_enough_context_to_retry(migrated: sa.Engine) -> None:
+    """A failed batch must neither block the others nor be lost."""
+    with migrated.begin() as connection:
+        connection.execute(
+            sa.text(
+                """
+                INSERT INTO ai.sync_failure
+                    (feed, cursor_since, payload, error, attempts, next_retry_at)
+                VALUES
+                    ('catalog', now(), '{"batch": 3}'::jsonb, 'timeout', 1,
+                     now() + interval '5 minutes')
+                """
+            )
+        )
+
+    with migrated.connect() as connection:
+        row = connection.execute(
+            sa.text(
+                "SELECT feed, cursor_since, payload, error, attempts, next_retry_at "
+                "FROM ai.sync_failure"
+            )
+        ).one()
+
+    feed, cursor_since, payload, error, attempts, next_retry_at = row
+    assert feed == "catalog"
+    assert cursor_since is not None
+    assert payload == {"batch": 3}
+    assert error == "timeout"
+    assert attempts == 1
+    assert next_retry_at is not None
+
+
 def test_deleting_knowledge_document_deletes_its_chunks(migrated: sa.Engine) -> None:
     """Cascade inside `ai` — no application logic involved."""
     document_id = uuid.uuid4()

@@ -25,19 +25,21 @@
 | Ejecución | Total | Fallos |
 |---|---|---|
 | **Línea base** (tras añadir dependencias, antes de escribir código de C05) | 77 | **0** |
-| Tras la implementación, **con Docker** | **112** | **0** |
-| Tras la implementación, **sin Docker** (`DOCKER_HOST` inalcanzable) | 93 + 19 omitidos | **0** |
+| Tras la implementación | 112 | **0** |
+| **Tras cerrar los huecos del verify**, con Docker | **127** | **0** |
+| Tras cerrar los huecos del verify, **sin Docker** (`DOCKER_HOST` inalcanzable) | 93 + 34 omitidos | **0** |
 
-**35 tests nuevos, todos en verde.** La línea base se midió de verdad: la suite se ejecutó justo después de instalar las cinco dependencias y antes de escribir nada más, precisamente para que un fallo de instalación no se confundiera después con un fallo de diseño.
+**50 tests nuevos, todos en verde** (35 en la implementación, 15 más al cerrar el verify). La línea base se midió de verdad: la suite se ejecutó justo después de instalar las cinco dependencias y antes de escribir nada más, precisamente para que un fallo de instalación no se confundiera después con un fallo de diseño.
 
-> **Nota sobre la lectura del recuento.** Aquí sí es fiable, a diferencia de la suite de .NET que documenta `CLAUDE.md`: la suite de Python parte de **cero fallos** y no tiene tests dependientes del orden. 77 + 35 = 112, exactamente.
+> **Nota sobre la lectura del recuento.** Aquí sí es fiable, a diferencia de la suite de .NET que documenta `CLAUDE.md`: la suite de Python parte de **cero fallos** y no tiene tests dependientes del orden — cada test de base de datos recibe una base recién creada. 77 + 50 = 127, exactamente.
 
-### Desglose de los 35 tests nuevos
+### Desglose de los 50 tests nuevos
 
 | Fichero | Nº | Marcador | Qué cubre |
 |---|---|---|---|
-| `tests/migrations/test_ai_schema_migration.py` | 13 | `db` | Extensión y esquema, tabla de versiones fuera de `public`, nada fuera de `ai`, *operator class* de los dos índices vectoriales, GIN sobre materiales y sobre las columnas consultables, columnas generadas en español, ausencia de FK cruzadas, reversibilidad de tres piernas |
-| `tests/migrations/test_ai_schema_invariants.py` | 6 | `db` | Vocabulario de origen, embedding ausente aceptado, vocabulario de bucket, orientación del par, borrado en cascada, unicidad del índice de fragmento |
+| `tests/migrations/test_ai_schema_migration.py` | 18 | `db` | Extensión y esquema, tabla de versiones fuera de `public`, nada fuera de `ai`, *operator class* de los dos índices vectoriales, GIN sobre materiales y sobre las columnas consultables, B-tree de los cuatro filtros estructurales, cola de reintentos indexada, columnas generadas en español, ausencia de FK cruzadas, reversibilidad de tres piernas sin tipos huérfanos |
+| `tests/migrations/test_ai_schema_invariants.py` | 9 | `db` | Vocabulario de origen, embedding ausente aceptado, vocabulario de bucket, frescura de la proyección, orientación del par y par duplicado, contexto del fallo de sincronización, borrado en cascada, unicidad del índice de fragmento |
+| `tests/migrations/test_bootstrap_and_privileges.py` | 7 | `db` | **`bootstrap.sql` ejecutado de verdad con psql dentro del contenedor**: aprovisionamiento, idempotencia sin rotar la contraseña, el rol dedicado migrando sin privilegio de extensión, y las dos negativas sobre `public` |
 | `tests/db/test_engine.py` | 9 | — | Tope del pool sin desbordamiento, tamaño configurable, espera acotada, comprobación previa, ausencia de motor al importar, reutilización de motor y fábrica, fallo con nombre cuando no hay configuración |
 | `tests/db/test_boots_without_database.py` | 3 | — | El perfil por defecto no trae cadena de conexión; `/health` y `/v1` responden sin motor y sin socket |
 | `tests/config/test_settings.py` (ampliado) | 4 | — | Ausencia de configuración no impide arrancar, configuración aceptada, cadena en blanco tratada como ausente, tamaño de pool no positivo rechazado |
@@ -51,10 +53,10 @@
 | Esquema `ai` es el único que escribe · bookkeeping dentro de `ai` | `test_migration_keeps_alembic_bookkeeping_out_of_public` | ✅ |
 | Esquema `ai` es el único que escribe · nada fuera de `ai` | `test_migration_creates_no_table_outside_the_ai_schema` | ✅ |
 | Aprovisionamiento previo · sobre base limpia | `test_migration_creates_vector_extension_and_ai_schema` | ✅ |
-| Aprovisionamiento previo · idempotencia | §2 y §3 (manual) | ✅ |
-| Aprovisionamiento previo · privilegio insuficiente falla identificable | §3 (manual) | ✅ |
-| Rol dedicado · puede migrar y operar `ai` | §3 (manual) | ✅ |
-| Rol dedicado · no puede leer `public` | §3 (manual) | ✅ |
+| Aprovisionamiento previo · idempotencia | `test_migration_is_idempotent_when_already_provisioned` · `test_bootstrap_is_idempotent_and_keeps_the_existing_password` | ✅ |
+| Aprovisionamiento previo · privilegio insuficiente falla identificable | `test_migration_without_provisioning_fails_identifiably` | ✅ |
+| Rol dedicado · puede migrar y operar `ai` | `test_service_role_can_migrate_and_own_the_ai_schema` | ✅ |
+| Rol dedicado · no puede leer `public` | `test_service_role_cannot_read_business_tables` · `test_service_role_cannot_create_in_the_business_schema` | ✅ |
 | Reversibilidad · revierte y conserva objetos compartidos | `test_upgrade_downgrade_is_reversible` | ✅ |
 | Reversibilidad · volver a aplicar funciona | ídem, tercera pierna | ✅ |
 | *Operator class* de coseno · documento de producto | `test_hnsw_index_uses_cosine_operator_class[ix_product_document_embedding_hnsw]` | ✅ |
@@ -62,18 +64,18 @@
 | *Operator class* de coseno · la euclídea se detecta como defecto | §4, rotura 1 | ✅ |
 | GIN · materiales | `test_gin_index_exists_on_materials` | ✅ |
 | GIN · texto completo y metadatos | `test_gin_index_exists_on_searchable_column` (3 casos) | ✅ |
-| B-tree de filtros estructurales | §5 (catálogo) | ✅ |
+| B-tree de filtros estructurales | `test_structural_filter_column_has_btree_index` (4 casos) | ✅ |
 | Texto completo generado en español | `test_tsvector_column_is_generated_with_spanish_configuration` (2 casos) | ✅ |
 | Documento de producto · vocabulario de origen | `test_product_document_rejects_data_origin_outside_vocabulary` | ✅ |
 | Documento de producto · embedding ausente | `test_product_document_accepts_row_without_embedding` | ✅ |
-| Documento de producto · sin tipos huérfanos al revertir | `test_upgrade_downgrade_is_reversible` + §5 | ✅ |
+| Documento de producto · sin tipos huérfanos al revertir | `test_upgrade_downgrade_is_reversible`, con aserción explícita sobre `pg_type` | ✅ |
 | Conocimiento · cascada | `test_deleting_knowledge_document_deletes_its_chunks` | ✅ |
 | Conocimiento · índice de fragmento único | `test_knowledge_chunk_index_is_unique_within_its_document` | ✅ |
 | Proyección · vocabulario de bucket | `test_pos_projection_rejects_quantity_outside_bucket_vocabulary` | ✅ |
-| Proyección · frescura propia | §5 (columna `refreshed_at`) | ✅ |
+| Proyección · frescura propia | `test_pos_projection_records_its_own_refresh_instant` | ✅ |
 | Co-ocurrencia · par invertido rechazado | `test_co_occurrence_rejects_reversed_pair` | ✅ |
-| Co-ocurrencia · par duplicado rechazado | Clave primaria compuesta, §5 | ✅ |
-| Fallos de sincronización · contexto y cola indexada | §5 (`ix_sync_failure_next_retry_at`) | ✅ |
+| Co-ocurrencia · par duplicado rechazado | `test_co_occurrence_rejects_the_same_pair_twice` | ✅ |
+| Fallos de sincronización · contexto y cola indexada | `test_sync_failure_records_enough_context_to_retry` · `test_retry_queue_is_indexed` | ✅ |
 | Sin FK hacia `public` | `test_ai_schema_declares_no_foreign_key_into_public` | ✅ |
 | Integridad intra-esquema preservada | ídem (afirma la FK hacia `ai.knowledge_document`) | ✅ |
 | Pool · tope efectivo | `test_pool_is_capped_at_configured_size_without_overflow` | ✅ |
@@ -148,10 +150,13 @@ Un detector de fallos mudos que nadie ha visto fallar es él mismo un fallo mudo
 | 2 | GIN sobre materiales → B-tree | **1 failed** |
 | 3 | `version_table_schema` → `public` | **1 failed** |
 | 4 | La reversión deja `product_document` sin borrar | **1 failed**, en la **tercera pierna** |
+| 5 | `bootstrap.sql` concede `ALL` sobre `public` y `SELECT` sobre sus tablas | **2 failed** — las dos negativas de la frontera |
 
 La rotura 1 es la demostración del argumento del change: **`CREATE INDEX` no emitió ni un aviso**. La migración construyó felizmente un índice que ninguna consulta habría usado jamás, y solo la aserción contra el catálogo lo dijo.
 
-Tras revertir las cuatro: **112 passed**.
+La rotura 5 se añadió al cerrar el verify, y prueba que los tests de frontera no son vacuos: aflojar los permisos del script los pone en rojo.
+
+Tras revertir las cinco: **127 passed**.
 
 ---
 
@@ -247,6 +252,28 @@ Ejecutado en la forma `--all --strict`, no en la de un solo change: `CLAUDE.md` 
 
 ---
 
-## 11. Estado del entorno al cerrar
+## 11. Huecos que encontró el verify, y cómo se cerraron
+
+El cruce escenario a escenario de las specs contra los nombres de test reveló **nueve escenarios sin ningún test automático**, verificados solo a mano en este mismo documento. En un change cuya tesis es *«estos fallos son mudos, por eso construimos detectores»*, dejarlos así era incoherente: la verificación manual no vuelve a ejecutarse nunca.
+
+| Escenario que quedó sin detector | Cerrado con |
+|---|---|
+| Índices B-tree de filtros estructurales | `test_structural_filter_column_has_btree_index` (4 casos) |
+| Cola de reintentos indexada | `test_retry_queue_is_indexed` |
+| La proyección lleva su propia frescura | `test_pos_projection_records_its_own_refresh_instant` |
+| El mismo par no puede almacenarse dos veces | `test_co_occurrence_rejects_the_same_pair_twice` |
+| Fallo de sincronización con contexto suficiente | `test_sync_failure_records_enough_context_to_retry` |
+| Revertir no deja tipos de vocabulario | Aserción explícita sobre `pg_type` dentro del test de reversibilidad |
+| Aprovisionamiento idempotente | `test_migration_is_idempotent_when_already_provisioned` |
+| Privilegio insuficiente falla identificable | `test_migration_without_provisioning_fails_identifiably` |
+| Las dos del rol dedicado | `test_service_role_can_migrate_and_own_the_ai_schema` y las dos negativas sobre `public` |
+
+**El hueco más grave no era ninguno de esos, sino uno que el cruce dejó a la vista: `bootstrap.sql` no tenía ni una sola línea de cobertura.** Es un fichero entregable, en el camino crítico de C17, y ninguna herramienta lo tocaba. No se puede ejecutar con un driver —usa meta-comandos de psql (`\gset`, `\if`, `\echo`)—, así que los tests lo lanzan **con psql dentro del contenedor**, pasando el contenido real del fichero por un *heredoc*. Eso importa: prueba el entregable, no una reimplementación suya.
+
+Los cuatro escenarios de `ai-service-dev-compose` siguen siendo comprobación manual, y así deben quedarse: describen el comportamiento de Compose al levantarse, que no es observable desde la suite del servicio.
+
+---
+
+## 12. Estado del entorno al cerrar
 
 Quedan levantados `jpv-pv-postgres` y `jpv-pv-jbg-ai`, con el esquema `ai` migrado sobre la base de desarrollo y un rol `jbg_ai` con contraseña de desarrollo. **Las seis tablas están vacías**, que es el estado que este change entrega. Para devolver el entorno a como estaba: `docker compose down` desde `backend/`.

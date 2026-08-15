@@ -24,7 +24,7 @@ import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
 
-from support.paths import ALEMBIC_INI, MIGRATIONS_DIR
+from support.paths import ALEMBIC_INI, BOOTSTRAP_SQL, MIGRATIONS_DIR
 
 #: Same image as `backend/docker-compose.yml`, so the tests exercise the engine
 #: developers actually run against.
@@ -84,6 +84,34 @@ def database_url(postgres_container) -> Iterator[str]:
             )
             connection.execute(sa.text(f'DROP DATABASE IF EXISTS "{name}"'))
         admin.dispose()
+
+
+@pytest.fixture
+def database_name(database_url: str) -> str:
+    """The bare database name, for callers that talk to psql instead of a driver."""
+    return database_url.rsplit("/", 1)[1]
+
+
+@pytest.fixture
+def run_bootstrap(postgres_container, database_name: str):
+    """Execute the real `bootstrap.sql` with psql inside the container.
+
+    It cannot be run through SQLAlchemy: the script uses psql meta-commands
+    (`\\gset`, `\\if`, `\\echo`) that the server never sees. Piping the file's
+    actual contents through a heredoc keeps the test honest — it exercises the
+    deliverable rather than a re-implementation of it.
+    """
+
+    def _run(password: str = "bootstrap-test-password") -> tuple[int, str]:
+        sql = BOOTSTRAP_SQL.read_text(encoding="utf-8")
+        script = (
+            f"psql -U {postgres_container.username} -d {database_name} "
+            f"-v ai_password={password} <<'JBG_BOOTSTRAP_EOF'\n{sql}\nJBG_BOOTSTRAP_EOF"
+        )
+        exit_code, output = postgres_container.exec(["sh", "-c", script])
+        return exit_code, output.decode("utf-8", errors="replace")
+
+    return _run
 
 
 @pytest.fixture

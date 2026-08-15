@@ -199,6 +199,27 @@ def test_gin_index_exists_on_searchable_column(
 
 
 @pytest.mark.parametrize(
+    "column", ["family_id", "piece_type", "price_band", "data_origin"]
+)
+def test_structural_filter_column_has_btree_index(
+    migrated: sa.Engine, column: str
+) -> None:
+    """Structural filters (§7.2) and the reporting dimension of §8.1.1.
+
+    At ~1,500 rows none of these improves a measurable latency. They exist
+    because adding them later costs a migration and having them costs nothing.
+    """
+    assert "btree" in _index_method_for_column(migrated, "product_document", column)
+
+
+def test_retry_queue_is_indexed(migrated: sa.Engine) -> None:
+    """The retry queue is read by due date; without an index it is a table scan."""
+    assert "btree" in _index_method_for_column(
+        migrated, "sync_failure", "next_retry_at"
+    )
+
+
+@pytest.mark.parametrize(
     ("table", "source"),
     [("product_document", "doc_text"), ("knowledge_chunk", "content")],
 )
@@ -278,6 +299,24 @@ def test_upgrade_downgrade_is_reversible(
 
         assert not (EXPECTED_TABLES & _tables(engine, AI))
         with engine.connect() as connection:
+            # The reason closed vocabularies are CHECK constraints and not
+            # enumerated types: a type survives dropping its table, and the
+            # *next* upgrade then fails with "type already exists" weeks later.
+            orphaned_types = connection.execute(
+                sa.text(
+                    """
+                    SELECT t.typname
+                    FROM pg_type t
+                    JOIN pg_namespace n ON n.oid = t.typnamespace
+                    WHERE n.nspname = :schema AND t.typtype = 'e'
+                    """
+                ),
+                {"schema": AI},
+            ).scalars().all()
+            assert orphaned_types == [], (
+                f"reverting left enumerated types behind: {orphaned_types}"
+            )
+
             # The extension is shared database-wide and the schema holds the
             # version table, so neither is dropped.
             assert connection.execute(
