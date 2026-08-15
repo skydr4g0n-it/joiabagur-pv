@@ -1078,6 +1078,41 @@ ALTER TABLE InventoryMovement SET (autovacuum_vacuum_scale_factor = 0.1);
 
 ---
 
+## Esquema `ai` (pgvector) — índice del servicio de IA
+
+> Introducido por el change OpenSpec `add-pgvector-schema-foundation` (C05 · [HU-AIENG-005](Historias/AI-Eng/HU-AIENG-005.md)). Vive en **la misma base de datos** que todo lo anterior, en un esquema aparte.
+
+**Regla de propiedad.** Todo lo descrito hasta aquí está en el esquema `public` y pertenece a .NET. El esquema `ai` pertenece al servicio Python `jbg-ai`, que **nunca escribe en `public` ni lo lee por SQL**: obtiene los datos de negocio por HTTP, a través de los feeds paginados. La frontera no es una convención sino un permiso: el rol `jbg_ai` recibe `permission denied` al leer cualquier tabla de `public`.
+
+Consecuencias visibles en el modelo:
+
+- Las columnas que referencian entidades de .NET (`product_id`, `pos_id`, `family_id`) son **uuid planos, sin clave foránea**. Una restricción real acoplaría el ciclo de vida de los dos esquemas y haría fallar migraciones de EF Core por una dependencia que no esperan.
+- Las tablas de `ai` usan `snake_case`, frente al `PascalCase` entrecomillado de EF Core. Los dos esquemas conviven sin compartir convención, a propósito.
+- Las migraciones son **Alembic**, independientes de EF Core, con su tabla de versiones dentro de `ai`.
+
+| Tabla | Contenido | Notas de modelado |
+|---|---|---|
+| `ai.product_document` | Una fila por producto, sin *chunking* | `materials text[]` para filtro por solape; `embedding vector(1536)` **nulable** (la fila puede preceder al cálculo); `tsv` **generada** con `to_tsvector('spanish', doc_text)`; `data_origin` (`real`/`synthetic`) porque toda métrica se reporta desglosada |
+| `ai.knowledge_document` | Conocimiento comercial **general**, nunca por producto | `doc_type`: material, talla, guion de venta, política, FAQ |
+| `ai.knowledge_chunk` | Fragmentos del anterior | FK intra-esquema con **borrado en cascada**; `(document_id, chunk_index)` único; `metadata jsonb` |
+| `ai.pos_projection` | Prior de ranking por punto de venta | PK `(pos_id, product_id)`; **`qty_bucket` (`0`/`1-2`/`3+`), nunca la cantidad exacta**: la proyección puede estar desfasada y el número real lo pone .NET |
+| `ai.co_occurrence` | Señal de complementarios | PK por el par más `CHECK (product_a < product_b)`: sin esa orientación única, cada par se almacenaría dos veces |
+| `ai.sync_failure` | Lotes de sincronización fallidos | Un lote fallido no bloquea a los demás; se reintenta con backoff |
+
+**Vocabularios cerrados con `CHECK`, nunca con tipos enumerados.** Un tipo enumerado sobrevive al borrado de su tabla, de modo que revertir la migración lo deja huérfano y la siguiente aplicación falla con «el tipo ya existe» — semanas después y sin nada que apunte a la causa.
+
+### Índices del esquema `ai`
+
+| Tipo | Sobre | Por qué |
+|---|---|---|
+| **HNSW `vector_cosine_ops`** | `product_document.embedding`, `knowledge_chunk.embedding` | Alineado con el operador de distancia coseno de las consultas. **Desalinearlo desactiva el índice sin dar ningún error**: PostgreSQL cae a recorrido secuencial en silencio. Parámetros explícitos `m = 16`, `ef_construction = 128` |
+| **GIN** | `materials`, ambas `tsv`, `knowledge_chunk.metadata` | Solape y contención sobre arrays, búsqueda léxica en español y filtros sobre JSON |
+| **B-tree** | `family_id`, `piece_type`, `price_band`, `data_origin`, `pos_projection.product_id`, `sync_failure.next_retry_at` | Filtros estructurales, desglose de métricas y cola de reintentos |
+
+A la escala del proyecto (~1.200-1.500 vectores) ningún índice mejora una latencia medible: se declaran porque tenerlos no cuesta nada y añadirlos con datos dentro sí. HNSW se elige en lugar de IVFFlat por dos motivos operativos: **puede construirse sobre tablas vacías** —IVFFlat necesita entrenamiento previo con datos— y no degrada su recall en silencio a medida que el corpus crece.
+
+---
+
 ## Consideraciones de Implementación
 
 ### Campos de Auditoría

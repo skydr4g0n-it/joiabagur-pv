@@ -95,7 +95,7 @@ alembic upgrade head
 
 **Por qué:** los roles son objetos **de clúster**, no de base de datos. Meterlos en una migración exigiría privilegio de creación de roles a quien migra, y la reversión tendría que borrar un rol que probablemente ya posee objetos —operación que falla—. Una migración que no se puede revertir limpiamente contradice el cuarto test de la ficha.
 
-**El efecto elegante:** con `IF NOT EXISTS` en la extensión, **no hacen falta dos cadenas de conexión**. El mismo comando funciona en los dos entornos:
+**El efecto elegante:** el aprovisionamiento idempotente hace que **no hagan falta dos cadenas de conexión**. El mismo comando funciona en los dos entornos:
 
 ```
    PREPARACIÓN (admin, una vez)        MIGRACIÓN (rol jbg_ai)      RUNTIME (rol jbg_ai)
@@ -108,6 +108,10 @@ alembic upgrade head
 ```
 
 En local se migra como superusuario y la extensión se crea en el primer intento; en RDS la instala el usuario maestro (C17) y la migración la encuentra hecha. Mismo código, misma variable.
+
+> **Corrección registrada al aplicar (2026-08-15).** La versión anterior de esta decisión decía que bastaba con `IF NOT EXISTS` para que el aprovisionamiento fuera un no-op inocuo. **Es falso para `CREATE SCHEMA`:** PostgreSQL evalúa el privilegio **antes** del cortocircuito, así que `CREATE SCHEMA IF NOT EXISTS ai` ejecutado por un rol sin `CREATE` sobre la base de datos falla con *«permission denied for database»* **aunque el esquema ya exista** — es decir, justo en el camino de RDS que esta decisión pretendía habilitar. Se detectó al migrar por primera vez como `jbg_ai` en lugar de como superusuario.
+>
+> La decisión no cambia; cambia su mecanismo: tanto el entorno de migración como la revisión **comprueban primero y crean después** (`SELECT ... FROM pg_namespace` / `pg_extension`), de modo que el caso ya aprovisionado no intenta ningún DDL y por tanto no exige ningún privilegio. Verificado migrando con el rol dedicado, que no puede instalar extensiones.
 
 **Alternativas descartadas:** `DATABASE_URL` + `DATABASE_ADMIN_URL` (dos variables, dos secretos y una pregunta más en cada despliegue, para resolver algo que `IF NOT EXISTS` ya resuelve); poner el rol en `backend/scripts/init.sql` (solo se ejecuta sobre volumen nuevo, y ese fichero es territorio de .NET).
 

@@ -18,12 +18,19 @@ TOKEN_TRACE_ID = "trace-from-token"
 
 
 def build_settings(**overrides: Any) -> Settings:
-    """In-process settings — no external services."""
+    """In-process settings — no external services.
+
+    `database_url` is pinned to `None` rather than left to its default: pydantic
+    reads unset fields from the environment, so a developer with `DATABASE_URL`
+    exported would otherwise see tests build engines against their own database
+    and the "absent configuration" cases would stop failing as they should.
+    """
     values: dict[str, Any] = {
         "app_env": "test",
         "service_version": "0.1.0-test",
         "log_level": "WARNING",
         "jwt_secret": TEST_JWT_SECRET,
+        "database_url": None,
     }
     values.update(overrides)
     return Settings(**values)

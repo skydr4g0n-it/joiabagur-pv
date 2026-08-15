@@ -20,6 +20,7 @@ tests/
 ├── fixtures/         # test data: payloads, golden set, corpus samples
 ├── api/              # HTTP surface: routing, auth, contracts, stubs, OpenAPI snapshot
 ├── config/           # settings loading and fail-fast validation
+├── db/               # engine, connection pool, lazy construction
 ├── migrations/       # Alembic upgrade/downgrade, schema `ai`, index definitions
 ├── data/             # catalog corpus and synthetic world generators
 ├── enrichment/       # LLM extraction, closed vocabularies, per-field confidence
@@ -39,6 +40,7 @@ parallel taxonomy later.
 |---|---|
 | `api/` | C01 (health), C02 (contracts, service auth, stubs, snapshot) |
 | `config/` | C01, C02 (settings, canonical OpenAPI profile) |
+| `db/` | C05 (engine, bounded pool, boot without a database) |
 | `migrations/` | C05 |
 | `data/` | C06, C10, C23 |
 | `enrichment/` | C09 |
@@ -106,8 +108,9 @@ uv run --system-certs pytest
 
 ## Current state
 
-Populated after C02: `api/` (8 files), `config/` (1) and `support/`. Everything
-else is a reserved name. Two settings in `pyproject.toml` hold the layout together:
+Populated after C05: `api/` (8 files), `config/` (1), `db/` (2), `migrations/` (2)
+and `support/`. Everything else is a reserved name. Two settings in
+`pyproject.toml` hold the layout together:
 
 - `pythonpath = ["src", "tests"]` — makes `support/` importable from any subfolder.
 - `addopts = "--import-mode=importlib"` — stops same-named test modules in
@@ -115,4 +118,11 @@ else is a reserved name. Two settings in `pyproject.toml` hold the layout togeth
 
 Never anchor a path with `Path(__file__).parents[N]` in a test file: the count is
 wrong as soon as the file changes depth. Import from `support/paths.py` instead,
-which is where `AI_SERVICE_ROOT` and `OPENAPI_SNAPSHOT` are resolved once.
+which is where `AI_SERVICE_ROOT`, `OPENAPI_SNAPSHOT`, `ALEMBIC_INI` and
+`MIGRATIONS_DIR` are resolved once.
+
+`build_settings()` in `support/settings.py` pins `database_url` to `None`. That is
+not decoration: pydantic reads unset fields from the environment, so without the
+pin a developer with `DATABASE_URL` exported would see tests build engines against
+their own database — and the cases that assert "no database configured" would
+quietly stop failing when they should.

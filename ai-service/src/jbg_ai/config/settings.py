@@ -43,6 +43,23 @@ class Settings(BaseSettings):
         default=True,
         description="Mount development-only routes such as GET /v1/evals/runs",
     )
+    database_url: str | None = Field(
+        default=None,
+        description=(
+            "PostgreSQL connection string for schema `ai`, e.g. "
+            "postgresql+psycopg://user:password@host:5432/db. Optional on purpose: "
+            "the service must boot without a database, so the engine is built on "
+            "first use and its absence only surfaces when a session is requested"
+        ),
+    )
+    db_pool_size: int = Field(
+        default=5,
+        gt=0,
+        description=(
+            "Hard ceiling on simultaneous connections, with no overflow. The "
+            "project budget is 5-10 for the whole system, shared with the .NET API"
+        ),
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -58,6 +75,19 @@ class Settings(BaseSettings):
     def reject_blank(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
             raise ValueError("must not be empty")
+        return value
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def blank_database_url_is_absent(cls, value: object) -> object:
+        """Treat an empty `DATABASE_URL` as unset rather than as a broken URL.
+
+        Compose and shell profiles export empty strings easily; failing later
+        with an unparseable URL would be a worse error than behaving as if the
+        variable had not been provided at all.
+        """
+        if isinstance(value, str) and not value.strip():
+            return None
         return value
 
 
@@ -82,4 +112,9 @@ def canonical_openapi_settings() -> Settings:
         jwt_ttl_seconds=300,
         stub_mode=True,
         enable_dev_endpoints=True,
+        # Pinned like the rest: pydantic-settings would otherwise read these
+        # from the environment, and the canonical profile exists precisely so
+        # that no environment leaks into the committed contract.
+        database_url=None,
+        db_pool_size=5,
     )

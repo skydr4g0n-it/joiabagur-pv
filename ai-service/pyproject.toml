@@ -1,16 +1,20 @@
 [project]
 name = "jbg-ai"
 version = "0.1.0"
-description = "JoiaBagur jbg-ai FastAPI skeleton (Proyecto Final RAG, C01)"
+description = "JoiaBagur jbg-ai FastAPI service (Proyecto Final RAG)"
 readme = "README.md"
 authors = [
     { name = "Sergio Valdueza Lozano", email = "SValduezaL@gmail.com" }
 ]
 requires-python = ">=3.11"
 dependencies = [
+    "alembic>=1.14",
     "fastapi>=0.141.1",
+    "pgvector>=0.3.6",
+    "psycopg[binary,pool]>=3.2",
     "pydantic-settings>=2.14.2",
     "pyjwt>=2.9.0",
+    "sqlalchemy[asyncio]>=2.0.36",
     "uvicorn[standard]>=0.52.1",
 ]
 
@@ -22,6 +26,7 @@ build-backend = "uv_build"
 dev = [
     "httpx>=0.28.1",
     "pytest>=9.1.1",
+    "testcontainers[postgres]>=4.9",
 ]
 
 [tool.pytest.ini_options]
