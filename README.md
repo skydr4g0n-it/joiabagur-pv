@@ -51,7 +51,7 @@ El producto tiene como propósito ofrecer una solución integral de gestión par
 - **Gestión de métodos de pago:** Lista general (Efectivo, Bizum, Transferencia, Tarjeta TPV propio/punto de venta, PayPal), asignación por punto de venta y registro del método en cada venta.
 - **Gestión de usuarios:** Roles Administrador y Operador, autenticación con usuario y contraseña, operadores asociados a puntos de venta concretos.
 - **Otras funcionalidades:** Devoluciones, ajustes manuales de inventario, historial de ventas y movimientos de stock, dashboard con estadísticas y stock crítico.
-- **Búsqueda semántica y venta asistida (en desarrollo):** Proyecto Final del Máster de IA. Añade búsqueda semántica sobre el catálogo, sugerencia de sustitutos y argumentario de venta asistido, mediante el microservicio `jbg-ai`. A día de hoy están congelados el contrato HTTP y la autenticación entre servicios, y el backend .NET ya dispone del cliente tipado que los consume, con timeouts, reintento único y cortacircuitos; la lógica de recuperación y generación se entrega en changes posteriores.
+- **Búsqueda semántica y venta asistida (en desarrollo):** Proyecto Final del Máster de IA. Añade búsqueda semántica sobre el catálogo, sugerencia de sustitutos y argumentario de venta asistido, mediante el microservicio `jbg-ai`. A día de hoy están congelados el contrato HTTP y la autenticación entre servicios, el backend .NET ya dispone del cliente tipado que los consume —con timeouts, reintento único y cortacircuitos— y la capa de persistencia vectorial está lista: esquema `ai` con pgvector, migraciones propias e índices HNSW por similitud coseno. La lógica de recuperación y generación se entrega en changes posteriores.
 
 ### 1.3. Diseño y experiencia de usuario
 

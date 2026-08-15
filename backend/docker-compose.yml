@@ -6,7 +6,8 @@ services:
     # Image swap may require recreating the local volume:
     #   docker compose down -v
     # (destroys local DB data; acceptable for O0 / empty catalog).
-    # Do NOT create schema `ai` or run CREATE EXTENSION here — that is C05.
+    # Do NOT create schema `ai` or run CREATE EXTENSION here: that is the one-off
+    # ai-service/migrations/bootstrap.sql, run once with admin privileges.
     image: pgvector/pgvector:pg15
     container_name: jpv-pv-postgres
     environment:
@@ -47,6 +48,12 @@ services:
       # and shares the same value with the .NET API, which signs the token.
       JWT_SECRET: local-dev-jwt-secret-0123456789abcdef
       STUB_MODE: "true"
+      # Resolves `postgres` by network name on the INTERNAL port 5432, not the
+      # 5433 published to the host. No depends_on: the engine is built on first
+      # use, and under STUB_MODE nothing asks for a session — so the container
+      # starts fine even against a database nobody has provisioned yet.
+      # Provisioning is the one-off `ai-service/migrations/bootstrap.sql`.
+      DATABASE_URL: postgresql+psycopg://jbg_ai:local-dev-ai-password@postgres:5432/joiabagur_pv
     ports:
       - "8001:8000"
     networks:

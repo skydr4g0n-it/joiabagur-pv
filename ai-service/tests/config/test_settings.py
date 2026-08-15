@@ -103,3 +103,67 @@ def test_dev_endpoints_can_be_overridden_by_env(
     get_settings.cache_clear()
 
     assert get_settings().enable_dev_endpoints is True
+
+
+def _minimal_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_ENV", "local")
+    monkeypatch.setenv("SERVICE_VERSION", "0.1.0")
+    monkeypatch.setenv("JWT_SECRET", "local-secret")
+
+
+def test_settings_load_without_database_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Absent database configuration must not stop the service booting.
+
+    `ai-service-dev-compose` guarantees local runs need no database, and the
+    Compose service is started without this variable. Making it required would
+    turn an accepted scenario false and leave the container dead on arrival.
+    """
+    _minimal_env(monkeypatch)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("DB_POOL_SIZE", raising=False)
+    get_settings.cache_clear()
+
+    settings = get_settings()
+
+    assert settings.database_url is None
+    assert settings.db_pool_size == 5
+
+
+def test_settings_accept_database_url_when_supplied(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@db:5432/jpv")
+    monkeypatch.setenv("DB_POOL_SIZE", "3")
+    get_settings.cache_clear()
+
+    settings = get_settings()
+
+    assert settings.database_url == "postgresql+psycopg://u:p@db:5432/jpv"
+    assert settings.db_pool_size == 3
+
+
+def test_blank_database_url_is_treated_as_absent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Compose files and shell profiles export empty strings very easily.
+
+    Failing later on an unparseable URL would be a worse error than behaving as
+    though the variable had never been set.
+    """
+    _minimal_env(monkeypatch)
+    monkeypatch.setenv("DATABASE_URL", "   ")
+    get_settings.cache_clear()
+
+    assert get_settings().database_url is None
+
+
+def test_settings_reject_non_positive_pool_size(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.setenv("DB_POOL_SIZE", "0")
+    get_settings.cache_clear()
+
+    with pytest.raises(ValidationError):
+        get_settings()

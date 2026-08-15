@@ -4,6 +4,7 @@ Python FastAPI microservice for the JoiaBagur Proyecto Final RAG.
 
 - **C01** (HU-AIENG-001) shipped the runnable skeleton: settings, public health, structured `trace_id` logging, container and Compose wiring.
 - **C02** (HU-AIENG-002) freezes the HTTP contract: eight `/v1` endpoints with complete Pydantic models, an internal HS256 service token, deterministic stubs, and a versioned `openapi.json`.
+- **C05** (HU-AIENG-005) adds the persistence foundation: `vector` extension, schema `ai`, a dedicated database role, Alembic migrations and six empty index tables with their indexes. No data, no queries — see [Database and migrations](#database-and-migrations).
 
 Boundary rule: *Python computes similarity and writes prose; .NET computes numbers and decides.* The service never emits a price or stock figure and never touches schema `public`.
 
@@ -24,10 +25,12 @@ Boundary rule: *Python computes similarity and writes prose; .NET computes numbe
 | `JWT_TTL_SECONDS` | no | `300` | documented TTL; the .NET API is the issuer |
 | `STUB_MODE` | no | `true` | serve deterministic fixtures instead of real logic |
 | `ENABLE_DEV_ENDPOINTS` | no | `true` unless `APP_ENV` is `prod`/`production` | mounts `GET /v1/evals/runs` |
+| `DATABASE_URL` | no | — | `postgresql+psycopg://…`; its absence does not stop the service booting |
+| `DB_POOL_SIZE` | no | `5` | hard ceiling on simultaneous connections; no overflow |
 
 Missing or blank `APP_ENV`, `SERVICE_VERSION` or `JWT_SECRET` aborts startup (fail-fast), so the process never serves `/v1` half-configured.
 
-`DATABASE_URL` and LLM keys are still **not** required: C02 has no database access and calls no model.
+`DATABASE_URL` is **optional on purpose**. The service must boot with no database — that is a requirement of `ai-service-dev-compose`, not an accident — so the engine is built on first use and never at import time. Under `STUB_MODE` nothing asks for a session, so the container starts fine against a database that has not even been provisioned. LLM keys are still not required: no model is called yet.
 
 ## Frozen endpoints (C02)
 
@@ -144,7 +147,54 @@ docker compose down -v
 docker compose up -d postgres
 ```
 
-`-v` deletes local volume data. Acceptable in O0 when there is no real catalog. This change does **not** create schema `ai` or run `CREATE EXTENSION vector` (reserved for C05).
+`-v` deletes local volume data. Acceptable in O0 when there is no real catalog. Bringing Compose up does **not** create schema `ai` or run `CREATE EXTENSION vector` — that is the one-off provisioning below.
+
+## Database and migrations
+
+Schema `ai` belongs to `jbg-ai`; schema `public` belongs to the .NET API. **Python never writes to `public` and never reads it by SQL** — it reads the business side over HTTP through the paginated feeds. That boundary is enforced by database grants, not by convention: the `jbg_ai` role gets `permission denied` on `public`.
+
+### 1. Provision once, with administrator privileges
+
+`migrations/bootstrap.sql` installs the extension, creates schema `ai`, creates the dedicated role and grants it the minimum it needs. It is **not** an Alembic migration, and deliberately so: roles are cluster-level objects, so creating one from a migration would demand role-creation privilege from whoever migrates and would make a clean revert impossible.
+
+```bash
+cd ai-service
+docker exec -i jpv-pv-postgres psql -U postgres -d joiabagur_pv \
+  -v ai_password=local-dev-ai-password < migrations/bootstrap.sql
+```
+
+Pass the password **raw, without quoting it yourself**: psql's `:'var'` already renders it as a quoted literal, so pre-quoting creates a password that literally contains apostrophes and then fails to authenticate.
+
+Re-running it is safe: the extension and schema are `IF NOT EXISTS`, and an existing role keeps its password — so the script can never silently rotate a production credential. Change one deliberately with `ALTER ROLE jbg_ai PASSWORD '...'`.
+
+In production this step belongs to **C17**, run by the RDS master user. Because the migration also declares the extension idempotently, the same `DATABASE_URL` works in both worlds — locally the extension gets installed, on RDS the migration finds it already there. No second admin connection string is needed.
+
+### 2. Migrate
+
+```bash
+cd ai-service
+export DATABASE_URL="postgresql+psycopg://jbg_ai:local-dev-ai-password@localhost:5433/joiabagur_pv"
+uv run alembic upgrade head
+```
+
+```powershell
+cd ai-service
+$env:DATABASE_URL = "postgresql+psycopg://jbg_ai:local-dev-ai-password@localhost:5433/joiabagur_pv"
+uv run alembic upgrade head
+```
+
+`alembic downgrade base` reverts it. The revert drops the six tables and **keeps** schema `ai` and the extension: the extension is shared database-wide, and the schema holds Alembic's own version table.
+
+Two details worth knowing before editing anything here:
+
+- **The version table lives in `ai`**, not in `public`. Alembic's default would break the ownership boundary in the project's first Python migration, silently.
+- **The schema is provisioned in `env.py`, not in the first revision.** Alembic materialises its version table *before* running any revision, so a `CREATE SCHEMA` inside `upgrade()` would arrive after the failure it was meant to prevent.
+
+### One driver, two callers
+
+`postgresql+psycopg://` is psycopg 3, which speaks sync for Alembic and async for FastAPI, so a single connection string serves both. Choosing `asyncpg` would have meant two URL forms and someone remembering to translate between them in every environment.
+
+> **Windows caveat.** psycopg's async mode does not work with `ProactorEventLoop`, Python's default event loop on Windows; it needs `WindowsSelectorEventLoopPolicy`. This does not affect production (Linux container) or the test suite (Alembic is sync), only running the app with uvicorn directly on a Windows host once a route actually touches the database.
 
 ## Tests
 
@@ -155,18 +205,33 @@ uv run --system-certs pytest
 
 Tests inject required env / settings in-process, sign their own tokens, and never call LLM providers, embedding APIs, or production RDS. The stub tests additionally block socket connections to prove it.
 
-The suite mirrors the `src/jbg_ai/` package — `tests/api/`, `tests/config/`, and a
+The suite mirrors the `src/jbg_ai/` package — `tests/api/`, `tests/config/`, `tests/migrations/`, and a
 `tests/support/` for shared helpers. [`tests/README.md`](tests/README.md) explains where a new test
 goes and which folder each upcoming change lands in.
 
-## Explicit non-goals (C02)
+### Migration tests need Docker
+
+`tests/migrations/` runs against a **throwaway pgvector container**, with a fresh database per test so the reversibility test cannot leak schema state into its neighbours. They are marked `db`:
+
+```bash
+uv run --system-certs pytest -m db        # only the database tests
+uv run --system-certs pytest -m "not db"  # everything else
+```
+
+**Without a reachable Docker they are skipped, not failed.** There is no CI running the Python suite yet, so permanent red on a laptop would teach everyone to ignore red — which costs more than these four tests are worth. The flip side is real and worth saying out loud: a green run does not by itself prove the migration was exercised. Check that the `db` tests ran, not just that nothing failed.
+
+These four tests exist to catch failures that produce **no error at all**: an HNSW index built with the wrong operator class is silently never used, Alembic's version table lands in `public` without complaint, and an orphaned type survives a revert to break the *next* upgrade weeks later.
+
+## Explicit non-goals
 
 - No real retrieval, enrichment, indexing or agent loops — stubs are replaced route by route in later changes
-- No JWT issuance or typed .NET client with Polly (C03)
 - No `POST /v1/retrieval/complementary` or `POST /v1/families/suggest` — later OpenAPI negotiation
-- No DB client, Alembic, schema `ai`, or `CREATE EXTENSION vector` (C05)
+- No rows: the six `ai.*` tables ship empty and are populated by C13 (catalog), C22 (POS projection) and C23 (knowledge)
+- No queries, no similarity search, no ORM models or repositories — typed access is born in C11/C13
+- No `ai.eval_*` tables (C24) and no `ai.query_log` (unassigned; see the change's open questions)
 - No SQL access to schema `public`, ever
-- No production deploy, SSM or enriched health (C17)
+- No production deploy, SSM, enriched health or `CREATE EXTENSION` on RDS (C17)
+- No production tuning: `halfvec`, `hnsw.iterative_scan`, `CREATE INDEX CONCURRENTLY` and the `VACUUM`/`REINDEX` cycle are deliberate omissions at ~1,500 vectors, not oversights
 
 ## Layout
 
@@ -181,11 +246,18 @@ ai-service/
       routers/      # retrieval, assist, inventory, enrich, index, evals
       schemas/      # frozen request/response contracts
     config/         # pydantic-settings + canonical OpenAPI profile
+    db/             # lazy async engine, bounded pool
     stubs/          # deterministic fixtures
+  migrations/
+    bootstrap.sql   # one-off: extension, schema, dedicated role, grants
+    env.py          # version table in `ai`; provisions before revisions run
+    versions/       # hand-written revisions (no autogenerate)
   tests/            # mirrors src/jbg_ai — see tests/README.md
     api/            # contract, auth, stubs, OpenAPI snapshot
     config/         # settings and fail-fast validation
+    migrations/     # schema, indexes, reversibility (marked `db`)
     support/        # shared helpers and injectable fakes
+  alembic.ini       # no connection string: read from DATABASE_URL
   openapi.json      # versioned contract snapshot
   Dockerfile
   pyproject.toml

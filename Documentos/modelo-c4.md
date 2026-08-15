@@ -80,7 +80,7 @@ El sistema está compuesto por cinco contenedores principales: una aplicación w
 - **Despliegue**: Contenedor Docker en **EC2** (pila actual, imagen bundlada) u otros hosts (App Service en Azure, ECS/App Runner en variantes legado)
 
 #### AI Service (`jbg-ai`)
-- **Tecnología**: Python 3.11, FastAPI, uvicorn, `uv`, pydantic-settings
+- **Tecnología**: Python 3.11, FastAPI, uvicorn, `uv`, pydantic-settings, SQLAlchemy 2 + psycopg 3 + Alembic
 - **Responsabilidades**:
   - Recuperación vectorial e híbrida sobre el índice del catálogo (pgvector)
   - Generación con LLM, atribución con citas y guardrails
@@ -383,7 +383,7 @@ C4Component
 
 ### 3.3 Componentes del Servicio de IA
 
-El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y generación, y servicios transversales. **Estado actual (C02):** existen la fábrica de aplicación, el health, el middleware de trazas, los seis routers de dominio con sus esquemas congelados, la capa de stubs deterministas y la dependencia de autenticación de servicio. La capa de recuperación y generación sigue planificada en los changes C09–C38.
+El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y generación, y servicios transversales. **Estado actual (C05):** existen la fábrica de aplicación, el health, el middleware de trazas, los seis routers de dominio con sus esquemas congelados, la capa de stubs deterministas, la dependencia de autenticación de servicio y la **capa de persistencia** —esquema `ai` con sus seis tablas vacías, migraciones Alembic y motor con pool acotado—. La capa de recuperación y generación sigue planificada en los changes C09–C38.
 
 #### Routers de Dominio (`/v1/*`)
 
@@ -435,6 +435,7 @@ C4Component
         Component(generation, "Generation Service", "LLM", "Argumentario con citas y placeholders")
         Component(guardrails, "Guardrails / Intent Router", "Python", "Intención, abstención y seguridad")
         Component(agent, "Agent Loop", "Python", "Bucles agénticos con tools de solo lectura")
+        Component(persistence, "Persistence", "SQLAlchemy 2 + Alembic", "Esquema ai: pool acotado y perezoso, migraciones, índices HNSW/GIN")
         Component(settings, "Settings", "pydantic-settings", "Configuración con fail-fast")
         Component(trace, "TraceId Middleware", "Starlette", "Propagación de trace_id")
     }
@@ -461,6 +462,8 @@ C4Component
     Rel(enrichRouter, generation, "Usa")
     Rel(indexRouter, embeddings, "Usa")
 
+    Rel(retriever, persistence, "Obtiene sesión")
+    Rel(persistence, db, "Pool acotado a 5 conexiones")
     Rel(retriever, db, "Consulta vectorial y léxica")
     Rel(embeddings, db, "Escribe documentos y vectores")
     Rel(indexRouter, api, "Feed paginado since-cursor")

@@ -28,14 +28,14 @@ Arquitectura monolítica simple con backend y frontend separados, desplegados en
 
 ### Servicio de IA (`jbg-ai`)
 
-Microservicio añadido en el Proyecto Final de IA (changes `init-ai-service-skeleton` / C01 y `add-ai-service-contracts-and-auth` / C02). Vive en `ai-service/` y es un contenedor independiente del backend .NET.
+Microservicio añadido en el Proyecto Final de IA (changes `init-ai-service-skeleton` / C01, `add-ai-service-contracts-and-auth` / C02 y `add-pgvector-schema-foundation` / C05). Vive en `ai-service/` y es un contenedor independiente del backend .NET.
 
 - **Lenguaje**: Python 3.11
 - **Framework**: FastAPI (fábrica `create_app`, `docs_url` deshabilitado)
 - **Gestor de dependencias**: `uv` (`pyproject.toml` + `uv.lock`)
 - **Configuración**: pydantic-settings con *fail-fast* de variables obligatorias
 - **Servidor**: Uvicorn
-- **Base de datos**: la misma PostgreSQL, en el esquema `ai` con extensión **pgvector** (el esquema y la extensión llegan en C05; en C01 solo se garantiza que la imagen los admita)
+- **Base de datos**: la misma PostgreSQL, en el esquema `ai` con extensión **pgvector**, ambos creados en C05. Acceso con SQLAlchemy 2 sobre psycopg 3 y **pool acotado a 5 conexiones sin desbordamiento**; migraciones con Alembic, independientes de EF Core y con su tabla de versiones dentro de `ai`. La cadena de conexión es **opcional**: el servicio arranca sin base de datos y el motor se construye en el primer uso
 - **Contenedorización**: Docker (`python:3.11-slim-bookworm`)
 - **Observabilidad**: logging estructurado con `trace_id` propagado por middleware
 - **Autenticación entre servicios**: JWT interno HS256 con `PyJWT`; claims obligatorios `user_id`, `role`, `pos_id` y `trace_id` (C02)
@@ -139,9 +139,9 @@ El fichero real levanta la base de datos, pgAdmin y el servicio de IA. El backen
 
 | Servicio | Imagen / origen | Puerto local | Notas |
 |---|---|---|---|
-| `postgres` | `pgvector/pgvector:pg15` | `5433` → 5432 | Imagen con **pgvector** disponible (C01). El esquema `ai` y `CREATE EXTENSION vector` llegan en C05 |
+| `postgres` | `pgvector/pgvector:pg15` | `5433` → 5432 | Imagen con **pgvector**. El esquema `ai`, la extensión y el rol dedicado los crea `ai-service/migrations/bootstrap.sql`, **una vez y con privilegios de administrador**; levantar Compose no los crea |
 | `pgadmin` | `dpage/pgadmin4` | `8080` → 80 | Administración de la BD |
-| `jbg-ai` | build de `../ai-service` | `8001` → 8000 | Variables: `APP_ENV`, `SERVICE_VERSION`, `LOG_LEVEL`, `JWT_SECRET` (placeholder local; en producción desde SSM en C17) y `STUB_MODE` |
+| `jbg-ai` | build de `../ai-service` | `8001` → 8000 | Variables: `APP_ENV`, `SERVICE_VERSION`, `LOG_LEVEL`, `JWT_SECRET` (placeholder local; en producción desde SSM en C17), `STUB_MODE` y `DATABASE_URL` (apunta a `postgres:5432` por nombre de red, no al puerto publicado). Sin `depends_on`: el motor es perezoso y el contenedor arranca aunque la base no esté aprovisionada |
 
 Todos comparten la red `jpv-network`, que es la que permitirá a `jbg-ai` alcanzar Postgres sin exponer puertos adicionales.
 
