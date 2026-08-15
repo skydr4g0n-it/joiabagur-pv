@@ -6,7 +6,8 @@ services:
     # Image swap may require recreating the local volume:
     #   docker compose down -v
     # (destroys local DB data; acceptable for O0 / empty catalog).
-    # Do NOT create schema `ai` or run CREATE EXTENSION here — that is C05.
+    # Do NOT create schema `ai` or run CREATE EXTENSION here: that is the one-off
+    # ai-service/migrations/bootstrap.sql, run once with admin privileges.
     image: pgvector/pgvector:pg15
     container_name: jpv-pv-postgres
     environment:

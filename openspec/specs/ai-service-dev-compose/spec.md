@@ -17,7 +17,7 @@ Local Docker Compose wiring for `jbg-ai` on `jpv-network`, pgvector-ready Postgr
 - **THEN** the response is HTTP 200 with OK status and version
 
 ### Requirement: Local Postgres image provides pgvector extension availability
-The Compose Postgres service MUST use a PostgreSQL 15 image that ships the pgvector extension so that extension name `vector` appears in `pg_available_extensions` (or equivalent). This change MUST NOT require creating schema `ai` or executing `CREATE EXTENSION vector` as part of bringing Compose up.
+The Compose Postgres service MUST use a PostgreSQL 15 image that ships the pgvector extension so that extension name `vector` appears in `pg_available_extensions` (or equivalent). Bringing Compose up MUST NOT by itself create schema `ai` nor execute `CREATE EXTENSION vector`: provisioning the extension, the schema and the dedicated role is a privileged one-off step run by a developer or an administrator, and creating the tables is the job of the migrations. Starting the Compose stack MUST remain possible, and `jbg-ai` MUST remain able to boot, on a database where none of that provisioning has been done.
 
 #### Scenario: vector extension is available locally
 - **WHEN** the Compose Postgres container is running on the pgvector-enabled image
@@ -25,18 +25,25 @@ The Compose Postgres service MUST use a PostgreSQL 15 image that ships the pgvec
 - **THEN** a matching row is returned
 - **AND** schema `ai` need not exist yet
 
-#### Scenario: Extension is not auto-created by this change
-- **WHEN** Compose is started after this change alone
-- **THEN** the stack MUST NOT depend on `ai.*` tables existing
+#### Scenario: Compose start does not provision the extension or the schema
+- **WHEN** the Compose stack is started against a fresh database volume and no provisioning step has been run
+- **THEN** the extension is not installed and schema `ai` does not exist
+- **AND** the stack MUST NOT depend on `ai.*` tables existing
 - **AND** application boot of `jbg-ai` MUST NOT require a database connection
 
 ### Requirement: Developers can run without production RDS
-Local development and automated tests for this change MUST use Compose/local process configuration only. Connection strings MUST NOT point developer laptops at production RDS as the default path.
+Local development and automated tests MUST use Compose or local process configuration only. Connection strings MUST NOT point developer laptops at production RDS as the default path. The `jbg-ai` Compose service MUST supply a `DATABASE_URL` that resolves the Compose Postgres service by its network name and internal port, never a published host port and never a production host. Because the database connection is opened on demand, the presence of that variable MUST NOT make the container's start depend on the database being ready or provisioned. The `ai-service` README MUST document the one-off provisioning step and how to apply migrations locally.
 
 #### Scenario: Default local config stays off production
 - **WHEN** a developer follows the `ai-service` README for local run
-- **THEN** documented `DATABASE_URL` / DB hosts refer to local Compose (or are omitted until a later change)
-- **AND** production RDS is not required to start `jbg-ai` or pass C01 tests
+- **THEN** documented `DATABASE_URL` and database hosts refer to local Compose
+- **AND** production RDS is not required to start `jbg-ai` or to run the test suite
+
+#### Scenario: Compose supplies a local database URL
+- **WHEN** the `jbg-ai` Compose service is started with no extra environment overrides
+- **THEN** `DATABASE_URL` is present and targets the Compose Postgres service by network name and internal port
+- **AND** the container starts even if the database has not been provisioned yet
+- **AND** `GET /health` answers HTTP 200 through the published local port
 
 ### Requirement: Compose supplies the internal service credentials for local runs
 The `jbg-ai` service in `backend/docker-compose.yml` MUST provide every environment variable the service requires to boot, including `JWT_SECRET` and `STUB_MODE`, so the container starts locally without extra manual setup. The Compose secret is a development-only placeholder and MUST NOT be reused in production, where the value is supplied by the parameter store. `STUB_MODE` MUST be enabled for local runs so no external AI provider or database is needed. The `ai-service` README MUST document the required environment variables and their defaults.

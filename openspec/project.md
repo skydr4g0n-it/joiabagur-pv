@@ -60,6 +60,9 @@
 - **Configuration**: pydantic-settings with fail-fast on required env
 - **Service Auth**: internal HS256 JWT (PyJWT); the .NET API is the only issuer
 - **Contract**: frozen `/v1` surface versioned in `ai-service/openapi.json`
+- **Persistence**: SQLAlchemy 2 (async) over psycopg 3, pgvector types, Alembic migrations in `ai-service/migrations/`
+- **Schema ownership**: `ai` only. Python never writes to `public` nor reads it by SQL — enforced by database grants, not convention
+- **Connection pool**: capped at `DB_POOL_SIZE` (default 5) with no overflow; built lazily, so the service boots with no database
 
 ### Infrastructure
 - **Containers**: Docker, Docker Compose (development)
@@ -90,6 +93,7 @@
 - Test Framework: pytest 9.x
 - HTTP Client: httpx (FastAPI `TestClient`)
 - No real LLM, embedding or RDS calls; stub tests block socket connections
+- Database tests: testcontainers with `pgvector/pgvector:pg15`, a fresh database per test; skipped (not failed) when Docker is unreachable
 
 ---
 
