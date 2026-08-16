@@ -345,6 +345,8 @@ Permite gestionar los componentes que constituyen las joyas (materiales, mano de
 >
 > **Convención de nomenclatura.** A diferencia del MVP, las historias del PF **no** se numeran por épica: siguen una serie plana `HU-AIENG-[NNN]` en `Documentos/Historias/AI-Eng/`, porque el trabajo se organiza por *change* de OpenSpec (C01–C39) y una misma historia puede atravesar varias épicas. Cada épica indica abajo qué changes agrupa.
 >
+> **El número de la historia es el del change, no el de creación** *(regla fijada el 2026-08-16, al redactar HU-AIENG-008)*. `HU-AIENG-[NNN]` y su ticket `T-AIENG-[NNN]` toman el número de `C[NN]`, de modo que el trío historia ↔ ticket ↔ change se lee sin tabla de equivalencias. Los changes se cogen por desbloqueo y no por orden, así que la serie tendrá huecos —`006` y `007` esperan a C06 y C07— y eso es correcto: un hueco significa «ese change aún no se ha redactado», que es exactamente lo que se quiere saber de un vistazo.
+>
 > **Fuentes:** [diseño del sistema de IA](Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) (§4 alcance acordado, §6 frontera, §7 diseño RAG) y [plan de changes](Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (tabla maestra C01–C39).
 
 ---
