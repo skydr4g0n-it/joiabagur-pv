@@ -1,6 +1,8 @@
 using FluentValidation;
+using JoiabagurPV.Application.Configuration;
 using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Application.Services;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JoiabagurPV.Application.Extensions;
@@ -79,8 +81,43 @@ public static class ServiceCollectionExtensions
         // Register assisted-search telemetry
         services.AddScoped<IProductSearchEventService, ProductSearchEventService>();
 
+        // Register catalog AI profiles. The policy is a singleton: it holds no state beyond its
+        // configured thresholds, and making it scoped would rebuild it once per request for no
+        // reason.
+        services.AddSingleton<IProfileReviewPolicy, ProfileReviewPolicy>();
+        services.AddScoped<IProductAiProfileService, ProductAiProfileService>();
+
         // Register background services
         services.AddHostedService<ModelTrainingBackgroundService>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Binds and validates the thresholds of the hybrid profile review policy.
+    /// </summary>
+    /// <remarks>
+    /// Validated at start-up rather than lazily, for the same reason the gateway options are: a
+    /// threshold outside the range zero to one would otherwise surface inside a request, having
+    /// already routed a batch of profiles by a rule that cannot be satisfied.
+    /// </remarks>
+    public static IServiceCollection AddProfileReview(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        services
+            .AddOptions<ProfileReviewOptions>()
+            .Bind(configuration.GetSection(ProfileReviewOptions.SectionName))
+            .Validate(
+                o => o.TagAutoApproveThreshold is >= 0 and <= 1,
+                $"{ProfileReviewOptions.SectionName}:TagAutoApproveThreshold must be between 0 and 1.")
+            .Validate(
+                o => o.MinimumFieldConfidence is >= 0 and <= 1,
+                $"{ProfileReviewOptions.SectionName}:MinimumFieldConfidence must be between 0 and 1.")
+            .ValidateOnStart();
 
         return services;
     }

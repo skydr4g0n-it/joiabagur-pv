@@ -7,7 +7,13 @@ from typing import Any
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from jbg_ai.api.auth import InvalidServiceToken, ServicePrincipal, decode_service_token
+from jbg_ai.api.auth import (
+    CATALOG_CLAIMS,
+    REQUIRED_CLAIMS,
+    InvalidServiceToken,
+    ServicePrincipal,
+    decode_service_token,
+)
 from jbg_ai.config import Settings
 
 UNAUTHORIZED_DETAIL = "Invalid or missing internal service token"
@@ -31,12 +37,43 @@ def get_service_principal(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     settings: Settings = Depends(get_app_settings),
 ) -> ServicePrincipal:
-    """Reject anything but a valid internal token; expose the caller to handlers."""
+    """Reject anything but a valid internal token; expose the caller to handlers.
+
+    For routes scoped to one point of sale: `pos_id` is required, and a token
+    without it is rejected here rather than being handled downstream.
+    """
+    return _principal(request, credentials, settings, REQUIRED_CLAIMS)
+
+
+def get_catalog_principal(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    settings: Settings = Depends(get_app_settings),
+) -> ServicePrincipal:
+    """Same validation, minus the point-of-sale requirement.
+
+    For routes that operate over the whole catalog — enrichment, index
+    synchronization — which belong to no point of sale. This is a *narrower*
+    dependency, not a laxer one: it is declared per route, so relaxing it for a
+    catalog route cannot relax it for retrieval, where the `pos_id` claim is the
+    only hard filter standing between two points of sale.
+    """
+    return _principal(request, credentials, settings, CATALOG_CLAIMS)
+
+
+def _principal(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None,
+    settings: Settings,
+    required_claims: tuple[str, ...],
+) -> ServicePrincipal:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise _unauthorized()
 
     try:
-        principal = decode_service_token(credentials.credentials, settings.jwt_secret)
+        principal = decode_service_token(
+            credentials.credentials, settings.jwt_secret, required_claims
+        )
     except InvalidServiceToken:
         raise _unauthorized() from None
 

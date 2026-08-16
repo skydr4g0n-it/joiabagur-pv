@@ -42,6 +42,18 @@ public class AiGatewayOptions
     /// </summary>
     public int AssistTimeoutMs { get; set; } = 5000;
 
+    /// <summary>
+    /// Time budget for a catalog enrichment batch, in milliseconds.
+    /// </summary>
+    /// <remarks>
+    /// Two orders of magnitude above the retrieval budget, and that is the point: a batch of up
+    /// to fifty products through a structured-extraction model has nothing in common with a
+    /// vector lookup. Nobody is waiting on this call the way an operator waits on a search — it
+    /// is an administration action — so the budget is generous enough that a slow provider does
+    /// not turn into a half-enriched catalog.
+    /// </remarks>
+    public int EnrichTimeoutMs { get; set; } = 120_000;
+
     /// <summary>Whether the gateway client is registered at all.</summary>
     public bool Enabled { get; set; } = true;
 

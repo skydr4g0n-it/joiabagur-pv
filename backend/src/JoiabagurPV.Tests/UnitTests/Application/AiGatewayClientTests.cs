@@ -315,4 +315,29 @@ public class AiGatewayClientTests
         logs.Single("ai_gateway_call_started").Property("QueryLength")
             .Should().Be(request.Query.Length);
     }
+
+    /// <summary>
+    /// The first of two independent closures on the point-of-sale boundary.
+    /// </summary>
+    /// <remarks>
+    /// The catalog scope exists so enrichment does not have to invent a point of sale. From C22
+    /// onward the `pos_id` claim is the retriever's only hard filter, so letting that scope
+    /// reach retrieval would be a cross-point-of-sale leak. jbg-ai refuses it as well; neither
+    /// side is trusted to be the only one that remembers.
+    /// </remarks>
+    [Fact]
+    public async Task SearchAsync_WithCatalogScope_IsRejected()
+    {
+        var handler = new FakeHttpMessageHandler().AlwaysRespond(HttpStatusCode.OK, SuccessBody);
+        await using var provider = AiGatewayTestHost.Build(handler);
+        var catalogScope = AiCallScope.ForCatalog(Guid.NewGuid(), "Administrator");
+
+        var act = async () => await provider.Client().SearchAsync(AnyRequest(), catalogScope);
+
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithParameterName("scope");
+
+        handler.Requests.Should().BeEmpty(
+            "the scope is refused before anything leaves the process");
+    }
 }

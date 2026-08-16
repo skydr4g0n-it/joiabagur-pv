@@ -52,7 +52,8 @@ public static class AiGatewayServiceCollectionExtensions
                 o => o.JwtSecret.Length >= AiGatewayOptions.MinimumSecretLength,
                 $"{AiGatewayOptions.SectionName}:JwtSecret is too short for HS256; at least {AiGatewayOptions.MinimumSecretLength} characters are required.")
             .Validate(
-                o => o.TokenTtlSeconds > 0 && o.RetrievalTimeoutMs > 0 && o.AssistTimeoutMs > 0,
+                o => o.TokenTtlSeconds > 0 && o.RetrievalTimeoutMs > 0 && o.AssistTimeoutMs > 0
+                     && o.EnrichTimeoutMs > 0,
                 $"{AiGatewayOptions.SectionName} time-to-live and time budgets must be positive.")
             // ValidateOnStart is the whole point. Without it the check is lazy and would surface
             // inside a request instead of at boot, which is the failure mode being removed here.
@@ -101,6 +102,30 @@ public static class AiGatewayServiceCollectionExtensions
                 });
 
                 builder.AddTimeout(TimeSpan.FromMilliseconds(options.RetrievalTimeoutMs));
+            });
+
+        services
+            .AddHttpClient(AiGatewayClient.EnrichClientName, client =>
+            {
+                client.BaseAddress = new Uri(options.BaseUrl);
+                client.Timeout = Timeout.InfiniteTimeSpan;
+            })
+            .AddResilienceHandler("ai-enrich-pipeline", builder =>
+            {
+                // No retry, deliberately. A second attempt at a structured extraction spends the
+                // model budget again with no reason to expect a different answer, and the
+                // delivery commits to the AI cost being instrumented and defensible. A failed
+                // batch is re-run by an administrator who decided to, not by a policy.
+                builder.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions
+                {
+                    FailureRatio = options.BreakerFailureRatio,
+                    MinimumThroughput = options.BreakerMinimumThroughput,
+                    SamplingDuration = TimeSpan.FromSeconds(options.BreakerSamplingDurationSeconds),
+                    BreakDuration = TimeSpan.FromSeconds(options.BreakerBreakDurationSeconds),
+                    ShouldHandle = args => ValueTask.FromResult(IsRetryable(args.Outcome))
+                });
+
+                builder.AddTimeout(TimeSpan.FromMilliseconds(options.EnrichTimeoutMs));
             });
 
         // C34 registers its own named client here for the generative route, with a 5 s budget

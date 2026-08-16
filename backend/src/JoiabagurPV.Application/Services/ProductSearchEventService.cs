@@ -60,10 +60,20 @@ public class ProductSearchEventService : IProductSearchEventService
                     result.MatchReasons))
                 .ToList();
 
+            // A search event belongs to a point of sale by definition, so a catalog scope
+            // reaching here is a programming error rather than a runtime condition. It is
+            // raised inside the try on purpose: the guarantee that telemetry never breaks a
+            // search outranks surfacing a mistake that the compiler cannot catch since the
+            // scope became nullable. It is swallowed and logged like any other failure below.
+            var pointOfSaleId = request.Scope.PointOfSaleId
+                ?? throw new ArgumentException(
+                    "A search event requires a point-of-sale scope; a catalog scope cannot produce one.",
+                    nameof(request));
+
             var searchEvent = new ProductSearchEvent
             {
                 UserId = request.Scope.UserId,
-                PointOfSaleId = request.Scope.PointOfSaleId,
+                PointOfSaleId = pointOfSaleId,
                 SearchSessionId = request.SearchSessionId ?? Guid.NewGuid(),
                 SearchText = request.Query,
                 FiltersJson = JsonSerializer.Serialize(request.Filters, JsonOptions),

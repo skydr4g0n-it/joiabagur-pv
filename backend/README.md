@@ -196,8 +196,44 @@ The system has two roles:
 | `POST /api/inventory/import` | ✅ | ❌ |
 | `POST /api/inventory/adjustment` | ✅ | ❌ |
 | `GET /api/inventory/import-template` | ✅ | ❌ |
+| `POST /api/ai/search-events/{id}/selection` | ✅** | ✅** |
+| `POST /api/ai/catalog/enrich-batch` | ✅ | ❌ |
 
 *Operators see only their assigned points of sale
+**Ownership, not role: only the operator who ran that search may record its selection
+
+### Catalog AI enrichment
+
+`POST /api/ai/catalog/enrich-batch` is administrator-only, and for two reasons rather than one:
+it rewrites what the catalog claims about a piece, and it spends money on a model provider.
+
+```jsonc
+// Request
+{ "productIds": ["..."],                 // 1..50, mirroring the AI contract's own batch limit
+  "reviewMode": "Routed" | "AutoBulk",   // Routed by default
+  "force": false }                       // true re-enriches even when the inputs are unchanged
+
+// Response 200
+{ "requested": 50, "enriched": 47, "skippedUnchanged": 3, "failed": 0,
+  "profiles": [ { "productId": "...", "reviewStatus": "Pending", "fieldsPendingReview": ["piece_type"] } ] }
+```
+
+- **`Routed`** applies the hybrid review policy: a sensitive field (piece type, materials, stone,
+  size) that a model *inferred* sends the profile to review; the same field produced by a
+  deterministic rule does not; commercial tags auto-approve above the configured threshold.
+- **`AutoBulk`** approves everything so the catalog can be indexed, and stamps the origin so that
+  it stays distinguishable from human review in every metric. The per-field confidence and
+  provenance are written in both modes, so it remains answerable afterwards how much of the
+  corpus nobody looked at.
+- **Idempotent**: a product whose inputs are unchanged is skipped and **no call is made to the AI
+  service** for it. That protects both the model bill and any review a person already did.
+- **503, never a degraded answer**, when the AI service has no enrichment implementation yet:
+  unlike search, which can fall back to the lexical index, producing attributes without the
+  extractor would mean inventing catalog data.
+
+Thresholds live under the `ProfileReview` configuration section and are validated at start-up.
+They are meant to be recalibrated against the evaluation golden set, which a compiled constant
+would prevent.
 
 ### Point of Sale Access Control
 
