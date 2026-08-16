@@ -1,0 +1,54 @@
+> **Línea de corte (regla 5 del plan).** Los grupos 1-3 forman una mitad archivable por sí sola: entidades, configuración de EF, migración y detectores de esquema. Liberan el turno único de migración y adelantan medio prerrequisito de C12. Los grupos 4-7 son la segunda mitad, no llevan migración y conviven con cualquier otro change. Si la sesión se desborda, se entrega primero la mitad que otra persona está esperando.
+
+## 1. Línea base y anuncio del turno de migración
+
+- [ ] 1.1 Anunciar que se abre el turno único de migración de EF Core antes de escribir nada, y comprobar que no hay ningún otro change 🗄️ activo (C19, C27, C29). Verificación: `openspec list` no muestra otro change con migración en curso.
+- [ ] 1.2 Medir la línea base de la suite de .NET **antes de tocar el código**: `git stash push -u` → `dotnet test src/JoiabagurPV.Tests/JoiabagurPV.Tests.csproj` → `git stash pop`. Guardar los **nombres** de los tests que ya fallan, no el recuento: dos pasadas idénticas de esta suite dan conjuntos distintos. Verificación: existe la lista de nombres con la que se comparará al final.
+
+## 2. Dominio y persistencia
+
+- [ ] 2.1 Definir `ProductFamily` en `JoiabagurPV.Domain/Entities/` con `Name`, `Description`, `Origin`, `ApprovedByUserId`, `ApprovedAt` y la colección de miembros, heredando de `BaseEntity`. Verificación: `dotnet build` limpio.
+- [ ] 2.2 Definir `ProductFamilyMember` en `JoiabagurPV.Domain/Entities/` con `ProductFamilyId`, `ProductId`, `VariantLabel` y `SortOrder`, heredando de `BaseEntity`. **Sin propiedad de navegación hacia `Product`** y sin tocar `Product`. Verificación: `dotnet build` limpio y `Product.cs` sin cambios en el diff.
+- [ ] 2.3 Definir el enum `FamilyOrigin` (`Manual = 1`, `AiApproved = 2`) en `JoiabagurPV.Domain/Enums/`. Verificación: `dotnet build` limpio.
+- [ ] 2.4 Escribir `ProductFamilyConfiguration` y `ProductFamilyMemberConfiguration` declarando **a mano** todo lo que falla en silencio: `UNIQUE (ProductId)`, `UNIQUE (ProductFamilyId, SortOrder)`, `UNIQUE (ProductFamilyId, VariantLabel)`, índices sobre `Name` y sobre `UpdatedAt` de ambas tablas, `HasConversion<int>()` en `Origin`, `Cascade` de familia a miembros, y `Restrict` hacia `Product` y hacia `User`. La clave foránea al producto se declara con `HasOne<Product>().WithMany()`. Verificación: `dotnet build` limpio y `Model_HasNoPendingMigrationDifferences` **en rojo** (aún no hay migración).
+- [ ] 2.5 Registrar los dos `DbSet` en `ApplicationDbContext` y generar **una única migración** desde `src/JoiabagurPV.API` con `dotnet ef migrations add AddProductFamily --project ../JoiabagurPV.Infrastructure`. Verificación: `Model_HasNoPendingMigrationDifferences` vuelve a verde.
+  - **Aviso heredado de C08:** generarla con `--no-build` produce una migración **vacía y sin error** —usa el ensamblado anterior a las entidades— y `ef migrations remove` no la deshace sin conexión. Si pasa, borrar los dos ficheros a mano y regenerar compilando.
+
+## 3. Detectores de esquema
+
+- [ ] 3.1 Escribir `ProductFamilySchemaTests` en `IntegrationTests/`, con `[Collection(RepositoryTestCollection.Name)]` para colgar de `TestDatabaseFixture`, que ya aplica migraciones. Cubrir `Migration_ProductIdIsUnique`, `Migration_SortOrderIsUniqueWithinFamily`, `Migration_VariantLabelIsUniqueWithinFamily`, `Migration_DeletingFamily_CascadesToMembers`, `Migration_DeletingProduct_IsRestrictedNotCascaded` y `Migration_ApprovalColumnsAcceptNull`. Verificación: los seis pasan con Testcontainers.
+  - **`SchemaAssert` no se extiende:** `IndexIsUniqueAsync`, `IndexColumnsAsync`, `ForeignKeyDeleteRuleAsync` y `ColumnIsNullableAsync` ya cubren las seis. Se respeta el guardarraíl de C04.
+- [ ] 3.2 Verificar el arnés rompiendo a propósito lo que cada detector vigila —quitar una unicidad, cambiar `Restrict` por `Cascade`— y comprobar que falla **exactamente** ese detector y ninguno más. Revertir las roturas. Verificación: se anota qué falló en cada rotura y la suite vuelve a verde.
+
+## 4. Repositorio
+
+- [ ] 4.1 Declarar `IProductFamilyRepository : IRepository<ProductFamily>` en `Domain/Interfaces/Repositories/` con `GetWithMembersAsync(Guid id)` y `GetByProductIdAsync(Guid productId)`, ambas con los miembros ordenados por `SortOrder`. Verificación: `dotnet build` limpio.
+- [ ] 4.2 Implementar `ProductFamilyRepository` en `Infrastructure/Data/Repositories/` siguiendo el molde de `ComponentTemplateRepository`, y registrarlo en `Infrastructure/Extensions/ServiceCollectionExtensions.cs`. Verificación: test de repositorio que persiste una familia con tres miembros y los recupera en orden.
+- [ ] 4.3 Añadir `ProductFamilyMother` a `TestHelpers/Mothers/` y exponerlo desde `TestDataMother`, con `.WithName()`, `.WithMembers()` y `CreateAsync()`. Verificación: los tests de los grupos 3 y 6 lo usan sin duplicar montaje.
+
+## 5. Servicio de aplicación
+
+- [ ] 5.1 Definir los DTOs en `Application/DTOs/Products/ProductFamilyDtos.cs`: petición de creación y de edición de metadatos, petición de declaración de miembros, y respuesta de familia con sus miembros (`productId`, `sku`, `name`, `variantLabel`, `sortOrder`). Sin foto ni precio. Verificación: `dotnet build` limpio.
+- [ ] 5.2 Escribir los validadores de FluentValidation en `Application/Validators/`: nombre obligatorio y acotado, y en la declaración de miembros rechazar producto repetido y etiqueta de variante repetida **antes de tocar la base de datos**. Verificación: `ReplaceMembers_WithSameProductTwice_ReturnsBadRequest` y `ReplaceMembers_WithDuplicateVariantLabel_ReturnsBadRequest` en verde.
+- [ ] 5.3 Implementar `IProductFamilyService` / `ProductFamilyService` con crear, leer, editar metadatos, declarar miembros y consultar por producto. El reemplazo de miembros **borra todos e inserta la lista nueva**, con `SortOrder` derivado de la posición en el array. Verificación: `CreateFamily_WithMembers_PersistsOrder` y `GetFamily_ReturnsSiblingsOrderedBySortOrder` en verde.
+- [ ] 5.4 Añadir el **cortocircuito de no-operación**: si la lista declarada coincide con la vigente en productos, etiquetas y orden, no se escribe ninguna fila. Verificación: `ReplaceMembers_WithIdenticalList_DoesNotRewriteRows` comprueba que `UpdatedAt` de los miembros no cambia.
+- [ ] 5.5 Implementar la detección de conflicto por doble pertenencia con sus dos cierres: comprobación previa que produce el mensaje nombrando **producto y familia que ya lo tiene**, y traducción de la violación de unicidad concurrente leyendo `DbException.SqlState == "23505"` —nunca `PostgresException`, para que `Application` no referencie el driver, como en `ProductAiProfileService`. Verificación: `AddMember_WhenProductAlreadyInAnotherFamily_ReturnsConflict` en verde y el mensaje contiene los dos identificadores.
+- [ ] 5.6 Cubrir con tests el resto del comportamiento del servicio: `RemoveMember_KeepsFamilyWhenOthersRemain`, `ReplaceMembers_WithEmptyList_LeavesFamilyWithoutMembers`, `ReplaceMembers_ReorderingExistingMembers_Succeeds`, `ReplaceMembers_SwappingTwoVariantLabels_Succeeds` y `ReplaceMembers_WithTwoUnlabelledMembers_Succeeds`. Verificación: los cinco en verde.
+  - **Si los dos de reordenado fallaran** por violación transitoria de unicidad, escalonar la escritura con `IUnitOfWork.BeginTransactionAsync()`: borrar y guardar, insertar y guardar, confirmar. **Lo decide el test, no la suposición.**
+- [ ] 5.7 Registrar el servicio en `Application/Extensions/ServiceCollectionExtensions.cs`, en un bloque comentado por épica como el resto. Verificación: la API arranca y resuelve la dependencia.
+
+## 6. Endpoints y autorización
+
+- [ ] 6.1 Crear `ProductFamiliesController` con `[Route("api/product-families")]` —ruta literal kebab-case, no `[controller]`— y las cuatro rutas: `POST`, `GET {id:guid}`, `PUT {id:guid}` y `PUT {id:guid}/members`. Escritura con `[Authorize(Roles = "Administrator")]`, lectura con `[Authorize]`. **Validación invocada explícitamente** con `IValidator<T>`: este proyecto no cablea pipeline automático. Verificación: las cuatro responden y `dotnet build` limpio.
+- [ ] 6.2 Añadir `GET {id}/family` a `ProductsController`, devolviendo **404** si el producto no existe, **204** si existe y es huérfano, y **200** con la familia si la tiene. Verificación: `GetFamily_WhenProductHasNoFamily_Returns204` y `GetFamily_WhenProductDoesNotExist_Returns404` en verde.
+- [ ] 6.3 Escribir los tests de autorización en `IntegrationTests/ProductFamiliesControllerTests.cs`: `CreateFamily_AsOperator_Returns403`, `CreateFamily_Unauthenticated_Returns401` y `GetFamily_AsOperator_ReturnsFamily`. Verificación: los tres en verde.
+  - **Trampa documentada:** el `HttpClient` compartido de la clase conserva las cookies de los logins previos y **no es anónimo**. Pedir un cliente nuevo a la factoría para afirmar el 401. Y fijar el teléfono del punto de venta con `.WithPhone("600123456")`, porque Bogus genera valores que desbordan `varchar(20)`.
+
+## 7. Verificación y documentación
+
+- [ ] 7.1 Ejecutar la suite completa de .NET y comparar con la línea base de 1.2 **por nombres de test**, nunca por recuento. Un nombre nuevo solo cuenta como regresión si además falla al ejecutarlo en aislamiento. Verificación: el conjunto de nombres fallidos coincide con el de partida.
+- [ ] 7.2 Actualizar `Documentos/modelo-de-datos.md` con las dos entidades, sus campos con el motivo de cada decisión, sus índices, sus reglas de borrado, **la tabla comparativa frente a `Collection`** y la advertencia de que `CreatedAt` de un miembro no es la fecha de alta en la familia. Verificación: la sección sigue el formato de `### ProductAiProfile`.
+- [ ] 7.3 Actualizar `Documentos/epicas.md` (EP13), `openspec/project.md` (*Key Entities* y la regla de negocio *un producto pertenece como máximo a una familia*) y `backend/README.md` (los cinco endpoints y la matriz de autorización). Verificación: ninguna de las tres menciona familias antes del cambio y las tres lo hacen después.
+- [ ] 7.4 Registrar en el **§0 del plan de changes** las cuatro desviaciones de la ficha: zona real de cinco carpetas y no tres; la reserva del almacenamiento de aprobación para C18, que no tiene turno de migración; que este change lleva `design.md` pese a no estar en la lista del §7; y **las dos obligaciones que quedan adjudicadas a C12** —un producto que sale de una familia pierde su fila y el cursor `since` no lo ve, y renombrar una familia obliga a reindexar a todos sus miembros. Verificación: la entrada del §0 tiene fecha y motivo, como las de C04, C05 y C08.
+- [ ] 7.5 Comprobar que `ai-service/openapi.json` **no ha cambiado** y que ninguna spec viva se ha modificado: este change no cruza la frontera. Verificación: `git diff --stat` no toca `ai-service/` ni `openspec/specs/`.
+- [ ] 7.6 Ejecutar **`openspec validate --all --strict`** y comprobar que reporta `0 failed`. La forma desnuda no valida nada y sale con 1: no cuenta como paso.
