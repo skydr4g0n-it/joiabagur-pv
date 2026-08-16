@@ -93,6 +93,14 @@ Se añade un **cortocircuito de no-operación**: si la lista pedida es idéntica
 
 **Seguro previsto.** Si los tests de reordenado e intercambio de etiquetas fallaran, se escalona la escritura en una transacción explícita con `IUnitOfWork.BeginTransactionAsync()`: borrar y guardar, insertar y guardar, confirmar. **Lo decide el test, no la suposición**; meter la transacción de forma preventiva es complejidad sin evidencia.
 
+> **Lo que pasó al implementarlo (2026-08-17).** Los tests de reordenado fallaron, se escalonó la escritura — y **siguieron fallando**, porque el culpable era otro. Una vez corregido (ver más abajo), se midieron las dos variantes: escalonada y de un solo `SaveChanges`, **ambas en verde**. El escalonado se retiró por no comprar nada. La predicción de arriba sobre el orden de comandos era correcta.
+>
+> **El fallo real, que esta decisión no anticipaba.** `BaseEntity` asigna el `Guid` en el constructor. Un miembro nuevo **añadido a la colección de navegación** de una familia rastreada llega al change tracker con clave no vacía, se toma por una fila que ya existe, y la escritura sale como `UPDATE` contra nada: `DbUpdateConcurrencyException`, *«se esperaba afectar a 1 fila, se afectaron 0»*. Solo se manifiesta cuando una misma petición **borra e inserta a la vez** —reordenar, intercambiar etiquetas—; añadir o quitar por separado funciona, que es lo que lo hace tan fácil de no ver.
+>
+> **La corrección** es declarar altas y bajas **explícitamente** por el repositorio (`AddMembersAsync` / `RemoveMembersAsync`) en lugar de mutar `family.Members`. Y hay un segundo fallo de la misma familia, corregido por el camino: ordenar los miembros cargados y **reasignar** la propiedad de navegación de una entidad rastreada la desengancha del change tracker — la ordenación va dentro del `Include`.
+>
+> **Aviso para C18, C19 y C29**, que van a mover colecciones hijas por el mismo camino: con claves asignadas en cliente, *«añadir a la colección»* no significa *«insertar»*. Queda también en el §0 del plan de changes.
+
 ### 5 · La etiqueta de variante es opcional y única dentro de la familia
 
 Un miembro sin etiqueta todavía es un estado real: el §7.4 contempla el aviso *«falta la talla»* y `ai.product_document.variant_label` es nulable. Dos «M» en la misma familia, en cambio, son un defecto. En PostgreSQL los `NULL` **no colisionan entre sí**, así que un único índice `UNIQUE (ProductFamilyId, VariantLabel)` da las dos cosas sin necesidad de filtro parcial.
@@ -167,7 +175,8 @@ sequenceDiagram
 | Riesgo | Mitigación |
 |---|---|
 | Un producto acaba en dos familias y el índice guarda documentos incoherentes | Índice único en la base, afirmado contra el catálogo de PostgreSQL, más comprobación previa para el mensaje accionable y traducción del `23505` concurrente |
-| Reordenar choca contra la unicidad de orden o de etiqueta durante la escritura | Estrategia de borrar e insertar, que produce un grafo acíclico; dos tests que ejercen el intercambio de posiciones y de etiquetas. Si fallaran, se escalona la escritura en transacción explícita |
+| Reordenar choca contra la unicidad de orden o de etiqueta durante la escritura | **Riesgo no materializado.** El change tracker ordena los borrados por delante de las altas que reutilizan una posición o una etiqueta, y se midió: un solo `SaveChanges` basta. El escalonado en transacción se implementó y se retiró |
+| Las altas de miembros salen como `UPDATE` contra filas inexistentes | **Riesgo real, encontrado al implementar** y no previsto aquí. Con la clave asignada en el constructor, un miembro añadido por la colección de navegación se toma por una fila existente. Mitigado declarando altas y bajas explícitamente por el repositorio, y cubierto por los dos tests de reordenado e intercambio |
 | La fecha de creación de un miembro se lee como fecha de alta en la familia | Se declara en `modelo-de-datos.md` y en el ticket. El historial de pertenencia sería una tabla de auditoría, fuera de alcance |
 | C18 descubre que necesita una columna y abre una séptima migración en la Ola 3 | Reserva de `Origin`, `ApprovedByUserId` y `ApprovedAt` |
 | **Un producto que sale de una familia nunca se reindexa** y conserva la familia antigua en el índice para siempre | **No se mitiga aquí, a propósito.** Requeriría borrado lógico y una columna más para un mecanismo que el §6.3 ya diseña en otro sitio: la invalidación que .NET empuja cuando cambia una familia. **Queda adjudicado a C12 por escrito** en el §0 del plan |

@@ -4,8 +4,11 @@ using FluentAssertions;
 using JoiabagurPV.Application.DTOs.Auth;
 using JoiabagurPV.Application.DTOs.Products;
 using JoiabagurPV.Domain.Entities;
+using JoiabagurPV.Domain.Interfaces.Repositories;
 using JoiabagurPV.Infrastructure.Data;
+using JoiabagurPV.Infrastructure.Data.Repositories;
 using JoiabagurPV.Tests.TestHelpers.Mothers;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -112,6 +115,91 @@ public class ProductFamiliesControllerTests : IAsyncLifetime
         family.Members.Select(member => member.VariantLabel).Should().Equal(["S", "M", "L"]);
         family.Members.Select(member => member.Sku).Should().Equal(["ERIZO-S", "ERIZO-M", "ERIZO-L"],
             "a sibling carries enough of its product to be identified without a second call");
+    }
+
+    /// <summary>
+    /// «Editable» is the word that justifies this entity existing at all: the generated text key it
+    /// replaced could not be corrected by an administrator, and re-running the enrichment overwrote
+    /// any attempt. Correcting a family must therefore work, and must not disturb its membership.
+    /// </summary>
+    [Fact]
+    public async Task UpdateFamily_ChangesNameAndDescription_LeavesMembersUntouched()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var familyId = await CreateFamilyAsync(admin, ("S", _small), ("M", _medium));
+
+        var response = await admin.PutAsJsonAsync(
+            $"{Endpoint}/{familyId}",
+            new UpdateProductFamilyRequest
+            {
+                Name = "Anillo erizo de mar (corregido)",
+                Description = "Tres tallas de la misma pieza"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var family = await response.Content.ReadFromJsonAsync<ProductFamilyDto>();
+        family!.Name.Should().Be("Anillo erizo de mar (corregido)");
+        family.Description.Should().Be("Tres tallas de la misma pieza");
+        family.Members.Select(member => member.ProductId).Should().Equal([_small.Id, _medium.Id],
+            "correcting the name is not a membership operation and must leave the members alone");
+    }
+
+    [Fact]
+    public async Task UpdateFamily_WhenFamilyDoesNotExist_Returns404()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+
+        var response = await admin.PutAsJsonAsync(
+            $"{Endpoint}/{Guid.NewGuid()}",
+            new UpdateProductFamilyRequest { Name = "Familia inexistente" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task GetFamilyById_WhenFamilyDoesNotExist_Returns404()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+
+        var response = await admin.GetAsync($"{Endpoint}/{Guid.NewGuid()}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    /// <summary>
+    /// Two families are allowed to share a name, and that is a decision rather than an oversight:
+    /// requiring uniqueness would force the assisted flow to invent disambiguating suffixes when
+    /// approving hundreds of suggestions, which is the generated-key failure this entity removed.
+    /// </summary>
+    /// <remarks>
+    /// Asserted explicitly even though the other tests happen to create families sharing a name.
+    /// Coverage by accident is not coverage: changing a helper would make it disappear silently.
+    /// </remarks>
+    [Fact]
+    public async Task CreateFamily_WithNameUsedByAnotherFamily_Succeeds()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+
+        var first = await admin.PostAsJsonAsync(Endpoint, new CreateProductFamilyRequest
+        {
+            Name = "Anillo erizo de mar",
+            Members = [new ProductFamilyMemberRequest { ProductId = _small.Id, VariantLabel = "S" }]
+        });
+        first.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var second = await admin.PostAsJsonAsync(Endpoint, new CreateProductFamilyRequest
+        {
+            Name = "Anillo erizo de mar",
+            Members = [new ProductFamilyMemberRequest { ProductId = _medium.Id, VariantLabel = "S" }]
+        });
+
+        second.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await context.ProductFamilies.CountAsync(family => family.Name == "Anillo erizo de mar"))
+            .Should().Be(2);
     }
 
     // ── Single membership ─────────────────────────────────────────────────────────────────────
@@ -267,6 +355,31 @@ public class ProductFamiliesControllerTests : IAsyncLifetime
         family.Members.Should().OnlyContain(member => member.VariantLabel == null);
     }
 
+    /// <summary>
+    /// The uniqueness of a variant label is scoped to its family, not global.
+    /// </summary>
+    /// <remarks>
+    /// Worth its own test because the mistake it catches is invisible otherwise: declared over
+    /// <c>VariantLabel</c> alone instead of over family and label, the index still exists, every
+    /// other test in this class still passes, and the catalogue as a whole ends up allowing exactly
+    /// one "M".
+    /// </remarks>
+    [Fact]
+    public async Task ReplaceMembers_WithLabelUsedInAnotherFamily_Succeeds()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        await CreateFamilyAsync(admin, ("S", _small));
+        var second = await CreateFamilyAsync(admin, ("única", _loner));
+
+        var response = await ReplaceMembersAsync(admin, second, ("única", _loner), ("S", _medium));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK,
+            "\"S\" is already used in another family, and that is none of this family's business");
+
+        var family = await response.Content.ReadFromJsonAsync<ProductFamilyDto>();
+        family!.Members.Select(member => member.VariantLabel).Should().Equal(["única", "S"]);
+    }
+
     [Fact]
     public async Task ReplaceMembers_WithDuplicateVariantLabel_ReturnsBadRequest()
     {
@@ -354,6 +467,62 @@ public class ProductFamiliesControllerTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// The spec restricts creating <em>and modifying</em>, so both halves are asserted. The two
+    /// PUTs carry the same attribute as the POST, but an attribute nobody exercises is a claim, not
+    /// a guarantee — and it is one line away from being deleted by accident.
+    /// </summary>
+    [Fact]
+    public async Task UpdateFamily_AsOperator_Returns403()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var familyId = await CreateFamilyAsync(admin, ("S", _small));
+
+        var operatorClient = await AuthenticateAsync("familyoperator", "Test123!");
+
+        var response = await operatorClient.PutAsJsonAsync(
+            $"{Endpoint}/{familyId}",
+            new UpdateProductFamilyRequest { Name = "Renombrada por el operador" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        await AssertFamilyNameAsync(familyId, "Anillo erizo de mar");
+    }
+
+    [Fact]
+    public async Task ReplaceMembers_AsOperator_Returns403()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var familyId = await CreateFamilyAsync(admin, ("S", _small));
+
+        var operatorClient = await AuthenticateAsync("familyoperator", "Test123!");
+
+        var response = await ReplaceMembersAsync(operatorClient, familyId, ("M", _medium));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        await AssertMembershipAsync(_small.Id, familyId);
+        await AssertNoMembershipAsync(_medium.Id);
+    }
+
+    /// <summary>
+    /// The spec says "any family endpoint", so the membership route is asserted too. Fresh clients
+    /// on purpose: the one this class holds carries the cookies of its logins.
+    /// </summary>
+    [Fact]
+    public async Task ReplaceMembers_Unauthenticated_Returns401()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var familyId = await CreateFamilyAsync(admin, ("S", _small));
+
+        var anonymous = _factory.CreateClient();
+
+        var response = await anonymous.PutAsJsonAsync(
+            $"{Endpoint}/{familyId}/members",
+            new ReplaceFamilyMembersRequest { Members = [] });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        await AssertMembershipAsync(_small.Id, familyId);
+    }
+
+    /// <summary>
     /// Reading is open to any authenticated user and is not filtered by point of sale: which
     /// variants exist is a fact about the catalogue, not about where stock happens to sit. The
     /// operator here has no inventory at all, and still sees every sibling.
@@ -373,6 +542,83 @@ public class ProductFamiliesControllerTests : IAsyncLifetime
         var family = await response.Content.ReadFromJsonAsync<ProductFamilyDto>();
         family!.Members.Should().HaveCount(3,
             "the sibling list an operator sees is the same one an administrator sees");
+    }
+
+    /// <summary>
+    /// The guard that reports a useful conflict reads before it writes, so two administrators can
+    /// slip between the two. The unique index is what actually holds the invariant; this asserts
+    /// that when it fires, the caller still gets a conflict rather than a 500.
+    /// </summary>
+    /// <remarks>
+    /// The window is opened deterministically by blinding the guard's first read, which is the only
+    /// honest way to test it: racing two real requests would pass or fail by timing. The second read
+    /// — the one that builds the conflict detail after the violation — is left intact, which is what
+    /// lets the response still name the family that won.
+    /// </remarks>
+    [Fact]
+    public async Task ReplaceMembers_WhenAnotherWriterWinsTheRace_ReturnsConflictInsteadOfServerError()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var winner = await CreateFamilyAsync(admin, ("S", _small));
+        var loser = await CreateFamilyAsync(admin, ("única", _loner));
+
+        using var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services => services.AddScoped<IProductFamilyRepository>(
+                provider => new RaceBlindFamilyRepository(
+                    new ProductFamilyRepository(provider.GetRequiredService<ApplicationDbContext>())))));
+
+        var blindAdmin = await AuthenticateAgainstAsync(factory, "admin", "Admin123!");
+
+        var response = await blindAdmin.PutAsJsonAsync(
+            $"{Endpoint}/{loser}/members",
+            new ReplaceFamilyMembersRequest
+            {
+                Members = [new ProductFamilyMemberRequest { ProductId = _small.Id, VariantLabel = "S" }]
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict,
+            "a lost race over a membership is an ordinary conflict, not an unhandled failure");
+
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain(_small.Id.ToString());
+        body.Should().Contain(winner.ToString(), "the response still names the family that won");
+
+        await AssertMembershipAsync(_small.Id, winner);
+    }
+
+    /// <summary>
+    /// Delegates everything to the real repository, except that it lets the membership guard look
+    /// exactly once and see nothing — the state a writer is in when somebody else commits first.
+    /// </summary>
+    private sealed class RaceBlindFamilyRepository : IProductFamilyRepository
+    {
+        private readonly IProductFamilyRepository _inner;
+        private bool _blinded;
+
+        public RaceBlindFamilyRepository(IProductFamilyRepository inner) => _inner = inner;
+
+        public Task<List<ProductFamilyMember>> GetMembershipsInOtherFamiliesAsync(
+            IEnumerable<Guid> productIds, Guid excludingFamilyId)
+        {
+            if (!_blinded)
+            {
+                _blinded = true;
+                return Task.FromResult(new List<ProductFamilyMember>());
+            }
+
+            return _inner.GetMembershipsInOtherFamiliesAsync(productIds, excludingFamilyId);
+        }
+
+        public Task<ProductFamily?> GetWithMembersAsync(Guid id) => _inner.GetWithMembersAsync(id);
+        public Task<ProductFamily?> GetByProductIdAsync(Guid productId) => _inner.GetByProductIdAsync(productId);
+        public Task RemoveMembersAsync(IEnumerable<ProductFamilyMember> members) => _inner.RemoveMembersAsync(members);
+        public Task AddMembersAsync(IEnumerable<ProductFamilyMember> members) => _inner.AddMembersAsync(members);
+        public IQueryable<ProductFamily> GetAll() => _inner.GetAll();
+        public Task<ProductFamily?> GetByIdAsync(Guid id) => _inner.GetByIdAsync(id);
+        public Task<ProductFamily> AddAsync(ProductFamily entity) => _inner.AddAsync(entity);
+        public Task<ProductFamily> UpdateAsync(ProductFamily entity) => _inner.UpdateAsync(entity);
+        public Task<bool> DeleteAsync(Guid id) => _inner.DeleteAsync(id);
+        public Task<bool> ExistsAsync(Guid id) => _inner.ExistsAsync(id);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────────────────────
@@ -438,6 +684,36 @@ public class ProductFamiliesControllerTests : IAsyncLifetime
 
         membership.Should().NotBeNull();
         membership!.ProductFamilyId.Should().Be(expectedFamilyId);
+    }
+
+    private async Task AssertFamilyNameAsync(Guid familyId, string expectedName)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var family = await context.ProductFamilies.SingleAsync(f => f.Id == familyId);
+        family.Name.Should().Be(expectedName, "a rejected write must leave the family as it was");
+    }
+
+    private static async Task<HttpClient> AuthenticateAgainstAsync(
+        WebApplicationFactory<Program> factory, string username, string password)
+    {
+        var login = await factory.CreateClient().PostAsJsonAsync(
+            "/api/auth/login",
+            new LoginRequest { Username = username, Password = password });
+        login.EnsureSuccessStatusCode();
+
+        var authenticated = factory.CreateClient();
+        foreach (var cookie in login.Headers.GetValues("Set-Cookie"))
+        {
+            var parts = cookie.Split(';')[0].Split('=');
+            if (parts.Length == 2)
+            {
+                authenticated.DefaultRequestHeaders.Add("Cookie", $"{parts[0]}={parts[1]}");
+            }
+        }
+
+        return authenticated;
     }
 
     private async Task AssertNoMembershipAsync(Guid productId)

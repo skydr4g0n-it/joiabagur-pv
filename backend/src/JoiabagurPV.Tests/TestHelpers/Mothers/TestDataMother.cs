@@ -69,70 +69,16 @@ public class TestDataMother : IDisposable
     /// </summary>
     public ProductPhotoEmbeddingMother ProductPhotoEmbedding() => new(_context);
 
-    /// <summary>
-    /// Creates a new ProductFamilyMother for building ProductFamily entities with their members.
-    /// </summary>
-    public ProductFamilyMother ProductFamily() => new(_context);
+    // There is deliberately no mother for ProductFamily. The mothers here build the fixtures
+    // *around* the subject of a test — points of sale, products, users — while the subject itself
+    // is built through its own endpoints, which keeps the arrangement honest: a state the API
+    // refuses to create is not a state worth testing against. The AI profile change made the same
+    // call and for the same reason. When a change needs a pre-existing family that no endpoint can
+    // produce, it can add one in a handful of lines, knowing what it actually needs.
 
     public void Dispose()
     {
         _scope.Dispose();
-    }
-}
-
-/// <summary>
-/// Mother Object for creating ProductFamily entities together with their members.
-/// </summary>
-/// <remarks>
-/// Members are added through <see cref="WithMember"/> so their position comes from the order they
-/// were declared, exactly as the service derives it. A test that wants to assert ordering must not
-/// be the place where the ordering is invented.
-/// </remarks>
-public class ProductFamilyMother
-{
-    private readonly ApplicationDbContext _context;
-    private readonly ProductFamily _family;
-    private readonly List<ProductFamilyMember> _members = [];
-
-    public ProductFamilyMother(ApplicationDbContext context)
-    {
-        _context = context;
-        _family = new ProductFamily { Name = "Familia de prueba" };
-    }
-
-    public ProductFamilyMother WithName(string name) { _family.Name = name; return this; }
-
-    public ProductFamilyMother WithDescription(string description)
-    {
-        _family.Description = description;
-        return this;
-    }
-
-    /// <summary>
-    /// Adds a member at the next free position, with an optional variant label.
-    /// </summary>
-    public ProductFamilyMother WithMember(Guid productId, string? variantLabel = null)
-    {
-        _members.Add(new ProductFamilyMember
-        {
-            ProductId = productId,
-            VariantLabel = variantLabel,
-            SortOrder = _members.Count
-        });
-
-        return this;
-    }
-
-    public async Task<ProductFamily> CreateAsync()
-    {
-        foreach (var member in _members)
-        {
-            _family.Members.Add(member);
-        }
-
-        _context.ProductFamilies.Add(_family);
-        await _context.SaveChangesAsync();
-        return _family;
     }
 }
 
