@@ -69,6 +69,13 @@ public class TestDataMother : IDisposable
     /// </summary>
     public ProductPhotoEmbeddingMother ProductPhotoEmbedding() => new(_context);
 
+    // There is deliberately no mother for ProductFamily. The mothers here build the fixtures
+    // *around* the subject of a test — points of sale, products, users — while the subject itself
+    // is built through its own endpoints, which keeps the arrangement honest: a state the API
+    // refuses to create is not a state worth testing against. The AI profile change made the same
+    // call and for the same reason. When a change needs a pre-existing family that no endpoint can
+    // produce, it can add one in a handful of lines, knowing what it actually needs.
+
     public void Dispose()
     {
         _scope.Dispose();

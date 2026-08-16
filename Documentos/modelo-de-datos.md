@@ -518,6 +518,40 @@ Atributos del producto propuestos por IA, con **la procedencia y la confianza de
 
 ---
 
+### ProductFamily / ProductFamilyMember (Familias de Producto y sus Variantes)
+
+Agrupación de los productos que son **la misma pieza en varias variantes** —el mismo anillo en tallas S, M y L—, como entidad de negocio editable. Añadidas por el change C07 (`add-product-family-entity`, EP13). Sustituyen a `VariantGroupKey`, la clave textual que las especificaciones v2 guardaban dentro del perfil de IA: se rompía por un guion («anillo-erizo-mar» vs «anillo-erizo-de-mar») y dejaba de agrupar justo donde el aviso importaba, no la podía corregir un administrador —y si la corregía, el siguiente enriquecimiento la machacaba—, y sin identidad propia no había contra qué comparar para detectar productos huérfanos.
+
+**Familia no es lo mismo que colección**, y confundirlas es el error de lectura más probable de este modelo:
+
+| | `Collection` | `ProductFamily` |
+|---|---|---|
+| Qué agrupa | Criterio editorial («Verano 2024») | La misma pieza en varias variantes |
+| Cardinalidad | Un producto, 0..1 colección, entre muchas sin relación entre sí | Un producto, **0..1 familia**, excluyente |
+| Quién la mantiene | El catálogo, desde el MVP | C07 a mano, C18 con propuesta asistida |
+| Para qué sirve aguas abajo | Filtro y agrupación comercial | **Desambiguación de variantes en la venta** |
+
+**Campos Clave de `ProductFamily`:**
+- `Name`: `varchar(200)`, espejo de `Product.Name`. **Deliberadamente no único**: dos familias pueden llamarse igual, y forzar unicidad obligaría a C18 a inventar sufijos desambiguadores al aprobar ~350 familias por lotes — que es el problema de la clave generada que estas entidades vinieron a eliminar
+- `Description`: `text` nulable
+- `Origin`: `Manual = 1` | `AiApproved = 2`, almacenado como `integer` y **nunca como `ENUM` de PostgreSQL** — un tipo enumerado sobrevive al borrado de su tabla y rompe la siguiente migración
+- `ApprovedByUserId`, `ApprovedAt`: nulables, **sin uso en C07**. Los escribe C18 al aprobar una sugerencia. Existen desde la primera migración porque C18 no tiene turno de migración propio y el plan cuenta seis; es la misma reserva que C08 hizo para las métricas de C28
+
+**Campos Clave de `ProductFamilyMember`:**
+- `ProductId`: `uuid` con índice **único global**. Es la garantía de que *un producto pertenece como máximo a una familia*, y está en la base y no en el servicio: una comprobación aplicativa deja abierta la carrera entre dos administradores y, peor, un segundo miembro **no da ningún error** — se descubriría como dos `family_id` emitidos para un mismo producto y documentos incoherentes en el índice vectorial
+- `VariantLabel`: `varchar(50)` **nulable**, único dentro de la familia. Nulable porque un miembro cuya talla aún no se conoce es un estado legítimo que los avisos por reglas deben reportar, no un defecto que bloquee; único porque dos «M» en la misma familia anulan el sentido de tenerla. En PostgreSQL los nulos no colisionan entre sí, así que un solo índice da las dos cosas
+- `SortOrder`: `integer`, único dentro de la familia. Se deriva de la posición en la lista declarada, nunca lo envía el cliente, lo que hace imposibles los huecos y los duplicados. Único de todas formas: dos miembros con la misma posición devuelven los hermanos en un orden que cambia entre lecturas, y un orden no determinista en una pantalla de desambiguación es peor que no tener orden
+- `CreatedAt`: **no significa «cuándo entró el producto en la familia»** sino cuándo se escribió la lista por última vez. La pertenencia se declara como lista completa y se persiste borrando todas las filas e insertando el conjunto nuevo; nada referencia el `Id` de un miembro, así que esa reescritura no cuesta nada, pero la fecha no es de alta. Si algún día hace falta historial de pertenencia, es una tabla de auditoría, no un retoque de esta
+
+**Optimizaciones:**
+- Tres índices **únicos**: `ProductId` global, `(ProductFamilyId, SortOrder)` y `(ProductFamilyId, VariantLabel)`. Los tres defienden invariantes que sin ellos fallan **sin producir ningún error**
+- Índice sobre `Name` para el listado y la búsqueda de la pantalla de C18
+- Índices sobre `UpdatedAt` en ambas tablas, para el cursor `since` del feed de indexación de C12. Con ~350 familias ninguno mejora una latencia medible: existen porque añadirlos después cuesta uno de los seis turnos de migración y tenerlos no cuesta nada
+- **`CASCADE` de familia a miembros** —no tienen vida propia: son la familia— y **`RESTRICT` hacia `Product` y hacia `User`**. El valor por defecto del framework para una relación requerida es `CASCADE`, que hacia el producto significaría que borrarlo destruye la curación; además `Product` se desactiva con `IsActive` en lugar de borrarse
+- **Sin propiedad de navegación desde `Product`**: el catálogo no gana ninguna columna ni ninguna colección, y no se puede llegar a las familias recorriéndolo por accidente
+
+---
+
 ### PaymentMethod (Métodos de Pago)
 
 Lista general de métodos de pago disponibles en el sistema.

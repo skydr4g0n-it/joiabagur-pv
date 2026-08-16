@@ -187,6 +187,21 @@ Sobre los dos primeros conviene una precisión que ahorra tests engañosos. Al p
 > completo, con el caso concreto de tres nombres que parecían regresión y no lo eran, está en
 > `openspec/changes/archive/2026-08-16-add-product-ai-profile-entity/qa.md` §1.1.
 
+> **Actualización del 2026-08-17, sobre `c07-add-product-family-entity`.** La suite tiene ahora
+> **771 tests** y **44 fallos**. La línea base de ese change, medida antes de escribir una línea de
+> código, dio **729 y 49** — dentro de la banda que registró C08.
+>
+> Esta tercera medición aporta la confirmación que a la anterior le faltaba. Se ejecutó la suite
+> completa dos veces sobre la misma rama, con la única diferencia de que entre una y otra el código
+> **solo ganó tests**: la primera pasada trajo **tres** nombres nuevos y la segunda **uno distinto**,
+> con los conjuntos **disjuntos** y los cuatro verdes al ejecutarlos en aislamiento. Un fallo real no
+> desaparece solo. Eso convierte la no determinación del conjunto de fallos de sospecha razonable en
+> hecho comprobado, y cierra la pregunta de si comparar recuentos podría servir «al menos para ver
+> la tendencia»: no sirve.
+>
+> El procedimiento y el detalle de las dos pasadas están en
+> `openspec/changes/archive/2026-08-17-add-product-family-entity/qa.md` §1.1.
+
 ### Por qué se acumularon sin que nadie los viera
 
 Los dos árboles se comportan de forma muy distinta, y esa es la clave:

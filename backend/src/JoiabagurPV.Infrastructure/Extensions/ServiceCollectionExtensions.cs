@@ -83,6 +83,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IProductComponentAssignmentRepository, ProductComponentAssignmentRepository>();
         services.AddScoped<IComponentTemplateRepository, ComponentTemplateRepository>();
 
+        // Register product family repositories (EP13)
+        services.AddScoped<IProductFamilyRepository, ProductFamilyRepository>();
+
         // Register unit of work
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 

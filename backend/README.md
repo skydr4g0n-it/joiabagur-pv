@@ -198,9 +198,44 @@ The system has two roles:
 | `GET /api/inventory/import-template` | ✅ | ❌ |
 | `POST /api/ai/search-events/{id}/selection` | ✅** | ✅** |
 | `POST /api/ai/catalog/enrich-batch` | ✅ | ❌ |
+| `POST /api/product-families` | ✅ | ❌ |
+| `GET /api/product-families/{id}` | ✅ | ✅ |
+| `PUT /api/product-families/{id}` | ✅ | ❌ |
+| `PUT /api/product-families/{id}/members` | ✅ | ❌ |
+| `GET /api/products/{id}/family` | ✅ | ✅ |
 
 *Operators see only their assigned points of sale
 **Ownership, not role: only the operator who ran that search may record its selection
+
+### Product families
+
+Variants of one piece — the same ring in sizes S, M and L — grouped as an editable business entity.
+Writing is administrator-only, like the rest of catalogue administration. **Reading is open to any
+authenticated user and is not filtered by point of sale**: which variants exist is a fact about the
+catalogue, not about where stock happens to sit, and applying inventory visibility here would make
+the sibling list depend on it.
+
+```jsonc
+// PUT /api/product-families/{id}/members — the complete membership, declared
+{ "members": [ { "productId": "...", "variantLabel": "S" },
+               { "productId": "...", "variantLabel": "M" } ] }
+```
+
+Membership is **declarative, not incremental**. Whatever is absent from the list stops being a
+member, each member's position comes from its place in the list — so gaps and duplicate positions
+cannot be expressed — and an empty list dissolves the family without deleting it. Declaring the list
+a family already has writes nothing, which keeps the indexing feed from being handed a change that
+did not happen.
+
+A product belongs to **at most one family**, enforced by a unique index rather than by a check in
+code. Declaring one that belongs elsewhere returns `409` naming the products that clash and the
+family holding each of them.
+
+`GET /api/products/{id}/family` distinguishes three answers: `404` when there is no such product,
+`204` when the product exists and belongs to no family, and `200` with the family otherwise. The
+middle case is ordinary rather than exceptional — a sizeable share of the catalogue is deliberately
+unfamilied — and collapsing it into the `404` would leave callers unable to tell a quality incidence
+from a bad identifier.
 
 ### Catalog AI enrichment
 

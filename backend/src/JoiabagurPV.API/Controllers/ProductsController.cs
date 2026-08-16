@@ -22,6 +22,7 @@ public class ProductsController : ControllerBase
     private readonly IProductPhotoService _productPhotoService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IQrCodeService _qrCodeService;
+    private readonly IProductFamilyService _productFamilyService;
     private readonly IValidator<CreateProductRequest> _createValidator;
     private readonly IValidator<UpdateProductRequest> _updateValidator;
     private readonly ILogger<ProductsController> _logger;
@@ -32,6 +33,7 @@ public class ProductsController : ControllerBase
         IProductPhotoService productPhotoService,
         ICurrentUserService currentUserService,
         IQrCodeService qrCodeService,
+        IProductFamilyService productFamilyService,
         IValidator<CreateProductRequest> createValidator,
         IValidator<UpdateProductRequest> updateValidator,
         ILogger<ProductsController> logger)
@@ -41,9 +43,36 @@ public class ProductsController : ControllerBase
         _productPhotoService = productPhotoService;
         _currentUserService = currentUserService;
         _qrCodeService = qrCodeService;
+        _productFamilyService = productFamilyService;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Gets the family a product belongs to, with every sibling variant in order.
+    /// </summary>
+    /// <remarks>
+    /// An orphan product and a product that does not exist are different answers, and both are
+    /// ordinary: roughly one in seven products belongs to no family by design. 204 says "this
+    /// product exists and has no family", 404 says "there is no such product" — collapsing the two
+    /// would leave callers unable to tell a quality incidence from a bad identifier.
+    /// <para>
+    /// Open to any authenticated user and not filtered by point of sale: which variants exist is a
+    /// fact about the catalogue, not about where stock happens to sit.
+    /// </para>
+    /// </remarks>
+    [HttpGet("{productId:guid}/family")]
+    [ProducesResponseType(typeof(ProductFamilyDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetFamily(Guid productId)
+    {
+        // A missing product surfaces as KeyNotFoundException, which the middleware turns into 404.
+        var family = await _productFamilyService.GetByProductIdAsync(productId);
+
+        return family is null ? NoContent() : Ok(family);
     }
 
     /// <summary>

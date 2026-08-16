@@ -87,6 +87,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IProfileReviewPolicy, ProfileReviewPolicy>();
         services.AddScoped<IProductAiProfileService, ProductAiProfileService>();
 
+        // Register product families (EP13)
+        services.AddScoped<IProductFamilyService, ProductFamilyService>();
+
         // Register background services
         services.AddHostedService<ModelTrainingBackgroundService>();
 

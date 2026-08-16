@@ -143,6 +143,16 @@ public class ApplicationDbContext : DbContext
     public DbSet<ProductAiProfile> ProductAiProfiles { get; set; }
 
     /// <summary>
+    /// Gets or sets the ProductFamilies DbSet.
+    /// </summary>
+    public DbSet<ProductFamily> ProductFamilies { get; set; }
+
+    /// <summary>
+    /// Gets or sets the ProductFamilyMembers DbSet.
+    /// </summary>
+    public DbSet<ProductFamilyMember> ProductFamilyMembers { get; set; }
+
+    /// <summary>
     /// Configures the model that was discovered by convention from the entity types
     /// exposed in Microsoft.EntityFrameworkCore.DbSet`1 properties on your derived context.
     /// </summary>
