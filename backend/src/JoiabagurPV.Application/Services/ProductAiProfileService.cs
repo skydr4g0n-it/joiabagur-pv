@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Text.Json;
 using JoiabagurPV.Application.DTOs.Ai;
 using JoiabagurPV.Application.Interfaces;
@@ -95,7 +96,7 @@ public class ProductAiProfileService : IProductAiProfileService
                 requested.Count,
                 skippedUnchanged);
 
-            return new EnrichBatchResponse(requested.Count, 0, skippedUnchanged, 0, results);
+            return new EnrichBatchResponse(requested.Count, 0, skippedUnchanged, 0, 0, results);
         }
 
         var batch = await RequestProposalsAsync(pendingProducts, userId, role, cancellationToken);
@@ -140,20 +141,89 @@ public class ProductAiProfileService : IProductAiProfileService
                 outcome.FieldsPendingReview));
         }
 
-        await _unitOfWork.SaveChangesAsync();
+        var skippedConcurrent = await SaveToleratingConcurrentInsertsAsync();
+        enriched -= skippedConcurrent;
 
-        var failed = pendingProducts.Count - enriched;
+        var failed = pendingProducts.Count - enriched - skippedConcurrent;
 
         _logger.LogInformation(
-            "enrich_batch_completed {Requested} {Enriched} {SkippedUnchanged} {Failed} {ReviewMode}",
+            "enrich_batch_completed {Requested} {Enriched} {SkippedUnchanged} {SkippedConcurrent} {Failed} {ReviewMode}",
             requested.Count,
             enriched,
             skippedUnchanged,
+            skippedConcurrent,
             failed,
             request.ReviewMode);
 
-        return new EnrichBatchResponse(requested.Count, enriched, skippedUnchanged, failed, results);
+        return new EnrichBatchResponse(
+            requested.Count, enriched, skippedUnchanged, skippedConcurrent, failed, results);
     }
+
+    /// <summary>
+    /// PostgreSQL's SQLSTATE for a unique-constraint violation.
+    /// </summary>
+    private const string UniqueViolationSqlState = "23505";
+
+    /// <summary>
+    /// Persists the batch, treating a lost race for a product as an outcome rather than a fault.
+    /// </summary>
+    /// <returns>How many products another batch had already enriched.</returns>
+    /// <remarks>
+    /// <para>
+    /// The window this closes is wide, not narrow. Between reading which products already have a
+    /// profile and writing the new ones sits the call to the extraction model, which takes
+    /// seconds. Two administrators enriching overlapping batches is an ordinary Tuesday, not a
+    /// pathological interleaving.
+    /// </para>
+    /// <para>
+    /// Letting the violation escape would contradict this very method: a product the extractor
+    /// returned nothing for is already counted and the other forty-nine proceed, so a race over
+    /// one row must not be the thing that discards the batch. The losing rows are detached and
+    /// the rest saved — the failed attempt rolls its transaction back, so nothing was written
+    /// and everything is still pending.
+    /// </para>
+    /// </remarks>
+    private async Task<int> SaveToleratingConcurrentInsertsAsync()
+    {
+        try
+        {
+            await _unitOfWork.SaveChangesAsync();
+            return 0;
+        }
+        catch (DbUpdateException exception) when (IsUniqueViolation(exception) && exception.Entries.Count > 0)
+        {
+            var lost = exception.Entries
+                .Select(entry => entry.Entity)
+                .OfType<ProductAiProfile>()
+                .Select(profile => profile.ProductId)
+                .ToList();
+
+            foreach (var entry in exception.Entries)
+            {
+                entry.State = EntityState.Detached;
+            }
+
+            _logger.LogInformation(
+                "enrich_batch_lost_race {ProductIds}",
+                string.Join(",", lost));
+
+            await _unitOfWork.SaveChangesAsync();
+
+            return lost.Count;
+        }
+    }
+
+    /// <summary>
+    /// Whether a persistence failure is the unique index refusing a duplicate profile.
+    /// </summary>
+    /// <remarks>
+    /// Matched on the SQLSTATE rather than on the message, which the server localises and which
+    /// would make this check depend on the language the database was started in. Read through
+    /// <see cref="DbException.SqlState"/>, a base-library property, so the application layer
+    /// stays free of a reference to the PostgreSQL driver — which belongs to infrastructure.
+    /// </remarks>
+    private static bool IsUniqueViolation(DbUpdateException exception) =>
+        exception.InnerException is DbException { SqlState: UniqueViolationSqlState };
 
     /// <summary>
     /// One batch's proposals plus the provenance of the run that produced them.

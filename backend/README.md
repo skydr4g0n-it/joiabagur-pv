@@ -214,7 +214,7 @@ it rewrites what the catalog claims about a piece, and it spends money on a mode
   "force": false }                       // true re-enriches even when the inputs are unchanged
 
 // Response 200
-{ "requested": 50, "enriched": 47, "skippedUnchanged": 3, "failed": 0,
+{ "requested": 50, "enriched": 47, "skippedUnchanged": 3, "skippedConcurrent": 0, "failed": 0,
   "profiles": [ { "productId": "...", "reviewStatus": "Pending", "fieldsPendingReview": ["piece_type"] } ] }
 ```
 

@@ -7,14 +7,20 @@ The system SHALL persist AI-proposed catalog attributes as a profile bound to ex
 #### Scenario: A second profile for the same product is rejected
 
 - **WHEN** a second profile is persisted for a product that already has one
-- **THEN** the write fails on a uniqueness constraint
+- **THEN** the write fails on the database's uniqueness constraint
 - **AND** the existing profile is left unchanged
 
-#### Scenario: Deleting a product does not cascade into the profile
+#### Scenario: Uniqueness is enforced by the database, not by an application check
 
-- **WHEN** a product that has an AI profile is deleted
-- **THEN** the deletion is restricted by the foreign key
-- **AND** the profile and its review data are not removed
+- **WHEN** the index over the product identifier is read from the database catalog
+- **THEN** it is reported as unique
+- **AND** the guarantee therefore holds for any writer, including one that forgets to check first
+
+#### Scenario: The foreign key to the product does not cascade
+
+- **WHEN** the delete rule of the profile's product foreign key is read from the database catalog
+- **THEN** it is `RESTRICT` rather than the framework's default of `CASCADE`
+- **AND** removing a product therefore cannot silently take the review work with it
 
 ### Requirement: A profile records the provenance and confidence of every field
 
@@ -26,10 +32,11 @@ The profile SHALL store, for each proposed field, the confidence with which it w
 - **THEN** the stored profile exposes a confidence value for each proposed field
 - **AND** it exposes, for each proposed field, whether the value came from a rule or was inferred
 
-#### Scenario: The original proposal survives a correction
+#### Scenario: The raw proposal is stored apart from the values in force
 
-- **WHEN** the value in force of a field is later changed
-- **THEN** the originally proposed value remains retrievable and unchanged
+- **WHEN** a profile is persisted from a proposal
+- **THEN** the raw proposal is retrievable exactly as the AI service returned it
+- **AND** it is held separately from the values in force, so that the two can be compared field by field
 
 #### Scenario: A product can hold several materials at once
 
@@ -111,20 +118,22 @@ The profile SHALL record its review status — pending, approved or rejected —
 - **THEN** the profile is still approved
 - **AND** the per-field confidence and provenance still record that the field would have required review
 
-### Requirement: Human review data is retained for later measurement
+### Requirement: The profile carries the storage that human-review metrics will need
 
-The profile SHALL retain who reviewed it, when, and how long that review took, so that the correction rate per field and the average review time can be computed without further schema changes. The duration MUST be optional, because it is measured by the client and is meaningless for bulk approval, where it MUST be absent rather than fabricated.
+The profile SHALL provide the fields from which the correction rate per field and the average review time can later be computed **without a further migration**: the raw AI proposal held apart from the values in force, the reviewing user, the instant of the review, and its duration. The duration MUST be optional, because it is measured by the client rather than observable by the server, and is meaningless for bulk approval, where it MUST be left absent rather than fabricated.
 
-#### Scenario: A human review records reviewer and instant
+Populating these fields when a person reviews a profile is **outside this capability**. What is required here is that they exist, that they accept absence, and that batch enrichment never leaves a profile claiming a human reviewed it.
 
-- **WHEN** a profile is approved or rejected by a person
-- **THEN** the profile records the reviewing user and the instant of the review
-- **AND** its review origin becomes human
+#### Scenario: Batch enrichment never claims a human review
 
-#### Scenario: Bulk approval records no duration
+- **WHEN** a batch produces or replaces a profile
+- **THEN** its review origin is bulk
+- **AND** no reviewing user, review instant or review duration is recorded on it
 
-- **WHEN** profiles are approved in bulk
-- **THEN** no review duration is recorded for them
+#### Scenario: The review fields accept absence
+
+- **WHEN** the schema of the profile is inspected
+- **THEN** the reviewing user, the review instant and the review duration all accept null
 
 ### Requirement: Batch enrichment is restricted to administrators
 
@@ -178,6 +187,18 @@ When the hash does change, the proposal is new: the profile returns to the routi
 - **THEN** the profile takes the review status the routing policy produces
 - **AND** its review origin returns to bulk
 - **AND** the previous reviewer and review instant are cleared
+
+#### Scenario: A batch that loses a race reports it apart from a failure
+
+- **WHEN** another batch persists a profile for one of these products while this batch is waiting on the AI service
+- **THEN** the batch still succeeds and persists the rest of its profiles
+- **AND** that product is reported as skipped for concurrency, counted separately from failures
+- **AND** the profile the other batch wrote is left intact
+
+> The window here is the call to the extraction model, which takes seconds, so this is an
+> ordinary outcome rather than a pathological interleaving. It is not a failure — the product
+> ended up enriched, just by somebody else — and reporting it as one would send an
+> administrator to re-run a batch chasing a problem that does not exist.
 
 ### Requirement: An unavailable enrichment implementation is reported, never simulated
 

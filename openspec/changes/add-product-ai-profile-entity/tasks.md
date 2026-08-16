@@ -2,6 +2,21 @@
 > liberan el turno de migración de EF Core y desbloquean a C12. Los grupos 4-8 son la segunda mitad,
 > no llevan migración y conviven con el C07 del compañero. Si la sesión se desborda, se corta ahí.
 
+## 0. Correcciones posteriores al verify (2026-08-16)
+
+> El verify encontró que **tres verificaciones declaradas en las tareas 6.3, 7.1 y 8.1 no se
+> habían ejecutado**: marqué los grupos 7 y 8 con un `sed` masivo en lugar de comprobar lo que
+> cada tarea decía. Queda anotado porque el error fue de método, no de código.
+
+- [x] 0.1 Escribir el test del 503 que la tarea 8.1 daba por hecho: `EnrichBatch_WhenAiServiceHasNoImplementation_Returns503AndPersistsNothing` y su gemelo para servicio no disponible, con el gateway sustituido vía `WithWebHostBuilder`. Ambos afirman además que **no se persiste ningún perfil**.
+- [x] 0.2 Escribir los tests de arranque que la tarea 7.1 daba por hecho: `ProfileReviewRegistrationTests`, con umbral fuera de rango en ambos extremos, valores por defecto documentados y lectura desde configuración.
+- [x] 0.3 Ampliar de verdad `AiGatewayRegistrationTests`, como decía la tarea 6.3: el cliente `ai-enrich` se resuelve bajo su propio nombre y su presupuesto sale de configuración; un presupuesto no positivo impide arrancar.
+- [x] 0.4 Reescribir el requisito *«Human review data is retained»* en términos de **disponibilidad de almacenamiento**, que es lo que este change garantiza. Sus escenarios describían un camino de escritura que es de C28, y al archivar habrían dejado la spec viva afirmando comportamiento inexistente.
+- [x] 0.5 **Traducir la carrera de unicidad.** Al analizar si merecía la pena un test de comportamiento sobre el índice único apareció un hueco real: el servicio hacía leer-luego-escribir sin capturar `DbUpdateException`, y **la ventana es la llamada al modelo**, de segundos. Dos lotes solapados producían un 500. Ahora la violación se traduce: se sueltan las filas perdedoras, se guarda el resto y se reportan en un contador propio `skippedConcurrent`. Contradecía al propio método, que ya trata un producto sin propuesta como dato sin tumbar los otros cuarenta y nueve.
+- [x] 0.6 Reformular los escenarios de unicidad y de borrado en cascada, separando el invariante de comportamiento de **dónde se hace cumplir**, y añadir el escenario de la carrera.
+
+---
+
 ## 1. Línea base y andamiaje
 
 - [x] 1.1 Medir la línea base de la suite de .NET **antes de escribir nada** (`git stash push -u` → `dotnet test` → `git stash pop`) y guardar la **lista de nombres** de los tests que ya fallan. `CLAUDE.md` documenta que el recuento es poco fiable porque algunos fallos dependen del orden: la comparación al final será por nombres.

@@ -61,11 +61,20 @@ public record EnrichBatchProfileResult(
 /// <param name="Requested">Products asked for.</param>
 /// <param name="Enriched">Products whose profile was written.</param>
 /// <param name="SkippedUnchanged">Products skipped because their inputs had not changed.</param>
+/// <param name="SkippedConcurrent">
+/// Products another batch enriched while this one was waiting on the model.
+/// </param>
 /// <param name="Failed">Products the service returned no proposal for.</param>
 /// <param name="Profiles">Per-product detail.</param>
+/// <remarks>
+/// A concurrent conflict is counted apart from <paramref name="Failed"/> on purpose. It is not a
+/// failure: the product ended up enriched, just by somebody else. Folding the two together would
+/// send an administrator to re-run a batch chasing a problem that does not exist.
+/// </remarks>
 public record EnrichBatchResponse(
     int Requested,
     int Enriched,
     int SkippedUnchanged,
+    int SkippedConcurrent,
     int Failed,
     IReadOnlyList<EnrichBatchProfileResult> Profiles);
