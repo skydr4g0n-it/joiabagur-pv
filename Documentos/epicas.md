@@ -397,13 +397,15 @@ Construcción del corpus sobre el que opera todo el sistema RAG: perfiles de pro
 Resuelve el caso de negocio crítico: variantes visualmente casi idénticas que provocan errores de venta. La IA propone agrupaciones y el administrador las aprueba, edita o rechaza; la familia resultante es una entidad de negocio editable sin tocar nada de IA.
 
 **Alcance:**
-- Entidades `ProductFamily` y `ProductFamilyMember` en .NET
+- ✅ Entidades `ProductFamily` y `ProductFamilyMember` en .NET, con pertenencia excluyente garantizada por índice único, etiqueta de variante y orden declarados de forma idempotente, y cinco endpoints de administración (C07)
 - Propuesta asistida de familias por similitud de embedding, tipo de pieza y raíz común de nombre
 - Pantalla de revisión y aprobación por lotes (segundo caso de intervención humana del PF)
 - Alerta de huérfanos: productos con similitud alta a una familia a la que no pertenecen
 - Pantalla de revisión de perfiles de IA con métricas de calidad
 
-**Changes asociados:** C07, C18, C28
+**Changes asociados:** C07 (hecho), C18, C28
+
+**Nota de secuencia.** C07 entrega la entidad y su edición manual, no la inteligencia: agrupar ~350 familias a mano es inviable y por eso existe C18. Lo que C07 hace posible es que haya un sitio donde esas familias vivan y se corrijan, y que `Product` no gane ninguna columna en el proceso. C07 reserva además `Origin`, `ApprovedByUserId` y `ApprovedAt` para que C18 —que no tiene turno de migración de EF Core— pueda registrar la aprobación humana sin abrir uno.
 
 ---
 
