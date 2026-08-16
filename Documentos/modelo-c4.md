@@ -207,6 +207,8 @@ Viven en la misma capa de aplicación que los anteriores; se listan aparte porqu
 
 - **Profile Review Policy** (C08): decide, campo a campo, qué necesita mirar una persona. Clase **pura** —sin base de datos, sin HTTP, sin reloj— con sus umbrales en configuración validada al arranque, porque están pensados para recalibrarse contra el golden set de evaluación.
 
+- **Product Family Service** (C07): gestión de las familias de producto y de su pertenencia. La lista de miembros se **declara entera** y el orden sale de la posición en ella, de modo que huecos y órdenes duplicados no se pueden expresar; declarar la lista que la familia ya tiene no escribe nada. La exclusión —un producto en una familia como máximo— la garantiza un índice único de la base, no una comprobación del servicio.
+
 - **AI Gateway Client** (C03, C08): cliente tipado hacia `jbg-ai`, con una familia de ruta por tipo de llamada y **cortacircuitos aislados entre ellas**, de modo que un enriquecimiento lento no pueda empujar la búsqueda del operador a su vía léxica degradada.
 
 #### Servicios Compartidos
@@ -248,6 +250,7 @@ C4Component
         Component(searchEventService, "Product Search Event Service", "C#", "Telemetría de búsqueda asistida (C04) · nunca lanza")
         Component(aiProfileService, "Product AI Profile Service", "C#", "Enriquecimiento por lotes y perfil IA revisable (C08)")
         Component(reviewPolicy, "Profile Review Policy", "C#", "Revisión híbrida por campo (C08) · clase pura")
+        Component(familyService, "Product Family Service", "C#", "Familias de producto y pertenencia declarativa (C07)")
         Component(aiGatewayClient, "AI Gateway Client", "C#", "Cliente tipado hacia jbg-ai (C03, C08) · breakers aislados por familia de ruta")
         
         Component(fileStorageService, "File Storage Service", "C#", "Abstracción de almacenamiento de archivos")
@@ -686,7 +689,7 @@ C4Component
 
 ### EP13: Familias de Producto y Desambiguación
 - **AI Service**: Hybrid Retriever (propuesta de familias por similitud)
-- **Backend**: ProductFamily, ProductFamilyMember
+- **Backend**: ProductFamily y ProductFamilyMember (entidades), Product Family Service (pertenencia declarativa), Product Families Controller (`POST`/`GET`/`PUT /api/product-families`, `PUT /api/product-families/{id}/members`, `GET /api/products/{id}/family`)
 - **Frontend**: pantalla de revisión y aprobación por lotes
 
 ### EP14: Búsqueda Semántica Híbrida
