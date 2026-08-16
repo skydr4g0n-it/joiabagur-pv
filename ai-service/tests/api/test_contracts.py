@@ -72,6 +72,113 @@ def test_enrichment_returns_one_profile_per_product_with_confidence(
             assert profile[field] is None or "confidence" in profile[field]
 
 
+SENSITIVE_FIELDS = ("piece_type", "materials", "stone_type", "size_label")
+TAG_FIELDS = ("color_tags", "style_tags", "occasion_tags")
+
+
+def _enrich(client: TestClient, auth_headers: dict[str, str], count: int) -> list[dict[str, Any]]:
+    response = client.post(
+        "/v1/enrich/products",
+        json={
+            "products": [
+                {"product_id": f"P-{index}", "sku": f"JBG-{index}", "name": f"Pieza {index}"}
+                for index in range(count)
+            ]
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 200, response.text
+    return response.json()["profiles"]
+
+
+def test_enrich_profile_carries_source_per_field(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    """Provenance is what the whole hybrid review policy turns on.
+
+    A sensitive field a model inferred needs a person; the same field produced by
+    a deterministic rule does not. Without `source` on the wire that distinction
+    cannot be made at all, so this asserts it on every proposed value rather than
+    only on the ones a particular fixture happens to fill.
+    """
+    profiles = _enrich(client, auth_headers, count=4)
+
+    for profile in profiles:
+        for field in (*SENSITIVE_FIELDS, *TAG_FIELDS, "title", "description"):
+            proposed = profile[field]
+            if proposed is None:
+                continue
+            assert proposed["source"] in {"rule", "inferred"}, field
+            assert 0.0 <= proposed["confidence"] <= 1.0, field
+
+
+def test_enrich_profile_exposes_sensitive_fields_and_split_tags(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    profiles = _enrich(client, auth_headers, count=2)
+
+    for profile in profiles:
+        for field in SENSITIVE_FIELDS:
+            assert field in profile
+        for field in TAG_FIELDS:
+            assert isinstance(profile[field]["value"], list)
+        # The flat list is gone: collapsing the three would force whoever needed
+        # the split downstream to reinvent the partition criterion.
+        assert "tags" not in profile
+
+
+def test_enrich_stub_exercises_both_provenances(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    """A fixture where everything is inferred cannot catch a broken policy.
+
+    Routing to review is what such a policy does by default, so a batch with no
+    rule-sourced field would let an implementation that exempts nothing pass.
+    """
+    profiles = _enrich(client, auth_headers, count=4)
+
+    sources = {
+        profile[field]["source"]
+        for profile in profiles
+        for field in SENSITIVE_FIELDS
+        if profile[field] is not None
+    }
+
+    assert sources == {"rule", "inferred"}
+
+
+def test_enrich_stub_straddles_a_tag_threshold(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    profiles = _enrich(client, auth_headers, count=4)
+
+    confidences = [profile["color_tags"]["confidence"] for profile in profiles]
+
+    assert max(confidences) >= 0.80
+    assert min(confidences) < 0.80
+
+
+def test_enrich_reports_prompt_version(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    response = client.post(
+        "/v1/enrich/products",
+        json={"products": [{"product_id": "P-1", "sku": "JBG-1"}]},
+        headers=auth_headers,
+    )
+
+    assert response.json()["prompt_version"]
+
+
+def test_enrich_stub_is_deterministic(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    first = _enrich(client, auth_headers, count=4)
+    second = _enrich(client, auth_headers, count=4)
+
+    assert first == second
+
+
 def test_index_sync_and_status_expose_counters_and_drift(
     client: TestClient, auth_headers: dict[str, str]
 ) -> None:

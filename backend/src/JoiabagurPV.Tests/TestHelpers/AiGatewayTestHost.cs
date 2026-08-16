@@ -35,7 +35,9 @@ public static class AiGatewayTestHost
         int breakerSamplingDurationSeconds = 10,
         int breakerBreakDurationSeconds = 30,
         string? traceId = null,
-        RecordingLoggerProvider? logs = null)
+        RecordingLoggerProvider? logs = null,
+        int enrichTimeoutMs = 120_000,
+        FakeHttpMessageHandler? enrichHandler = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -47,7 +49,8 @@ public static class AiGatewayTestHost
                 ["AiGateway:BreakerMinimumThroughput"] = breakerMinimumThroughput.ToString(),
                 ["AiGateway:BreakerFailureRatio"] = breakerFailureRatio.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 ["AiGateway:BreakerSamplingDurationSeconds"] = breakerSamplingDurationSeconds.ToString(),
-                ["AiGateway:BreakerBreakDurationSeconds"] = breakerBreakDurationSeconds.ToString()
+                ["AiGateway:BreakerBreakDurationSeconds"] = breakerBreakDurationSeconds.ToString(),
+                ["AiGateway:EnrichTimeoutMs"] = enrichTimeoutMs.ToString()
             })
             .Build();
 
@@ -68,6 +71,14 @@ public static class AiGatewayTestHost
         services.Configure<HttpClientFactoryOptions>(
             AiGatewayClient.RetrievalClientName,
             options => options.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = handler));
+
+        // The enrichment family gets its own handler when a test supplies one. Sharing the
+        // retrieval handler would defeat the very property most worth asserting here: that the
+        // two circuits are independent.
+        services.Configure<HttpClientFactoryOptions>(
+            AiGatewayClient.EnrichClientName,
+            options => options.HttpMessageHandlerBuilderActions.Add(
+                b => b.PrimaryHandler = enrichHandler ?? handler));
 
         return services.BuildServiceProvider();
     }

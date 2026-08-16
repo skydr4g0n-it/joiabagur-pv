@@ -491,6 +491,33 @@ Registra cada búsqueda asistida ejecutada y, si la hubo, la selección que el o
 
 ---
 
+### ProductAiProfile (Perfil IA Revisable del Catálogo)
+
+Atributos del producto propuestos por IA, con **la procedencia y la confianza de cada campo** y su estado de revisión. Añadida por el change C08 (`add-product-ai-profile-entity`, EP12). Es el primer dato del sistema generado por un modelo que el negocio usa para vender: `Product` no tiene ningún atributo estructurado —solo SKU, nombre, descripción, precio y colección—, así que todo `PieceType`, `Materials`, `StoneType` y `SizeLabel` nace aquí.
+
+**Un perfil por producto**, garantizado por índice **único** sobre `ProductId`. No es una comprobación aplicativa a propósito: un segundo perfil no produce ningún error y se descubriría como documentos duplicados dentro del índice vectorial.
+
+**Campos Clave:**
+- `PieceType`, `StoneType`, `SizeLabel`: `varchar(64)` nulables. **Vocabularios como texto, nunca `ENUM` de PostgreSQL** — los cierra C09, y un tipo `ENUM` sobrevive al borrado de su tabla y rompe la siguiente migración
+- `MaterialsJson`: `jsonb`, array. Lista y no valor único porque una pieza es a la vez de plata y con baño de oro, y el filtro de recuperación es de solape. `[]` cuando no hay evidencia, **nunca nulo ni un material por defecto**
+- `ColorTagsJson`, `StyleTagsJson`, `OccasionTagsJson`: `jsonb`, arrays separados, alineados con las columnas que `ai.product_document` ya declara desde C05
+- `FieldConfidenceJson`: `jsonb`, confianza por campo — `{ "materials": 0.72, "piece_type": 0.91, … }`
+- `FieldSourceJson`: `jsonb`, procedencia por campo — `rule` \| `inferred`. **Es la columna de la que depende toda la política de revisión**: un campo sensible que produjo una regla determinista no necesita persona; uno que infirió un modelo, sí
+- `ProposedProfileJson`: `jsonb` con la propuesta cruda de la IA, **inmutable**. La tasa de corrección del extractor es la diferencia entre esto y los valores vigentes; sin ella la métrica no se puede calcular
+- `AiConfidence`: `numeric(4,3)`, media de los campos presentes. Solo ordena la cola de revisión — la decisión de revisar se toma por campo
+- `SourceHash`: SHA-256 de las **entradas** (SKU + nombre + descripción + colección, orden fijo). **No es el `source_hash` de C11**, que Python calcula sobre el texto canónico para decidir si recalcula embedding. Aquí sirve para no volver a pagar el modelo por un producto sin cambios y para no machacar una ficha ya revisada
+- `ReviewStatus`: `Pending = 1` | `Approved = 2` | `Rejected = 3` — dónde está
+- `ReviewOrigin`: `AutoBulk = 1` | `Human = 2` — **quién lo puso ahí**. Ortogonal al anterior: el feed de indexación filtra por estado y las métricas de revisión humana por origen, y un único valor combinado haría que una de las dos consultas mintiera
+- `ReviewedByUserId`, `ReviewedAt`, `ReviewDurationMs`: quién revisó, cuándo y cuánto tardó. La duración la mide el navegador y queda **nula en aprobación masiva**, donde el número mentiría
+- `GeneratedByModel`, `PromptVersion`: procedencia de la ejecución, para poder medir después el efecto de una versión de prompt frente a otra
+
+**Optimizaciones:**
+- Índice **único** sobre `ProductId`
+- Índice sobre `ReviewStatus` para el feed de indexación de C12, e índice compuesto `(ReviewStatus, ReviewOrigin)` para la cola de revisión y las métricas de C28
+- `RESTRICT` en las dos claves foráneas. El valor por defecto del framework para una relación requerida es `CASCADE`, que aquí significaría que borrar un producto —o un usuario— destruye el registro del trabajo de revisión hecho sobre él
+
+---
+
 ### PaymentMethod (Métodos de Pago)
 
 Lista general de métodos de pago disponibles en el sistema.

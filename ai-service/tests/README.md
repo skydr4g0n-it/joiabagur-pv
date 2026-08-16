@@ -38,7 +38,7 @@ parallel taxonomy later.
 
 | Folder | Changes that will land here |
 |---|---|
-| `api/` | C01 (health), C02 (contracts, service auth, stubs, snapshot) |
+| `api/` | C01 (health), C02 (contracts, service auth, stubs, snapshot), C08 (enrichment provenance, catalog-scoped auth) |
 | `config/` | C01, C02 (settings, canonical OpenAPI profile) |
 | `db/` | C05 (engine, bounded pool, boot without a database) |
 | `migrations/` | C05 |

@@ -26,10 +26,22 @@ public class AiGatewayClient : IAiGatewayClient
     /// <summary>Named client carrying the retrieval time budget and its own circuit breaker.</summary>
     public const string RetrievalClientName = "ai-retrieval";
 
+    /// <summary>
+    /// Named client for catalog enrichment, with its own budget and its own breaker state.
+    /// </summary>
+    /// <remarks>
+    /// Separate from retrieval on purpose, and not as a formality. An extraction call is orders
+    /// of magnitude slower than a retrieval one, so sharing a breaker would let a batch of
+    /// enrichment open the retrieval circuit and push every operator's search onto its degraded
+    /// lexical path — for a service that is answering retrieval perfectly well.
+    /// </remarks>
+    public const string EnrichClientName = "ai-enrich";
+
     /// <summary>Correlation header, the only thing that ties a rejected request to its origin.</summary>
     public const string TraceHeaderName = "X-Trace-Id";
 
     private const string RetrievalPath = "/v1/retrieval/products";
+    private const string EnrichPath = "/v1/enrich/products";
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IAiServiceTokenFactory _tokenFactory;
@@ -59,6 +71,18 @@ public class AiGatewayClient : IAiGatewayClient
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(scope);
+
+        // The first of two independent closures on this boundary. From C22 onward the pos_id
+        // claim is the retriever's only hard filter, so a catalog scope reaching this route
+        // would be a cross-POS leak. jbg-ai refuses it too; neither side is trusted to be the
+        // only one that remembers.
+        if (scope.Kind != AiCallScopeKind.PointOfSale)
+        {
+            throw new ArgumentException(
+                "Retrieval requires a point-of-sale scope. A catalog scope carries no pos_id, "
+                + "which the retriever uses as its only hard filter between points of sale.",
+                nameof(scope));
+        }
 
         var traceId = _traceContextAccessor.CurrentTraceId;
 
@@ -99,7 +123,7 @@ public class AiGatewayClient : IAiGatewayClient
 
             if (!response.IsSuccessStatusCode)
             {
-                throw TranslateStatus(response.StatusCode, stopwatch);
+                throw TranslateStatus(response.StatusCode, stopwatch, RetrievalPath);
             }
 
             var payload = await response.Content.ReadFromJsonAsync<AiSearchResponse>(
@@ -158,6 +182,125 @@ public class AiGatewayClient : IAiGatewayClient
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<AiEnrichResponse> EnrichAsync(
+        AiEnrichRequest request,
+        AiCallScope scope,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(scope);
+
+        // The mirror image of the guard in SearchAsync. Enrichment covers the whole catalog, so
+        // a point-of-sale scope here would silently narrow nothing and merely emit a claim the
+        // route does not use — but accepting it would blur the one distinction that keeps the
+        // catalog scope from drifting into retrieval.
+        if (scope.Kind != AiCallScopeKind.Catalog)
+        {
+            throw new ArgumentException(
+                "Catalog enrichment requires a catalog scope. Enriching the catalog belongs to no "
+                + "point of sale.",
+                nameof(scope));
+        }
+
+        if (request.Products.Count is 0 or > AiEnrichRequest.MaxBatchSize)
+        {
+            throw new ArgumentException(
+                $"A batch must hold between 1 and {AiEnrichRequest.MaxBatchSize} products, which is "
+                + "the limit the frozen contract accepts.",
+                nameof(request));
+        }
+
+        var traceId = _traceContextAccessor.CurrentTraceId;
+
+        using var logScope = _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["trace_id"] = traceId,
+            ["endpoint"] = EnrichPath
+        });
+
+        _logger.LogInformation(
+            "ai_gateway_enrich_started {Role} {ProductCount}",
+            scope.Role,
+            request.Products.Count);
+
+        var stopwatch = Stopwatch.StartNew();
+        AiGatewayAttemptTracker.Begin();
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient(EnrichClientName);
+
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, EnrichPath)
+            {
+                Content = JsonContent.Create(request, options: AiGatewaySerialization.Options)
+            };
+
+            httpRequest.Headers.Authorization =
+                new AuthenticationHeaderValue("Bearer", _tokenFactory.Create(scope, traceId));
+            httpRequest.Headers.TryAddWithoutValidation(TraceHeaderName, traceId);
+
+            using var response = await client.SendAsync(httpRequest, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw TranslateStatus(response.StatusCode, stopwatch, EnrichPath);
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<AiEnrichResponse>(
+                AiGatewaySerialization.Options,
+                cancellationToken);
+
+            if (payload is null)
+            {
+                throw Fail(AiGatewayOutcome.ServerError, stopwatch,
+                    new AiUnavailableException("The AI service returned an empty enrichment body."));
+            }
+
+            stopwatch.Stop();
+
+            // Token usage is logged on every batch, not sampled. The delivery commits to
+            // reporting what the AI costs, and a figure nobody recorded cannot be reported.
+            _logger.LogInformation(
+                "ai_gateway_enrich_completed {StatusCode} {LatencyMs} {ProfileCount} {TotalTokens} {PromptVersion}",
+                (int)response.StatusCode,
+                stopwatch.ElapsedMilliseconds,
+                payload.Profiles.Count,
+                payload.Usage.TotalTokens,
+                payload.PromptVersion);
+
+            return payload;
+        }
+        catch (AiGatewayException)
+        {
+            throw;
+        }
+        catch (BrokenCircuitException ex)
+        {
+            throw Fail(AiGatewayOutcome.CircuitOpen, stopwatch,
+                new AiUnavailableException("The AI enrichment circuit is open; no request was issued.", ex));
+        }
+        catch (TimeoutRejectedException ex)
+        {
+            throw Fail(AiGatewayOutcome.Timeout, stopwatch,
+                new AiUnavailableException("The AI service did not answer within the enrichment time budget.", ex));
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw Fail(AiGatewayOutcome.Timeout, stopwatch,
+                new AiUnavailableException("The AI service did not answer within the enrichment time budget.", ex));
+        }
+        catch (HttpRequestException ex)
+        {
+            throw Fail(AiGatewayOutcome.Transport, stopwatch,
+                new AiUnavailableException("The AI service could not be reached.", ex));
+        }
+        finally
+        {
+            AiGatewayAttemptTracker.End();
+        }
+    }
+
     /// <summary>
     /// Maps a non-success status onto the contract's failure modes.
     /// </summary>
@@ -166,7 +309,7 @@ public class AiGatewayClient : IAiGatewayClient
     /// implementation yet — jbg-ai chose 501 over 503 exactly so this client would not insist.
     /// Both reach here only because the resilience pipeline declines to retry them.
     /// </remarks>
-    private AiGatewayException TranslateStatus(HttpStatusCode statusCode, Stopwatch stopwatch)
+    private AiGatewayException TranslateStatus(HttpStatusCode statusCode, Stopwatch stopwatch, string path)
     {
         if (statusCode == HttpStatusCode.Unauthorized)
         {
@@ -181,7 +324,7 @@ public class AiGatewayClient : IAiGatewayClient
         {
             return Fail(AiGatewayOutcome.NotImplemented, stopwatch,
                 new AiNotImplementedException(
-                    $"The AI service has no implementation for {RetrievalPath} yet."));
+                    $"The AI service has no implementation for {path} yet."));
         }
 
         return Fail(AiGatewayOutcome.ServerError, stopwatch,

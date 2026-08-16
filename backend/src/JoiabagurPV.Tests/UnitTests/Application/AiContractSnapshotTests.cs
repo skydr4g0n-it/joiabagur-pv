@@ -25,7 +25,14 @@ public class AiContractSnapshotTests
         { typeof(AiSearchFilters), "RetrievalFilters" },
         { typeof(AiSearchResult), "RetrievalResult" },
         { typeof(AiSearchResponse), "RetrievalResponse" },
-        { typeof(AiDebugInfo), "DebugInfo" }
+        { typeof(AiDebugInfo), "DebugInfo" },
+        { typeof(AiEnrichProductInput), "EnrichProductInput" },
+        { typeof(AiEnrichRequest), "EnrichRequest" },
+        { typeof(AiProposedText), "ProposedText" },
+        { typeof(AiProposedList), "ProposedList" },
+        { typeof(AiProposedProfile), "ProposedProfile" },
+        { typeof(AiEnrichResponse), "EnrichResponse" },
+        { typeof(AiUsage), "Usage" }
     };
 
     [Theory]
@@ -63,6 +70,32 @@ public class AiContractSnapshotTests
         typeof(AiSearchRequest).GetProperties()
             .Select(p => Wire.PropertyNamingPolicy!.ConvertName(p.Name))
             .Should().NotContain("pos_id");
+    }
+
+    /// <summary>
+    /// Provenance is the field the whole hybrid review policy turns on, so it is asserted by
+    /// name rather than left to the generic property sweep.
+    /// </summary>
+    /// <remarks>
+    /// If a later renegotiation dropped `source` from a proposed value, the sweep above would
+    /// still pass — it only checks that .NET properties exist in the contract, not the reverse.
+    /// The review policy would then silently treat every sensitive field as inferred and send
+    /// the whole catalog to a review queue nobody has time for.
+    /// </remarks>
+    [Theory]
+    [InlineData("ProposedText")]
+    [InlineData("ProposedList")]
+    public void ProposedValues_DeclareProvenanceInTheContract(string schemaName)
+    {
+        var schema = LoadSchema(schemaName);
+
+        schema.TryGetProperty("source", out var source).Should().BeTrue(
+            "without per-field provenance the hybrid review policy cannot distinguish a value a "
+            + "rule produced from one a model inferred, which is the whole of decision 5");
+
+        source.GetProperty("enum").EnumerateArray()
+            .Select(value => value.GetString())
+            .Should().BeEquivalentTo(["rule", "inferred"]);
     }
 
     private static JsonElement LoadSchema(string schemaName)

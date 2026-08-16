@@ -1,3 +1,4 @@
+using System.Reflection;
 using FluentAssertions;
 using JoiabagurPV.Application.DTOs.Ai;
 
@@ -62,9 +63,62 @@ public class AiCallScopeTests
     {
         typeof(AiCallScope)
             .GetConstructors()
-            .Should().BeEmpty("ForPointOfSale must be the only way to build a scope");
+            .Should().BeEmpty("the two static factories must be the only ways to build a scope");
 
         typeof(AiCallScope).IsValueType
             .Should().BeFalse("a value type would always have a default instance with an empty point of sale");
+    }
+
+    [Fact]
+    public void ForCatalog_CarriesNoPointOfSale()
+    {
+        var scope = AiCallScope.ForCatalog(AnyUser, AnyRole);
+
+        scope.PointOfSaleId.Should().BeNull(
+            "enriching the catalog belongs to no point of sale, and a null cannot be mistaken "
+            + "for one the way a sentinel value could");
+        scope.Kind.Should().Be(AiCallScopeKind.Catalog);
+        scope.UserId.Should().Be(AnyUser);
+        scope.Role.Should().Be(AnyRole);
+    }
+
+    [Fact]
+    public void ForCatalog_WhenRoleIsBlank_ThrowsArgumentException()
+    {
+        var act = () => AiCallScope.ForCatalog(AnyUser, "  ");
+
+        act.Should().Throw<ArgumentException>()
+            .WithParameterName("role");
+    }
+
+    [Fact]
+    public void ForCatalog_WhenUserIsEmpty_ThrowsArgumentException()
+    {
+        var act = () => AiCallScope.ForCatalog(Guid.Empty, AnyRole);
+
+        act.Should().Throw<ArgumentException>()
+            .WithParameterName("userId");
+    }
+
+    [Fact]
+    public void ForPointOfSale_IsMarkedAsPointOfSaleScoped()
+    {
+        var scope = AiCallScope.ForPointOfSale(AnyUser, AnyRole, AnyPointOfSale);
+
+        scope.Kind.Should().Be(AiCallScopeKind.PointOfSale);
+    }
+
+    /// <summary>
+    /// The catalog scope must remain a second scope, never a third construction path that
+    /// happens to produce a point-of-sale one without a point of sale.
+    /// </summary>
+    [Fact]
+    public void AiCallScope_ExposesExactlyTwoFactories()
+    {
+        typeof(AiCallScope)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Where(method => method.ReturnType == typeof(AiCallScope))
+            .Select(method => method.Name)
+            .Should().BeEquivalentTo(["ForPointOfSale", "ForCatalog"]);
     }
 }

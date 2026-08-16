@@ -197,6 +197,18 @@ El Backend API está organizado en servicios de dominio, controladores REST, rep
 
 - **Report Service**: Consultas de historial de ventas con filtros, consultas de inventario, consultas de movimientos de stock, generación de reportes.
 
+#### Servicios del Proyecto Final de IA
+
+Viven en la misma capa de aplicación que los anteriores; se listan aparte porque su ciclo de vida lo marcan los changes C01–C39 y no las épicas del MVP.
+
+- **Product Search Event Service** (C04): registro de la telemetría de búsqueda asistida en dos pasos —el servidor escribe la mitad de búsqueda mientras la sirve, el navegador reporta solo la selección— y derivación del rango a partir de la lista realmente devuelta. **Nunca lanza**: un fallo de telemetría no puede convertir una búsqueda correcta en un error.
+
+- **Product AI Profile Service** (C08): enriquecimiento por lotes del catálogo contra `jbg-ai`, aplicación de la política híbrida de revisión por campo y persistencia del perfil con su procedencia. Idempotente sobre el hash de las entradas del producto, de modo que repetir un lote no vuelve a pagar el modelo ni sobrescribe una ficha ya revisada.
+
+- **Profile Review Policy** (C08): decide, campo a campo, qué necesita mirar una persona. Clase **pura** —sin base de datos, sin HTTP, sin reloj— con sus umbrales en configuración validada al arranque, porque están pensados para recalibrarse contra el golden set de evaluación.
+
+- **AI Gateway Client** (C03, C08): cliente tipado hacia `jbg-ai`, con una familia de ruta por tipo de llamada y **cortacircuitos aislados entre ellas**, de modo que un enriquecimiento lento no pueda empujar la búsqueda del operador a su vía léxica degradada.
+
 #### Servicios Compartidos
 
 - **File Storage Service**: Abstracción para almacenamiento de archivos (local en desarrollo, S3/Blob Storage en producción), gestión de fotos de productos y ventas.
@@ -233,6 +245,10 @@ C4Component
         Component(paymentService, "Payment Method Service", "C#", "Gestión de métodos de pago")
         Component(posService, "Point of Sale Service", "C#", "Gestión de puntos de venta")
         Component(reportService, "Report Service", "C#", "Consultas y reportes")
+        Component(searchEventService, "Product Search Event Service", "C#", "Telemetría de búsqueda asistida (C04) · nunca lanza")
+        Component(aiProfileService, "Product AI Profile Service", "C#", "Enriquecimiento por lotes y perfil IA revisable (C08)")
+        Component(reviewPolicy, "Profile Review Policy", "C#", "Revisión híbrida por campo (C08) · clase pura")
+        Component(aiGatewayClient, "AI Gateway Client", "C#", "Cliente tipado hacia jbg-ai (C03, C08) · breakers aislados por familia de ruta")
         
         Component(fileStorageService, "File Storage Service", "C#", "Abstracción de almacenamiento de archivos")
         Component(stockValidationService, "Stock Validation Service", "C#", "Validación de stock disponible")
@@ -247,6 +263,7 @@ C4Component
 
     ContainerDb(db, "PostgreSQL Database")
     Container(storage, "Object Storage")
+    Container(jbgAi, "jbg-ai", "Python · FastAPI", "Recuperación vectorial y generación")
 
     Rel(controllers, authService, "Usa")
     Rel(controllers, userService, "Usa")
@@ -257,6 +274,11 @@ C4Component
     Rel(controllers, paymentService, "Usa")
     Rel(controllers, posService, "Usa")
     Rel(controllers, reportService, "Usa")
+    Rel(controllers, searchEventService, "Usa")
+    Rel(controllers, aiProfileService, "Usa")
+    
+    Rel(aiProfileService, reviewPolicy, "Usa")
+    Rel(aiProfileService, aiGatewayClient, "Usa")
     
     Rel(saleService, stockValidationService, "Usa")
     Rel(saleService, paymentValidationService, "Usa")
@@ -274,10 +296,13 @@ C4Component
     Rel(paymentService, repositories, "Usa")
     Rel(posService, repositories, "Usa")
     Rel(reportService, repositories, "Usa")
+    Rel(searchEventService, repositories, "Usa")
+    Rel(aiProfileService, repositories, "Usa")
     
     Rel(repositories, dbContext, "Usa")
     Rel(dbContext, db, "Lee y escribe")
     Rel(fileStorageService, storage, "Lee y escribe")
+    Rel(aiGatewayClient, jbgAi, "JWT interno HS256 · red Docker interna")
     Rel(middleware, controllers, "Intercepta")
 ```
 

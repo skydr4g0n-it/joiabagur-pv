@@ -171,6 +171,22 @@ Sobre los dos primeros conviene una precisión que ahorra tests engañosos. Al p
 
 **585 tests, 52 fallos.** Ninguno tiene que ver con el código de aplicación en producción: son defectos de los propios tests y desajustes de dependencias. Se documentan aquí porque, sin este registro, cada persona que ejecuta la suite pierde una hora concluyendo que ha roto algo.
 
+> **Actualización del 2026-08-16, sobre `c08-add-product-ai-profile-entity`.** La suite tiene ahora
+> **729 tests** y los fallos se mueven en la banda de **45 a 51** según la ejecución. La cifra
+> anterior sigue siendo válida como lo que era —una medición de aquel día sobre aquella rama—,
+> pero quien ejecute la suite hoy no reconocerá ni el total ni el número de rojos.
+>
+> Lo importante de esta segunda medición no es el total, sino algo que la primera no registró:
+> **el conjunto de fallos cambia entre ejecuciones idénticas**. Dos pasadas consecutivas sobre el
+> mismo commit, sin tocar nada, dieron 48 y 51; dos pasadas posteriores dieron 46 y 48, y los
+> nombres no coincidían. `InventoryIntegrationTests` baraja los suyos de una vez a otra.
+>
+> **Consecuencia práctica:** comparar recuentos no sirve para nada, ni siquiera para decidir que
+> algo va mejor. La única comparación válida es **por nombres de test**, y un nombre nuevo en la
+> lista solo cuenta como regresión si además falla al ejecutarlo en aislamiento. El procedimiento
+> completo, con el caso concreto de tres nombres que parecían regresión y no lo eran, está en
+> `openspec/changes/archive/2026-08-16-add-product-ai-profile-entity/qa.md` §1.1.
+
 ### Por qué se acumularon sin que nadie los viera
 
 Los dos árboles se comportan de forma muy distinta, y esa es la clave:

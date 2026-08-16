@@ -25,6 +25,9 @@ from jbg_ai.api.schemas.enrich import (
     ProposedProfile,
     ProposedText,
 )
+from jbg_ai.api.schemas.enrich import (
+    MAX_BATCH_SIZE as ENRICH_MAX_BATCH_SIZE,
+)
 from jbg_ai.api.schemas.evals import EvalMetric, EvalRun, EvalRunsResponse
 from jbg_ai.api.schemas.index import (
     IndexStatusResponse,
@@ -60,6 +63,21 @@ _MATERIALS_CYCLE: tuple[tuple[str, ...], ...] = (
 )
 _VARIANT_CYCLE: tuple[str | None, ...] = ("18 mm", "20 mm", "22 mm", None)
 _SIGNAL_CYCLE: tuple[str, ...] = ("coverage_gap", "demand_up", "slow_mover", "family_incomplete")
+
+# Enrichment fixtures. The cycles have coprime-ish lengths on purpose so a batch
+# covers combinations rather than repeating one shape.
+_PIECE_TYPE_CYCLE: tuple[str, ...] = ("anillo", "collar", "pendiente", "pulsera")
+_STONE_TYPE_CYCLE: tuple[str | None, ...] = (None, "circonita", None, "perla", "ninguna")
+_SIZE_LABEL_CYCLE: tuple[str, ...] = ("S", "M", "L")
+_COLOR_TAG_CYCLE: tuple[tuple[str, ...], ...] = (("dorado",), ("plateado",), ("dorado", "blanco"))
+
+# Straddles any plausible auto-approval threshold, so a batch exercises both the
+# auto-approved and the sent-to-review branches of the consuming policy.
+_TAG_CONFIDENCE_CYCLE: tuple[float, ...] = (0.92, 0.45, 0.87, 0.63)
+
+#: Stubs run no prompt; the contract still requires the field, and a value that
+#: says so is more honest than a plausible-looking version number.
+STUB_PROMPT_VERSION = "stub"
 
 # Fixed instants: a clock call would break determinism and the snapshot contract.
 _LAST_FULL_SYNC_AT = datetime(2026, 8, 1, 3, 0, tzinfo=UTC)
@@ -233,31 +251,83 @@ def inventory_propose_stub(
 
 
 def enrich_products_stub(request: EnrichRequest, principal: ServicePrincipal) -> EnrichResponse:
+    """Proposed profiles that exercise both provenances and both sides of a threshold.
+
+    The variety is the point, not decoration. A fixture where every sensitive field
+    is inferred would let a broken review policy pass its own tests: routing to
+    review is what such a policy does by default, so it would never be caught
+    exempting nothing. The cycles below guarantee that any batch of four products
+    contains at least one `rule` field, at least one `inferred` sensitive field,
+    and tags on both sides of a plausible auto-approval threshold.
+    """
     profiles: list[ProposedProfile] = []
     for index, product in enumerate(request.products):
         materials = _materials(index)
         title = (product.name or f"Pieza {product.sku}").strip()
+
+        # Every fourth piece has its size read off the SKU by a deterministic rule,
+        # mirroring what the real pipeline does before calling a model at all.
+        size_is_rule = index % 4 == 0
+        tag_confidence = _TAG_CONFIDENCE_CYCLE[index % len(_TAG_CONFIDENCE_CYCLE)]
+
         profiles.append(
             ProposedProfile(
                 product_id=product.product_id,
                 sku=product.sku,
-                title=ProposedText(value=title, confidence=0.81),
+                title=ProposedText(value=title, confidence=0.81, source="inferred"),
                 description=ProposedText(
                     value=f"{title} en {', '.join(materials)}.",
                     confidence=0.64,
+                    source="inferred",
                 ),
-                materials=ProposedList(value=materials, confidence=0.72),
-                family_id=ProposedText(value=f"F-{index // VARIANTS_PER_FAMILY:03d}", confidence=0.55),
+                piece_type=ProposedText(
+                    value=_PIECE_TYPE_CYCLE[index % len(_PIECE_TYPE_CYCLE)],
+                    confidence=0.88,
+                    source="inferred",
+                ),
+                materials=ProposedList(value=materials, confidence=0.72, source="inferred"),
+                stone_type=(
+                    ProposedText(value=stone, confidence=0.61, source="inferred")
+                    if (stone := _STONE_TYPE_CYCLE[index % len(_STONE_TYPE_CYCLE)]) is not None
+                    else None
+                ),
+                size_label=(
+                    ProposedText(
+                        value=_SIZE_LABEL_CYCLE[index % len(_SIZE_LABEL_CYCLE)],
+                        confidence=1.0 if size_is_rule else 0.57,
+                        source="rule" if size_is_rule else "inferred",
+                    )
+                ),
+                color_tags=ProposedList(
+                    value=list(_COLOR_TAG_CYCLE[index % len(_COLOR_TAG_CYCLE)]),
+                    confidence=tag_confidence,
+                    source="inferred",
+                ),
+                style_tags=ProposedList(
+                    value=["marino", "verano"], confidence=tag_confidence, source="inferred"
+                ),
+                occasion_tags=ProposedList(
+                    value=["regalo"], confidence=tag_confidence, source="inferred"
+                ),
+                family_id=ProposedText(
+                    value=f"F-{index // VARIANTS_PER_FAMILY:03d}",
+                    confidence=0.55,
+                    source="inferred",
+                ),
                 variant_label=(
-                    ProposedText(value=variant, confidence=0.58)
+                    ProposedText(value=variant, confidence=0.58, source="inferred")
                     if (variant := _variant_label(index)) is not None
                     else None
                 ),
-                tags=ProposedList(value=["stub", "catalogo"], confidence=0.5),
                 warnings=[STUB_WARNING],
             )
         )
-    return EnrichResponse(profiles=profiles, usage=Usage(), trace_id=principal.trace_id)
+    return EnrichResponse(
+        profiles=profiles,
+        usage=Usage(),
+        prompt_version=STUB_PROMPT_VERSION,
+        trace_id=principal.trace_id,
+    )
 
 
 def index_sync_stub(request: IndexSyncRequest, principal: ServicePrincipal) -> IndexSyncResponse:

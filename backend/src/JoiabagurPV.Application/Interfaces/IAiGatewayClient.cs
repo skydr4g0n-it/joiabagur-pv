@@ -35,4 +35,29 @@ public interface IAiGatewayClient
         AiSearchRequest request,
         AiCallScope scope,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Asks jbg-ai to propose enriched profiles for a batch of products.
+    /// </summary>
+    /// <param name="request">Products to enrich. At most <see cref="AiEnrichRequest.MaxBatchSize"/>.</param>
+    /// <param name="scope">Caller identity. Must be a catalog scope: the catalog has no point of sale.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>
+    /// One proposal per requested product, each field carrying its own confidence and whether a
+    /// rule or a model produced it. Nothing is persisted on either side by this call.
+    /// </returns>
+    /// <exception cref="Exceptions.AiUnavailableException">
+    /// Timeout, transport failure, open circuit, or a server error other than 501.
+    /// </exception>
+    /// <exception cref="Exceptions.AiNotImplementedException">
+    /// The route is contracted but has no implementation yet.
+    /// </exception>
+    /// <exception cref="Exceptions.AiGatewayConfigurationException">
+    /// The service rejected the credentials.
+    /// </exception>
+    /// <exception cref="ArgumentException">The scope is not a catalog scope.</exception>
+    Task<AiEnrichResponse> EnrichAsync(
+        AiEnrichRequest request,
+        AiCallScope scope,
+        CancellationToken cancellationToken = default);
 }

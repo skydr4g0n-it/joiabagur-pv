@@ -1,7 +1,7 @@
 namespace JoiabagurPV.Application.DTOs.Ai;
 
 /// <summary>
-/// Caller identity and point-of-sale scope carried into every jbg-ai call.
+/// Caller identity and, when the route has one, point-of-sale scope carried into every jbg-ai call.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -10,30 +10,33 @@ namespace JoiabagurPV.Application.DTOs.Ai;
 /// only transports it.
 /// </para>
 /// <para>
-/// <see cref="ForPointOfSale"/> is deliberately the only way to construct a scope, and it
-/// requires a concrete point of sale. From C22 onward the <c>pos_id</c> claim becomes the
-/// retriever's only hard filter, so a sentinel value such as "*" or "system" reaching it
-/// would be a cross-POS leak wearing a convenience-parameter costume. Making that state
-/// unconstructible is cheaper than asking people not to write it.
+/// There are exactly two construction paths and no third. <see cref="ForPointOfSale"/> requires
+/// a concrete point of sale: from C22 onward the <c>pos_id</c> claim becomes the retriever's only
+/// hard filter, so a sentinel value such as "*" or "system" reaching it would be a cross-POS leak
+/// wearing a convenience-parameter costume. <see cref="ForCatalog"/> carries none at all, for the
+/// routes that operate over the whole catalog — enrichment, and later index synchronization — and
+/// therefore belong to no point of sale.
+/// </para>
+/// <para>
+/// The second path is not a relaxation of the first: it is a different scope, and it is
+/// <em>refused</em> by every point-of-sale operation of the client. Making the leaking state
+/// unconstructible is cheaper than asking people not to write it; refusing the catalog scope
+/// where a point of sale is mandatory is what keeps that guarantee once the state exists.
 /// </para>
 /// <para>
 /// A sealed class rather than a record struct on purpose: every struct has an implicit
-/// <c>default</c> value, which would be a scope with an empty point of sale and would
-/// defeat the guarantee above. A private constructor on a class has no such hole.
-/// </para>
-/// <para>
-/// Routes with no point of sale — catalog-wide enrichment and index sync — will need a
-/// different scope. Adding it is the job of the first change that calls them (C08 or C13),
-/// together with the jbg-ai rule that keeps such a scope away from retrieval routes.
+/// <c>default</c> value, which would be a scope with neither kind nor identity and would defeat
+/// the guarantee above. A private constructor on a class has no such hole.
 /// </para>
 /// </remarks>
 public sealed class AiCallScope
 {
-    private AiCallScope(Guid userId, string role, Guid pointOfSaleId)
+    private AiCallScope(Guid userId, string role, Guid? pointOfSaleId, AiCallScopeKind kind)
     {
         UserId = userId;
         Role = role;
         PointOfSaleId = pointOfSaleId;
+        Kind = kind;
     }
 
     /// <summary>Identifier of the user on whose behalf the call is made.</summary>
@@ -42,17 +45,54 @@ public sealed class AiCallScope
     /// <summary>Role of that user.</summary>
     public string Role { get; }
 
-    /// <summary>Point of sale the call is scoped to.</summary>
-    public Guid PointOfSaleId { get; }
+    /// <summary>
+    /// Point of sale the call is scoped to, or null for a catalog-wide scope.
+    /// </summary>
+    /// <remarks>
+    /// Nullable rather than a sentinel: a null cannot be mistaken for a point of sale, and it
+    /// makes the token factory omit the claim entirely instead of emitting an empty one, which
+    /// the service would reject anyway.
+    /// </remarks>
+    public Guid? PointOfSaleId { get; }
+
+    /// <summary>What kind of route this scope may be used on.</summary>
+    public AiCallScopeKind Kind { get; }
 
     /// <summary>
-    /// Builds a scope for a concrete point of sale. The only construction path.
+    /// Builds a scope for a concrete point of sale.
     /// </summary>
     /// <param name="userId">User the call is made for. Must not be empty.</param>
     /// <param name="role">Role of that user. Must not be blank.</param>
     /// <param name="pointOfSaleId">Point of sale the call is scoped to. Must not be empty.</param>
     /// <exception cref="ArgumentException">Any argument is empty or blank.</exception>
     public static AiCallScope ForPointOfSale(Guid userId, string role, Guid pointOfSaleId)
+    {
+        RequireIdentity(userId, role);
+
+        if (pointOfSaleId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "A point-of-sale gateway call scope requires a concrete point of sale. There is no scope without one.",
+                nameof(pointOfSaleId));
+        }
+
+        return new AiCallScope(userId, role, pointOfSaleId, AiCallScopeKind.PointOfSale);
+    }
+
+    /// <summary>
+    /// Builds a scope for a catalog-wide call, which belongs to no point of sale.
+    /// </summary>
+    /// <param name="userId">User the call is made for. Must not be empty.</param>
+    /// <param name="role">Role of that user. Must not be blank.</param>
+    /// <exception cref="ArgumentException">Any argument is empty or blank.</exception>
+    public static AiCallScope ForCatalog(Guid userId, string role)
+    {
+        RequireIdentity(userId, role);
+
+        return new AiCallScope(userId, role, pointOfSaleId: null, AiCallScopeKind.Catalog);
+    }
+
+    private static void RequireIdentity(Guid userId, string role)
     {
         if (userId == Guid.Empty)
         {
@@ -63,14 +103,5 @@ public sealed class AiCallScope
         {
             throw new ArgumentException("A gateway call scope requires a role.", nameof(role));
         }
-
-        if (pointOfSaleId == Guid.Empty)
-        {
-            throw new ArgumentException(
-                "A gateway call scope requires a concrete point of sale. There is no scope without one.",
-                nameof(pointOfSaleId));
-        }
-
-        return new AiCallScope(userId, role, pointOfSaleId);
     }
 }

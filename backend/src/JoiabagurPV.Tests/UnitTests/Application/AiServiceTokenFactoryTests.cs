@@ -105,4 +105,23 @@ public class AiServiceTokenFactoryTests
 
         act.Should().Throw<ArgumentException>().WithParameterName("traceId");
     }
+
+    /// <summary>
+    /// A catalog call belongs to no point of sale, so the claim is left out rather than
+    /// emitted empty. The service rejects a blank claim exactly like an absent one, but an
+    /// empty string on the wire would read like a point of sale that failed to resolve
+    /// instead of one that was never meant to be there.
+    /// </summary>
+    [Fact]
+    public void BuildToken_ForCatalogScope_OmitsPosClaim()
+    {
+        var scope = AiCallScope.ForCatalog(Guid.NewGuid(), "Administrator");
+
+        var token = Decode(CreateFactory().Create(scope, AnyTraceId));
+
+        token.Payload.Keys.Should().NotContain(AiServiceTokenFactory.PointOfSaleClaim);
+        token.Payload.Keys.Should().BeEquivalentTo(
+            ["user_id", "role", "trace_id", "exp"],
+            "a catalog token carries the three base claims plus an expiry, and nothing else");
+    }
 }

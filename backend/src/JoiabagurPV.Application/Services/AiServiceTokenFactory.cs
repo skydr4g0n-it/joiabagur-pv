@@ -89,10 +89,18 @@ public class AiServiceTokenFactory : IAiServiceTokenFactory
         {
             { UserIdClaim, scope.UserId.ToString() },
             { RoleClaim, scope.Role },
-            { PointOfSaleClaim, scope.PointOfSaleId.ToString() },
             { TraceIdClaim, traceId },
             { ExpiryClaim, EpochTime.GetIntDate(expiresAt.UtcDateTime) }
         };
+
+        // Omitted entirely for a catalog scope, not emitted empty. The service treats a blank
+        // claim as an absent one and answers 401 either way, but an empty string on the wire
+        // would read like a point of sale that failed to resolve rather than one that was never
+        // meant to be there.
+        if (scope.PointOfSaleId is { } pointOfSaleId)
+        {
+            payload.Add(PointOfSaleClaim, pointOfSaleId.ToString());
+        }
 
         var token = new JwtSecurityToken(new JwtHeader(credentials), payload);
 

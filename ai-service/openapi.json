@@ -402,6 +402,11 @@
             "title": "Profiles",
             "type": "array"
           },
+          "prompt_version": {
+            "description": "Version of the extraction prompt behind this batch. Cheap to emit and impossible to reconstruct afterwards, which is why it is here rather than deferred",
+            "title": "Prompt Version",
+            "type": "string"
+          },
           "trace_id": {
             "description": "Correlation id, from the token claim when present",
             "title": "Trace Id",
@@ -414,7 +419,8 @@
         "required": [
           "trace_id",
           "profiles",
-          "usage"
+          "usage",
+          "prompt_version"
         ],
         "title": "EnrichResponse",
         "type": "object"
@@ -849,6 +855,15 @@
             "title": "Confidence",
             "type": "number"
           },
+          "source": {
+            "description": "`rule` for a deterministic normalization, `inferred` for a model",
+            "enum": [
+              "rule",
+              "inferred"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "value": {
             "items": {
               "type": "string"
@@ -858,13 +873,18 @@
           }
         },
         "required": [
-          "confidence"
+          "confidence",
+          "source"
         ],
         "title": "ProposedList",
         "type": "object"
       },
       "ProposedProfile": {
+        "description": "One product's proposed attributes.\n\nThe sensitive fields — `piece_type`, `materials`, `stone_type`, `size_label` —\nare the ones whose error reaches a customer, and each is proposed\nindividually so its provenance can be judged individually.\n\nCommercial tags are split into three lists rather than one flat `tags`,\nmatching the columns the vector index already declares: collapsing them here\nwould force the split to be reinvented downstream, by whoever needed it first.",
         "properties": {
+          "color_tags": {
+            "$ref": "#/components/schemas/ProposedList"
+          },
           "description": {
             "anyOf": [
               {
@@ -888,15 +908,48 @@
           "materials": {
             "$ref": "#/components/schemas/ProposedList"
           },
+          "occasion_tags": {
+            "$ref": "#/components/schemas/ProposedList"
+          },
+          "piece_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposedText"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "product_id": {
             "title": "Product Id",
             "type": "string"
+          },
+          "size_label": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposedText"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "sku": {
             "title": "Sku",
             "type": "string"
           },
-          "tags": {
+          "stone_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposedText"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "style_tags": {
             "$ref": "#/components/schemas/ProposedList"
           },
           "title": {
@@ -931,7 +984,9 @@
           "product_id",
           "sku",
           "materials",
-          "tags"
+          "color_tags",
+          "style_tags",
+          "occasion_tags"
         ],
         "title": "ProposedProfile",
         "type": "object"
@@ -944,14 +999,24 @@
             "title": "Confidence",
             "type": "number"
           },
+          "source": {
+            "description": "`rule` for a deterministic normalization, `inferred` for a model",
+            "enum": [
+              "rule",
+              "inferred"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "value": {
             "title": "Value",
             "type": "string"
           }
         },
         "required": [
-          "value",
-          "confidence"
+          "confidence",
+          "source",
+          "value"
         ],
         "title": "ProposedText",
         "type": "object"
@@ -1538,7 +1603,7 @@
     },
     "/v1/enrich/products": {
       "post": {
-        "description": "Every proposed field carries its own confidence; nothing is written anywhere.",
+        "description": "Every proposed field carries its own confidence and provenance; nothing is written.\n\nCatalog-scoped: enriching the catalog belongs to no point of sale, so this\nroute accepts a token without `pos_id`. Retrieval, assistance and inventory\nkeep requiring one.",
         "operationId": "enrich_products_v1_enrich_products_post",
         "requestBody": {
           "content": {

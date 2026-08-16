@@ -26,6 +26,11 @@ builder.Services.AddApplication();
 // 401 the AI service is required not to explain.
 builder.Services.AddAiGateway(builder.Configuration);
 
+// Thresholds of the hybrid profile review policy, validated at start-up for the same reason:
+// a value outside its range must stop the host, not route a batch of profiles by a rule that
+// cannot be satisfied.
+builder.Services.AddProfileReview(builder.Configuration);
+
 // Add API services
 builder.Services.AddApiServices(builder.Configuration);
 

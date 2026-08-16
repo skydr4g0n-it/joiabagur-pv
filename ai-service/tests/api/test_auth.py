@@ -189,3 +189,66 @@ def test_rejected_request_still_carries_a_trace_id(client: TestClient) -> None:
 
     assert response.status_code == 401
     assert response.headers.get("X-Trace-Id")
+
+
+ENRICH_BODY = {"products": [{"product_id": "P-1", "sku": "JBG-1"}]}
+
+
+def test_catalog_token_without_pos_is_accepted_on_enrich(
+    client: TestClient, issue_token: Callable[..., str]
+) -> None:
+    """Enriching the catalog belongs to no point of sale.
+
+    Requiring `pos_id` here would force the caller to invent one, and the only
+    values available to invent are wildcards — which is precisely what must never
+    exist, since that claim is the retriever's only hard filter.
+    """
+    token = issue_token(pos_id=None)
+
+    response = client.post(
+        "/v1/enrich/products", json=ENRICH_BODY, headers={"Authorization": f"Bearer {token}"}
+    )
+
+    assert response.status_code == 200, response.text
+
+
+def test_catalog_token_is_rejected_on_retrieval(
+    client: TestClient, issue_token: Callable[..., str]
+) -> None:
+    """The second of the two independent closures on this boundary.
+
+    The .NET client already refuses to send a catalog scope to retrieval. This
+    asserts the service refuses it too, so that relaxing one side by accident
+    does not open the door.
+    """
+    token = issue_token(pos_id=None)
+
+    response = client.post(
+        "/v1/retrieval/products",
+        json={"query": "anillo", "top_k": 1},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.parametrize("claim", ["user_id", "role", "trace_id"])
+def test_catalog_route_still_rejects_a_token_missing_the_other_claims(
+    client: TestClient, issue_token: Callable[..., str], claim: str
+) -> None:
+    token = issue_token(pos_id=None, **{claim: None})
+
+    response = client.post(
+        "/v1/enrich/products", json=ENRICH_BODY, headers={"Authorization": f"Bearer {token}"}
+    )
+
+    assert response.status_code == 401
+
+
+def test_catalog_route_still_reports_pos_scope_when_the_token_carries_one(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    """A point-of-sale token is not rejected on a catalog route — it is just not required."""
+    response = client.post("/v1/enrich/products", json=ENRICH_BODY, headers=auth_headers)
+
+    assert response.status_code == 200

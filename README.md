@@ -207,7 +207,7 @@ Descripción completa y resto de entidades (Return, ReturnSale, Collection, etc.
 - **Inventory:** Id, ProductId, PointOfSaleId, Quantity, IsActive (asignado/desasignado). Unique(ProductId, PointOfSaleId). La presencia de registro activo determina visibilidad del producto para operadores en ese POS.
 - **InventoryMovement:** Id, InventoryId, SaleId/ReturnId (opcionales), UserId, MovementType (Sale, Return, Adjustment, Import), QuantityChange, QuantityBefore, QuantityAfter, Reason (ajustes), MovementDate. Trazabilidad completa de movimientos.
 
-Otras entidades (ProductPhoto, PaymentMethod, PointOfSalePaymentMethod, Return, ReturnSale, Collection, ProductSearchEvent, etc.) se describen con detalle en [Documentos/modelo-de-datos.md](Documentos/modelo-de-datos.md).
+Otras entidades (ProductPhoto, PaymentMethod, PointOfSalePaymentMethod, Return, ReturnSale, Collection, ProductSearchEvent, ProductAiProfile, etc.) se describen con detalle en [Documentos/modelo-de-datos.md](Documentos/modelo-de-datos.md).
 
 ---
 

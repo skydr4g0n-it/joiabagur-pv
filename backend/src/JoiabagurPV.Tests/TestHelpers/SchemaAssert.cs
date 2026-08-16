@@ -107,6 +107,31 @@ public sealed class SchemaAssert : IAsyncDisposable
     }
 
     /// <summary>
+    /// Whether an index enforces uniqueness. Null when the index does not exist.
+    /// </summary>
+    /// <remarks>
+    /// Added by the change that introduces the AI profile, where "one profile per product" is an
+    /// invariant nothing else defends. A non-unique index is indistinguishable from a unique one
+    /// in every symptom available before the damage: it exists, it is reported as present, it
+    /// serves the same queries, and the second row saves without complaint. It surfaces later as
+    /// duplicated documents in the vector index, with no way left to tell which profile is the
+    /// real one.
+    /// </remarks>
+    public async Task<bool?> IndexIsUniqueAsync(string indexName)
+    {
+        var value = await ScalarAsync<bool?>(
+            """
+            SELECT i.indisunique
+            FROM pg_index i
+            JOIN pg_class c ON c.oid = i.indexrelid
+            WHERE c.relname = @index
+            """,
+            ("index", indexName));
+
+        return value;
+    }
+
+    /// <summary>
     /// The delete rule of a foreign key — <c>CASCADE</c>, <c>RESTRICT</c>, <c>SET NULL</c> or
     /// <c>NO ACTION</c>. Null when the constraint does not exist.
     /// </summary>
