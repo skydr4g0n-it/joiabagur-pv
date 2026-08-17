@@ -370,17 +370,25 @@ Ningún número de evaluación mezcla ambas vías sin decirlo.
 | Fuente | Disponibilidad | Uso |
 |---|---|---|
 | Modelo de datos y semántica de negocio | **Real y verificado** | Define esquemas, filtros, permisos, reglas |
-| **Catálogo real e histórico de ventas 2026 anonimizado** | **Confirmado, de tamaño desconocido** | Núcleo del corpus y **ancla del golden set**. Se amplía con sintético hasta alcanzar volumen |
+| **Catálogo real e histórico de ventas 2026 anonimizado** | **Recibido el 2026-08-17: 436 productos, 28 colecciones** | Núcleo del corpus y **ancla del golden set**. Se amplía con sintético hasta alcanzar volumen. **El tamaño resultó suficiente y la calidad textual no**: 38,5 caracteres de media entre nombre y descripción, 51 productos sin descripción. Ver §8.1.1 |
 | Textos comerciales de la joyería (materiales, garantía, tallas) | A pedir al negocio | Semilla del corpus de conocimiento |
-| Fotos de producto | Reales si hay export | No se usan (el índice visual ya existe y es otro problema) |
+| Fotos de producto | **No llegaron: 0 fotos y 0 embeddings visuales en el sistema** | No se usan (el índice visual ya existe y es otro problema). **Consecuencia añadida el 2026-08-17:** la asistencia de redacción de C06a simula un reconocimiento multimodal que no existe, así que no puede verificar piedras ni acabados — solo expandir lo que ya consta y acotar por banda de precio lo que no. Declarado en §15 |
 
 ### 8.1.1. Corpus híbrido: cómo se combinan real y sintético
 
-El export real llegará pero probablemente no dé el volumen necesario. La combinación no es "mezclar y olvidar": tiene tres reglas que protegen la validez de la evaluación.
+El export real llegó el 2026-08-17 con 436 productos: cubre la mitad del volumen objetivo y hay que ampliarlo. La combinación no es "mezclar y olvidar": tiene tres reglas que protegen la validez de la evaluación.
 
-1. **Todo documento lleva `data_origin: real | synthetic`**, tanto en `ai.product_document` como en el golden set. Es una columna, no un comentario.
-2. **El generador sintético se calibra con lo real, no al revés.** Del export se extraen distribución de precios, longitud típica de descripción, convenciones de SKU, mezcla de materiales y tamaño medio de familia; el generador reproduce esas distribuciones. Así el sintético no es "más fácil" por accidente de estilo.
-3. **Toda métrica se reporta desglosada: real, sintético y global.** Es la regla que evita el autoengaño. Los productos sintéticos son más limpios y regulares; si el Recall@5 global sale bien pero el de la porción real sale mal, el sistema no sirve y hay que verlo. **El número que va al README como resultado principal es el de la porción real.**
+1. **Todo documento lleva dos ejes de procedencia**, tanto en `ai.product_document` como en el golden set. Son columnas, no comentarios:
+   - **`data_origin: real | synthetic`** — ¿el producto existe? SKU, precio y colección de un producto `real` son reales, y .NET sigue siendo su autoridad.
+   - **`text_provenance: merchant | ai_assisted | synthetic`** — ¿de dónde sale su texto?
+
+   *Revisado el 2026-08-17.* Originalmente había un solo eje. El export real llegó con 38,5 caracteres de texto por producto y hubo que asistir su redacción; al hacerlo se vio que la columna respondía a **dos preguntas independientes** y se rompía. Un producto real puede tener texto del comerciante o texto asistido sin dejar de ser real.
+2. **El generador sintético se calibra con lo real, no al revés.** Del export se extraen distribución de precios, convenciones de SKU, mezcla de materiales y tamaño medio de familia; el generador reproduce esas distribuciones. Así el sintético no es "más fácil" por accidente de estilo.
+
+   **Excepción, añadida el 2026-08-17: la longitud de descripción no se calibra, se declara.** Heredarla del real daría 100 % de descripciones pobres y no el ~30 % de §8.4, así que las dos reglas se contradecían en cuanto el export resultó ser este. El reparto de calidad —~70 % rico, ~20 % escueto, ~10 % sin descripción— se fija explícitamente en ambos corpus, **sorteado por familia de variantes y no por producto suelto**: si dentro de una familia una talla tuviera texto rico y otra ninguno, el recuperador podría separarlas por riqueza de texto en vez de por talla, que es justo lo que la categoría crítica del golden set pretende medir.
+3. **Toda métrica se reporta desglosada por los dos ejes, y también global.** Es la regla que evita el autoengaño. Los productos sintéticos son más limpios y regulares; si el Recall@5 global sale bien pero el de la porción real sale mal, el sistema no sirve y hay que verlo.
+
+   **El número que va al README como resultado principal es el de `data_origin: real`, declarando junto a él qué `text_provenance` lo compone.** Mientras esa porción llevaba texto del comerciante, era además el grupo de control honesto del experimento. Desde que su texto está asistido ya no lo es, y el README debe decirlo: la afirmación del proyecto es «funciona sobre un catálogo **realista**», no «sobre un catálogo real». Las métricas de enriquecimiento (§11.5) no se ven afectadas —miden al extractor, no a la verdad del dato—; las de recuperación sí dejan de hablar del negocio tal cual es.
 
 Y una regla sobre el golden set: **se etiqueta primero sobre productos reales** y solo se completa con sintéticos si no hay material suficiente para cubrir las 9 categorías. Si el export trae, por ejemplo, 200 productos, esos 200 sostienen la mayor parte de las 60-70 consultas.
 
@@ -397,7 +405,7 @@ El histórico así generado es **coherente por construcción** con catálogo y s
 
 | # | Dataset | Volumen | Novedades v3 | Alimenta |
 |---|---|---|---|---|
-| D0 | **Catálogo real anonimizado** | Desconocido | **Ancla del corpus y del golden set**; calibra las distribuciones de D1 | Índice, evaluación |
+| D0 | **Catálogo real anonimizado** | **436** (recibido) | **Ancla del corpus y del golden set**; calibra las distribuciones de D1 salvo la longitud de descripción (§8.1.1 regla 2). Su texto se redacta asistido en C06a: `data_origin: real`, `text_provenance: ai_assisted` | Índice, evaluación |
 | D1 | Catálogo sintético | Hasta completar 900-1.200 con D0, ~350 familias | **`materials[]` multivalor** (~35 % con 2+ materiales); distribuciones calibradas con D0 | Índice |
 | D2 | Perfiles IA | = D1 | `materials[]`, confianza por campo, `source: rule\|inferred` | Filtros, revisión |
 | D3 | `SourceText` + embeddings | = D1 | Incluye familia y variante | Búsqueda vectorial |
@@ -416,11 +424,15 @@ El histórico así generado es **coherente por construcción** con catálogo y s
 
 ### 8.4. Realismo dirigido
 
-Familias confundibles (3-5 variantes con diferencia solo de talla) · ~30 % de descripciones pobres · 3-4 convenciones de SKU mezcladas · **~35 % de productos multi-material** · **15 % de productos huérfanos de familia** para probar la alerta · colisiones semánticas verificadas (ningún par > 0,97 coseno) · consultas con faltas, abreviaturas y sinónimos · estacionalidad por hotel.
+Familias confundibles (3-5 variantes con diferencia solo de talla) · **~20 % de descripciones escuetas y ~10 % sin descripción** · 3-4 convenciones de SKU mezcladas · **~35 % de productos multi-material** · **15 % de productos huérfanos de familia** para probar la alerta · colisiones semánticas verificadas (ningún par > 0,97 coseno) · consultas con faltas, abreviaturas y sinónimos · estacionalidad por hotel.
+
+**Revisado el 2026-08-17.** Donde antes decía «~30 % de descripciones pobres» ahora hay dos tramos, porque «pobre» agrupaba dos casos que el recuperador no trata igual: un texto escueto aporta algo de señal léxica y uno vacío no aporta ninguna. Y **el reparto se sortea por familia de variantes, nunca por producto suelto**: todos los miembros de una familia comparten nivel. Sin esa regla, la riqueza del texto se convierte en un discriminador artificial dentro de la familia y contamina la desambiguación de variantes, que son 10 de las 60-70 consultas del golden set y el caso que este documento llama crítico. La unidad es la familia de variantes y no el tipo de pieza: sobre el catálogo real hay 403 grupos de variantes frente a solo 37 tipos, cuatro de los cuales concentran el 78 % del catálogo.
 
 ### 8.5. Calidad, privacidad y trazabilidad
 
-- **Puertas de calidad** antes de indexar: unicidad de SKU, vocabulario cerrado respetado, `materials` no vacío salvo justificación, cobertura de tags ≥ 90 %, sin colisiones, sin obligatorios vacíos. Falla la puerta → falla el pipeline.
+- **Puertas de calidad** antes de indexar: unicidad de SKU, vocabulario cerrado respetado, `materials` no vacío salvo justificación, **cobertura de tags ≥ 70 % global y ≥ 90 % sobre el estrato `text_provenance: ai_assisted`**, sin colisiones, sin obligatorios vacíos. Falla la puerta → falla el pipeline.
+
+  *Revisado el 2026-08-17.* El umbral era del 90 % global, cifra fijada suponiendo descripciones de longitud normal. Con el reparto de §8.4 el techo alcanzable es ≈ 77 %, así que el 90 % global bloquearía el pipeline siempre. Peor aún, un umbral solo global **mide en parte la propia política de ruido**: cambiar el reparto haría saltar la puerta sin que el extractor se hubiera tocado, y una puerta que salta por decisiones nuestras deja de detectar regresiones. El desglose por estrato conserva la exigencia donde hay evidencia textual y deja de castigar el 10 % que se vació a propósito. Es también lo que permite cumplir la puerta **sin violar** la regla de §7.1 —«devuelve `[]` si no hay evidencia, nunca inventa»—, con la que el 90 % global era incompatible sobre este catálogo.
 - **PII**: el modelo **no almacena datos de cliente final** (`Sale` no tiene cliente). Los únicos datos personales son de operadores: ficticios en sintético, anonimizados antes de salir de producción si hay export. Ningún dato personal entra en el índice ni en un prompt.
 - **Trazabilidad**: cada dataset lleva `generator_version`, `seed`, `model`, `generated_at`; el corpus se regenera con un comando.
 
@@ -617,7 +629,11 @@ Si el **26 de agosto** (fin de O3) no está la tabla de ablations y el sistema d
 
 ## 15. Limitaciones que el README debe declarar
 
-1. **El corpus es híbrido**: una porción real anonimizada, ampliada con datos sintéticos calibrados sobre ella. El README declara el porcentaje exacto de cada origen y **reporta las métricas desglosadas**, con la porción real como resultado principal.
+1. **El corpus es híbrido**: una porción real anonimizada (436 productos), ampliada con datos sintéticos calibrados sobre ella. El README declara el porcentaje exacto de cada origen y **reporta las métricas desglosadas**, con la porción real como resultado principal.
+
+   **Y el texto de esa porción real no lo escribió el comerciante** *(añadido el 2026-08-17)*. El export llegó con 38,5 caracteres de media entre nombre y descripción —51 productos sin descripción ninguna— y **sin una sola etiqueta de estilo, color u ocasión**, que son campos que el enriquecimiento necesita extraer. Su texto se ha redactado con un LLM que **simula un reconocimiento multimodal de fotografías que no está implementado**: no hay ni una foto en el sistema. La redacción expande la evidencia que sí constaba —el 88 % de los productos ya declaraba tipo de pieza y material— y acota por banda de precio lo que no constaba, pero **los atributos no derivables de esa evidencia son plausibles, no verificados**: un anillo puede figurar con diamantes sin que nadie haya comprobado que los lleva. `SKU`, precio y colección no se tocan en ningún caso y siguen siendo reales.
+
+   Tres consecuencias que el lector debe tener presentes: la afirmación defendible es **«funciona sobre un catálogo realista»**, no «sobre un catálogo real»; las métricas de **enriquecimiento** (§11.5) no se ven afectadas, porque miden al extractor y no la verdad del dato; las de **recuperación** dejan de describir el negocio tal como está hoy. El catálogo original queda archivado y **el delta entre ambos sigue siendo medible** con un segundo `eval_run` (§11.2).
 2. **Solo el 12-15 % de los perfiles está revisado por humanos**; el resto es `auto_bulk` y está marcado como tal en todas las métricas.
 3. **No hay validación con usuarios reales.** Los KPIs de negocio están instrumentados, no medidos.
 4. **El golden set es pequeño (60-70) y hecho por el equipo.** Mitigado con *pooling* y doble etiquetado, no eliminado.

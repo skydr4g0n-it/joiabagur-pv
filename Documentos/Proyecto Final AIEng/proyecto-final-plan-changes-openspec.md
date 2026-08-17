@@ -12,6 +12,48 @@
 
 Este documento se escribió antes de implementar. Cuando una sesión de diseño de un change concreto altera lo que su ficha decía, el cambio se registra aquí con fecha y motivo, y la ficha afectada se corrige en el sitio.
 
+### 2026-08-17 — C06, tras la sesión de exploración previa al proposal: el export real sirve por tamaño y no por texto
+
+El export llegó y se importó: **436 productos**. El plan se había preparado para que fuera **pequeño** —§14 pregunta 7 pregunta por su tamaño, §13.5 teme que sea insuficiente— y resultó ser de tamaño razonable (la mitad del objetivo de 900-1.200) pero **textualmente casi vacío**: 38,5 caracteres de media entre nombre y descripción, con 51 productos sin descripción ninguna.
+
+Medido por campo que C09 tiene que extraer, el corpus no es pobre de forma uniforme, es **ciego a las etiquetas comerciales**:
+
+| Campo | Evidencia en los 436 reales | |
+|---|---|---|
+| `piece_type` | 383 | **88 %** |
+| `materials[]` | 384 | **88 %** |
+| `size_label` | 66 | 15 % (por regex, como ya diseñaba C09) |
+| `stone_type` | 34 | **8 %** |
+| tags de color / estilo / ocasión | ~0 | **sin ninguna base** |
+
+Eso destapa **dos contradicciones que ya estaban en el documento** y que nadie podía ver hasta tener el dato:
+
+| # | Contradicción | Resolución |
+|---|---|---|
+| 1 | **C09 no puede aprobar su propia puerta.** §8.5 exige `cobertura de tags ≥ 90 %` y §7.1 exige «devuelve `[]` si no hay evidencia, nunca inventa». Sobre 38 caracteres sin vocabulario de estilo ni ocasión, ambas a la vez son insatisfacibles | La puerta baja a **70 % global** y se mide además **≥ 90 % sobre el estrato con texto asistido**. Ver la ficha de C09 |
+| 2 | **C06 se contradice consigo mismo.** §8.1.1 regla 2 calibra el sintético con lo real «incluida la longitud típica de descripción»; §8.4 exige «~30 % de descripciones pobres». Calibrar sobre 15 caracteres da **100 %** pobres | El reparto de calidad deja de heredarse del real y se **declara**: ~70 % rico, ~20 % escueto, ~10 % sin descripción |
+
+**C06 se parte en dos, y el motivo es de ruta crítica, no de calidad.** C09 se construye y prueba con LLM falso sobre fixtures: necesita *un* corpus, no *el* corpus. Los 900-1.200 sintéticos los necesitan C11, C10 y C24, no C09.
+
+| Change | Alcance | Desbloquea |
+|---|---|---|
+| **C06a** `add-real-catalog-ingestion-and-text-assist` | Ingesta de los 436; asistencia de redacción; reparto de calidad; JSONL versionado | **C09 y C10** |
+| **C06b** `add-synthetic-catalog-augmentation` | Ampliación a 900-1.200, ~350 familias, 35 % multi-material, 15 % huérfanos | C11, C24 |
+
+Partir no es recortar, así que la lista «nunca se recorta» del §13.4 no lo impide; y Python no tiene la regla de migración única, así que la revisión de Alembic que esto añade es barata.
+
+**Tres decisiones de diseño que salen de la sesión:**
+
+1. **`data_origin` confundía dos ejes independientes** —«¿el producto es real?» y «¿de dónde sale su texto?»— y por eso se rompía al mejorar el corpus. Se separa: `data_origin` sigue significando identidad del producto (SKU, precio y colección son reales y .NET manda sobre ellos) y aparece **`text_provenance`** (`merchant` | `ai_assisted` | `synthetic`). La regla 3 de §8.1.1 se reescribe sobre el eje nuevo.
+2. **La unidad del reparto de calidad es la familia de variantes, nunca el producto suelto.** Si dentro de una familia una talla tiene texto rico y otra ninguno, el recuperador puede separarlas por riqueza de texto en vez de por talla — y la desambiguación de variantes son 10 de las 60-70 consultas del golden set, la categoría que §8.4 llama «el caso crítico». Medido: **403 grupos**, de los cuales 23 con variantes (56 productos) y 380 sueltos. Cuidado con leer «familia» como tipo de pieza: hay 37 tipos pero cuatro concentran el 78 %, y sortear por ahí daría *todos* los pendientes ricos y *todos* los colgantes vacíos.
+3. **El texto asistido simula un reconocimiento multimodal que no existe y que el diseño excluyó.** §8.1 dice de las fotos «no se usan (el índice visual ya existe y es otro problema)», y se ha verificado que hay **0 fotos y 0 embeddings visuales** en la base. Sin fotos el modelo no puede saber cuántas piedras lleva una joya: expande lo que ya consta y acota por banda de precio lo que no. Esto **entra en §15 como limitación declarada**, no como detalle de implementación.
+
+**Consecuencia sobre el resultado que publica el README.** §15 limitación 1 obliga a publicar la porción real como resultado principal, y §11.2 y C24 aplican ahí el umbral de aceptación. Con el texto real redactado por un LLM, ese número deja de decir lo que decía: la afirmación del proyecto pasa de «funciona sobre un catálogo real de joyería» a «funciona sobre un catálogo realista». Sigue siendo defendible, pero hay que escribirlo. Las métricas de **enriquecimiento** (§11.5, tasa de corrección por campo) sobreviven intactas —miden al extractor, no a la verdad—; las de **recuperación** son las que dejan de hablar del negocio real.
+
+**Puerta que se deja abierta a coste cero.** El corpus original queda archivado (`.xlsx` y volcado `pg_dump` en `data/catalog/real/`, fuera de git). C24 admitirá un segundo `eval_run` sobre él, de modo que el delta «con asistencia − sin asistencia» siga siendo medible más adelante. Es el resultado más fuerte que este proyecto podría enseñar y perderlo era irreversible.
+
+---
+
 ### 2026-08-17 — C07, al aplicar: la zona, una reserva para C18 y dos deudas que hereda C12
 
 | Qué decía la ficha | Qué es en realidad | Por qué |
@@ -128,11 +170,12 @@ Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin e
 | **C03** | `add-dotnet-ai-gateway-client` | .NET | C02 | 🔴 | — |
 | **C04** | `add-product-search-event-tracking` | .NET 🗄️ | — | 🟢 | specs v2 §5.8 |
 | **C05** | `add-pgvector-schema-foundation` | Python, infra | C01 | 🔴 | — |
-| **C06** | `add-hybrid-catalog-corpus` | Python | C01 | 🔴 | rev. dec. 3 |
+| **C06a** | `add-real-catalog-ingestion-and-text-assist` | Python | C01 | 🔴 | **rev. 17 ago** |
+| **C06b** | `add-synthetic-catalog-augmentation` | Python | C06a | 🟢 | rev. dec. 3, **17 ago** |
 | **C07** | `add-product-family-entity` | .NET 🗄️ | — | 🟢 | **rev. dec. 2** |
 | **C08** | `add-product-ai-profile-entity` | .NET 🗄️ | C03 | 🟢 | rev. dec. 3, 5 |
-| **C09** | `add-catalog-enrichment-pipeline` | Python | C06 | 🔴 | rev. dec. 3, 5 |
-| **C10** | `add-synthetic-world-simulator` | Python | C06 | 🟢 | rev. dec. 8 |
+| **C09** | `add-catalog-enrichment-pipeline` | Python | C06a | 🔴 | rev. dec. 3, 5, **17 ago** |
+| **C10** | `add-synthetic-world-simulator` | Python | C06a | 🟢 | rev. dec. 8 |
 | **C11** | `add-source-text-and-embedding-client` | Python | C05, C09 | 🔴 | — |
 | **C12** | `add-dotnet-index-feed-endpoints` | .NET | C07, C08 | 🔴 | **rev. dec. 10** |
 | **C13** | `add-product-document-indexer` | Python | C11, C12 | 🔴 | — |
@@ -230,13 +273,26 @@ Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin e
 
 ---
 
-#### C06 · `add-hybrid-catalog-corpus` 🔴
+> **Fichas revisadas el 2026-08-17** tras la sesión de exploración previa al proposal, con el export real ya importado. C06 se parte en dos. Ver [§0](#0-revisiones-posteriores-a-la-versión-3) para el registro de qué cambió y por qué.
 
-**Objetivo.** Ampliar el catálogo **real** hasta el volumen necesario con productos sintéticos **calibrados sobre él**, con el ruido dirigido que hace realista el problema.
-**Prereq.** C01 · **Zona.** `ai-service/src/jbg_ai/data/generators/`
-**Alcance.** Ingesta del export real anonimizado si está disponible, marcado **`data_origin: real`**; extracción de sus distribuciones (precio, longitud de descripción, convenciones de SKU, mezcla de materiales, tamaño de familia); generación sintética **reproduciendo esas distribuciones** hasta 900-1.200 productos, ~350 familias con variantes S/M/L, marcados `data_origin: synthetic`; **~35 % multi-material**; ~30 % descripciones pobres; **15 % de huérfanos de familia**; salida JSONL versionada.
-**Tests.** `test_generator_is_deterministic_for_same_seed`; `test_skus_are_unique_across_real_and_synthetic`; `test_synthetic_price_distribution_matches_real_seed`; `test_multi_material_ratio_within_tolerance`; `test_orphan_family_ratio_within_tolerance`; `test_every_product_has_data_origin`.
-**Si no hay export a tiempo.** El generador funciona con distribuciones por defecto y todo queda `data_origin: synthetic`; cuando llegue el export se re-ejecuta la calibración. No bloquea.
+#### C06a · `add-real-catalog-ingestion-and-text-assist` 🔴
+
+**Objetivo.** Convertir el export real en un corpus sobre el que el enriquecimiento de C09 sea demostrable, sin falsear lo que el corpus es. **Desbloquea C09 y C10 sin esperar al volumen sintético.**
+**Prereq.** C01 · **Zona.** `ai-service/src/jbg_ai/data/generators/`, `ai-service/prompts/`, `ai-service/migrations/`
+**Alcance.** Ingesta de los **436 productos reales** (`data_origin: real`); revisión de Alembic que añade **`text_provenance`** (`merchant` | `ai_assisted` | `synthetic`) con su CHECK, separando identidad de producto y procedencia del texto; derivación de la **agrupación de variantes** (403 grupos, 23 con variantes) y emisión en el JSONL para que C18 la reutilice como semilla; **reparto de calidad sorteado por familia con semilla** —~70 % rico, ~20 % escueto, ~10 % sin descripción—; asistencia de redacción con prompt versionado que **expande la evidencia existente y acota por banda de precio lo que no consta**, sin tocar nunca SKU, precio ni colección; salida JSONL versionada con `generator_version`, `seed`, `model` y `generated_at`.
+**Tests.** `test_generator_is_deterministic_for_same_seed`; **`test_variant_family_shares_text_quality`** (ningún grupo mezcla dos niveles: es lo que impide que la riqueza de texto se cuele como discriminador en la categoría crítica del golden set); `test_text_quality_ratios_within_tolerance_by_product`; **`test_sku_price_and_collection_are_never_modified`** (la asistencia no toca dato autoritativo de .NET); `test_every_product_has_data_origin_and_text_provenance`; `test_migration_rejects_unknown_text_provenance`; `test_upgrade_downgrade_is_reversible`.
+**Limitación que hereda §15.** El texto asistido **simula un reconocimiento multimodal que no se ha implementado y que §8.1 excluyó**; no hay fotos en el sistema (verificado: 0 `ProductPhotos`, 0 embeddings visuales). Los atributos no derivables de la evidencia previa son plausibles, no verificados.
+
+---
+
+#### C06b · `add-synthetic-catalog-augmentation` 🟢
+
+**Objetivo.** Llevar el corpus al volumen necesario con productos sintéticos **calibrados sobre el real**, con el ruido dirigido que hace realista el problema.
+**Prereq.** C06a · **Zona.** `ai-service/src/jbg_ai/data/generators/`
+**Alcance.** Extracción de las distribuciones del real (precio, convenciones de SKU, mezcla de materiales, tamaño de familia); generación **reproduciendo esas distribuciones** hasta 900-1.200 productos, ~350 familias con variantes S/M/L, marcados `data_origin: synthetic` y `text_provenance: synthetic`; **~35 % multi-material**; **15 % de huérfanos de familia**; salida JSONL versionada.
+**Tests.** `test_generator_is_deterministic_for_same_seed`; `test_skus_are_unique_across_real_and_synthetic`; `test_synthetic_price_distribution_matches_real_seed`; `test_multi_material_ratio_within_tolerance`; `test_orphan_family_ratio_within_tolerance`.
+**Nota sobre la calibración.** La **longitud de descripción se excluye** de lo que se calibra: heredarla del real daría 100 % de descripciones pobres, no el ~30 % que pide §8.4. El reparto de calidad se declara, igual que en C06a, en lugar de heredarse. Es la contradicción 2 registrada en §0.
+**Puede correr en paralelo** a C09 y C10: solo lo necesitan C11 y C24, por volumen.
 
 ---
 
@@ -261,9 +317,10 @@ Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin e
 #### C09 · `add-catalog-enrichment-pipeline` 🔴
 
 **Objetivo.** De producto crudo a perfil propuesto: extracción estructurada con **`materials[]`**, vocabulario cerrado, confianza por campo y puertas de calidad de lote.
-**Prereq.** C06 · **Zona.** `ai-service/src/jbg_ai/enrichment/`
-**Alcance.** Normalización determinista previa (talla por regex → `source: rule`); prompt **v1 versionado** en `ai-service/prompts/enrichment/v1.md`; JSON schema estricto a temperatura 0; **vocabulario cerrado de materiales** con normalización de sinónimos ("plata de ley", "925" → `plata`); `materials` como lista, `[]` si no hay evidencia; confianza **por campo**; puertas de lote (unicidad SKU, cobertura de tags ≥ 90 %, vocabulario respetado); `POST /v1/enrich/products` real.
-**Tests.** Con LLM falso: `test_extracts_multiple_materials_from_description`; `test_material_synonym_normalized_to_canonical_term`; `test_rejects_value_outside_closed_vocabulary`; `test_empty_materials_flags_review_not_default_value`; `test_size_regex_marks_field_source_as_rule`; `test_batch_fails_when_tag_coverage_below_threshold`.
+**Prereq.** C06a · **Zona.** `ai-service/src/jbg_ai/enrichment/`
+**Alcance.** Normalización determinista previa (talla por regex → `source: rule`); prompt **v1 versionado** en `ai-service/prompts/enrichment/v1.md`; JSON schema estricto a temperatura 0; **vocabulario cerrado de materiales** con normalización de sinónimos ("plata de ley", "925" → `plata`); `materials` como lista, `[]` si no hay evidencia; confianza **por campo**; puertas de lote (unicidad SKU, **cobertura de tags ≥ 70 % global y ≥ 90 % sobre el estrato `text_provenance: ai_assisted`**, vocabulario respetado); `POST /v1/enrich/products` real.
+**Tests.** Con LLM falso: `test_extracts_multiple_materials_from_description`; `test_material_synonym_normalized_to_canonical_term`; `test_rejects_value_outside_closed_vocabulary`; `test_empty_materials_flags_review_not_default_value`; `test_size_regex_marks_field_source_as_rule`; `test_batch_fails_when_tag_coverage_below_threshold`; **`test_tag_coverage_gate_is_evaluated_per_text_provenance`**.
+**Por qué la puerta baja de 90 % a 70 %** *(revisado el 2026-08-17)*. Con el reparto de C06a el techo alcanzable es ≈ 77 % —0,70 × 95 % + 0,20 × 40 % + 0,10 × 20 %—, así que un 90 % global es **inalcanzable por construcción** y bloquearía el pipeline siempre. Un umbral solo global tendría además el defecto de **medir en parte nuestra propia política de ruido**: cambiar el reparto a 60/25/15 lo haría saltar sin que el extractor hubiera cambiado. El desglose por estrato conserva el 90 % donde sí significa algo y deja de castigar el 10 % que se vació a propósito. Es lo que permite aprobar la puerta **sin violar** la regla de §7.1: «devuelve `[]` si no hay evidencia, nunca inventa».
 **Si se desborda:** partir en pipeline+prompt / puertas de calidad.
 
 ---
@@ -271,7 +328,7 @@ Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin e
 #### C10 · `add-synthetic-world-simulator` 🟢
 
 **Objetivo.** POS, inventario, histórico de ventas y **co-ocurrencia**, coherentes por construcción con el catálogo.
-**Prereq.** C06 · **Zona.** `ai-service/src/jbg_ai/data/generators/`
+**Prereq.** C06a · **Zona.** `ai-service/src/jbg_ai/data/generators/`
 **Alcance.** 10-14 POS con perfil de clientela, estacionalidad y **marca de origen de suministro**; matriz de propensión producto×POS; 5.000-9.000 filas de inventario respetando `Inventory.IsActive`; simulación Poisson → 15.000-25.000 ventas sobre 14-18 meses; movimientos derivados; **co-ocurrencia por operación de venta** (`BulkOperationId` o mismo POS y día) para complementarios.
 **Tests.** `test_no_sale_without_stock_at_that_pos`; `test_seasonality_peaks_match_pos_profile`; `test_inventory_movements_reconcile_with_final_stock`; `test_co_occurrence_only_counts_same_operation`; `test_simulation_is_deterministic_for_same_seed`.
 **Si se desborda:** partir en POS+inventario / ventas+co-ocurrencia.
@@ -592,11 +649,12 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ```mermaid
 flowchart LR
-    C01 --> C02 & C05 & C06
+    C01 --> C02 & C05 & C06a
     C02 --> C03
     C03 --> C08 & C15
     C05 --> C11
-    C06 --> C09 & C10
+    C06a --> C06b & C09 & C10
+    C06b --> C11
     C07 --> C12 & C18 & C30
     C08 --> C12 & C28
     C09 --> C11
@@ -632,7 +690,7 @@ flowchart LR
 | Ola | Fechas | Changes | Ruta crítica de la ola |
 |---|---|---|---|
 | **O0** | 3-5 ago | C01-C04 (4) | C01 → C02 → C03 |
-| **O1** | 6-12 ago | C05-C12 (8) | C06 → C09 → C11 → C12 |
+| **O1** | 6-12 ago | C05-C12 (9, tras partir C06) | C06a → C09 → C11 → C12, con **C06b en paralelo** |
 | **O2** | 13-19 ago | C13-C19 (7) | C13 → C14 → C15 → C16, C17 |
 | **O3** | 20-26 ago | C20-C29 (10) | C21 → C22 → C24 → C25 |
 | **O4** | 27-31 ago | C30-C38 (9) | C30 → C31 → C32, C34 → C36, C38 |
@@ -666,7 +724,7 @@ Si el **26 de agosto** (fin de O3) no están la tabla de ablations y el sistema 
 7. **Golden set de C24** 70 → 45 consultas, **nunca renunciando al doble etiquetado**
 8. **C35** agente de inventario → las recomendaciones se generan por reglas puras (C29), sin capa agéntica ni redacción LLM
 
-**Nunca se recortan:** C01, C02, C03, C05, C06, C07, C09, C11, C12, C13, C14, C15, C16, C17, C21, C22, C24, C30, C32, C34, C36, el validador de C38 y C39.
+**Nunca se recortan:** C01, C02, C03, C05, **C06a**, C07, C09, C11, C12, C13, C14, C15, C16, C17, C21, C22, C24, C30, C32, C34, C36, el validador de C38 y C39. **C06b sí admite recorte**: si no llega, el corpus se queda en los 436 reales, todas las métricas se reportan sobre ellos y el README declara que no hubo ampliación sintética. Se pierde volumen y las categorías del golden set que necesiten productos inexistentes, no el sistema.
 
 ---
 
