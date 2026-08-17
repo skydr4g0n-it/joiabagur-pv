@@ -69,7 +69,40 @@ To change something on your own machine, create `appsettings.Local.json` in `src
 
 For anything genuinely secret, prefer .NET user-secrets (`dotnet user-secrets set`), which stores values in your user profile instead of the working tree. See [Configuration](#configuration).
 
-### 4. Setup HTTPS Certificates (Development)
+### 4. Create your launch profile
+
+`Properties/launchSettings.json` is **gitignored**: it pins ports and environment variables to your own machine, so each developer keeps a separate one. Copy the versioned template:
+
+```bash
+# Windows PowerShell
+Copy-Item src/JoiabagurPV.API/Properties/launchSettings.Example.json `
+          src/JoiabagurPV.API/Properties/launchSettings.json
+
+# Linux/Mac
+cp src/JoiabagurPV.API/Properties/launchSettings.Example.json \
+   src/JoiabagurPV.API/Properties/launchSettings.json
+```
+
+**This step is not optional, and skipping it fails in a way that does not point at its cause.** With no launch profile, `ASPNETCORE_ENVIRONMENT` is unset and .NET falls back to `Production`. Under `Production`, `AuthController.SetTokenCookies` issues the session cookie with `SameSite=None` and — since there is no HTTPS locally — `Secure=false`. Every modern browser rejects that combination: `POST /api/auth/login` answers `200`, the cookie is discarded silently, and every authenticated call after it answers `401`. `curl` does not enforce the rule, so a smoke test from the terminal passes while the browser cannot log in at all.
+
+Which one you are getting:
+
+```bash
+curl -s -i -X POST http://localhost:5056/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"Admin123!"}' | grep -i set-cookie
+```
+
+`samesite=lax` is correct. `samesite=none` means the profile was not applied.
+
+Two properties of the file itself:
+
+- **It admits no comments.** Unlike `appsettings*.json`, which the configuration binder reads leniently, `launchSettings.json` is parsed as strict JSON by the SDK. A single `//` line rejects the whole file with `'/' is an invalid start of a property name`, and `dotnet run` carries on with no profile — straight back to `Production`, with the cookie symptom above.
+- **Port 5056 is not arbitrary.** It is the value [`frontend/.env.development`](../frontend/.env.development) expects in `VITE_API_BASE_URL`. Change it and the SPA stops finding the API.
+
+### 5. Setup HTTPS Certificates (Development)
+
+Only needed for the `https` profile; the `http` profile of step 4 works without it.
 
 ```bash
 # Windows PowerShell
@@ -79,17 +112,24 @@ For anything genuinely secret, prefer .NET user-secrets (`dotnet user-secrets se
 ./setup-dev-certificates.sh
 ```
 
-### 5. Run the Application
+### 6. Run the Application
 
 ```bash
 cd src/JoiabagurPV.API
-dotnet run --launch-profile https
+dotnet run
 ```
 
-The API will be available at:
+With no arguments, `dotnet run` picks the **first** profile in `launchSettings.json` — `http`:
+- **API**: `http://localhost:5056`
+- **Scalar API Reference**: `http://localhost:5056/scalar/v1`
+- **OpenAPI document**: `http://localhost:5056/openapi/v1.json`
+
+Over HTTPS (requires step 5), `dotnet run --launch-profile https`:
 - **API**: `https://localhost:7169`
 - **Scalar API Reference**: `https://localhost:7169/scalar/v1`
 - **OpenAPI document**: `https://localhost:7169/openapi/v1.json`
+
+Scalar and the OpenAPI document are mapped only when the environment is `Development`, which is another thing the launch profile of step 4 is what turns on.
 
 ## Authentication
 

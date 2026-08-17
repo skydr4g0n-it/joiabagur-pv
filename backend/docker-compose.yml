@@ -3,9 +3,15 @@ version: '3.8'
 services:
   postgres:
     # pgvector-enabled PG 15 so extension `vector` is available for C05.
-    # Image swap may require recreating the local volume:
-    #   docker compose down -v
-    # (destroys local DB data; acceptable for O0 / empty catalog).
+    #
+    # `docker compose down` keeps the data: the volume is named and survives the
+    # container being stopped, removed or recreated. `docker compose down -v` does
+    # destroy it. That was the recipe recommended here while the catalogue was
+    # empty; it stopped being empty when the real shop catalogue was imported, so
+    # `-v` now costs a re-import. If the volume genuinely has to be recreated
+    # (another image swap, say), dump it first:
+    #   docker exec jpv-pv-postgres pg_dump -U postgres joiabagur_pv > backup.sql
+    #
     # Do NOT create schema `ai` or run CREATE EXTENSION here: that is the one-off
     # ai-service/migrations/bootstrap.sql, run once with admin privileges.
     image: pgvector/pgvector:pg15
@@ -60,7 +66,17 @@ services:
       - jpv-network
 
 volumes:
+  # Explicit `name`, so the volume is `jpv-pv-postgres-data` rather than the
+  # `<directory>_postgres_data` Compose derives from the folder. Two reasons:
+  #   1. Docker Desktop lists the volumes of every project side by side, and a
+  #      name taken from the folder ("backend_postgres_data") says nothing about
+  #      which project owns it.
+  #   2. It pairs with container_name `jpv-pv-postgres`, so the two land together
+  #      in any alphabetically sorted listing.
+  # Renaming does NOT migrate anything: Compose creates a new empty volume and
+  # leaves the previous one orphaned until someone removes it by hand.
   postgres_data:
+    name: jpv-pv-postgres-data
 
 networks:
   jpv-network:

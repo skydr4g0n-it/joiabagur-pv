@@ -72,9 +72,12 @@ El usuario aterriza en la pantalla de login; tras autenticarse, accede al dashbo
    ```bash
    cd backend/src/JoiabagurPV.API
    dotnet restore
+   cp Properties/launchSettings.Example.json Properties/launchSettings.json
    dotnet run
    ```
-   La API queda disponible en `http://localhost:5000`. Los ficheros `appsettings*.json` ya vienen versionados con valores de desarrollo que funcionan tal cual; para ajustar algo en tu máquina, crea `appsettings.Local.json` (ignorado por git) o usa user-secrets, en lugar de editar los ficheros versionados. Si se usan migraciones EF Core, ejecutar `dotnet ef database update` desde el proyecto API o el de Infrastructure según la estructura del proyecto.
+   La API queda disponible en `http://localhost:5056`. **El copiado del perfil de arranque no es opcional:** `launchSettings.json` está ignorado por git y, sin él, `ASPNETCORE_ENVIRONMENT` queda vacío, .NET asume `Production` y la cookie de sesión sale con `SameSite=None` sin `Secure` — combinación que el navegador descarta, dejando el login en un `200` engañoso y todo lo autenticado en `401`. El detalle está en [backend/README.md](backend/README.md#4-create-your-launch-profile).
+
+   Los ficheros `appsettings*.json` ya vienen versionados con valores de desarrollo que funcionan tal cual; para ajustar algo en tu máquina, crea `appsettings.Local.json` (ignorado por git) o usa user-secrets, en lugar de editar los ficheros versionados. Las migraciones EF Core se aplican solas en cada arranque, junto con la siembra del usuario administrador; para aplicarlas a mano, `dotnet ef database update --project ../JoiabagurPV.Infrastructure`.
 
 2. **Frontend**
    ```bash
@@ -82,7 +85,7 @@ El usuario aterriza en la pantalla de login; tras autenticarse, accede al dashbo
    npm install --legacy-peer-deps
    npm run dev
    ```
-   La UI queda disponible en `http://localhost:3000`. Configurar `VITE_API_BASE_URL` si la API no está en `http://localhost:5000/api`.
+   La UI queda disponible en `http://localhost:3000`. El fichero `.env.development` ya apunta a `http://localhost:5056/api`, el mismo puerto que fija el perfil de arranque del backend; solo hay que tocar `VITE_API_BASE_URL` si cambias uno de los dos.
 
 3. **Usuario por defecto (desarrollo)**  
    Usuario: `admin`. Contraseña: `Admin123!`. Cambiar la contraseña tras el primer acceso.
