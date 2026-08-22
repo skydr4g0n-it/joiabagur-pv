@@ -146,6 +146,8 @@ flowchart TB
 - `Documentos/`: Arquitectura, modelo de datos, épicas, historias de usuario, guías de deploy y testing.
 - `openspec/`: Especificaciones (specs) y cambios (changes) según metodología OpenSpec (spec-driven development).
 - `ai-service/`: Microservicio Python `jbg-ai` (FastAPI) del Proyecto Final de IA. Contenedor independiente, alcanzable solo desde el backend .NET.
+- `scripts/catalog/`: pipeline offline de C06a (lectura xlsx, JSONL, ingesta local de `Description`). No forma parte de `jbg-ai`.
+- `data/catalog/real/generated/`: corpus JSONL versionado (`data_origin: real`). El xlsx crudo permanece gitignored.
 - `terraform/`: Pila de infraestructura AWS de producción (EC2, RDS, S3, ECR, SSM, OIDC).
 
 ### 2.4. Infraestructura y despliegue

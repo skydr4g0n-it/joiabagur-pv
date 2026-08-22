@@ -71,7 +71,7 @@ El valor no es de usuario final de tienda —no hay pantalla— sino de **desblo
 [epicas.md](../../epicas.md) (EP12),
 [modelo-de-datos.md](../../modelo-de-datos.md) (`Product`),
 [HU-AIENG-001.md](HU-AIENG-001.md), [HU-AIENG-005.md](HU-AIENG-005.md) (`data_origin` en `ai.product_document`),
-change OpenSpec `openspec/changes/add-real-catalog-ingestion-and-text-assist/` y su ticket técnico,
+change OpenSpec [`openspec/changes/archive/2026-08-22-add-real-catalog-ingestion-and-text-assist/`](../../../openspec/changes/archive/2026-08-22-add-real-catalog-ingestion-and-text-assist/) y su [ticket técnico](../../../openspec/changes/archive/2026-08-22-add-real-catalog-ingestion-and-text-assist/ticket.md),
 [`ExcelImportService`](../../../backend/src/JoiabagurPV.Application/Services/ExcelImportService.cs).
 
 ---

@@ -380,6 +380,7 @@ Cimientos del microservicio `jbg-ai`: esqueleto ejecutable, contratos HTTP conge
 Construcción del corpus sobre el que opera todo el sistema RAG: perfiles de producto extraídos con LLM contra vocabularios cerrados, confianza por campo y revisión humana híbrida, más el corpus de conocimiento comercial que permite responder con citas verificables.
 
 **Alcance:**
+- ✅ Corpus JSONL de 436 productos reales con procedencia dual, pipeline offline en `scripts/catalog/` e ingesta local de `Description` (C06a)
 - Pipeline de enriquecimiento: normalización determinista → extracción estructurada → validación → confianza por campo
 - `materials[]` como lista contra vocabulario cerrado; nunca se inventa un material por defecto
 - Entidad `ProductAiProfile` en .NET con su ciclo de aprobación
@@ -387,7 +388,7 @@ Construcción del corpus sobre el que opera todo el sistema RAG: perfiles de pro
 - Corpus de conocimiento comercial (materiales, tallas, cuidados, políticas), troceado y citable
 - Generador de mundo sintético con semilla fija para disponer de catálogo, inventario y ventas coherentes
 
-**Changes asociados:** C06a, C06b, C08, C09, C10, C11, C23
+**Changes asociados:** C06a (hecho), C06b, C08, C09, C10, C11, C23
 
 **User Stories:**
 - [HU-AIENG-006a: Ingesta del catálogo real y corpus enriquecido versionado](Historias/AI-Eng/HU-AIENG-006a.md) *(C06a — corpus JSONL + informe)*
@@ -511,7 +512,7 @@ Se miden por *changes* de OpenSpec, no por número de historias: la serie `HU-AI
 | Épica | Descripción Breve | Changes | Ruta crítica |
 |-------|-------------------|---------|--------------|
 | **EP11** | Plataforma del Servicio de IA | C01, C02, C03, C05, C17 | 🔴 completa |
-| **EP12** | Corpus y Enriquecimiento del Catálogo | C06, C08, C09, C10, C11, C23 | 🔴 parcial |
+| **EP12** | Corpus y Enriquecimiento del Catálogo | C06a (hecho), C06b, C08, C09, C10, C11, C23 | 🔴 parcial |
 | **EP13** | Familias de Producto y Desambiguación | C07, C18, C28 | 🟢 |
 | **EP14** | Búsqueda Semántica Híbrida | C12, C13, C14, C15, C16, C20, C21, C22, C25 | 🔴 mayoritaria |
 | **EP15** | Venta Asistida, Sustitutos y Agentes | C26, C27, C30, C31, C32, C34, C36 | 🔴 parcial |
