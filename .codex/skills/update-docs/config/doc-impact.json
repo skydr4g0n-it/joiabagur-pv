@@ -339,6 +339,12 @@
       "reason": "Change activo o recien archivado: alcance de la epica, plan de changes e historias asociadas."
     },
     {
+      "name": "catalog-pipeline",
+      "globs": ["scripts/catalog/**", "data/catalog/real/generated/**"],
+      "docs": ["readme-root", "readme-ai-service", "doc-epicas", "doc-pf-plan", "openspec-project"],
+      "reason": "Pipeline offline C06a y corpus JSONL: README raiz, frontera jbg-ai, EP12, plan de changes y project.md."
+    },
+    {
       "name": "scripts",
       "globs": ["**/*.ps1", "**/*.sh", "**/*.sql"],
       "docs": ["readme-backend"],

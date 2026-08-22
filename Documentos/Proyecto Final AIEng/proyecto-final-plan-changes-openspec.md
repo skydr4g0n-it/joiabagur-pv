@@ -12,6 +12,20 @@
 
 Este documento se escribió antes de implementar. Cuando una sesión de diseño de un change concreto altera lo que su ficha decía, el cambio se registra aquí con fecha y motivo, y la ficha afectada se corrige en el sitio.
 
+### 2026-08-22 — C06a: la zona de implementación no es `jbg_ai.data`
+
+La ficha de C06a adjudicaba generadores en `ai-service/src/jbg_ai/data/generators/`, cliente LLM y migración Alembic de `text_provenance`. El apply entrega el resultado (JSONL de 436, dos ejes de procedencia, ingesta local de `Description`) por otro camino, documentado en el `design.md` del change:
+
+| Ficha | Apply |
+|---|---|
+| Zona `jbg_ai.data` + `prompts/` | Pipeline offline en [`scripts/catalog/`](../../scripts/catalog/) |
+| Cliente LLM en `ai-service` | Pasada de vendedor `catalog-assist/v2`; `model: null` en el sidecar |
+| Migración `text_provenance` | **C13** |
+| JSONL on-demand | JSONL **commiteado** en `data/catalog/real/generated/` |
+| ~10 % «sin descripción» / tier `empty` | Tier **`original`**: se deja la `Description` del xlsx (no se vacía ni se reescribe) |
+
+Informe: [`informes/c06a-catalog-enrichment-report.md`](informes/c06a-catalog-enrichment-report.md).
+
 ### 2026-08-17 — C06, tras la sesión de exploración previa al proposal: el export real sirve por tamaño y no por texto
 
 El export llegó y se importó: **436 productos**. El plan se había preparado para que fuera **pequeño** —§14 pregunta 7 pregunta por su tamaño, §13.5 teme que sea insuficiente— y resultó ser de tamaño razonable (la mitad del objetivo de 900-1.200) pero **textualmente casi vacío**: 38,5 caracteres de media entre nombre y descripción, con 51 productos sin descripción ninguna.
@@ -170,7 +184,7 @@ Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin e
 | **C03** | `add-dotnet-ai-gateway-client` | .NET | C02 | 🔴 | — |
 | **C04** | `add-product-search-event-tracking` | .NET 🗄️ | — | 🟢 | specs v2 §5.8 |
 | **C05** | `add-pgvector-schema-foundation` | Python, infra | C01 | 🔴 | — |
-| **C06a** | `add-real-catalog-ingestion-and-text-assist` | Python | C01 | 🔴 | **rev. 17 ago** |
+| **C06a** | `add-real-catalog-ingestion-and-text-assist` | scripts/catalog/ 🗄️ | C01 | 🔴 | **rev. 17 ago**, **22 ago** |
 | **C06b** | `add-synthetic-catalog-augmentation` | Python | C06a | 🟢 | rev. dec. 3, **17 ago** |
 | **C07** | `add-product-family-entity` | .NET 🗄️ | — | 🟢 | **rev. dec. 2** |
 | **C08** | `add-product-ai-profile-entity` | .NET 🗄️ | C03 | 🟢 | rev. dec. 3, 5 |
@@ -275,12 +289,12 @@ Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin e
 
 > **Fichas revisadas el 2026-08-17** tras la sesión de exploración previa al proposal, con el export real ya importado. C06 se parte en dos. Ver [§0](#0-revisiones-posteriores-a-la-versión-3) para el registro de qué cambió y por qué.
 
-#### C06a · `add-real-catalog-ingestion-and-text-assist` 🔴
+#### C06a · `add-real-catalog-ingestion-and-text-assist` 🟢 🗄️
 
 **Objetivo.** Convertir el export real en un corpus sobre el que el enriquecimiento de C09 sea demostrable, sin falsear lo que el corpus es. **Desbloquea C09 y C10 sin esperar al volumen sintético.**
-**Prereq.** C01 · **Zona.** `ai-service/src/jbg_ai/data/generators/`, `ai-service/prompts/`, `ai-service/migrations/`
-**Alcance.** Ingesta de los **436 productos reales** (`data_origin: real`); revisión de Alembic que añade **`text_provenance`** (`merchant` | `ai_assisted` | `synthetic`) con su CHECK, separando identidad de producto y procedencia del texto; derivación de la **agrupación de variantes** (403 grupos, 23 con variantes) y emisión en el JSONL para que C18 la reutilice como semilla; **reparto de calidad sorteado por familia con semilla** —~70 % rico, ~20 % escueto, ~10 % sin descripción—; asistencia de redacción con prompt versionado que **expande la evidencia existente y acota por banda de precio lo que no consta**, sin tocar nunca SKU, precio ni colección; salida JSONL versionada con `generator_version`, `seed`, `model` y `generated_at`.
-**Tests.** `test_generator_is_deterministic_for_same_seed`; **`test_variant_family_shares_text_quality`** (ningún grupo mezcla dos niveles: es lo que impide que la riqueza de texto se cuele como discriminador en la categoría crítica del golden set); `test_text_quality_ratios_within_tolerance_by_product`; **`test_sku_price_and_collection_are_never_modified`** (la asistencia no toca dato autoritativo de .NET); `test_every_product_has_data_origin_and_text_provenance`; `test_migration_rejects_unknown_text_provenance`; `test_upgrade_downgrade_is_reversible`.
+**Prereq.** C01 · **Zona.** `scripts/catalog/` *(desviación 2026-08-22: no `jbg_ai.data` ni `prompts/`; `text_provenance` en `ai.product_document` queda para C13 — ver [§0](#0-revisiones-posteriores-a-la-versión-3))*
+**Alcance.** Corpus JSONL de **436 productos reales** (`data_origin: real`) en `data/catalog/real/generated/`; pipeline offline en `scripts/catalog/` (no `jbg_ai.data`); **reparto de calidad por familia interna** —~70 % `rich`, ~20 % `sparse`, ~10 % `original` (texto del xlsx, no se vacía)— **sin** emitir `variant_group_key` / `variant_label` / `family_seed`; voz `catalog-assist/v2`; `text_provenance` solo en JSONL (columna Alembic → **C13**); ingesta local `UPDATE` de `Description` por SKU, sin tocar identidad; sidecar `c06a-assist/v2`; informe en `informes/c06a-catalog-enrichment-report.md`.
+**Tests.** En `scripts/catalog/tests/`: `test_generator_is_deterministic_for_same_seed`; **`test_variant_family_shares_text_quality`**; `test_jsonl_omits_family_seed_fields`; `test_original_tier_keeps_source_description`; `test_assisted_copy_does_not_mention_photos_or_source_sheet`; **`test_sku_price_name_and_collection_are_never_modified`**; `test_ingest_lists_unmatched_without_insert`; `test_ingest_rolls_back_when_identity_would_change`.
 **Limitación que hereda §15.** El texto asistido **simula un reconocimiento multimodal que no se ha implementado y que §8.1 excluyó**; no hay fotos en el sistema (verificado: 0 `ProductPhotos`, 0 embeddings visuales). Los atributos no derivables de la evidencia previa son plausibles, no verificados.
 
 ---
@@ -320,7 +334,7 @@ Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin e
 **Prereq.** C06a · **Zona.** `ai-service/src/jbg_ai/enrichment/`
 **Alcance.** Normalización determinista previa (talla por regex → `source: rule`); prompt **v1 versionado** en `ai-service/prompts/enrichment/v1.md`; JSON schema estricto a temperatura 0; **vocabulario cerrado de materiales** con normalización de sinónimos ("plata de ley", "925" → `plata`); `materials` como lista, `[]` si no hay evidencia; confianza **por campo**; puertas de lote (unicidad SKU, **cobertura de tags ≥ 70 % global y ≥ 90 % sobre el estrato `text_provenance: ai_assisted`**, vocabulario respetado); `POST /v1/enrich/products` real.
 **Tests.** Con LLM falso: `test_extracts_multiple_materials_from_description`; `test_material_synonym_normalized_to_canonical_term`; `test_rejects_value_outside_closed_vocabulary`; `test_empty_materials_flags_review_not_default_value`; `test_size_regex_marks_field_source_as_rule`; `test_batch_fails_when_tag_coverage_below_threshold`; **`test_tag_coverage_gate_is_evaluated_per_text_provenance`**.
-**Por qué la puerta baja de 90 % a 70 %** *(revisado el 2026-08-17)*. Con el reparto de C06a el techo alcanzable es ≈ 77 % —0,70 × 95 % + 0,20 × 40 % + 0,10 × 20 %—, así que un 90 % global es **inalcanzable por construcción** y bloquearía el pipeline siempre. Un umbral solo global tendría además el defecto de **medir en parte nuestra propia política de ruido**: cambiar el reparto a 60/25/15 lo haría saltar sin que el extractor hubiera cambiado. El desglose por estrato conserva el 90 % donde sí significa algo y deja de castigar el 10 % que se vació a propósito. Es lo que permite aprobar la puerta **sin violar** la regla de §7.1: «devuelve `[]` si no hay evidencia, nunca inventa».
+**Por qué la puerta baja de 90 % a 70 %** *(revisado el 2026-08-17)*. Con el reparto de C06a el techo alcanzable es ≈ 77 % —0,70 × 95 % + 0,20 × 40 % + 0,10 × 20 %—, así que un 90 % global es **inalcanzable por construcción** y bloquearía el pipeline siempre. Un umbral solo global tendría además el defecto de **medir en parte nuestra propia política de ruido**: cambiar el reparto a 60/25/15 lo haría saltar sin que el extractor hubiera cambiado. El desglose por estrato conserva el 90 % donde sí significa algo y deja de castigar el ~10 % `original` (texto del comerciante, no reescrito). Es lo que permite aprobar la puerta **sin violar** la regla de §7.1: «devuelve `[]` si no hay evidencia, nunca inventa».
 **Si se desborda:** partir en pipeline+prompt / puertas de calidad.
 
 ---

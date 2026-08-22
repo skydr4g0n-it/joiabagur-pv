@@ -207,6 +207,7 @@ After completing an OpenSpec change implementation (e.g., via `openspec-apply`),
 | `frontend/README.md` | Tech stack versions, npm scripts, or test setup changed |
 | `ai-service/README.md` | `jbg-ai` contract, settings, layout, non-goals, or the change marker (C01, C02…) changed |
 | `ai-service/tests/README.md` | The test tree gains a folder, a marker, or a shared helper in `tests/support/` |
+| `scripts/catalog/README.md` | Offline catalog pipeline commands, `JPV_PG*`, seed or `generator_version` changed |
 | `terraform/README.md` | AWS resources, variables, outputs, or `/jpv/prod/*` parameters changed |
 | `openspec/config.yaml` | A fact restated in the condensed `context` block changed |
 
@@ -344,3 +345,4 @@ Run the `update-docs` command (skill replicated in `.agent/`, `.claude/`, `.code
 - **AWS vs Azure Comparison**: `Documentos/Propuestas/comparacion-aws-azure-deploy.md`
 - **User Story Procedure**: `Documentos/Procedimientos/Procedimiento-UserStories.md`
 - **Work Ticket Procedure**: `Documentos/Procedimientos/Procedimiento-TicketsTrabajo.md`
+- **C06a catalog corpus**: `data/catalog/real/generated/catalog-real-enriched.jsonl` + `scripts/catalog/README.md` + `Documentos/Proyecto Final AIEng/informes/c06a-catalog-enrichment-report.md`

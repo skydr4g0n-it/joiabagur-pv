@@ -1,0 +1,31 @@
+{
+  "generator_version": "c06a-assist/v2",
+  "seed": "20260822",
+  "generated_at": "2026-08-22T15:10:33.576280+00:00",
+  "model": null,
+  "product_count": 436,
+  "counts_by_tier": {
+    "rich": 293,
+    "sparse": 94,
+    "original": 49
+  },
+  "ratios_by_tier": {
+    "rich": 67.20183486238533,
+    "sparse": 21.559633027522935,
+    "original": 11.238532110091743
+  },
+  "counts_by_text_provenance": {
+    "ai_assisted": 387,
+    "merchant": 49
+  },
+  "ratios_by_text_provenance": {
+    "ai_assisted": 88.76146788990826,
+    "merchant": 11.238532110091743
+  },
+  "grouping": {
+    "group_count": 354,
+    "multi_variant_count": 44,
+    "unary_count": 310,
+    "product_count": 436
+  }
+}
