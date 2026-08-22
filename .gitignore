@@ -266,3 +266,7 @@ models/
 # C06 publique será el derivado anonimizado (data_origin: real).
 data/catalog/real/*
 !data/catalog/real/.gitkeep
+# C06a: derivado anonimizado (JSONL + sidecar). El xlsx y el backup SQL
+# siguen ocultos por el patrón de arriba.
+!data/catalog/real/generated/
+!data/catalog/real/generated/**

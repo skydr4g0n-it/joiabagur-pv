@@ -38,27 +38,34 @@ SKU, name, price and collection in the JSONL MUST match the export row for that 
 - **AND** no product description from that run remains committed
 
 ### Requirement: Quality tiers are assigned per variant family
-The pipeline MUST assign `text_quality_tier` (`rich` | `sparse` | `empty`) to each `variant_group_key`, not to a lone product and not by piece type. Every member of a group MUST share the same tier. Global product ratios MUST fall within 70 % / 20 % / 10 % with a tolerance of ±3 percentage points when measured on the 436-product corpus.
+The pipeline MUST assign `text_quality_tier` (`rich` | `sparse` | `original`) to each internal variant family (stem of the product name plus size suffix), not to a lone product and not by piece type. Every member of a family MUST share the same tier. The JSONL MUST NOT carry `variant_group_key`, `variant_label` or `family_seed`. Global product ratios MUST fall within 70 % / 20 % / 10 % (`rich` / `sparse` / `original`) with a tolerance of ±3 percentage points when measured on the 436-product corpus. The former name `empty` MUST NOT be used: it was read as “blank the description”.
 
-#### Scenario: A variant group does not mix tiers
+#### Scenario: An internal variant family does not mix tiers
+- **GIVEN** a generated JSONL and the source names used to build it
+- **WHEN** products are grouped by the internal stem-and-size heuristic
+- **THEN** no family contains two distinct `text_quality_tier` values
+
+#### Scenario: JSONL does not emit family seed fields
 - **GIVEN** a generated JSONL
-- **WHEN** records are grouped by `variant_group_key`
-- **THEN** no group contains two distinct `text_quality_tier` values
+- **WHEN** any line is parsed
+- **THEN** it does not contain `variant_group_key`
+- **AND** it does not contain `variant_label`
+- **AND** it does not contain `family_seed`
 
 #### Scenario: Product-level ratios stay inside tolerance
 - **GIVEN** the 436-product committed corpus
 - **WHEN** products are counted by `text_quality_tier`
 - **THEN** `rich` is between 67 % and 73 %
 - **AND** `sparse` is between 17 % and 23 %
-- **AND** `empty` is between 7 % and 13 %
+- **AND** `original` is between 7 % and 13 %
 
 #### Scenario: Fixture family shares a single tier
-- **GIVEN** a fixture of three products that the grouping step places in one `variant_group_key`
+- **GIVEN** a fixture of three products that the internal grouping step places in one family
 - **WHEN** quality assignment runs with a fixed seed
 - **THEN** the three records carry the same `text_quality_tier`
 
 ### Requirement: Text provenance matches the quality tier
-Records with `text_quality_tier` `rich` or `sparse` MUST set `text_provenance` to `ai_assisted`. Records with `text_quality_tier` `empty` MUST set `text_provenance` to `merchant` and MUST have an empty or null `description`. The pipeline MUST NOT write `text_provenance` onto `public."Products"` or onto `ai.product_document`.
+Records with `text_quality_tier` `rich` or `sparse` MUST set `text_provenance` to `ai_assisted`. Records with `text_quality_tier` `original` MUST set `text_provenance` to `merchant` and MUST set `description` to the export `Description` for that SKU, unchanged. The pipeline MUST NOT blank a non-empty original description. The pipeline MUST NOT write `text_provenance` onto `public."Products"` or onto `ai.product_document`.
 
 #### Scenario: Assisted tiers carry ai_assisted provenance
 - **GIVEN** a generated JSONL
@@ -66,11 +73,23 @@ Records with `text_quality_tier` `rich` or `sparse` MUST set `text_provenance` t
 - **THEN** each has `text_provenance` equal to `ai_assisted`
 - **AND** each has a non-empty `description`
 
-#### Scenario: Empty tier carries merchant provenance and no copy
-- **GIVEN** a generated JSONL
-- **WHEN** records with `text_quality_tier` `empty` are selected
-- **THEN** each has `text_provenance` equal to `merchant`
-- **AND** each has `description` equal to `null` or an empty string
+#### Scenario: Original tier keeps merchant provenance and source copy
+- **GIVEN** an export row whose Description is "plata de ley"
+- **WHEN** that SKU is assigned `text_quality_tier` `original`
+- **THEN** the JSONL line has `text_provenance` equal to `merchant`
+- **AND** `description` equals "plata de ley"
+
+#### Scenario: Original tier does not wipe a present description
+- **GIVEN** an export row with a non-empty Description
+- **WHEN** that SKU is assigned `text_quality_tier` `original`
+- **THEN** the JSONL `description` is not empty
+- **AND** it equals the export Description
+
+#### Scenario: Original tier may stay blank if the export was blank
+- **GIVEN** an export row whose Description is empty
+- **WHEN** that SKU is assigned `text_quality_tier` `original`
+- **THEN** the JSONL `description` is empty or null
+- **AND** `text_provenance` is `merchant`
 
 #### Scenario: Provenance is absent from the Products table
 - **GIVEN** a completed local ingest
@@ -78,36 +97,30 @@ Records with `text_quality_tier` `rich` or `sparse` MUST set `text_provenance` t
 - **THEN** no `text_provenance` column exists
 - **AND** no other provenance column was added by this change
 
-### Requirement: Variant grouping is emitted as a seed for families
-Every JSONL record MUST include `variant_group_key`. Multi-member groups MUST include a `variant_label` on each member when a suffix was detected. Every record MUST include `family_seed` with `group_key` and the complete `member_skus` list for that group. The enrichment report MUST document the observed group count and multi-variant count. Those counts MUST NOT be required to equal any exploration reference.
+### Requirement: Assisted copy reads as a salesperson describing the piece
+Assisted descriptions (`rich` and `sparse` only) MUST read as natural product copy, written as if a seller were looking at the piece. They MUST restate information already present in the original `Name` or `Description` (motif, metal, size, finish named there). They MUST NOT invent stones or accessories that those fields do not mention. They MUST NOT mention photographs, source sheets, missing evidence, or the act of imagining. `rich` copy MUST be more generative (3–5 sentences). `sparse` copy MUST be shorter and more restrained (1–2 sentences). Records with `text_quality_tier` `original` MUST NOT receive assisted copy: their `description` MUST equal the export `Description`. Descriptions MUST NOT exceed 1000 characters. The enrichment report MUST include at least five `rich`, three `sparse` and two `original` before/after samples. The report, not the product text, MAY declare that there are no real photos and that visual detail is plausible.
 
-#### Scenario: Each product carries family seed metadata
+#### Scenario: Copy does not talk about photos or the source sheet
 - **GIVEN** a generated JSONL
-- **WHEN** any line is read
-- **THEN** it contains `variant_group_key`
-- **AND** it contains `family_seed.group_key` equal to `variant_group_key`
-- **AND** `family_seed.member_skus` lists every SKU that shares that group key
+- **WHEN** records with `text_quality_tier` `rich` or `sparse` are read
+- **THEN** no description mentions a photograph, image, ficha de origen, missing evidence, or that stones were not counted
 
-#### Scenario: Multi-variant members expose a label
-- **GIVEN** two fixture products whose normalised names share a stem and differ by a size suffix
-- **WHEN** grouping runs
-- **THEN** they share one `variant_group_key`
-- **AND** each has a `variant_label` derived from its suffix
+#### Scenario: Original name and description facts are kept
+- **GIVEN** a fixture product whose name contains a motif and whose original description names a metal
+- **WHEN** assisted copy is applied at `rich` or `sparse`
+- **THEN** the description still conveys that motif
+- **AND** the description still conveys that metal
 
-#### Scenario: Report records grouping counts without a numeric gate
-- **GIVEN** generation has finished
-- **WHEN** the enrichment report is read
-- **THEN** it states the number of variant groups and the number of multi-member groups
-- **AND** it does not treat an exploration reference of ~403 / ~23 as a pass/fail threshold
-
-### Requirement: Assisted copy respects the multimodal limitation
-Assisted descriptions MUST expand only evidence present in the original name or description. They MUST NOT assert stone counts, verified finishes, or visual details that require a photograph. Descriptions MUST NOT exceed 1000 characters. The enrichment report MUST include at least five `rich`, three `sparse` and two `empty` before/after samples and MUST declare that multimodal recognition is simulated.
+#### Scenario: Stones and accessories are not invented
+- **GIVEN** a product whose name and original description do not mention a gemstone or an extra accessory
+- **WHEN** assisted copy is applied
+- **THEN** the description does not introduce diamonds, pearls as added stones, extra chains, boxes, or other accessories absent from the source
 
 #### Scenario: Report samples cover all three tiers
 - **GIVEN** the committed corpus and its report
 - **WHEN** the report is reviewed
-- **THEN** it includes at least five rich, three sparse and two empty samples with original and assisted text
-- **AND** it states that there are no product photos and that non-derivable attributes are plausible, not verified
+- **THEN** it includes at least five rich, three sparse and two original samples with original and resulting text
+- **AND** the assisted samples read as product descriptions, not as commentary on the export
 
 #### Scenario: Overlong copy is rejected before ingest
 - **GIVEN** a JSONL line whose `description` is longer than 1000 characters
@@ -115,30 +128,30 @@ Assisted descriptions MUST expand only evidence present in the original name or 
 - **THEN** the run fails
 - **AND** no `UPDATE` from that run is committed
 
-#### Scenario: Empty tier is not filled to look complete
-- **GIVEN** a product assigned `text_quality_tier` `empty`
-- **WHEN** assisted copy is applied
-- **THEN** its `description` remains empty or null
+#### Scenario: Original tier is not rewritten to look complete or blank
+- **GIVEN** a product assigned `text_quality_tier` `original`
+- **WHEN** corpus generation runs
+- **THEN** its `description` equals the export Description for that SKU
 
-### Requirement: Grouping and tiers are deterministic for a fixed seed
-The same export, the same grouping rules, the same `generator_version` and the same `seed` MUST produce the same `variant_group_key` assignments and the same `text_quality_tier` per group. The sidecar MUST record `generator_version`, `seed`, `generated_at`, product ratios by tier and by `text_provenance`, and grouping counts.
+### Requirement: Tiers are deterministic for a fixed seed
+The same export, the same internal grouping rules, the same `generator_version` and the same `seed` MUST produce the same `text_quality_tier` per product. The sidecar MUST record `generator_version`, `seed`, `generated_at`, and product ratios by tier and by `text_provenance`.
 
 #### Scenario: Rerunning assignment with the same seed repeats tiers
 - **GIVEN** a fixture export and seed `20260822`
 - **WHEN** grouping and quality assignment run twice
-- **THEN** `variant_group_key` and `text_quality_tier` per SKU are identical in both outputs
+- **THEN** `text_quality_tier` per SKU is identical in both outputs
 
 #### Scenario: A different seed may change tier assignment
 - **GIVEN** a fixture export
 - **WHEN** quality assignment runs with two distinct seeds
 - **THEN** the per-SKU `text_quality_tier` map is allowed to differ
-- **AND** no `variant_group_key` mixes tiers in either run
+- **AND** no internal family mixes tiers in either run
 
 #### Scenario: Sidecar carries traceability fields
 - **GIVEN** a completed generation
 - **WHEN** the `.meta.json` sidecar is read
 - **THEN** it contains `generator_version`, `seed` and `generated_at`
-- **AND** it contains product counts or ratios for `rich`, `sparse` and `empty`
+- **AND** it contains product counts or ratios for `rich`, `sparse` and `original`
 - **AND** it contains product counts or ratios for `ai_assisted` and `merchant`
 
 ### Requirement: Local ingest updates Description by SKU only

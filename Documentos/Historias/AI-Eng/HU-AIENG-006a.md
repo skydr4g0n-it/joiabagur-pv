@@ -12,28 +12,28 @@ Primer tramo de C06 del Proyecto Final de IA (change OpenSpec `add-real-catalog-
 
 El export llegó el 2026-08-17: **436 productos**, 28 colecciones — tamaño razonable, **texto casi vacío**. Media de 37,7 caracteres entre nombre y descripción; 51 productos sin descripción. Sobre ese dato, el enriquecimiento estructurado de C09 no puede demostrar sus puertas de calidad sin un corpus con descripciones utilizables. Esta historia produce ese corpus.
 
-El valor no es de usuario final de tienda —no hay pantalla— sino de **desbloqueo**: C09 (extracción estructurada), C10 (simulador POS/ventas) y, más adelante, C18 (semilla de familias) consumen lo que aquí se genera. Sin C06a, C09 se construye solo sobre fixtures mínimos y C10 no tiene SKUs reales sobre los que simular.
+El valor no es de usuario final de tienda —no hay pantalla— sino de **desbloqueo**: C09 (extracción estructurada) y C10 (simulador POS/ventas) consumen lo que aquí se genera. **C18 no** toma semilla de familias de este JSONL: esos campos contaminarían el extractor. Sin C06a, C09 se construye solo sobre fixtures mínimos y C10 no tiene SKUs reales sobre los que simular.
 
 **Desviación acordada respecto a la ficha C06a del plan (2026-08-22).** La ficha original incluye cliente LLM embebido en `ai-service`, migración Alembic de `text_provenance` y tests de generador Python. Esta historia adopta un camino operativo equivalente en resultado pero distinto en implementación:
 
-- El texto enriquecido se produce en **una pasada asistida** (agente + reglas deterministas + criterios de redacción del diseño §15), **sin** cliente LLM en runtime ni llamadas API en producción/tests.
-- `text_provenance` viaja en el **JSONL** (y en el informe); la **columna Alembic** en `ai.product_document` queda para **C13**, cuando el indexador escriba filas en `ai.*`.
-- La ingesta operativa va a **`public."Products"`** en PostgreSQL local (Docker), por SKU, actualizando **solo `Description`**; .NET **no** gana columna `text_provenance` ni se modifica `Name`.
+- El texto enriquecido se produce en **una pasada de vendedor** (`catalog-assist/v2`) **solo** en los tiers `rich` y `sparse`. El agente se imagina la pieza como si la tuviera delante y escribe una descripción natural de producto. **No** menciona fotografías, fichas ni lagunas. Conserva `Name`/`Description` originales. **No inventa** piedras ni accesorios. `rich` se esmera más (3–5 frases); `sparse` es 1–2 frases. El tercer tier se llama **`original`** (no `empty`): **copia la `Description` del xlsx tal cual**, vacía o no; vaciar un texto que sí estaba es un error.
+- `text_provenance` viaja en el **JSONL** (y en el informe); la **columna Alembic** en `ai.product_document` queda para **C13**.
+- La ingesta operativa va a **`public."Products"`** en PostgreSQL local (Docker), por SKU, actualizando **solo `Description`**.
 
 **Alcance de esta historia (sí):**
 
 - Lectura del xlsx anonimizado [`data/catalog/real/product-JoiaBagur.xlsx`](../../data/catalog/real/product-JoiaBagur.xlsx) — columnas `SKU`, `Name`, `Description`, `Price`, `Collection`, alineadas con [`ExcelImportService`](../../../backend/src/JoiabagurPV.Application/Services/ExcelImportService.cs).
-- Derivación **determinista** de agrupación de variantes (referencia orientativa de exploración: ~403 grupos, ~23 multi-variante — **con tolerancia**, no exigencia exacta) y emisión en JSONL como semilla para C18 (`variant_group_key`, `variant_label`, `family_seed`).
-- Reparto de calidad **por familia de variantes** con **semilla fija** y determinismo: ~70 % rico, ~20 % escueto, ~10 % sin descripción — **toda la familia comparte nivel** (§8.4).
-- Redacción asistida de descripciones siguiendo [proyecto-final-diseno-rag-joiabagur.md](../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) §8.1.1 y **limitación §15** (0 fotos: expandir evidencia existente, acotar por banda de precio, no inventar piedras ni acabados).
+- Agrupación de variantes **solo interna** para el sorteo de calidad. El JSONL **no** emite `variant_group_key`, `variant_label` ni `family_seed`.
+- Reparto de calidad **por familia de variantes** con **semilla fija**: ~70 % `rich`, ~20 % `sparse`, ~10 % `original` — **toda la familia comparte nivel** (§8.4). `original` = texto del comerciante, no «campo vacío».
+- Redacción asistida de vendedor (`catalog-assist/v2`): describir lo que «se ve», sin aludir a la foto; limitación (0 fotos reales) **solo en el informe**.
 - Salida versionada:
   - `data/catalog/real/generated/catalog-real-enriched.jsonl` — **versionado en git** (derivado anonimizado)
-  - sidecar `.meta.json` (`generator_version`, `seed`, `generated_at`, ratios por tier y por `text_provenance`)
+  - sidecar `.meta.json` (`generator_version` `c06a-assist/v2`, `seed`, `generated_at`, ratios)
   - informe [`Documentos/Proyecto Final AIEng/informes/c06a-catalog-enrichment-report.md`](../Proyecto%20Final%20AIEng/informes/c06a-catalog-enrichment-report.md)
-- Metadatos por producto en JSONL: `data_origin: real`, `text_provenance` (`merchant` | `ai_assisted`), `text_quality_tier`, más campos de catálogo inmutables.
-- **`product_id` en JSONL:** el xlsx no trae UUID; se resuelve por **lookup de SKU** en ingesta y, opcionalmente, se incluye el `Id` de .NET como campo enriquecido post-query.
+- Metadatos por producto en JSONL: `data_origin: real`, `text_provenance` (`merchant` | `ai_assisted`), `text_quality_tier`, más campos de catálogo inmutables. **Sin** campos de familia.
+- **`product_id` en JSONL:** opcional, por lookup de SKU.
 - **Ingesta en BD local** (Docker, puerto host **5433**, BD `joiabagur_pv`): `UPDATE "Products"` **por SKU**, conservando `Id`, `SKU`, `Price`, `CollectionId` y **`Name`**; actualizar **únicamente `Description`**.
-- Scripts deterministas en **`scripts/catalog/`** (lectura xlsx, agrupación, reparto, ingesta) según `design.md` / `tasks.md` del change OpenSpec.
+- Scripts en **`scripts/catalog/`**.
 - xlsx crudo permanece gitignored en `data/catalog/real/`.
 
 **Fuera de alcance (no):**
@@ -46,18 +46,19 @@ El valor no es de usuario final de tienda —no hay pantalla— sino de **desblo
 - **RDS / producción** — solo base local Docker.
 - Columna **`text_provenance`** en entidad .NET `Product`.
 - **C08** `ProductAiProfile` — este change no crea perfiles estructurados; solo enriquece texto de catálogo.
+- **C18** — semilla de `ProductFamily`; no se emite en este JSONL.
 
 **Decisiones de diseño ya acordadas:**
 
 | Tema | Decisión |
 |---|---|
-| Dos ejes de procedencia (§8.1.1) | `data_origin: real` en los 436 · `text_provenance`: `ai_assisted` en tiers rich/sparse · `merchant` en tier empty (~10 %), descripción vacía |
+| Dos ejes de procedencia (§8.1.1) | `data_origin: real` en los 436 · `text_provenance`: `ai_assisted` en `rich`/`sparse` · `merchant` en `original` (~10 %), **texto del xlsx sin reescribir** |
 | Unidad del reparto de calidad | **Familia de variantes**, nunca producto suelto ni tipo de pieza (§8.4 advierte del sesgo 78 % en cuatro tipos) |
 | Invariante .NET | **SKU, precio, colección y nombre nunca se modifican** — la asistencia solo toca `Description` en ingesta |
-| Limitación multimodal (§15) | 0 fotos verificadas: el texto **simula** riqueza comercial sin verificar piedras ni acabados |
+| Limitación multimodal | 0 fotos reales: el **informe** lo declara; el texto de producto es de vendedor, plausible, sin mencionar la foto |
 | Dónde vive `text_provenance` | **JSONL + informe en C06a** · columna `ai.product_document` en **C13** · `public."Products"` **no** |
-| Generación del texto | **Pasada asistida** con reglas del diseño; scripts de soporte en `scripts/catalog/` |
-| Agrupación de variantes | Referencia ~403/~23 **orientativa**; **hay tolerancia** — no es requisito numérico exacto |
+| Generación del texto | **Pasada de vendedor** `catalog-assist/v2`; scripts en `scripts/catalog/` |
+| Agrupación de variantes | **Interna** para el sorteo; **prohibida** en cada línea JSONL |
 | JSONL en git | **Sí** — derivado anonimizado commiteado; xlsx crudo sigue ignorado |
 | Puerta C09 (§8.5) | Cobertura de tags ≥ 90 % sobre estrato `ai_assisted` — el reparto 70/20/10 existe para que esa puerta sea alcanzable (~77 % global teórico) |
 | Corpus archivado | xlsx fuera de git; C24 podrá medir delta «con asistencia − sin asistencia» (§0 plan) |
@@ -92,29 +93,30 @@ change OpenSpec `openspec/changes/add-real-catalog-ingestion-and-text-assist/` y
 
 ### Escenario 3: El reparto de calidad respeta la unidad familia
 **Dado que** el diseño §8.4 exige sortear calidad **por familia de variantes**
-**Cuando** se inspecciona el JSONL
-**Entonces** ningún `variant_group_key` mezcla dos `text_quality_tier` distintos
+**Cuando** se inspecciona el JSONL junto a los nombres de origen
+**Entonces** ninguna familia interna mezcla dos `text_quality_tier` distintos
+**Y** el JSONL **no** contiene `variant_group_key`, `variant_label` ni `family_seed`
 **Y** los ratios globales por producto están dentro de ~70 % / ~20 % / ~10 % con tolerancia razonable (±3 pp)
 
 ### Escenario 4: Los estratos `text_provenance` cuadran con el reparto
-**Dado que** el tier empty (~10 %) debe aportar ruido sin castigar la puerta C09 sobre asistidos
+**Dado que** el tier `original` (~10 %) debe aportar texto de comerciante sin castigar la puerta C09 sobre asistidos
 **Cuando** se agrupan productos por `text_provenance`
 **Entonces** los tiers `rich` y `sparse` llevan `text_provenance: ai_assisted`
-**Y** los del tier `empty` llevan `text_provenance: merchant` y descripción vacía o nula
+**Y** los del tier `original` llevan `text_provenance: merchant` y la `Description` **idéntica** a la del xlsx (no se vacía si había texto)
 
-### Escenario 5: Las familias de variantes quedan en el JSONL para C18
-**Dado que** C18 reutilizará la agrupación como semilla
-**Cuando** se inspecciona el JSONL
-**Entonces** cada producto incluye `variant_group_key` y, cuando aplique, `variant_label`
-**Y** existe un bloque `family_seed` con la lista de SKUs del grupo
-**Y** el informe documenta el conteo de grupos y multi-variantes (referencia orientativa ~403/~23, **sin exigir cifra exacta**)
+### Escenario 5: El JSONL no contamina fases posteriores con semilla de familias
+**Dado que** C09 extrae sobre el texto y C18 no debe leer agrupación de este corpus
+**Cuando** se inspecciona cualquier línea del JSONL
+**Entonces** no existen las claves `variant_group_key`, `variant_label` ni `family_seed`
 
-### Escenario 6: La redacción respeta la limitación §15
-**Dado que** no hay fotos ni embeddings visuales en el sistema
-**Cuando** se revisan muestras del informe (mínimo 5 rich, 3 sparse, 2 empty)
-**Entonces** las descripciones ricas expanden evidencia del nombre/descripción original
-**Y** no afirman conteos de piedras, acabados verificados ni detalles visuales inventados
-**Y** el informe declara explícitamente la limitación multimodal simulada
+### Escenario 6: La redacción es de vendedor, no de ficha
+**Dado que** no hay fotos reales y el texto debe servir a C09 como descripción de producto
+**Cuando** se revisan muestras del informe (mínimo 5 `rich`, 3 `sparse`, 2 `original`)
+**Entonces** las descripciones `rich` y `sparse` leen como catálogo (pieza, motivo, metal), no como comentario sobre el export
+**Y** no mencionan fotografías, fichas de origen ni que «no se cuentan piedras»
+**Y** no inventan piedras ni accesorios que no estén en `Name` o `Description` originales
+**Y** las muestras `original` coinciden con la `Description` del xlsx (no se vacían ni se reescriben)
+**Y** el informe, no el producto, declara que el reconocimiento visual es plausible
 
 ### Escenario 7: El corpus es determinista para la misma semilla
 **Dado que** el diseño §8.5 exige trazabilidad con `seed` fija
@@ -155,7 +157,9 @@ change OpenSpec `openspec/changes/add-real-catalog-ingestion-and-text-assist/` y
 
 - **Estado del export.** El xlsx vive en `data/catalog/real/` (gitignored). El backup SQL local es **solo esquema**, sin datos — el `product_id` de .NET se obtiene por **lookup de SKU** en ingesta.
 
-- **Change OpenSpec.** Tras esta HU y su ticket, el flujo continúa con `proposal` → `design` → `specs` → `tasks` → apply → verify → archive.
+- **Relación con C18.** C18 no lee agrupación de este JSONL. La familia es interna al sorteo de calidad de C06a.
+
+**Entregable.** Corpus: [`data/catalog/real/generated/catalog-real-enriched.jsonl`](../../../data/catalog/real/generated/catalog-real-enriched.jsonl). Informe: [`c06a-catalog-enrichment-report.md`](../../Proyecto%20Final%20AIEng/informes/c06a-catalog-enrichment-report.md). Pipeline: [`scripts/catalog/`](../../../scripts/catalog/).
 
 ---
 

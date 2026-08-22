@@ -12,6 +12,20 @@
 
 Este documento se escribió antes de implementar. Cuando una sesión de diseño de un change concreto altera lo que su ficha decía, el cambio se registra aquí con fecha y motivo, y la ficha afectada se corrige en el sitio.
 
+### 2026-08-22 — C06a: la zona de implementación no es `jbg_ai.data`
+
+La ficha de C06a adjudicaba generadores en `ai-service/src/jbg_ai/data/generators/`, cliente LLM y migración Alembic de `text_provenance`. El apply entrega el resultado (JSONL de 436, dos ejes de procedencia, ingesta local de `Description`) por otro camino, documentado en el `design.md` del change:
+
+| Ficha | Apply |
+|---|---|
+| Zona `jbg_ai.data` + `prompts/` | Pipeline offline en [`scripts/catalog/`](../../scripts/catalog/) |
+| Cliente LLM en `ai-service` | Pasada de vendedor `catalog-assist/v2`; `model: null` en el sidecar |
+| Migración `text_provenance` | **C13** |
+| JSONL on-demand | JSONL **commiteado** en `data/catalog/real/generated/` |
+| ~10 % «sin descripción» / tier `empty` | Tier **`original`**: se deja la `Description` del xlsx (no se vacía ni se reescribe) |
+
+Informe: [`informes/c06a-catalog-enrichment-report.md`](informes/c06a-catalog-enrichment-report.md).
+
 ### 2026-08-17 — C06, tras la sesión de exploración previa al proposal: el export real sirve por tamaño y no por texto
 
 El export llegó y se importó: **436 productos**. El plan se había preparado para que fuera **pequeño** —§14 pregunta 7 pregunta por su tamaño, §13.5 teme que sea insuficiente— y resultó ser de tamaño razonable (la mitad del objetivo de 900-1.200) pero **textualmente casi vacío**: 38,5 caracteres de media entre nombre y descripción, con 51 productos sin descripción ninguna.
@@ -278,7 +292,7 @@ Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin e
 #### C06a · `add-real-catalog-ingestion-and-text-assist` 🔴
 
 **Objetivo.** Convertir el export real en un corpus sobre el que el enriquecimiento de C09 sea demostrable, sin falsear lo que el corpus es. **Desbloquea C09 y C10 sin esperar al volumen sintético.**
-**Prereq.** C01 · **Zona.** `ai-service/src/jbg_ai/data/generators/`, `ai-service/prompts/`, `ai-service/migrations/`
+**Prereq.** C01 · **Zona.** `scripts/catalog/` *(desviación 2026-08-22: no `jbg_ai.data` ni `prompts/`; `text_provenance` en `ai.product_document` queda para C13 — ver [§0](#0-revisiones-posteriores-a-la-versión-3))*
 **Alcance.** Ingesta de los **436 productos reales** (`data_origin: real`); revisión de Alembic que añade **`text_provenance`** (`merchant` | `ai_assisted` | `synthetic`) con su CHECK, separando identidad de producto y procedencia del texto; derivación de la **agrupación de variantes** (403 grupos, 23 con variantes) y emisión en el JSONL para que C18 la reutilice como semilla; **reparto de calidad sorteado por familia con semilla** —~70 % rico, ~20 % escueto, ~10 % sin descripción—; asistencia de redacción con prompt versionado que **expande la evidencia existente y acota por banda de precio lo que no consta**, sin tocar nunca SKU, precio ni colección; salida JSONL versionada con `generator_version`, `seed`, `model` y `generated_at`.
 **Tests.** `test_generator_is_deterministic_for_same_seed`; **`test_variant_family_shares_text_quality`** (ningún grupo mezcla dos niveles: es lo que impide que la riqueza de texto se cuele como discriminador en la categoría crítica del golden set); `test_text_quality_ratios_within_tolerance_by_product`; **`test_sku_price_and_collection_are_never_modified`** (la asistencia no toca dato autoritativo de .NET); `test_every_product_has_data_origin_and_text_provenance`; `test_migration_rejects_unknown_text_provenance`; `test_upgrade_downgrade_is_reversible`.
 **Limitación que hereda §15.** El texto asistido **simula un reconocimiento multimodal que no se ha implementado y que §8.1 excluyó**; no hay fotos en el sistema (verificado: 0 `ProductPhotos`, 0 embeddings visuales). Los atributos no derivables de la evidencia previa son plausibles, no verificados.

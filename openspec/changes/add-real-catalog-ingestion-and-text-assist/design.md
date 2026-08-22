@@ -8,8 +8,8 @@ El estado del repositorio al diseñar:
 |---|---|
 | `data/catalog/real/product-JoiaBagur.xlsx` | Presente en local, **gitignored**. Columnas `SKU`, `Name`, `Description`, `Price`, `Collection` — las mismas que `ExcelImportService` |
 | `data/catalog/real/backup-2026-08-17-catalogo-corregido.sql` | Solo esquema, sin `COPY` de filas |
-| `data/catalog/real/generated/` | **Ausente**. `.gitignore` ignora todo `data/catalog/real/*` salvo `.gitkeep` |
-| `scripts/catalog/` | **Ausente** |
+| `data/catalog/real/generated/` | **Ausente** al abrir el change. `.gitignore` ignora todo `data/catalog/real/*` salvo `.gitkeep` |
+| `scripts/catalog/` | Pipeline offline (C06a) |
 | `ai-service/src/jbg_ai/data/` | **Ausente** (zona que la ficha original adjudicaba) |
 | `ai.product_document.data_origin` | Existe (C05). **`text_provenance` no** |
 | `public."Products"` | Sin columna de procedencia. `Description` es `varchar(1000)` |
@@ -21,32 +21,35 @@ El estado del repositorio al diseñar:
 
 | Ficha original | Este change |
 |---|---|
-| Cliente LLM en `ai-service`, `prompts/`, settings `LLM_*` | Pasada asistida **offline**; criterios versionados en el informe (`catalog-assist/v1`); cero llamadas en runtime/tests |
+| Cliente LLM en `ai-service`, `prompts/`, settings `LLM_*` | Pasada asistida **offline**; criterios versionados en el informe (`catalog-assist/v2`); cero llamadas en runtime/tests |
 | Generadores en `ai-service/src/jbg_ai/data/generators/` | Scripts en `scripts/catalog/` |
 | Migración `text_provenance` en `ai.product_document` | **C13** |
 | Tests con LLM fake | Tests de scripts deterministas + validación del JSONL |
 | Solo JSONL | JSONL **commiteado** + sidecar + informe + **ingesta local** en `public."Products"` |
+| Semilla de familias en el JSONL | **No se emite.** Agrupación solo interna para el sorteo de calidad |
+
+**Revisión 2026-08-22 (pasada v2).** La primera redacción (`catalog-assist/v1`) parafraseaba la ficha y declaraba en el propio texto lo que no se sabía («la ficha de origen indica…», «no se cuentan piedras», «el catálogo no incluye fotografías»). Eso no sirve a C09: no es una descripción de producto. v2 escribe **como un vendedor con la pieza delante**.
 
 **Dependientes que condicionan el diseño:**
 
 | Change | Qué necesita | Consecuencia |
 |---|---|---|
-| **C09** 🔴 | Texto utilizable y un estrato `ai_assisted` sobre el que la puerta ≥ 90 % de tags sea alcanzable | El ~10 % vacío es **a propósito**; no se puede «arreglar» llenándolo |
+| **C09** 🔴 | Texto de catálogo utilizable y un estrato `ai_assisted` | El ~10 % `original` (texto del comerciante, sin reescribir) es **a propósito**; el JSONL no debe llevar metadatos de familia |
 | **C10** | SKUs reales con precio y colección intactos | La asistencia no toca identidad |
 | **C13** | Ambos ejes de procedencia al indexar | C06a los deja en JSONL; C13 los materializa en `ai.*` |
-| **C18** | Semilla de agrupación de variantes | JSONL emite `family_seed`; no crea filas `ProductFamily` |
-| **C06b** | Distribuciones del real (precio, SKU, familias), **excepto** longitud de descripción | El JSONL es el ancla de calibración; el reparto 70/20/10 se **declara**, no se hereda |
+| **C18** | Semilla de agrupación de variantes | **Fuera de este JSONL.** C18 no lee `family_seed` de C06a |
+| **C06b** | Distribuciones del real (precio, SKU), **excepto** longitud de descripción | El JSONL es el ancla de calibración; el reparto 70/20/10 se **declara**, no se hereda |
 
 ```mermaid
 flowchart TD
   xlsx["xlsx gitignored<br/>436 filas"] --> read["scripts/catalog<br/>lectura + normalización"]
-  read --> group["Agrupación de variantes<br/>stem + sufijos"]
+  read --> group["Agrupación interna<br/>solo para el sorteo"]
   group --> assign["Reparto por familia<br/>semilla fija 70/20/10"]
-  assign --> assist["Pasada asistida §15<br/>solo rich y sparse"]
-  assist --> jsonl["JSONL + .meta.json<br/>commiteados"]
+  assign --> assist["Pasada vendedor v2<br/>solo rich y sparse;<br/>original = xlsx tal cual"]
+  assist --> jsonl["JSONL sin campos de familia<br/>+ .meta.json"]
   jsonl --> validate["Validación de invariantes"]
   validate --> ingest["UPDATE Products.Description<br/>por SKU · transacción"]
-  validate --> report["Informe c06a<br/>muestras + limitación §15"]
+  validate --> report["Informe c06a<br/>muestras; limitación solo aquí"]
   ingest --> unmatched["Lista unmatched<br/>en el informe"]
 ```
 
@@ -55,26 +58,27 @@ flowchart TD
 **Goals:**
 
 - Un corpus de **436 líneas** con `data_origin: real`, SKU único, e identidad (SKU, nombre, precio, colección) idéntica al xlsx.
-- Reparto de calidad **por familia de variantes**, determinista, dentro de ~70/20/10 ±3 pp por producto.
-- Texto asistido que C09 pueda extraer, sin afirmar lo que las fotos no pueden verificar.
+- Reparto de calidad **por familia de variantes** (interno), determinista, dentro de ~70 `rich` / ~20 `sparse` / ~10 `original` ±3 pp por producto.
+- Texto asistido **de vendedor**: natural, como si se viera la pieza; conservando Name/Description originales; sin inventar piedras ni accesorios; sin mencionar fotos ni lagunas.
+- JSONL **sin** `variant_group_key`, `variant_label` ni `family_seed`.
 - Ingesta local que deja el catálogo .NET con descripciones nuevas **sin** mutar identidad.
-- Trazabilidad regenerable: misma `seed` + misma `generator_version` → mismos grupos y tiers; el JSONL commiteado es la fuente de las descripciones.
-- Documentar en este fichero, de forma que sobreviva al archive, por qué no se siguió la ficha literal.
+- Trazabilidad: misma `seed` + misma `generator_version` → mismos tiers; el JSONL commiteado es la fuente de las descripciones.
+- Documentar en este fichero por qué no se siguió la ficha literal.
 
 **Non-Goals:**
 
 - Cliente LLM, `prompts/` como servicio, settings `LLM_*`, o cualquier dependencia nueva en `ai-service/pyproject.toml`.
 - Migración Alembic / columna `text_provenance` en `ai.product_document` (C13) o en `Product` .NET.
-- C06b, C08, C09, C10, C18. Este change **emite** la semilla de familias; no las persiste.
+- C06b, C08, C09, C10, C18. Este change **no** emite semilla de familias.
 - API, frontend, OpenAPI, RDS, producción.
 - Perfiles IA estructurados (`piece_type`, `materials[]`): eso es extracción (C09) y persistencia (C08).
-- Cifra exacta de grupos de variantes: ~403/~23 es referencia de exploración, no un test de igualdad.
+- Publicar en el JSONL conteos o claves de agrupación.
 
 ## Decisions
 
 ### 1 · La ficha se desvía a propósito: el resultado es el contrato, el runtime LLM no
 
-**Decisión:** producir el texto en **una pasada asistida** (agente de implementación + reglas deterministas + criterios §15), versionar el JSONL, y no añadir ningún cliente LLM al servicio.
+**Decisión:** producir el texto en **una pasada asistida** (agente de implementación + criterios `catalog-assist/v2`), versionar el JSONL, y no añadir ningún cliente LLM al servicio.
 
 **Por qué.** El valor de C06a para la ruta crítica es el **corpus**, no un generador reejecutable contra un proveedor. Meter LLM en `ai-service` ahora obliga a settings, prompts, fakes de pytest y una superficie que C09 va a volver a tocar. El diseño §8.2 ya separa «LLM → lo textual» de «código con semilla → lo relacional»; esa separación se respeta **en el producto del change**, no en un servicio que nadie llama en runtime.
 
@@ -94,7 +98,7 @@ Los dos ejes del §8.1.1 son independientes: un producto `real` puede llevar tex
 
 ### 3 · Scripts en `scripts/catalog/`, no en `jbg-ai`
 
-**Decisión:** pipeline offline en la raíz del repo. Lectura xlsx, agrupación, reparto, validación e ingesta SQL. Dependencias mínimas (`openpyxl`, `psycopg`, `pytest`) en un `pyproject.toml` local de esa carpeta, **sin** contaminar `ai-service/pyproject.toml`.
+**Decisión:** pipeline offline en la raíz del repo. Lectura xlsx, agrupación interna, reparto, validación e ingesta SQL. Dependencias mínimas (`openpyxl`, `psycopg`, `pytest`) en un `pyproject.toml` local de esa carpeta, **sin** contaminar `ai-service/pyproject.toml`.
 
 **Por qué.** La zona de la ficha (`ai-service/src/jbg_ai/data/generators/`) existe para C06b, que sí es un generador de producto del servicio. C06a no arranca ningún proceso de `jbg-ai`. Meterlo ahí mezclaría un lote de datos con el runtime y haría que `uv sync` del servicio arrastrara `openpyxl` para siempre.
 
@@ -106,52 +110,62 @@ El repositorio es público. El xlsx trae SKU, nombres y **precios reales**. El J
 
 Hoy `.gitignore` oculta todo `data/catalog/real/*`. Hay que **abrir una excepción** para `data/catalog/real/generated/` (JSONL + sidecar) sin levantar el xlsx ni el backup SQL.
 
-**Por qué commitear.** C09 y C10 no pueden depender de un fichero que no está en git y de una pasada asistida que no es un comando puro. El artefacto commiteado **es** el corpus; los scripts sirven para regenerar agrupación/tiers y para re-ingerir.
+**Por qué commitear.** C09 y C10 no pueden depender de un fichero que no está en git y de una pasada asistida que no es un comando puro. El artefacto commiteado **es** el corpus; los scripts sirven para regenerar tiers y para re-ingerir.
 
 **Alternativa descartada:** generar on-demand en cada máquina. Exige el xlsx local y rehacer la pasada asistida; rompe determinismo de descripciones entre clones.
 
-### 5 · Agrupación por stem de nombre, con tolerancia de conteo
+### 5 · La agrupación es interna; el JSONL no lleva semilla de familias
 
-**Decisión:** heurística determinista, no modelo:
+**Decisión:** la heurística de stem + sufijos de talla (y material solo si acompaña a una talla) sigue existiendo **solo** para que el sorteo de calidad sea por familia. El JSONL **prohíbe** `variant_group_key`, `variant_label` y `family_seed`.
 
-1. Normalizar nombre (minúsculas, sin acentos, espacios colapsados).
-2. Extraer sufijo de variante si existe: tallas (`s`/`m`/`l`/`xl`, numéricas, `mm`) y tokens finales de material/color habituales.
-3. El resto es el `variant_group_key` (slug). Productos con el mismo stem forman familia.
-4. `variant_label` es el sufijo extraído, o nulo si el producto es unario.
-5. `family_seed.member_skus` lista los SKUs del grupo, ordenados.
+**Por qué no emitirla.** C09 extrae sobre el texto. Un campo de agrupación en cada línea es una señal paralela que el pipeline posterior puede tratar como verdad de negocio o como feature. El usuario lo descartó porque contamina fases siguientes. C18 tiene su propio change; C07 ya tiene la entidad.
 
-La exploración dio ~403 grupos y ~23 multi-variante. **No es un umbral de test.** El informe publica los conteos reales. Si el spike de apply produce un resultado **patológicamente** distinto —p. ej. un solo grupo, o casi 436 grupos con 0 multi-variante cuando la inspección manual ve tallas— se ajusta la heurística antes de commitear, no se fuerza el número.
+**Por qué no agrupar por `piece_type`.** El §8.4 lo prohíbe: cuatro tipos concentran el 78 % del catálogo; el sorteo de calidad sesgaría por tipo de pieza.
 
-**Por qué no crear `ProductFamily`.** C07 ya tiene la entidad. C18 es quien aprueba sugerencias. Escribir filas ahora crearía una segunda autoridad y mezclaría semilla con dato de negocio.
+El sidecar **puede** anotar conteos de agrupación como traza del pipeline. Eso no entra en cada línea de producto.
 
-**Por qué no agrupar por `piece_type`.** El §8.4 lo prohíbe: cuatro tipos concentran el 78 % del catálogo; el sorteo de calidad sesgaría por tipo de pieza, no por familia confundible.
+### 6 · El sorteo de calidad es por familia, con semilla; `original` no borra texto
 
-### 6 · El sorteo de calidad es por familia, con semilla, y el 10 % vacío es ruido dirigido
+Los tres valores de `text_quality_tier` son **cómo se obtiene el texto**, no «cuán vacío queda el campo»:
+
+| Tier | ~% | `text_provenance` | Qué se escribe en `description` |
+|---|---|---|---|
+| `rich` | 70 | `ai_assisted` | Pasada de vendedor, 3–5 frases, más inventiva |
+| `sparse` | 20 | `ai_assisted` | Pasada de vendedor, 1–2 frases, más contenida |
+| `original` | 10 | `merchant` | **La `Description` del xlsx, sin tocar.** Si venía vacía, sigue vacía; si decía «plata de ley», sigue diciendo «plata de ley». |
+
+`empty` era el nombre anterior y **confundía**: se interpretó como «poner la descripción a `""`», y eso **borra** texto de comerciante que sí existía. Ese comportamiento queda **prohibido**. El grupo de control de C09 es «texto del comerciante, no reescrito», no «campo anulado».
 
 ```
-hash(variant_group_key, seed) → bucket
-  [0.00, 0.70)  rich    text_provenance = ai_assisted   3–5 frases
-  [0.70, 0.90)  sparse  text_provenance = ai_assisted   1–2 frases
-  [0.90, 1.00)  empty   text_provenance = merchant      descripción vacía
+hash(stem interno, seed) → bucket
+  [0.00, 0.70)  rich      text_provenance = ai_assisted
+  [0.70, 0.90)  sparse    text_provenance = ai_assisted
+  [0.90, 1.00)  original  text_provenance = merchant
 ```
 
-Todos los miembros del grupo heredan el bucket. Los ratios se miden **por producto** (no por familia) y deben caer en ±3 pp respecto de 70/20/10. Semilla por defecto: `20260822`. `generator_version`: `c06a-assist/v1`.
+Todos los miembros del grupo interno heredan el **tier**. En `original`, cada SKU conserva **su propia** descripción de origen (no se copia la de un hermano ni se unifica a vacío). Los ratios se miden **por producto** y deben caer en ±3 pp respecto de 70/20/10. Semilla por defecto: `20260822`. `generator_version`: `c06a-assist/v2`.
 
-**Por qué por familia.** Si una talla tiene texto rico y su hermana ninguno, el recuperador las separa por riqueza de texto, no por talla: exactamente lo que la categoría crítica del golden set pretende medir, contaminada.
+Si el hash por familia deja los ratios de producto fuera de ventana, un rebalanceo determinista mueve familias enteras (las más pequeñas primero) hasta entrar. Sigue sin mezclar tiers dentro de un grupo.
 
-**Por qué el 10 % se vacía de verdad.** La puerta de C09 es ≥ 90 % de tags **sobre `ai_assisted`**. Llenar el vacío subiría el techo global y mediría la política de ruido, no el extractor. `merchant` + descripción vacía es el grupo de control honesto que el README debe declarar.
+**Por qué por familia.** Si una talla tiene texto rico y su hermana el original de tres palabras, el recuperador las separa por riqueza de texto, no por talla.
 
-### 7 · La redacción asistida está acotada por evidencia y por `varchar(1000)`
+**Por qué el 10 % no se reescribe.** La puerta de C09 es ≥ 90 % de tags **sobre `ai_assisted`**. Meter asistencia también en ese estrato mediría la política de relleno, no el extractor. Dejar el texto del xlsx (corto, irregular, a veces en blanco) es el control honesto. **No** se «arregla» vaciándolo.
 
-Criterios equivalentes al prompt `catalog-assist/v1`, publicados en el informe (no en un servicio):
+### 7 · La redacción es de vendedor, no de ficha técnica (`catalog-assist/v2`)
 
-- Expandir solo lo que consta en nombre, descripción original o material **implícito en el nombre**.
-- No afirmar conteos de piedras, acabados verificados ni detalles que exijan foto.
-- Acotar el registro por **banda de precio operativa** (no es el vocabulario de C09): *entrada* &lt; 80 €, *media* 80–250 €, *alta* &gt; 250 €. Sin evidencia, no se escribe «diamante» en un producto de 40 €.
-- Tiers: rich = 3–5 frases; sparse = 1–2; empty = `null` o `""`.
-- **Tope duro: 1000 caracteres.** `Product.Description` es `varchar(1000)`. El validador del JSONL rechaza cualquier línea que lo rebase **antes** de ingerir. Es el mismo 22001 que `CLAUDE.md` documenta para teléfonos: aquí el riesgo es una descripción rica que no cabe.
+El agente se **imagina** la pieza como si la tuviera delante (un vendedor de joyería con el producto en la bandeja) y escribe lo que «ve». El texto resultante es una descripción de catálogo, no un comentario sobre el export. **Esto aplica solo a `rich` y `sparse`.** El tier `original` no pasa por esta redacción.
 
-La pasada se hace **una vez**. El JSONL commiteado es la fuente. Re-ejecutar agrupación/tiers con la misma semilla no reescribe descripciones ya asistidas salvo que el operador lo pida explícitamente (flag de regeneración).
+Criterios, publicados en el informe (no en un servicio):
+
+1. **Voz.** Natural, de producto. Describe la pieza: tipo, motivo, metal, tamaño si consta, cómo se lleva o cómo se presenta. Nunca en segunda persona meta («si tuvieras la foto…»).
+2. **Prohibido en el texto asistido.** Mencionar fotografía, foto, imagen, ficha de origen, export, que algo «no consta», que no se certifican acabados, que no se cuentan piedras, que el catálogo no incluye fotografías, o cualquier alusión a imaginar o a la ausencia de evidencia.
+3. **No perder información (rich/sparse).** Todo lo que está en `Name` o en `Description` original debe reaparecer en el texto asistido, con redacción natural.
+4. **No inventar piedras ni accesorios.** Si el nombre o la ficha no hablan de diamantes, perlas, cadenas añadidas, cierres, estuches o piedras concretas, el texto no los introduce. Un «erizo de mar» o una «caracola» **sí** se describen como forma de la pieza: eso ya está en el nombre.
+5. **Inventiva permitida (sin contradecir 3–4).** Silueta, volumen, cómo cae o sienta, brillo del metal que ya consta, uso (oreja, dedo, cuello, muñeca) derivado del tipo de pieza. La banda de precio **modula el registro** pero no se escribe como etiqueta.
+6. **Tiers.** `rich`: 3–5 frases, más inventiva. `sparse`: 1–2 frases. `original`: copia idéntica de la `Description` del xlsx; **no** se genera y **no** se vacía.
+7. **Tope duro: 1000 caracteres** en cualquier línea (el original del xlsx ya cabe; el asistido también debe caber). El validador rechaza cualquier línea que lo rebase **antes** de ingerir.
+
+La pasada se hace **una vez** (o con `--regenerate-text` al cambiar de v1 a v2). El JSONL commiteado es la fuente.
 
 ### 8 · La ingesta toca solo `Description`, por SKU, en transacción
 
@@ -183,11 +197,11 @@ sequenceDiagram
   participant J as JSONL git
   participant PG as Postgres :5433
 
-  Op->>S: generar agrupación + tiers
+  Op->>S: generar tiers + pasada vendedor
   S->>X: leer 436 filas
-  S->>S: grupos + hash(seed)
-  Op->>S: pasada asistida rich/sparse
-  S->>J: escribir JSONL + .meta.json
+  S->>S: grupos internos + hash(seed)
+  Op->>S: redactar rich/sparse; original = Description del xlsx
+  S->>J: escribir JSONL (sin familia) + .meta.json
   Op->>S: ingerir
   S->>J: leer corpus
   S->>PG: BEGIN
@@ -207,39 +221,43 @@ El xlsx no está en git; CI y un clon fresco no lo tienen. Los tests de `scripts
 
 - unicidad de SKU y `data_origin: real`
 - inmutabilidad de identidad
-- un `variant_group_key` no mezcla tiers
-- `rich`/`sparse` → `ai_assisted`; `empty` → `merchant` y texto vacío
-- determinismo de agrupación y tiers a semilla fija
+- el JSONL **no** contiene `variant_group_key`, `variant_label` ni `family_seed`
+- internamente, un grupo de variantes no mezcla tiers
+- `rich`/`sparse` → `ai_assisted` y texto generado; `original` → `merchant` y `description` **igual** a la del export
+- `rich`/`sparse` no mencionan foto/ficha/laguna; conservan material/motivo del original
+- determinismo de tiers a semilla fija
 - el UPDATE de fixture no altera `Price`/`Name`/`CollectionId`
 - rechazo de descripción &gt; 1000 caracteres
 - **cero** sockets a proveedores (mismo espíritu que la regla transversal del plan §1)
 
-Los tests del JSONL **real** (436 líneas, ratios ±3 pp, muestras §15) son validadores que se ejecutan en apply cuando el xlsx está presente; no son la suite que tiene que pasar en un árbol sin datos.
+Los tests del JSONL **real** (436 líneas, ratios ±3 pp, muestras de vendedor) son validadores de apply cuando el xlsx está presente.
 
-### 10 · El informe es el sitio donde se declara la limitación §15
+### 10 · El informe declara la limitación; el producto no
 
-`Documentos/Proyecto Final AIEng/informes/c06a-catalog-enrichment-report.md` incluye, como mínimo: conteos de agrupación, ratios por tier y por `text_provenance`, SKUs unmatched, muestras (5 rich, 3 sparse, 2 empty) **antes/después**, y un párrafo explícito: el texto **simula** un reconocimiento multimodal que no existe; 0 fotos; atributos no derivables son plausibles, no verificados; la afirmación defendible es «catálogo **realista**», no «real tal cual».
+`Documentos/Proyecto Final AIEng/informes/c06a-catalog-enrichment-report.md` incluye, como mínimo: ratios por tier y por `text_provenance`, SKUs unmatched, muestras (5 `rich`, 3 `sparse` y 2 `original`) **antes/después**. En `original`, antes y después deben coincidir con el xlsx. Un párrafo **solo en el informe**: no hay fotos de producto; el texto `rich`/`sparse` se redactó como lo haría un vendedor con la pieza delante; lo visual no verificable es plausible, no certificado.
 
-Sin ese párrafo, C24 no puede medir el delta «con asistencia − sin asistencia» y el README del proyecto miente.
+Las muestras del informe deben ser descripciones de producto, no el estilo v1 (meta-comentario sobre la ficha).
 
 ## Risks / Trade-offs
 
-- **[Riesgo] La heurística de agrupación parte familias reales o fusiona piezas distintas.** → Mitigación: tolerancia de conteo + inspección de las ~23 multi-variante en el informe; ajuste de sufijos en el spike de apply **antes** de commitear. C18 puede corregir familias; este change no las persiste.
-- **[Riesgo] Descripción rica > 1000 caracteres revienta la ingesta con `22001`.** → Mitigación: validador previo al `UPDATE`; criterio de redacción con tope; test de fixture a 1001 caracteres.
-- **[Riesgo] La BD local no tiene los 436 SKUs** (backup solo esquema; hay que haber importado el xlsx vía .NET). → Mitigación: unmatched en informe; la ingesta no inserta; el JSONL sigue siendo válido para C09 aunque la BD esté vacía.
-- **[Riesgo] Re-ejecutar la pasada asistida produce texto distinto y ensucia el diff.** → Mitigación: el JSONL commiteado es la fuente; regenerar descripciones exige flag explícito; agrupación/tiers sí son reproducibles por semilla.
-- **[Riesgo] Alguien commitea el xlsx al abrir la excepción de `generated/`.** → Mitigación: excepción **solo** de `data/catalog/real/generated/`; el patrón `data/catalog/real/*` sigue ocultando el resto; revisar `git status` antes del commit del corpus.
-- **[Trade-off] Sin cliente LLM no hay `model` en el sidecar.** El §8.5 pide `generator_version`, `seed`, `model`, `generated_at`. Se emite `model: null` (o se omite) y se declara `generator_version: c06a-assist/v1`. Honesto frente a fingir un modelo.
-- **[Trade-off] Python de desarrollo escribe en `public."Products"`.** Aceptable porque no es el proceso `jbg-ai` ni su rol de BD. El servicio sigue sin SELECT/UPDATE sobre `public`.
-- **[Trade-off] El 10 % vacío «empeora» el catálogo visible en local.** Es el ruido que C09 y el golden set necesitan. No se «arregla» en un follow-up de C06a.
+- **[Riesgo] La inventiva visual se pasa de rosca e inventa piedras o accesorios.** → Mitigación: criterio 4 de v2; validador que rechaza tokens de piedra/accesorio no presentes en name+description original; revisión de muestras en el informe.
+- **[Riesgo] El texto sigue oliendo a plantilla** (v1). → Mitigación: voz de vendedor; prohibición explícita de las frases v1; `rich` vs `sparse` por inventiva, no por disclaimers.
+- **[Riesgo] Descripción rica > 1000 caracteres revienta la ingesta con `22001`.** → Mitigación: validador previo al `UPDATE`; test de fixture a 1001 caracteres.
+- **[Riesgo] La BD local no tiene los 436 SKUs.** → Mitigación: unmatched en informe; la ingesta no inserta; el JSONL sigue siendo válido para C09.
+- **[Riesgo] Re-ejecutar la pasada produce texto distinto y ensucia el diff.** → Mitigación: el JSONL commiteado es la fuente; regenerar descripciones exige `--regenerate-text`.
+- **[Riesgo] Alguien commitea el xlsx al abrir la excepción de `generated/`.** → Mitigación: excepción **solo** de `data/catalog/real/generated/`; revisar `git status` antes del commit del corpus.
+- **[Trade-off] Sin cliente LLM no hay `model` en el sidecar.** Se emite `model: null` y `generator_version: c06a-assist/v2`.
+- **[Trade-off] Python de desarrollo escribe en `public."Products"`.** Aceptable porque no es el proceso `jbg-ai`.
+- **[Trade-off] El ~10 % `original` deja el texto del comerciante (a menudo pobre) visible en local.** Es el control que C09 necesita. No se vacía ni se reescribe en un follow-up de C06a.
+- **[Trade-off] C18 no recibe semilla de este JSONL.** Aceptado: contaminaba C09. C18 agrupará por su lado.
 
 ## Migration Plan
 
 No hay migración de esquema. El plan es de **datos locales**:
 
 1. Asegurar Postgres Docker en 5433 y que `"Products"` tenga filas (import Excel .NET si hace falta).
-2. Generar JSONL + sidecar; validar invariantes y tope de 1000.
-3. Snapshot de `"Products"` (`SKU, Name, Description, Price, CollectionId`).
+2. Generar JSONL v2 + sidecar; validar invariantes, tope de 1000, ausencia de campos de familia, voz de vendedor en `rich`/`sparse`, y `original` idéntico al xlsx.
+3. Snapshot de `"Products"` (`SKU, Name, Description, Price, CollectionId`) si aún no existe.
 4. Ingesta en una transacción. Rollback si invariante roto.
 5. Commitear `generated/` e informe. El xlsx no entra.
 6. **Rollback de datos:** restaurar el snapshot. El JSONL se queda; es el corpus, no el estado de la BD.
@@ -247,10 +265,11 @@ No hay migración de esquema. El plan es de **datos locales**:
 
 ## Open Questions
 
-Ninguna bloqueante: las seis del ticket están cerradas (tolerancia de agrupación, JSONL en git, migración en C13, solo `Description`, scripts en `scripts/catalog/`, `product_id` por lookup de SKU).
+Ninguna bloqueante.
 
 | # | Tema residual | Opción por defecto |
 |---|---|---|
 | 1 | Valor concreto de `seed` | `20260822` |
 | 2 | ¿Copiar utilidades de agrupación a `jbg_ai.data` en C06b? | **No en C06a.** Lo decide C06b |
-| 3 | ¿Rellenar `product_id` en el JSONL durante la ingesta? | **Opcional.** El lookup es de la ingesta; el campo puede añadirse en una segunda escritura del JSONL si resulta útil a C09, sin ser requisito de aceptación |
+| 3 | ¿Rellenar `product_id` en el JSONL durante la ingesta? | **Opcional.** El JSONL es válido sin el campo |
+| 4 | `generator_version` | `c06a-assist/v2` (rompe el contrato de voz de v1) |

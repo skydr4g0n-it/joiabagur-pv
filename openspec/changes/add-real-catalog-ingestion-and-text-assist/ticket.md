@@ -78,25 +78,25 @@ La ficha **C06a** del plan resuelve esto: ingestar los 436 reales, aplicar repar
 - Referencia orientativa de exploración: ~403 grupos, ~23 con >1 miembro (~56 productos).
 - **Hay tolerancia:** no es requisito alcanzar esas cifras exactas; el informe documenta los conteos reales.
 - Unidad: **familia de variantes**, no `piece_type` (§8.4).
-- Salida JSONL: `variant_group_key`, `variant_label`, `family_seed: { group_key, member_skus[] }`.
-- Algoritmo: documentar en `design.md` (spike); enfoque base: normalización de nombre + sufijos talla/material.
+- Uso **interno** para el sorteo de calidad (misma familia → mismo tier). **No se serializa** en el JSONL (`variant_group_key`, `variant_label`, `family_seed` contaminan C09/C10).
+- Algoritmo: documentar en `design.md`; enfoque base: normalización de nombre + sufijos de talla.
 
 ### Reparto de calidad (semilla fija, determinista)
 
 | Tier | ~% familias | `text_quality_tier` | `text_provenance` | Descripción |
 |---|---|---|---|---|
-| Rico | 70 | `rich` | `ai_assisted` | 3–5 frases, evidencia + banda precio |
-| Escueto | 20 | `sparse` | `ai_assisted` | 1–2 frases |
-| Vacío | 10 | `empty` | `merchant` | Sin descripción |
+| Rico | 70 | `rich` | `ai_assisted` | 3–5 frases, más inventiva de vendedor |
+| Escueto | 20 | `sparse` | `ai_assisted` | 1–2 frases, más contenido |
+| Original | 10 | `original` | `merchant` | `Description` del xlsx **sin cambiar** (vacía o no) |
 
-**Regla crítica:** todos los miembros de un `variant_group_key` comparten tier.
+**Regla crítica:** todos los miembros de una familia interna comparten tier. Esa clave **no** sale en el JSONL. `original` **no** significa «campo vacío»: vaciar un texto que sí estaba en el catálogo es un error.
 
-### Redacción asistida (§15)
+### Redacción asistida (`catalog-assist/v2`)
 
-- Expandir solo lo que consta en nombre/descripción/material implícito.
-- No inventar piedras, acabados ni conteos visuales (0 fotos).
-- Acotar lenguaje por banda de precio cuando falte evidencia.
-- Documentar criterios en informe (equivalente a prompt `catalog-assist/v1`, sin servicio runtime).
+- Escribir como un vendedor con la pieza delante: descripción natural de producto, sin mencionar fotos, fichas ni lagunas.
+- Conservar todo lo que está en `Name` y `Description` originales.
+- No inventar piedras ni accesorios que no consten.
+- `rich` se esmera más; `sparse` es 1–2 frases. El tier `original` **no redacta**: deja la `Description` del xlsx exactamente como está.
 
 ### Contrato JSONL (línea por producto)
 
@@ -112,12 +112,11 @@ Campos mínimos:
   "data_origin": "real",
   "text_provenance": "ai_assisted",
   "text_quality_tier": "rich",
-  "variant_group_key": "...",
-  "variant_label": "S",
-  "family_seed": { "group_key": "...", "member_skus": ["SKU01", "SKU02"] },
   "product_id": "uuid-opcional-post-query"
 }
 ```
+
+Prohibidos en cada línea: `variant_group_key`, `variant_label`, `family_seed`.
 
 - `product_id`: **opcional** en JSONL; se obtiene por lookup de SKU contra `public."Products"` durante ingesta o enriquecimiento posterior del artefacto.
 - Sidecar `.meta.json`: `generator_version`, `seed`, `generated_at`, ratios, conteos de agrupación.
@@ -152,7 +151,7 @@ Script location: scripts/catalog/
 
 ## Arquitectura
 
-**Frontera §6.3.** Metadatos de corpus (`data_origin`, `text_provenance`, `family_seed`) viven en **artefactos de generación** (JSONL) en C06a y en `ai.product_document` desde C13. El texto operativo que ve .NET es `Product.Description` — sin mezclar ejes de evaluación en `public.*`.
+**Frontera §6.3.** Metadatos de corpus (`data_origin`, `text_provenance`) viven en **artefactos de generación** (JSONL) en C06a y en `ai.product_document` desde C13. El texto operativo que ve .NET es `Product.Description`. No se emite semilla de familias en el JSONL.
 
 **Sin contrato HTTP.** Este change no toca `jbg-ai` routers ni `openapi.json`. Es trabajo offline + scripts en `scripts/catalog/`.
 
@@ -167,10 +166,10 @@ Script location: scripts/catalog/
 ## Definición de Hecho (DoD)
 
 - [ ] Artefactos OpenSpec del change completos y `openspec validate --all --strict` → **0 failed**
-- [ ] JSONL con **436** líneas commiteado; `.meta.json` con seed, ratios y conteos de agrupación
-- [ ] Informe publicado con estadísticas, muestras antes/después y limitación §15
+- [ ] JSONL con **436** líneas commiteado; `.meta.json` con seed y ratios; **sin** campos de familia por línea
+- [ ] Informe publicado con estadísticas, muestras de vendedor antes/después y limitación **solo en el informe**
 - [ ] Invariante SKU/precio/colección/nombre verificado (JSONL vs xlsx)
-- [ ] Ningún `variant_group_key` mezcla tiers
+- [ ] Ninguna familia interna mezcla tiers; el JSONL no serializa la agrupación
 - [ ] Ingesta local ejecutada: UPDATE **solo `Description`** por SKU; `Price`, `CollectionId` y `Name` verificados
 - [ ] SKUs unmatched documentados en informe
 - [ ] Scripts en `scripts/catalog/` documentados y ejecutables
@@ -231,3 +230,4 @@ Script location: scripts/catalog/
 |---|---|---|
 | 2026-08-22 | `/enrich-us` | Creación del ticket y HU a partir de exploración C06a |
 | 2026-08-22 | Revisión | Renombrado a HU-AIENG-006a / T-AIENG-06a; decisiones cerradas (tolerancia agrupación, JSONL en git, migración en C13, solo Description, scripts/catalog/, product_id por SKU) |
+| 2026-08-22 | Revisión v2 | Voz de vendedor (`catalog-assist/v2`); JSONL sin campos de familia; tercer tier `original` (conserva Description del xlsx; no se llama `empty` ni se vacía) |
