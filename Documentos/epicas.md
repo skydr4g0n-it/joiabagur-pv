@@ -393,6 +393,7 @@ Construcción del corpus sobre el que opera todo el sistema RAG: perfiles de pro
 **User Stories:**
 - [HU-AIENG-006a: Ingesta del catálogo real y corpus enriquecido versionado](Historias/AI-Eng/HU-AIENG-006a.md) *(C06a — corpus JSONL + informe)*
 - [HU-AIENG-006b: Ampliación sintética del catálogo — LLM, colecciones nuevas e ingesta local](Historias/AI-Eng/HU-AIENG-006b.md) *(C06b — hecho; CLI en `jbg_ai.data`; sin familias)*
+- [HU-AIENG-009: Pipeline de enriquecimiento del catálogo — extracción estructurada con vocabularios cerrados](Historias/AI-Eng/HU-AIENG-009.md) *(C09 — extractor real de `POST /v1/enrich/products`)*
 
 **Entregable C06a.** El corpus versionado vive en [`data/catalog/real/generated/catalog-real-enriched.jsonl`](../data/catalog/real/generated/catalog-real-enriched.jsonl) (sidecar `.meta.json` al lado; `generator_version` `c06a-assist/v2`). Cada línea lleva identidad + `data_origin` / `text_provenance` / `text_quality_tier` (`rich` / `sparse` / `original`); **no** emite `variant_group_key`, `variant_label` ni `family_seed`. La pasada de vendedor, los ratios y la limitación §15 están en [`Proyecto Final AIEng/informes/c06a-catalog-enrichment-report.md`](Proyecto%20Final%20AIEng/informes/c06a-catalog-enrichment-report.md). Los scripts son el pipeline offline [`scripts/catalog/`](../scripts/catalog/). El xlsx crudo sigue gitignored.
 
