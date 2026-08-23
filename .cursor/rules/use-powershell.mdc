@@ -1,4 +1,28 @@
 ---
-alwaysApply: false
+description: Shell del Agent en Windows — PowerShell, nunca HEREDOC de bash
+alwaysApply: true
 ---
-We are on Windows OS. When you have to execute a command, ALWAYS use Powershell instead of bash.
+
+# PowerShell en este equipo
+
+El Agent corre en **Windows + PowerShell**, no en bash/zsh. Toda orden de terminal debe ser sintaxis PowerShell.
+
+## Commits y mensajes multilínea
+
+Nunca uses HEREDOC de bash (`cat <<'EOF'`, `$(cat <<'EOF' ... EOF)`). En PowerShell `<<` es redirección y falla con `Missing file specification after redirection operator`.
+
+Para `git commit` o `gh` con cuerpo multilínea, usa here-string:
+
+```powershell
+git commit -m @"
+Completa los artefactos OpenSpec de C09 para poder aplicar el change.
+
+"@
+```
+
+Esto **pisa** la plantilla por defecto del Agent que pide HEREDOC de bash.
+
+## Otras trampas bash → PowerShell
+
+- Encadena con `;`, no con `&&` (en Windows PowerShell 5.x `&&` no existe).
+- No invoques `bash -c` solo para envolver un commit.
