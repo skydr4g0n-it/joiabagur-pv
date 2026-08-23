@@ -1,10 +1,12 @@
-# `jbg_ai.data` — CLI C06b
+# `jbg_ai.data` — CLI C06b (catálogo) y C10 (mundo)
 
-Genera el corpus sintético e inserta colecciones/productos en Postgres **local**.
-`jbg_ai.api.main` **no** importa este paquete. `GET /health` arranca sin clave de proveedor.
+Genera el corpus sintético, simula el mundo POS/inventario/ventas e inserta en
+Postgres **local**. `jbg_ai.api.main` **no** importa este paquete. `GET /health`
+arranca sin clave de proveedor.
 
-`generate` corre **en el host**, no dentro del contenedor `jbg-ai`. Docker solo entra
-en `ingest` (Postgres en `:5433`).
+`generate` y `world simulate` corren **en el host**, no dentro del contenedor
+`jbg-ai`. Docker solo entra en `ingest` / `world ingest` (Postgres en `:5433`).
+`world simulate` **no** habla con Postgres ni con un LLM.
 
 ## Secretos locales
 
@@ -25,9 +27,9 @@ al runtime). Producción: SSM `/jpv/prod/*` (C17), otro nombre.
 |---|---|---|
 | `JPV_CATALOG_LLM_API_KEY` | solo `generate` | `JPV_RAG_LLM_API_KEY` (C09, contenedor + SSM) |
 | `JPV_CATALOG_LLM_MODEL` | `generate` | default `gpt-4o` (OpenAI) |
-| `JPV_PGHOST` `JPV_PGPORT` `JPV_PGDATABASE` `JPV_PGUSER` `JPV_PGPASSWORD` | `ingest` | host **5433**, BD `joiabagur_pv` |
+| `JPV_PGHOST` `JPV_PGPORT` `JPV_PGDATABASE` `JPV_PGUSER` `JPV_PGPASSWORD` | `ingest` y `world ingest` | host **5433**, BD `joiabagur_pv` |
 
-## Comandos
+## Catálogo (C06b)
 
 ```powershell
 cd ai-service
@@ -47,3 +49,30 @@ uv run --system-certs python -m jbg_ai.data ingest --jsonl ../data/catalog/synth
 - Sin `--regenerate-text` no se pisa un JSONL ya escrito.
 - La ingesta es un `INSERT` transaccional. No toca SKUs reales ni `ProductFamily*`.
   El rol de runtime de `jbg-ai` no gana `INSERT` sobre `public` (§6.3).
+
+## Mundo (C10)
+
+Perfiles commiteados: [`data/world/pos-profiles.yaml`](../../../data/world/pos-profiles.yaml)
+(`generator_version` `c10-world/v1`, semilla `20260823`). El JSONL de ventas y los
+dumps SQL **no** van a git (`data/world/generated/`, `data/world/backups/`).
+
+```powershell
+cd ai-service
+uv run --system-certs python -m jbg_ai.data world simulate --profiles ../data/world/pos-profiles.yaml --out ../data/world/generated
+uv run --system-certs python -m jbg_ai.data world ingest --dir ../data/world/generated
+```
+
+`world ingest` usa las mismas `JPV_PG*` que el ingest de catálogo. No usa
+`JPV_CATALOG_LLM_*`. Tres operadores de demo (`op-ciutadella`, `op-fornells`,
+`op-aeroport`) entran con `Operator123!` (BCrypt cost 12). `MAO-TALLER` es
+origen de suministro **solo en el YAML**; la columna SQL llega en C19.
+
+### Backup / restore (volumen Docker)
+
+```powershell
+docker exec jpv-pv-postgres pg_dump -U postgres joiabagur_pv > data/world/backups/c10-world.sql
+Get-Content data/world/backups/c10-world.sql | docker exec -i jpv-pv-postgres psql -U postgres -d joiabagur_pv
+```
+
+Rehydrate = restore del dump, no un segundo ingest encima (el CLI aborta si los
+códigos del censo ya existen).

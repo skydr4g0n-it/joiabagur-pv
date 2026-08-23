@@ -1,0 +1,340 @@
+generator_version: c10-world/v1
+seed: "20260823"
+horizon_months: 16
+phone: "600123456"
+inactive_inventory_ratio_live_pos: 0.08
+bulk_checkout_ratio: 0.15
+catalog_sku_holes:
+  - SKU135
+  - SKU400
+  - SKU418
+
+operators:
+  - username: op-ciutadella
+    first_name: Catalina
+    last_name: Pons
+    password: Operator123!
+    pos_code: CIU-CENTRE
+  - username: op-fornells
+    first_name: Joan
+    last_name: Marí
+    password: Operator123!
+    pos_code: FORNELLS
+  - username: op-aeroport
+    first_name: Marta
+    last_name: Soler
+    password: Operator123!
+    pos_code: MAO-AIR
+
+pos:
+  - code: MAO-TALLER
+    name: Taller Joia Bagur, Maó
+    island: Menorca
+    address: Carrer de ses Moreres, Maó
+    is_supply_source: true
+    is_active: true
+    allow_manual_price_edit: false
+    lambda_retail: 0.02
+    coverage: 0.98
+    qty_min: 40
+    qty_max: 90
+    operator: null
+    closed_after: null
+    seasonality: {1: 1.0, 2: 1.0, 3: 1.0, 4: 1.0, 5: 1.0, 6: 1.0, 7: 1.0, 8: 1.0, 9: 1.0, 10: 1.0, 11: 1.0, 12: 1.0}
+    collection_weights:
+      Cielo estrellado: 3.0
+      Filigrana: 3.0
+      La Pomada: 1.2
+      Tramontana: 0.8
+      Caliza: 0.8
+      El Jaleo: 0.3
+      Fuego: 0.3
+      Umbra: 0.3
+      Coral negro: 0.3
+      Marea viva: 0.2
+
+  - code: CIU-CENTRE
+    name: Ciutadella Centre
+    island: Menorca
+    address: Carrer de ses Voltes, Ciutadella
+    is_supply_source: false
+    is_active: true
+    allow_manual_price_edit: false
+    lambda_retail: 9.8
+    coverage: 0.78
+    qty_min: 14
+    qty_max: 36
+    operator: op-ciutadella
+    closed_after: null
+    seasonality: {1: 0.85, 2: 0.8, 3: 0.9, 4: 1.0, 5: 1.05, 6: 1.15, 7: 1.2, 8: 1.2, 9: 1.1, 10: 1.0, 11: 0.9, 12: 0.95}
+    collection_weights:
+      La Pomada: 3.2
+      Cielo estrellado: 2.2
+      Filigrana: 2.2
+      El Jaleo: 1.8
+      Tramontana: 1.4
+      Caliza: 1.4
+      Fuego: 0.8
+      Umbra: 0.6
+      Coral negro: 0.6
+      Marea viva: 0.5
+
+  - code: MAO-AIR
+    name: Aeroport de Menorca
+    island: Menorca
+    address: Aeroport de Menorca, Maó
+    is_supply_source: false
+    is_active: true
+    allow_manual_price_edit: true
+    lambda_retail: 6.2
+    coverage: 0.38
+    qty_min: 8
+    qty_max: 22
+    operator: op-aeroport
+    closed_after: null
+    seasonality: {1: 0.5, 2: 0.5, 3: 0.7, 4: 0.9, 5: 1.2, 6: 1.5, 7: 1.7, 8: 1.7, 9: 1.3, 10: 0.9, 11: 0.55, 12: 0.6}
+    collection_weights:
+      El Jaleo: 4.0
+      Marea viva: 4.0
+      Fuego: 1.6
+      Coral negro: 1.2
+      Umbra: 0.8
+      La Pomada: 0.6
+      Tramontana: 0.5
+      Caliza: 0.5
+      Cielo estrellado: 0.15
+      Filigrana: 0.15
+
+  - code: FORNELLS
+    name: Fornells
+    island: Menorca
+    address: Passeig Marítim, Fornells
+    is_supply_source: false
+    is_active: true
+    allow_manual_price_edit: false
+    lambda_retail: 1.25
+    coverage: 0.22
+    qty_min: 6
+    qty_max: 16
+    operator: op-fornells
+    closed_after: null
+    seasonality: {1: 0.12, 2: 0.12, 3: 0.25, 4: 0.5, 5: 0.9, 6: 2.1, 7: 2.4, 8: 2.4, 9: 1.6, 10: 0.6, 11: 0.2, 12: 0.15}
+    collection_weights:
+      Tramontana: 3.5
+      Caliza: 3.5
+      La Pomada: 1.2
+      Marea viva: 0.8
+      El Jaleo: 0.5
+      Cielo estrellado: 0.3
+      Filigrana: 0.3
+      Fuego: 0.4
+      Umbra: 0.3
+      Coral negro: 0.3
+
+  - code: BINIBECA
+    name: Boutique Binibeca
+    island: Menorca
+    address: Binibeca Vell
+    is_supply_source: false
+    is_active: true
+    allow_manual_price_edit: false
+    lambda_retail: 2.5
+    coverage: 0.42
+    qty_min: 7
+    qty_max: 18
+    operator: null
+    closed_after: null
+    seasonality: {1: 0.35, 2: 0.35, 3: 0.55, 4: 0.8, 5: 1.1, 6: 1.6, 7: 1.8, 8: 1.8, 9: 1.3, 10: 0.8, 11: 0.45, 12: 0.5}
+    collection_weights:
+      Tramontana: 3.2
+      Caliza: 3.2
+      La Pomada: 2.0
+      Marea viva: 1.0
+      El Jaleo: 0.8
+      Cielo estrellado: 0.5
+      Filigrana: 0.5
+      Fuego: 0.5
+      Umbra: 0.4
+      Coral negro: 0.4
+
+  - code: HT-GALDANA
+    name: Hotel Cala Galdana
+    island: Menorca
+    address: Cala Galdana
+    is_supply_source: false
+    is_active: true
+    allow_manual_price_edit: true
+    lambda_retail: 4.0
+    coverage: 0.42
+    qty_min: 8
+    qty_max: 20
+    operator: null
+    closed_after: null
+    seasonality: {1: 0.2, 2: 0.2, 3: 0.4, 4: 0.7, 5: 1.1, 6: 1.8, 7: 2.1, 8: 2.1, 9: 1.5, 10: 0.7, 11: 0.25, 12: 0.25}
+    collection_weights:
+      Fuego: 3.2
+      Umbra: 3.0
+      Coral negro: 3.0
+      El Jaleo: 1.6
+      Marea viva: 0.8
+      La Pomada: 0.5
+      Cielo estrellado: 0.4
+      Filigrana: 0.4
+      Tramontana: 0.5
+      Caliza: 0.5
+
+  - code: HT-SONBOU
+    name: Hotel Son Bou
+    island: Menorca
+    address: Son Bou
+    is_supply_source: false
+    is_active: true
+    allow_manual_price_edit: true
+    lambda_retail: 3.1
+    coverage: 0.40
+    qty_min: 8
+    qty_max: 18
+    operator: null
+    closed_after: null
+    seasonality: {1: 0.15, 2: 0.15, 3: 0.3, 4: 0.6, 5: 1.0, 6: 1.9, 7: 2.3, 8: 2.3, 9: 1.4, 10: 0.55, 11: 0.2, 12: 0.2}
+    collection_weights:
+      Fuego: 3.0
+      Umbra: 2.4
+      Coral negro: 2.4
+      Marea viva: 1.8
+      El Jaleo: 1.0
+      La Pomada: 0.5
+      Cielo estrellado: 0.3
+      Filigrana: 0.3
+      Tramontana: 0.5
+      Caliza: 0.5
+
+  - code: PORT-MAO
+    name: Estació Marítima, Maó
+    island: Menorca
+    address: Estació Marítima, Maó
+    is_supply_source: false
+    is_active: true
+    allow_manual_price_edit: false
+    lambda_retail: 2.85
+    coverage: 0.36
+    qty_min: 7
+    qty_max: 18
+    operator: null
+    closed_after: null
+    seasonality: {1: 0.4, 2: 0.4, 3: 0.65, 4: 0.9, 5: 1.2, 6: 1.5, 7: 1.7, 8: 1.7, 9: 1.2, 10: 0.85, 11: 0.5, 12: 0.5}
+    collection_weights:
+      El Jaleo: 3.5
+      Marea viva: 3.5
+      Fuego: 1.0
+      Coral negro: 0.8
+      La Pomada: 0.6
+      Tramontana: 0.6
+      Caliza: 0.6
+      Umbra: 0.5
+      Cielo estrellado: 0.25
+      Filigrana: 0.25
+
+  - code: PALMA-JAIME3
+    name: Palma Jaume III
+    island: Mallorca
+    address: Avinguda de Jaume III, Palma
+    is_supply_source: false
+    is_active: true
+    allow_manual_price_edit: false
+    lambda_retail: 6.2
+    coverage: 0.74
+    qty_min: 12
+    qty_max: 32
+    operator: null
+    closed_after: null
+    seasonality: {1: 0.8, 2: 0.75, 3: 0.9, 4: 1.0, 5: 1.1, 6: 1.2, 7: 1.25, 8: 1.25, 9: 1.1, 10: 1.0, 11: 0.85, 12: 0.95}
+    collection_weights:
+      La Pomada: 3.0
+      Cielo estrellado: 2.2
+      Filigrana: 2.2
+      Fuego: 1.6
+      Umbra: 1.2
+      Coral negro: 1.2
+      Tramontana: 1.2
+      Caliza: 1.2
+      El Jaleo: 0.8
+      Marea viva: 0.6
+
+  - code: EIV-MARINA
+    name: Eivissa Marina
+    island: Ibiza
+    address: Marina d'Eivissa
+    is_supply_source: false
+    is_active: true
+    allow_manual_price_edit: true
+    lambda_retail: 3.55
+    coverage: 0.40
+    qty_min: 8
+    qty_max: 20
+    operator: null
+    closed_after: null
+    seasonality: {1: 0.25, 2: 0.25, 3: 0.45, 4: 0.8, 5: 1.3, 6: 1.8, 7: 2.0, 8: 2.0, 9: 1.5, 10: 1.1, 11: 0.4, 12: 0.3}
+    collection_weights:
+      El Jaleo: 3.2
+      Marea viva: 2.4
+      Tramontana: 1.6
+      Caliza: 1.6
+      Fuego: 1.2
+      Coral negro: 1.0
+      Umbra: 0.8
+      La Pomada: 0.6
+      Cielo estrellado: 0.3
+      Filigrana: 0.3
+
+  - code: HT-ALCUDIA
+    name: Hotel Alcúdia
+    island: Mallorca
+    address: Port d'Alcúdia
+    is_supply_source: false
+    is_active: true
+    allow_manual_price_edit: true
+    lambda_retail: 2.3
+    coverage: 0.38
+    qty_min: 7
+    qty_max: 18
+    operator: null
+    closed_after: null
+    seasonality: {1: 0.2, 2: 0.2, 3: 0.4, 4: 0.7, 5: 1.1, 6: 1.7, 7: 2.0, 8: 2.0, 9: 1.4, 10: 0.7, 11: 0.25, 12: 0.25}
+    collection_weights:
+      Fuego: 3.2
+      Umbra: 2.4
+      Coral negro: 2.4
+      El Jaleo: 0.8
+      Marea viva: 0.8
+      La Pomada: 0.6
+      Cielo estrellado: 0.4
+      Filigrana: 0.4
+      Tramontana: 0.5
+      Caliza: 0.5
+
+  - code: HT-ARTRUTX
+    name: Hotel Cap d'Artrutx
+    island: Menorca
+    address: Cap d'Artrutx, Ciutadella
+    is_supply_source: false
+    is_active: false
+    allow_manual_price_edit: false
+    lambda_retail: 1.95
+    coverage: 0.12
+    qty_min: 3
+    qty_max: 10
+    operator: null
+    closed_after: 2025-09-30
+    seasonality: {1: 0.1, 2: 0.1, 3: 0.3, 4: 0.6, 5: 1.1, 6: 1.9, 7: 2.2, 8: 2.2, 9: 1.5, 10: 0.0, 11: 0.0, 12: 0.0}
+    collection_weights:
+      Fuego: 2.5
+      Umbra: 2.5
+      Coral negro: 2.5
+      El Jaleo: 0.8
+      Marea viva: 0.6
+      La Pomada: 0.4
+      Cielo estrellado: 0.3
+      Filigrana: 0.3
+      Tramontana: 0.4
+      Caliza: 0.4
