@@ -1,0 +1,184 @@
+# Closed vocabularies for catalog enrichment (C09).
+# Canonical terms are stored as `text` in PostgreSQL — never as ENUM.
+# Expand stone_type here when a recognisable gem/mineral appears in the corpus.
+
+piece_type:
+  terms:
+    - anillo
+    - pendientes
+    - collar
+    - pulsera
+    - colgante
+    - tobillera
+    - broche
+    - cadena
+  synonyms:
+    sortija: anillo
+    alianza: anillo
+    gargantilla: collar
+    brazalete: pulsera
+    esclava: pulsera
+    criollas: pendientes
+    aro: pendientes
+    aros: pendientes
+
+materials:
+  terms:
+    - plata
+    - oro
+    - baño de oro
+    - hilo
+    - latón
+    - acero
+    - resina
+    - cuero
+    - perla
+  synonyms:
+    plata de ley: plata
+    "925": plata
+    sterling: plata
+    silver: plata
+    18k: oro
+    18kl: oro
+    18kt: oro
+    gold: oro
+    hilo encerado: hilo
+    chapado en oro: baño de oro
+    gold plated: baño de oro
+
+stone_type:
+  terms:
+    - piedra
+    - ambar
+    - onix
+    - perla
+    - coral
+    - turquesa
+    - cuarzo
+    - amatista
+    - jade
+    - lapislazuli
+    - citrino
+    - granate
+    - malaquita
+    - nacar
+    - howlita
+    - aventurina
+    - obsidiana
+    - hematites
+    - ojo de tigre
+    - piedra luna
+    - labradorita
+    - amazonita
+    - agata
+    - jaspe
+    - madreperla
+    - circonita
+    - diamante
+    - zafiro
+    - esmeralda
+    - rubi
+    - topacio
+    - opalo
+    - calcedonia
+  synonyms:
+    ámbar: ambar
+    amber: ambar
+    ónix: onix
+    onyx: onix
+    nácar: nacar
+    lapis lazuli: lapislazuli
+    lapislázuli: lapislazuli
+    ágata: agata
+    agate: agata
+    ópalo: opalo
+    opal: opalo
+    rubí: rubi
+    ruby: rubi
+    zirconia: circonita
+    cz: circonita
+    moonstone: piedra luna
+    tiger eye: ojo de tigre
+    ojo-de-tigre: ojo de tigre
+    pearl: perla
+    perlas: perla
+
+size_label:
+  terms:
+    - XXS
+    - XS
+    - S
+    - M
+    - L
+    - XL
+    - XXL
+    - mini
+    - extramini
+    - pequeno
+    - mediano
+    - grande
+  synonyms:
+    xxs: XXS
+    xs: XS
+    s: S
+    m: M
+    l: L
+    xl: XL
+    xxl: XXL
+    extra-mini: extramini
+    extra mini: extramini
+    pequeño: pequeno
+    pequeña: pequeno
+    pequena: pequeno
+    pequenas: pequeno
+    mediana: mediano
+    medianas: mediano
+    grandes: grande
+
+color_tags:
+  terms:
+    - plateado
+    - dorado
+    - blanco
+    - negro
+    - azul
+    - verde
+    - rojo
+    - rosa
+    - beige
+    - marron
+  synonyms:
+    silver: plateado
+    gold: dorado
+    marrón: marron
+    brown: marron
+
+style_tags:
+  terms:
+    - clasico
+    - moderno
+    - minimalista
+    - boho
+    - marino
+    - vintage
+    - etnico
+    - romantico
+  synonyms:
+    clásico: clasico
+    étnico: etnico
+    romántico: romantico
+    bohemio: boho
+
+occasion_tags:
+  terms:
+    - diario
+    - regalo
+    - fiesta
+    - boda
+    - verano
+    - ceremonia
+  synonyms:
+    día a día: diario
+    gift: regalo
+    party: fiesta
+    wedding: boda

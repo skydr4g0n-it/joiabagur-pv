@@ -75,6 +75,26 @@ class Settings(BaseSettings):
         default=None,
         description="Optional OpenAI-compatible base URL for the catalog CLI.",
     )
+    jpv_rag_llm_api_key: str | None = Field(
+        default=None,
+        description=(
+            "C09 runtime enrichment (JPV_RAG_LLM_API_KEY). Distinct from "
+            "JPV_CATALOG_LLM_API_KEY. Not required to boot /health."
+        ),
+    )
+    jpv_rag_llm_model: str | None = Field(
+        default=None,
+        description="Optional provider-prefixed model id (e.g. openai/gpt-4o).",
+    )
+    jpv_rag_llm_base_url: str | None = Field(
+        default=None,
+        description="Optional LiteLLM api_base (proxy / Azure / local).",
+    )
+    jpv_rag_llm_concurrency: int = Field(
+        default=8,
+        gt=0,
+        description="In-flight enrichment calls per batch. Default 8.",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -97,6 +117,9 @@ class Settings(BaseSettings):
         "jpv_catalog_llm_api_key",
         "jpv_catalog_llm_model",
         "jpv_catalog_llm_base_url",
+        "jpv_rag_llm_api_key",
+        "jpv_rag_llm_model",
+        "jpv_rag_llm_base_url",
         mode="before",
     )
     @classmethod
@@ -109,6 +132,13 @@ class Settings(BaseSettings):
         """
         if isinstance(value, str) and not value.strip():
             return None
+        return value
+
+    @field_validator("jpv_rag_llm_concurrency", mode="before")
+    @classmethod
+    def blank_concurrency_is_default(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return 8
         return value
 
 
@@ -141,4 +171,8 @@ def canonical_openapi_settings() -> Settings:
         jpv_catalog_llm_api_key=None,
         jpv_catalog_llm_model=None,
         jpv_catalog_llm_base_url=None,
+        jpv_rag_llm_api_key=None,
+        jpv_rag_llm_model=None,
+        jpv_rag_llm_base_url=None,
+        jpv_rag_llm_concurrency=8,
     )

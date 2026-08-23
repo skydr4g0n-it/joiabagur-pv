@@ -391,13 +391,17 @@ joiabagur-pv/
 │   ├── src/                             # pages, components, services, hooks, providers, routing, types
 │   ├── e2e/                             # Playwright
 │   └── package.json
-├── ai-service/                          # Microservicio de IA (C01-C02)
+├── ai-service/                          # Microservicio de IA (C01–C09)
 │   ├── src/jbg_ai/
 │   │   ├── api/                         # main.py (create_app), auth.py, deps.py, middleware.py, routers/, schemas/
-│   │   ├── stubs/                       # respuestas deterministas bajo STUB_MODE
-│   │   └── config/                      # settings.py (pydantic-settings)
+│   │   ├── config/                      # settings.py (pydantic-settings)
+│   │   ├── db/                          # motor perezoso, pool acotado (C05)
+│   │   ├── data/                        # CLI C06b; api.main no lo importa
+│   │   ├── enrichment/                  # extractor C09 (vocabularios, talla, LiteLLM, auditor)
+│   │   └── stubs/                       # respuestas deterministas bajo STUB_MODE
+│   ├── prompts/                         # catalog-synth/v3 (C06b) + enrichment/v1 (C09)
 │   ├── openapi.json                     # snapshot versionado del contrato
-│   ├── tests/                           # api, config, support — espeja src/jbg_ai
+│   ├── tests/                           # api, config, db, migrations, data, enrichment, support
 │   ├── pyproject.toml · uv.lock
 │   └── Dockerfile
 ├── terraform/                           # IaC de producción (EC2, RDS, S3, ECR, SSM, IAM)

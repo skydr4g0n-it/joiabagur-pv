@@ -34,6 +34,10 @@ def build_settings(**overrides: Any) -> Settings:
         "jpv_catalog_llm_api_key": None,
         "jpv_catalog_llm_model": None,
         "jpv_catalog_llm_base_url": None,
+        "jpv_rag_llm_api_key": None,
+        "jpv_rag_llm_model": None,
+        "jpv_rag_llm_base_url": None,
+        "jpv_rag_llm_concurrency": 8,
     }
     values.update(overrides)
     return Settings(**values)

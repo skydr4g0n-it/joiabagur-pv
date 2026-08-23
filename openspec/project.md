@@ -63,6 +63,7 @@
 - **Persistence**: SQLAlchemy 2 (async) over psycopg 3, pgvector types, Alembic migrations in `ai-service/migrations/`
 - **Schema ownership**: `ai` only for the `jbg-ai` runtime process. Host CLIs (C06a `scripts/catalog/`, C06b `python -m jbg_ai.data ingest`) are the documented exception: they use `JPV_PG*` against local Docker and do not run inside the service container.
 - **Connection pool**: capped at `DB_POOL_SIZE` (default 5) with no overflow; built lazily, so the service boots with no database
+- **Runtime LLM**: LiteLLM (`litellm==1.98.0`) for C09 enrichment; `JPV_RAG_LLM_*` optional at boot, required when `STUB_MODE=false` on `POST /v1/enrich/products`. Distinct from `JPV_CATALOG_LLM_*` (C06b CLI).
 
 ### Infrastructure
 - **Containers**: Docker, Docker Compose (development)
@@ -314,6 +315,7 @@ Run the `update-docs` command (skill replicated in `.agent/`, `.claude/`, `.code
 
 **AI Service (`jbg-ai`):**
 - OpenAI SDK (`openai`) — C06b catalog CLI (`generate`); not required to boot `/health`
+- LiteLLM (`litellm==1.98.0`) — C09 runtime enrichment; not required to boot `/health`
 
 **Frontend:**
 - Metronic React template (UI components, layouts)

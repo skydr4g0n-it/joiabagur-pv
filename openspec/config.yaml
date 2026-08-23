@@ -18,6 +18,7 @@ context: |
   AI service: jbg-ai — Python 3.11, FastAPI, uv, pydantic-settings (ai-service/).
   Persistence: SQLAlchemy 2 + psycopg 3 + Alembic; schema `ai` only, pool capped at 5.
   Testing: pytest + FastAPI TestClient; test tree mirrors src/jbg_ai (see ai-service/tests/README.md).
+  Runtime enrichment (C09) uses LiteLLM and JPV_RAG_LLM_*; catalog generate (C06b) uses the OpenAI SDK and JPV_CATALOG_LLM_*. Neither key is required to boot /health.
   DB tests use testcontainers with pgvector and skip when Docker is unreachable.
   Separate container; Python does vector search and LLM only, .NET owns all business
   logic and is the final authority on price, stock and permissions. Browser never
