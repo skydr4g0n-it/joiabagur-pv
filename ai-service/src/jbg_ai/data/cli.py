@@ -1,4 +1,4 @@
-"""CLI: `python -m jbg_ai.data generate|ingest`."""
+"""CLI: `python -m jbg_ai.data generate|ingest` and `world simulate|ingest`."""
 
 from __future__ import annotations
 
@@ -79,10 +79,47 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_world_simulate(args: argparse.Namespace) -> int:
+    from jbg_ai.data.world.simulate import run_simulate
+
+    result = run_simulate(
+        profiles_path=Path(args.profiles),
+        output_dir=Path(args.out),
+    )
+    _print(
+        f"pos=12 inventories={len(result.inventories)} "
+        f"sales={len(result.sales)} movements={len(result.movements)} "
+        f"pairs={len(result.co_occurrence)} -> {args.out}"
+    )
+    return 0
+
+
+def cmd_world_ingest(args: argparse.Namespace) -> int:
+    from jbg_ai.data.envload import load_local_env
+    from jbg_ai.data.world.ingest import ingest_world
+
+    load_local_env()
+    counts = ingest_world(
+        profiles_path=Path(args.profiles),
+        generated_dir=Path(args.dir),
+    )
+    _print(
+        f"pos={counts.pos} users={counts.users} inventories={counts.inventories} "
+        f"sales={counts.sales} movements={counts.movements}"
+    )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
+    from jbg_ai.data.world.constants import (
+        GENERATED_DIR,
+        GENERATOR_VERSION as WORLD_GENERATOR_VERSION,
+        PROFILES_PATH,
+    )
+
     parser = argparse.ArgumentParser(
         prog="python -m jbg_ai.data",
-        description="C06b synthetic catalog CLI (generate + local ingest).",
+        description="C06b catalog generate/ingest and C10 world simulate/ingest.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -100,9 +137,22 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument("--real-jsonl", default=str(REAL_JSONL))
     ingest.set_defaults(func=cmd_ingest)
 
+    world = sub.add_parser("world", help="C10 synthetic POS / inventory / sales")
+    world_sub = world.add_subparsers(dest="world_command", required=True)
+
+    world_sim = world_sub.add_parser("simulate", help="Poisson world JSONL (no Postgres)")
+    world_sim.add_argument("--profiles", default=str(PROFILES_PATH))
+    world_sim.add_argument("--out", default=str(GENERATED_DIR))
+    world_sim.set_defaults(func=cmd_world_simulate)
+
+    world_ingest = world_sub.add_parser("ingest", help="INSERT public world tables (JPV_PG*)")
+    world_ingest.add_argument("--profiles", default=str(PROFILES_PATH))
+    world_ingest.add_argument("--dir", default=str(GENERATED_DIR))
+    world_ingest.set_defaults(func=cmd_world_ingest)
+
     parser.epilog = (
         f"generator_version={GENERATOR_VERSION} prompt_version={PROMPT_VERSION} "
-        f"default_seed={DEFAULT_SEED}"
+        f"default_seed={DEFAULT_SEED} world_generator_version={WORLD_GENERATOR_VERSION}"
     )
     return parser
 

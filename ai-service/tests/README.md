@@ -41,7 +41,7 @@ parallel taxonomy later.
 | `config/` | C01, C02 (settings, canonical OpenAPI profile) |
 | `db/` | C05 (engine, bounded pool, boot without a database) |
 | `migrations/` | C05 |
-| `data/` | C06b (landed: generate/ingest CLI), C10, C23 |
+| `data/` | C06b (landed: generate/ingest CLI), C10 (landed: `world/`), C23 |
 | `enrichment/` | C09 |
 | `indexing/` | C11, C13, C22, C23 |
 | `retrieval/` | C14, C18, C20, C21, C22, C25, C26, C27 |

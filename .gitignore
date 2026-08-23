@@ -278,3 +278,9 @@ data/catalog/synthetic/*
 !data/catalog/synthetic/.gitkeep
 !data/catalog/synthetic/generated/
 !data/catalog/synthetic/generated/**
+
+# C10: YAML de perfiles commiteado; JSONL de ventas y dumps locales no.
+data/world/generated/*
+!data/world/generated/.gitkeep
+data/world/backups/*
+!data/world/backups/.gitkeep
