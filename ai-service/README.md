@@ -9,6 +9,7 @@ Python FastAPI microservice for the JoiaBagur Proyecto Final RAG.
 - **C06a** (HU-AIENG-006a) ships the real-catalog corpus **outside this service**: offline scripts in `scripts/catalog/`, JSONL in `data/catalog/real/generated/`. No LLM client, no Alembic `text_provenance`, no writes to `public` from `jbg-ai`.
 - **C06b** (HU-AIENG-006b) adds the **CLI** `python -m jbg_ai.data` (`generate` / `ingest`) under `jbg_ai.data`. `api.main` does not import it. Generate reads `JPV_CATALOG_LLM_API_KEY` from `backend/.env` (host only; not the RAG key). `GET /health` does not need it. See [`src/jbg_ai/data/README.md`](src/jbg_ai/data/README.md).
 - **C09** (HU-AIENG-009) replaces the enrichment stub when `STUB_MODE=false`: closed vocabularies, size regex on `Name` then `Description` (never SKU), LiteLLM at temperature 0 (`JPV_RAG_LLM_*`), confidence by evidence span, `prompt_version = enrichment/v1`. Batch quality gates live in an auditor, not as HTTP 422. Compose and the OpenAPI snapshot stay on `STUB_MODE=true` until a RAG key exists. See [`prompts/enrichment/v1.md`](prompts/enrichment/v1.md).
+- **C10** (HU-AIENG-010) adds nested CLI `python -m jbg_ai.data world simulate|ingest` under `jbg_ai.data.world`. Simulate is offline (YAML of 12 POS, no Postgres, no LLM). Ingest uses `JPV_PG*` against local Docker and does not touch `"Products"` / `"Collections"` / schema `ai`. Recipe: [`../data/world/pos-profiles.yaml`](../data/world/pos-profiles.yaml). See [`src/jbg_ai/data/README.md`](src/jbg_ai/data/README.md).
 
 Boundary rule: *Python computes similarity and writes prose; .NET computes numbers and decides.* The service never emits a price or stock figure and never touches schema `public`.
 
@@ -34,6 +35,7 @@ Boundary rule: *Python computes similarity and writes prose; .NET computes numbe
 | `JPV_CATALOG_LLM_API_KEY` | no | — | C06b `generate` only (host `backend/.env`). Distinct from `JPV_RAG_LLM_API_KEY`. Absence does not block `/health` |
 | `JPV_CATALOG_LLM_MODEL` | no | — | optional; CLI default `gpt-4o` |
 | `JPV_CATALOG_LLM_BASE_URL` | no | — | optional OpenAI-compatible proxy; empty = api.openai.com |
+| `JPV_PG*` | no | — | Host CLI ingest only (C06b catalog, C10 world). `backend/.env`, port 5433. Absence does not block `/health` |
 | `JPV_RAG_LLM_API_KEY` | no | — | C09 runtime enrichment (LiteLLM). Distinct from `JPV_CATALOG_LLM_API_KEY`. Absence does not block `/health`; real enrich requires it |
 | `JPV_RAG_LLM_MODEL` | no | — | provider-prefixed id (e.g. `openai/gpt-4o`) |
 | `JPV_RAG_LLM_BASE_URL` | no | — | optional LiteLLM `api_base`; empty = provider default |
@@ -259,7 +261,7 @@ ai-service/
     config/         # pydantic-settings + canonical OpenAPI profile
     db/             # lazy async engine, bounded pool
     stubs/          # deterministic fixtures
-    data/           # C06b CLI (generate / ingest); not imported by api.main
+    data/           # C06b generate/ingest + C10 world/; not imported by api.main
     enrichment/     # C09 extractor: vocabs, size regex, LiteLLM port, auditor
   prompts/          # versioned prompts: catalog-synth/v3 (C06b generate) + enrichment/v1 (C09 extract)
   migrations/
@@ -269,7 +271,7 @@ ai-service/
   tests/            # mirrors src/jbg_ai — see tests/README.md
     api/            # contract, auth, stubs, OpenAPI snapshot
     config/         # settings and fail-fast validation
-    data/           # C06b CLI tests (fake LLM, no provider sockets)
+    data/           # C06b catalog CLI + C10 world/ (no provider sockets)
     migrations/     # schema, indexes, reversibility (marked `db`)
     support/        # shared helpers and injectable fakes
   alembic.ini       # no connection string: read from DATABASE_URL
