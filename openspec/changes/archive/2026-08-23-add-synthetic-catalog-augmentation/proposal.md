@@ -8,7 +8,7 @@ C06a dejó 436 productos reales con texto utilizable y desbloqueó C09, pero C11
 - **CLI en `jbg_ai.data`** (orquestador + cliente OpenAI + prompt versionado). `jbg_ai.api.main` **no** lo importa. Sin ruta HTTP en FastAPI ni en la API .NET. Settings `LLM_*` / clave OpenAI **opcionales** al arrancar `GET /health`; el CLI las exige.
 - **SKU reservados por código** con el esquema del real (`SKU` + 2/3/4 dígitos según magnitud), continuando **después de 436** (`SKU437`…). Sin prefijo `SYN-` ni otra marca que delate origen a C09. Unique vs JSONL C06a y vs `"Products"."SKU"`.
 - **8–12 colecciones nuevas** con nombre de **diseño** (p. ej. «El Jaleo», «Fuego»). Hotel / aeropuerto / turista / atelier son **brief de público o POS pensado** para el prompt y el informe, no `Collection.Name` ni columna en `Product`. Ningún sintético reutiliza una colección real.
-- **Texto y precio razonados por OpenAI** (temperatura > 0). El código sella procedencia, asigna `text_quality_tier` (~70 `rich` / ~20 `sparse` / ~10 corto o vacío) por **stem del `Name`** (hermanos de talla no mezclan tier), valida `Description` ≤ 1000 y `0 < price < 50000`. ~35 % de las descripciones nombran dos o más materiales **en la prosa**; el JSONL **no** lleva `materials[]`.
+- **Texto y precio razonados por OpenAI** (temperatura > 0). El código sella procedencia, asigna `text_quality_tier` (~70 `rich` / ~20 `sparse` / ~10 corto o vacío) por **stem del `Name`** **antes** del draft, recorta solo frases enteras para que la longitud coincida con el tier (medias del real: `rich` ~290 / `sparse` ~115 / `short` ~14; ~20 % de los `short` vacíos), valida `Description` ≤ 1000 y `0 < price < 50000`. ~35 % de las descripciones nombran dos o más materiales **en la prosa**; el JSONL **no** lleva `materials[]`.
 - **Sin pistas a C18 ni a C09:** el JSONL no emite `variant_group_key`, `variant_label`, `family_seed`, `materials` ni `product_id`. La ingesta no escribe `"ProductFamilies"` / `"ProductFamilyMembers"`. Todos los sintéticos nacen huérfanos.
 - **Ingesta local** (Docker, host **5433**, BD `joiabagur_pv`): transacción con `INSERT` de colecciones nuevas y productos (`IsActive = true`). **No** `UPDATE` de filas reales. Credenciales solo por `JPV_PG*`. El `Id` lo genera PostgreSQL; el JSONL no se reescribe.
 - **Sidecar** (`.meta.json`: `generator_version`, `seed`, `model`, `prompt_version`, `generated_at`, recuentos y ratios) e **informe** `Documentos/Proyecto Final AIEng/informes/c06b-synthetic-catalog-report.md`. Regenerar texto exige flag explícito.
@@ -34,7 +34,7 @@ Ninguna. `real-catalog-corpus` describe el pipeline C06a (xlsx → JSONL real + 
 **Nuevo**
 
 - `ai-service/src/jbg_ai/data/`: orquestador, reservador de SKU, cliente OpenAI, validación, CLI de generate e ingest.
-- `ai-service/prompts/` (p. ej. `catalog-synth/v1`): prompt versionado; distingue brief de público vs nombre de colección.
+- `ai-service/prompts/` (`catalog-synth/v3` vigente; `v1` y `v2` se conservan): prompt versionado; distingue brief de público vs nombre de colección; el lote declara el tier.
 - `data/catalog/synthetic/generated/catalog-synthetic.jsonl` y sidecar `.meta.json` (commiteados).
 - `Documentos/Proyecto Final AIEng/informes/c06b-synthetic-catalog-report.md`.
 - Excepción en `.gitignore` para versionar `data/catalog/synthetic/generated/`.

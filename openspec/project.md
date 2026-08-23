@@ -61,7 +61,7 @@
 - **Service Auth**: internal HS256 JWT (PyJWT); the .NET API is the only issuer
 - **Contract**: frozen `/v1` surface versioned in `ai-service/openapi.json`
 - **Persistence**: SQLAlchemy 2 (async) over psycopg 3, pgvector types, Alembic migrations in `ai-service/migrations/`
-- **Schema ownership**: `ai` only. Python never writes to `public` nor reads it by SQL — enforced by database grants, not convention
+- **Schema ownership**: `ai` only for the `jbg-ai` runtime process. Host CLIs (C06a `scripts/catalog/`, C06b `python -m jbg_ai.data ingest`) are the documented exception: they use `JPV_PG*` against local Docker and do not run inside the service container.
 - **Connection pool**: capped at `DB_POOL_SIZE` (default 5) with no overflow; built lazily, so the service boots with no database
 
 ### Infrastructure
@@ -276,7 +276,7 @@ Run the `update-docs` command (skill replicated in `.agent/`, `.claude/`, `.code
 
 ### Performance Targets
 - **Users**: 2-3 concurrent
-- **Products**: ~500 catalog items
+- **Products**: ~1.200 catalog items (436 real + 764 synthetic; hybrid C06a+C06b)
 - **Response time**: Optimize for mobile operators
 
 ### Security Requirements
@@ -312,6 +312,9 @@ Run the `update-docs` command (skill replicated in `.agent/`, `.claude/`, `.code
 - BCrypt.Net (password hashing)
 - ClosedXML (Excel processing)
 
+**AI Service (`jbg-ai`):**
+- OpenAI SDK (`openai`) — C06b catalog CLI (`generate`); not required to boot `/health`
+
 **Frontend:**
 - Metronic React template (UI components, layouts)
 - TensorFlow.js or ONNX.js (ML inference)
@@ -346,3 +349,4 @@ Run the `update-docs` command (skill replicated in `.agent/`, `.claude/`, `.code
 - **User Story Procedure**: `Documentos/Procedimientos/Procedimiento-UserStories.md`
 - **Work Ticket Procedure**: `Documentos/Procedimientos/Procedimiento-TicketsTrabajo.md`
 - **C06a catalog corpus**: `data/catalog/real/generated/catalog-real-enriched.jsonl` + `scripts/catalog/README.md` + `Documentos/Proyecto Final AIEng/informes/c06a-catalog-enrichment-report.md`
+- **C06b synthetic corpus**: `data/catalog/synthetic/generated/catalog-synthetic.jsonl` + `ai-service/src/jbg_ai/data/README.md` + `Documentos/Proyecto Final AIEng/informes/c06b-synthetic-catalog-report.md`

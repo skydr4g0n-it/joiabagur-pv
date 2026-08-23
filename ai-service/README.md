@@ -7,6 +7,7 @@ Python FastAPI microservice for the JoiaBagur Proyecto Final RAG.
 - **C05** (HU-AIENG-005) adds the persistence foundation: `vector` extension, schema `ai`, a dedicated database role, Alembic migrations and six empty index tables with their indexes. No data, no queries — see [Database and migrations](#database-and-migrations).
 - **C08** (HU-AIENG-008) **renegotiates the enrichment contract** and opens catalog-wide auth. `POST /v1/enrich/products` now returns `source` (`rule` | `inferred`) on every proposed value, plus `piece_type`, `stone_type`, `size_label`, tags split into `color_tags` / `style_tags` / `occasion_tags`, and `prompt_version` on the response. Without per-field provenance the .NET side cannot tell a value a rule produced from one a model inferred, which is the whole of its hybrid review policy. Catalog-wide routes (`/v1/enrich/*`) authenticate through `get_catalog_principal`, which does **not** require `pos_id`; retrieval, assistance and inventory keep requiring it, and a token without it is still rejected there with 401.
 - **C06a** (HU-AIENG-006a) ships the real-catalog corpus **outside this service**: offline scripts in `scripts/catalog/`, JSONL in `data/catalog/real/generated/`. No LLM client, no Alembic `text_provenance`, no writes to `public` from `jbg-ai`.
+- **C06b** (HU-AIENG-006b) adds the **CLI** `python -m jbg_ai.data` (`generate` / `ingest`) under `jbg_ai.data`. `api.main` does not import it. Generate reads `JPV_CATALOG_LLM_API_KEY` from `backend/.env` (host only; not the RAG key). `GET /health` does not need it. See [`src/jbg_ai/data/README.md`](src/jbg_ai/data/README.md).
 
 Boundary rule: *Python computes similarity and writes prose; .NET computes numbers and decides.* The service never emits a price or stock figure and never touches schema `public`.
 
@@ -29,10 +30,13 @@ Boundary rule: *Python computes similarity and writes prose; .NET computes numbe
 | `ENABLE_DEV_ENDPOINTS` | no | `true` unless `APP_ENV` is `prod`/`production` | mounts `GET /v1/evals/runs` |
 | `DATABASE_URL` | no | — | `postgresql+psycopg://…`; its absence does not stop the service booting |
 | `DB_POOL_SIZE` | no | `5` | hard ceiling on simultaneous connections; no overflow |
+| `JPV_CATALOG_LLM_API_KEY` | no | — | C06b `generate` only (host `backend/.env`). Distinct from `JPV_RAG_LLM_API_KEY`. Absence does not block `/health` |
+| `JPV_CATALOG_LLM_MODEL` | no | — | optional; CLI default `gpt-4o` |
+| `JPV_CATALOG_LLM_BASE_URL` | no | — | optional OpenAI-compatible proxy; empty = api.openai.com |
 
 Missing or blank `APP_ENV`, `SERVICE_VERSION` or `JWT_SECRET` aborts startup (fail-fast), so the process never serves `/v1` half-configured.
 
-`DATABASE_URL` is **optional on purpose**. The service must boot with no database — that is a requirement of `ai-service-dev-compose`, not an accident — so the engine is built on first use and never at import time. Under `STUB_MODE` nothing asks for a session, so the container starts fine against a database that has not even been provisioned. LLM keys are still not required: no model is called yet.
+`DATABASE_URL` is **optional on purpose**. The service must boot with no database — that is a requirement of `ai-service-dev-compose`, not an accident — so the engine is built on first use and never at import time. Under `STUB_MODE` nothing asks for a session, so the container starts fine against a database that has not even been provisioned. LLM keys are not required to boot `/health`; the catalog CLI reads `JPV_CATALOG_LLM_*` from `backend/.env`.
 
 ## Frozen endpoints (C02)
 
@@ -207,8 +211,8 @@ uv run --system-certs pytest
 
 Tests inject required env / settings in-process, sign their own tokens, and never call LLM providers, embedding APIs, or production RDS. The stub tests additionally block socket connections to prove it.
 
-The suite mirrors the `src/jbg_ai/` package — `tests/api/`, `tests/config/`, `tests/migrations/`, and a
-`tests/support/` for shared helpers. [`tests/README.md`](tests/README.md) explains where a new test
+The suite mirrors the `src/jbg_ai/` package — `tests/api/`, `tests/config/`, `tests/data/`, `tests/migrations/`, and a
+`tests/support/` for shared helpers (including `fake_llm.py`). [`tests/README.md`](tests/README.md) explains where a new test
 goes and which folder each upcoming change lands in.
 
 ### Migration tests need Docker
@@ -250,6 +254,8 @@ ai-service/
     config/         # pydantic-settings + canonical OpenAPI profile
     db/             # lazy async engine, bounded pool
     stubs/          # deterministic fixtures
+    data/           # C06b CLI (generate / ingest); not imported by api.main
+  prompts/          # versioned prompts (catalog-synth/v3 vigente)
   migrations/
     bootstrap.sql   # one-off: extension, schema, dedicated role, grants
     env.py          # version table in `ai`; provisions before revisions run
@@ -257,6 +263,7 @@ ai-service/
   tests/            # mirrors src/jbg_ai — see tests/README.md
     api/            # contract, auth, stubs, OpenAPI snapshot
     config/         # settings and fail-fast validation
+    data/           # C06b CLI tests (fake LLM, no provider sockets)
     migrations/     # schema, indexes, reversibility (marked `db`)
     support/        # shared helpers and injectable fakes
   alembic.ini       # no connection string: read from DATABASE_URL

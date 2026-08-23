@@ -56,7 +56,7 @@ La ficha v3 de C06b pedía un generador determinista que calibrara precio, SKU y
 | Componente | Impacto |
 |---|---|
 | `ai-service/src/jbg_ai/data/` | **Nuevo** — orquestador, reservador de SKU, cliente OpenAI, validación, CLI |
-| `ai-service/prompts/` (p. ej. `catalog-synth/v1`) | **Nuevo** — prompt versionado. Distingue brief de público vs nombre de colección. No es router |
+| `ai-service/prompts/` (`catalog-synth/v3` vigente; `v1` y `v2` se conservan) | **Nuevo** — prompt versionado. Distingue brief de público vs nombre de colección. Declara el `text_quality_tier` del lote. No es router |
 | `ai-service/src/jbg_ai/config/settings.py` | Clave OpenAI / `LLM_*` **opcionales**; fail-fast del CLI, no de `/health` |
 | `ai-service/pyproject.toml` | Cliente OpenAI (u HTTP equivalente); no tocar OpenAPI |
 | `data/catalog/synthetic/generated/` | **Nuevo** — JSONL + sidecar commiteados |
@@ -90,9 +90,9 @@ Prohibidos: `variant_group_key`, `variant_label`, `family_seed`, `materials`, `m
 - `sku`: lo asigna el **código**, mismo esquema que C06a: literal `SKU` + 2 dígitos si n &lt; 100 (`SKU01`…`SKU99`), 3 si n &lt; 1000, 4 a partir de 1000. Continúa en **437**. Unique vs JSONL C06a y vs `"Products"."SKU"`. El LLM no inventa SKUs.
 - `collection_name`: nombre de **diseño**, no de canal. Unique vs las 28 reales.
 - `price`: string decimal como C06a; el LLM lo propone; validador: `> 0`, precisión 18,2, **`price < 50000`**.
-- `text_quality_tier`: ~70 `rich` / ~20 `sparse` / ~10 corto o vacío. Sorteo por **stem de `Name`** (regla C06a): hermanos de talla no mezclan tier. `text_provenance` es **siempre** `synthetic`.
+- `text_quality_tier`: ~70 `rich` / ~20 `sparse` / ~10 corto o vacío. El código asigna el bucket **antes** del draft (stem de `Name`; hermanos de talla no mezclan tier). La longitud del copy tiene que coincidir: `rich` ≥150, `sparse` ~115 (techo de frase entera 140), `short` ≤32 o vacío (~20 % de los `short` vacíos, stem entero). Nunca se recorta a mitad de frase. `text_provenance` es **siempre** `synthetic`.
 
-Sidecar: `generator_version`, `seed`, `model` (OpenAI + id de modelo), `prompt_version`, `generated_at`, `product_count`, ratios por tier. Opcional: mapa colección → público/POS **pensado** (metadato de generación; no es columna .NET).
+Sidecar: `generator_version` (`c06b-synth/v3`), `seed`, `model` (OpenAI + id de modelo), `prompt_version` (`catalog-synth/v3`), `generated_at`, `product_count`, ratios por tier, `empty_short_count`. Opcional: mapa colección → público/POS **pensado** (metadato de generación; no es columna .NET).
 
 ### Nombres de colección vs brief de POS
 
@@ -111,8 +111,8 @@ Dos capas que el prompt debe separar:
 código (semilla, presupuesto ~1200 − 436)
   → reserva SKU437, SKU438, …
   → 8–12 briefs: (nombre-de-diseño propuesto o pedido al modelo, público/POS pensado)
-  → OpenAI (JSON schema, temperatura > 0): name, description, price
-  → código: pisa procedencia, asigna tier por stem de Name (70/20/10), valida
+  → OpenAI (JSON schema, temperatura > 0): name, description, price; el lote ya trae el tier
+  → código: recorte por frases enteras, ~20 % de short vacíos, valida longitud vs tier
   → JSONL + sidecar → git  (sin product_id)
   → INSERT transaccional  (la BD asigna Id)
 ```
@@ -239,3 +239,4 @@ Ninguna pregunta abierta bloqueante.
 |---|---|---|
 | 2026-08-22 | `/enrich-us` | Creación del ticket y HU a partir de la exploración C06b (LLM+CLI, INSERT, colecciones nuevas, familias en C18) |
 | 2026-08-22 | Cierre Q | SKU esquema real desde 437; OpenAI; tiers 70/20/10 por stem de `Name`; colecciones de diseño 8–12; sin `product_id`; techo 50.000 €; canal ≠ nombre de colección |
+| 2026-08-22 | Apply v3 | Prompt `catalog-synth/v3`; el tier se declara al LLM; recorte solo por frases enteras; bandas alineadas al real (`rich` ≥150 / `sparse` ~115 / `short` ≤32, ~20 % vacíos); JSONL regenerado |

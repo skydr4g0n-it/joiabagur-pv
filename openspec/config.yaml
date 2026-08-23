@@ -2,7 +2,7 @@ schema: spec-driven
 
 context: |
   Jewelry POS management system — multi-location inventory, sales, AI image recognition.
-  Target: 2-3 concurrent users, ~500 products, free-tier cloud (AWS).
+  Target: 2-3 concurrent users, ~1.200 products (436 real + 764 synthetic), free-tier cloud (AWS).
 
   Backend: .NET 10, ASP.NET Core Web API, C#, EF Core, PostgreSQL 15+, JWT auth, Serilog.
   API docs: Scalar (not Swagger). Excel: ClosedXML. Passwords: BCrypt.Net.

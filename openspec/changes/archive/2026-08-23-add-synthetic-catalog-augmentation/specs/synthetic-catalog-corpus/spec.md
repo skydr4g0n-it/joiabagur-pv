@@ -18,12 +18,12 @@ The offline synthetic catalog CLI SHALL emit one JSONL record per generated prod
 - **AND** each synthetic SKU appears exactly once
 
 ### Requirement: SKUs follow the real numbering scheme and do not leak origin
-The allocator MUST assign SKUs as the literal `SKU` plus 2 digits when n < 100 (`SKU01`…`SKU99`), 3 digits when n < 1000, and 4 digits from 1000. The numeric sequence MUST start after 436 (`SKU437`, …). The allocator MUST NOT use prefixes such as `SYN-` or `JB-S-` that do not exist on the real anchor. The same `seed` MUST yield the same reserved SKU sequence. The LLM MUST NOT invent SKUs.
+The allocator MUST assign SKUs as the literal `SKU` plus 2 digits when n < 100 (`SKU01`…`SKU99`), 3 digits when n < 1000, and 4 digits from 1000. The scan MUST start at 437 and MUST skip identifiers already present in the C06a JSONL or in `"Products"."SKU"`. On the committed 436-line C06a corpus the highest number is 439, so the first free identifier is `SKU440`. The allocator MUST NOT use prefixes such as `SYN-` or `JB-S-` that do not exist on the real anchor. The same `seed` MUST yield the same reserved SKU sequence. The LLM MUST NOT invent SKUs.
 
-#### Scenario: Reserved SKUs continue after 436 with magnitude padding
-- **GIVEN** the real catalog ends at numeric SKU 436
+#### Scenario: Reserved SKUs continue after occupied real numbers
+- **GIVEN** the committed C06a JSONL (436 lines; highest SKU number 439)
 - **WHEN** the allocator reserves the next identifiers
-- **THEN** the first reserved SKU is `SKU437`
+- **THEN** the first reserved SKU is `SKU440`
 - **AND** values below 1000 use 3 digits
 - **AND** values at or above 1000 use 4 digits
 
@@ -43,9 +43,16 @@ The generator MUST create 8–12 new collections whose names evoke piece design,
 
 #### Scenario: Collection names do not collide with the real catalog
 - **GIVEN** the 28 C06a collection names and a generated synthetic JSONL
-- **WHEN** synthetic `collection_name` values are compared
+- **WHEN** non-empty synthetic `collection_name` values are compared
 - **THEN** none equals a C06a collection name
-- **AND** the number of distinct synthetic collection names is between 8 and 12 inclusive
+- **AND** the number of distinct non-empty synthetic collection names is between 8 and 12 inclusive
+- **AND** those non-empty counts are unequal across collections
+
+#### Scenario: About one fifth of synthetic products have no collection
+- **GIVEN** a generated synthetic JSONL of typical hybrid size
+- **WHEN** empty `collection_name` values are counted
+- **THEN** they are about 20 % of synthetic lines (±5 percentage points)
+- **AND** local ingest stores those products with `CollectionId` null
 
 #### Scenario: Collection names are not channel or POS labels
 - **GIVEN** the generated collection names
@@ -55,7 +62,7 @@ The generator MUST create 8–12 new collections whose names evoke piece design,
 
 #### Scenario: Synthetic products do not reuse a real collection
 - **GIVEN** a generated synthetic JSONL
-- **WHEN** each line's `collection_name` is read
+- **WHEN** each non-empty `collection_name` is read
 - **THEN** it is one of the new design collections
 - **AND** it is not a collection already present in the C06a JSONL
 
@@ -90,12 +97,30 @@ The pipeline MUST assign `text_quality_tier` (`rich` | `sparse` | `short`) by th
 - **WHEN** quality assignment completes
 - **THEN** both records carry the same `text_quality_tier`
 
+#### Scenario: Lexical size families share copy and split 60/40 complete vs incomplete
+- **GIVEN** a generated synthetic JSONL of typical hybrid size
+- **WHEN** stems with two or more size siblings are grouped
+- **THEN** about 60 % of those member products belong to a complete S/M/L/XL family (±5 percentage points)
+- **AND** the rest belong to incomplete families (two or three sizes)
+- **AND** members of one stem share `description` and `collection_name`
+- **AND** they differ only by the size suffix on `name` and by `price`
+
 #### Scenario: Product-level ratios stay inside slack
 - **GIVEN** a generated synthetic JSONL
 - **WHEN** products are counted by `text_quality_tier`
 - **THEN** `rich` is between 65 % and 75 %
 - **AND** `sparse` is between 15 % and 25 %
 - **AND** `short` is between 5 % and 15 %
+
+#### Scenario: Description length tracks the declared tier and the real corpus means
+- **GIVEN** a generated synthetic JSONL
+- **WHEN** each description is measured against its `text_quality_tier`
+- **THEN** `rich` descriptions are at least 150 characters
+- **AND** `sparse` descriptions are longer than the short ceiling, target about 115 characters, and at most 140
+- **AND** `short` descriptions are empty or at most 32 characters
+- **AND** about 20 % of `short` products have a fully empty description
+- **AND** size siblings that share a name stem share that empty or non-empty copy
+- **AND** every non-empty description is one or more complete sentences (never a mid-sentence clip)
 
 #### Scenario: Fixture stem group shares a single tier
 - **GIVEN** a fixture of three products that the stem step places in one group
@@ -108,7 +133,7 @@ The pipeline MUST assign `text_quality_tier` (`rich` | `sparse` | `short`) by th
 - **THEN** `text_quality_tier` per SKU is identical in both outputs
 
 ### Requirement: Generated copy is imaginative jewelry within validation bounds
-Names and descriptions MUST read as jewelry a maker could sell, not as the C06a `assist.py` template. About one third of descriptions MUST name two or more materials in the prose. The JSONL MUST NOT carry a `materials` array. Descriptions MUST NOT exceed 1000 characters. Price MUST be greater than 0, fit `decimal(18,2)`, and be strictly less than 50.000. Validation MUST reject overlong copy and prices at or above 50.000 before ingest.
+Names and descriptions MUST read as jewelry a maker could sell, not as the C06a `assist.py` template. About one third of descriptions MUST name two or more materials in the prose. The JSONL MUST NOT carry a `materials` array. Descriptions MUST NOT exceed 1000 characters. A non-empty description MUST be one or more complete sentences; the pipeline MUST NOT clip mid-sentence. Price MUST be greater than 0, fit `decimal(18,2)`, and be strictly less than 50.000. Validation MUST reject overlong copy and prices at or above 50.000 before ingest.
 
 #### Scenario: Copy is not the C06a assist template
 - **GIVEN** generated synthetic descriptions
@@ -189,7 +214,7 @@ Against the local Docker PostgreSQL (host port 5433, database `joiabagur_pv`), i
 - **THEN** the committed descriptions are left unchanged
 
 ### Requirement: The HTTP service does not import the data package or require LLM keys
-`jbg_ai.api.main` MUST NOT import `jbg_ai.data`. `GET /health` MUST start without `LLM_*` or `OPENAI_*` settings. `ai-service/openapi.json` MUST remain unchanged. The generator unit suite MUST NOT open sockets to LLM providers.
+`jbg_ai.api.main` MUST NOT import `jbg_ai.data`. `GET /health` MUST start without `JPV_CATALOG_LLM_*`, `JPV_RAG_LLM_*`, `LLM_*` or `OPENAI_*` settings. `ai-service/openapi.json` MUST remain unchanged. The generator unit suite MUST NOT open sockets to LLM providers.
 
 #### Scenario: API factory does not import the data package
 - **GIVEN** this change is implemented
@@ -198,7 +223,7 @@ Against the local Docker PostgreSQL (host port 5433, database `joiabagur_pv`), i
 
 #### Scenario: Health boots without an LLM key
 - **GIVEN** `APP_ENV`, `SERVICE_VERSION` and `JWT_SECRET` are set
-- **AND** `LLM_*` and `OPENAI_*` are omitted
+- **AND** `JPV_CATALOG_LLM_*`, `JPV_RAG_LLM_*`, `LLM_*` and `OPENAI_*` are omitted
 - **WHEN** settings load and `GET /health` is called
 - **THEN** settings load successfully
 - **AND** the response status is 200

@@ -22,14 +22,14 @@ El valor no es de usuario de tienda —no hay pantalla ni ruta `/v1`— sino de 
 - Nombres de colección inspirados en el **diseño de las piezas** (p. ej. «El Jaleo», «Fuego», «Cielo estrellado», «La Pomada»). 8–12 colecciones **nuevas**. Un par pueden seguir temática menorquina en el diseño; el resto divergen. **No** meter sintéticos en Biniacolla, Melia, Composturas, etc.
 - El código reserva SKUs con el **mismo esquema que el real**: `SKU` + 2, 3 o 4 dígitos según la magnitud (`SKU01`…`SKU99`, `SKU100`…`SKU999`, `SKU1000`…), continuando **después de 436** (`SKU437`, `SKU438`, …). Sin prefijo `SYN-` ni otra marca que delate origen al extractor de C09. Unique vs JSONL C06a y vs `"Products"."SKU"` (máx. 50).
 - Sellado `data_origin: synthetic` y `text_provenance: synthetic` **por código**, no por el modelo.
-- `text_quality_tier` ~70 `rich` / ~20 `sparse` / ~10 corto o vacío. Misma regla que C06a: el stem del **`Name`** (hermanos de talla) comparte tier; no se mezcla riqueza dentro de esa «familia» de nombre. `text_provenance` es siempre `synthetic`.
+- `text_quality_tier` ~70 `rich` / ~20 `sparse` / ~10 corto o vacío. El código asigna el bucket **antes** del draft (stem del **`Name`**; hermanos de talla no mezclan tier). La longitud del copy tiene que coincidir con el tier, acercándose a las medias del JSONL real: `rich` ≥150 (~290 en el real enriquecido), `sparse` ~115 (una frase entera puede llegar a 140), `short` ≤32 o vacío (~20 % de los `short` vacíos, stem entero). El recorte no deja frases a medias. `text_provenance` es siempre `synthetic`.
 - Validación `Description` ≤ 1000 (`Product.Description` es `varchar(1000)`). Precio > 0; se rechaza `>= 50000`.
 - ~35 % de las descripciones mencionan **dos o más materiales en la prosa**. El JSONL **no** lleva `materials[]` (eso es extracción C09).
 - Tallas en el **nombre** permitidas (como el real: «Colgante erizo S»). Eso es catálogo, no semilla de C18.
 - El JSONL **no** lleva `product_id`: el `Id` lo genera PostgreSQL en el `INSERT`; C12/C13 lo leen de .NET.
 - Salida versionada:
   - `data/catalog/synthetic/generated/catalog-synthetic.jsonl` — **commiteado**
-  - sidecar `.meta.json` (`generator_version`, `seed`, `model`, `prompt_version`, `generated_at`)
+  - sidecar `.meta.json` (`generator_version` `c06b-synth/v3`, `prompt_version` `catalog-synth/v3`, `seed`, `model`, `generated_at`, ratios, `empty_short_count`)
   - informe `Documentos/Proyecto Final AIEng/informes/c06b-synthetic-catalog-report.md`
 - **Ingesta local** (Docker, host **5433**, BD `joiabagur_pv`): transacción con `INSERT` de colecciones nuevas y productos (`IsActive = true`). **No** `UPDATE` de filas reales. **No** toca `ProductFamily` / `ProductFamilyMember`. Credenciales solo por `JPV_PG*` (mismo patrón que C06a).
 - Settings `LLM_*` / clave OpenAI **opcionales** al arrancar `/health`; el CLI las exige. `openapi.json` no cambia.
@@ -61,7 +61,7 @@ El valor no es de usuario de tienda —no hay pantalla ni ruta `/v1`— sino de 
 | Zona | `jbg_ai.data` como **CLI**, no como proceso FastAPI ni como API Joiabagur |
 | Texto y precio | **OpenAI**. El código reserva SKU, sella procedencia y valida. Temperatura > 0: el JSONL commiteado es la fuente; regenerar exige flag |
 | SKU | Esquema del real: `SKU` + 2/3/4 dígitos según magnitud, a partir de **437**. Sin prefijo que delate sintético |
-| Calibración al real | **No** se heredan precios, tamaño de familia ni longitud de descripción. Del real se toman SKUs y nombres de colección **a no reutilizar**; el esquema de SKU **sí** se copia a propósito |
+| Calibración al real | **No** se heredan precios ni tamaño de familia. La **longitud** del copy sí se aproxima a las medias del JSONL real (`rich` / `sparse` / `original`). Del real se toman SKUs y nombres de colección **a no reutilizar**; el esquema de SKU **sí** se copia a propósito |
 | Multi-material | ~35 % en la **prosa**; sin `materials[]` en el JSONL |
 | Ingesta | **INSERT** local de colecciones nuevas + productos. Sin repetir SKU real. Sin RDS |
 | `product_id` en JSONL | **No.** Lo genera la BD; C12 lo emite al indexar |

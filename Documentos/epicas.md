@@ -388,13 +388,15 @@ Construcción del corpus sobre el que opera todo el sistema RAG: perfiles de pro
 - Corpus de conocimiento comercial (materiales, tallas, cuidados, políticas), troceado y citable
 - Generador de mundo sintético con semilla fija para disponer de catálogo, inventario y ventas coherentes
 
-**Changes asociados:** C06a (hecho), C06b, C08, C09, C10, C11, C23
+**Changes asociados:** C06a (hecho), C06b (hecho), C08, C09, C10, C11, C23
 
 **User Stories:**
 - [HU-AIENG-006a: Ingesta del catálogo real y corpus enriquecido versionado](Historias/AI-Eng/HU-AIENG-006a.md) *(C06a — corpus JSONL + informe)*
-- [HU-AIENG-006b: Ampliación sintética del catálogo — LLM, colecciones nuevas e ingesta local](Historias/AI-Eng/HU-AIENG-006b.md) *(C06b — CLI en `jbg_ai.data`; sin familias)*
+- [HU-AIENG-006b: Ampliación sintética del catálogo — LLM, colecciones nuevas e ingesta local](Historias/AI-Eng/HU-AIENG-006b.md) *(C06b — hecho; CLI en `jbg_ai.data`; sin familias)*
 
 **Entregable C06a.** El corpus versionado vive en [`data/catalog/real/generated/catalog-real-enriched.jsonl`](../data/catalog/real/generated/catalog-real-enriched.jsonl) (sidecar `.meta.json` al lado; `generator_version` `c06a-assist/v2`). Cada línea lleva identidad + `data_origin` / `text_provenance` / `text_quality_tier` (`rich` / `sparse` / `original`); **no** emite `variant_group_key`, `variant_label` ni `family_seed`. La pasada de vendedor, los ratios y la limitación §15 están en [`Proyecto Final AIEng/informes/c06a-catalog-enrichment-report.md`](Proyecto%20Final%20AIEng/informes/c06a-catalog-enrichment-report.md). Los scripts son el pipeline offline [`scripts/catalog/`](../scripts/catalog/). El xlsx crudo sigue gitignored.
+
+**Entregable C06b (JSONL).** El corpus sintético vive en [`data/catalog/synthetic/generated/catalog-synthetic.jsonl`](../data/catalog/synthetic/generated/catalog-synthetic.jsonl) (sidecar al lado; `generator_version` `c06b-synth/v3`, `prompt_version` `catalog-synth/v3`). 764 líneas, híbrido 1.200 con el real. Tiers `rich` / `sparse` / `short` (nunca `empty` ni `original`); el copy se recorta por frases enteras y se aproxima a las medias del real. CLI en [`ai-service/src/jbg_ai/data/`](../ai-service/src/jbg_ai/data/README.md). Recuentos, muestras, ingesta local y nota §15: [`Proyecto Final AIEng/informes/c06b-synthetic-catalog-report.md`](Proyecto%20Final%20AIEng/informes/c06b-synthetic-catalog-report.md). Ingesta Docker (`INSERT` en `:5433` / `joiabagur_pv`): 10 colecciones + 764 productos; GET familia sobre un sintético → 204.
 
 ---
 
@@ -513,7 +515,7 @@ Se miden por *changes* de OpenSpec, no por número de historias: la serie `HU-AI
 | Épica | Descripción Breve | Changes | Ruta crítica |
 |-------|-------------------|---------|--------------|
 | **EP11** | Plataforma del Servicio de IA | C01, C02, C03, C05, C17 | 🔴 completa |
-| **EP12** | Corpus y Enriquecimiento del Catálogo | C06a (hecho), C06b, C08, C09, C10, C11, C23 | 🔴 parcial |
+| **EP12** | Corpus y Enriquecimiento del Catálogo | C06a (hecho), C06b (hecho), C08, C09, C10, C11, C23 | 🔴 parcial |
 | **EP13** | Familias de Producto y Desambiguación | C07, C18, C28 | 🟢 |
 | **EP14** | Búsqueda Semántica Híbrida | C12, C13, C14, C15, C16, C20, C21, C22, C25 | 🔴 mayoritaria |
 | **EP15** | Venta Asistida, Sustitutos y Agentes | C26, C27, C30, C31, C32, C34, C36 | 🔴 parcial |

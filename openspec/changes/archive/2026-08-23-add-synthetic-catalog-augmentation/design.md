@@ -133,7 +133,7 @@ Dependencia: paquete `openai` (u HTTP equivalente) en `ai-service/pyproject.toml
 
 ### 3 · SKU con el esquema del real, desde 437
 
-**Decisión:** literal `SKU` + 2 dígitos si n < 100 (`SKU01`…`SKU99`), 3 si n < 1000, 4 a partir de 1000. La secuencia empieza en **437**. Unique vs JSONL C06a y vs `"Products"."SKU"` (máx. 50). Sin `SYN-`, `JB-S-` ni otra marca.
+**Decisión:** literal `SKU` + 2 dígitos si n < 100 (`SKU01`…`SKU99`), 3 si n < 1000, 4 a partir de 1000. El barrido empieza en **437** y **salta** los SKU ya ocupados. El JSONL C06a tiene 436 productos pero el número más alto es **439**, así que el primer libre es `SKU440`. Unique vs JSONL C06a y vs `"Products"."SKU"` (máx. 50). Sin `SYN-`, `JB-S-` ni otra marca.
 
 **Por qué.** C09 extrae sobre texto y SKU. Un prefijo «synthetic» es una feature gratuita que el extractor (o un evaluador despistado) puede tratar como verdad. Copiar el esquema del real **es** deliberado; copiar precios o tamaños de familia **no**.
 
@@ -150,13 +150,17 @@ Dos capas que el prompt y el informe deben separar:
 
 8–12 colecciones nuevas. Un par pueden ser de diseño menorquín/marino; el resto divergen. Prohibido llamarlas Hotel, Aeropuerto, Turista, Atelier o sinónimos de canal. Unique vs las 28 del JSONL C06a y vs filas ya presentes en `"Collections"`. Ningún producto sintético apunta a una colección real.
 
+**Reparto v2:** el código **no** parte en partes iguales. ~20 % ±5 pp de los sintéticos van **sin colección** (`collection_name` vacío → `CollectionId` NULL). El resto se reparte con pesos estrictamente desiguales (cuadrados  n²…1², permutados por semilla). «El Jaleo» es el **jaleo de cavalls de Menorca**, no flamenco.
+
 **Por qué no reutilizar Biniacolla / Melia / Composturas.** Mezclaría el ancla real con piezas inventadas y falsearía la línea editorial que C12 indexará como colección .NET.
 
 ### 5 · Familias fuera; el stem del `Name` solo sirve al tier
 
 **Decisión:** no se escribe `"ProductFamilies"` ni `"ProductFamilyMembers"`. El JSONL **prohíbe** `variant_group_key`, `variant_label`, `family_seed`, `materials` y `product_id`. El sorteo 70/20/10 agrupa por **stem del `Name`** (tallas: «Colgante erizo S» / «Colgante erizo M»): un grupo no mezcla `text_quality_tier`.
 
-**Por qué no preasignar familias.** `Product` no tiene columna de familia. D4 es C18. El real ya tiene 354 grupos internos; ~350 familias sintéticas + 15 % de huérfanos era una cifra de un catálogo 100 % sintético. Todos los sintéticos nacen huérfanos (GET familia → 204, no 404).
+**Familias léxicas (v2):** el LLM redacta una **pieza base** (nombre sin talla). El código expande ~40 % de los sintéticos a hermanos S/M/L/XL. De esos miembros, ~60 % ±5 pp pertenecen a una familia **completa** (las cuatro tallas) y ~40 % a una **incompleta** (2 o 3 tallas). Dentro de un grupo: misma `description` y misma `collection_name` (o todas vacías); solo cambian el sufijo de talla y el precio (factores 1.00 / 1.15 / 1.30 / 1.50). C18 sigue siendo quien escribe `ProductFamily*`. GET familia sobre un sintético ingerido: 204.
+
+**Por qué no preasignar ProductFamily.** `Product` no tiene columna de familia. D4 es C18. El real ya tiene 354 grupos internos; ~350 familias sintéticas + 15 % de huérfanos era una cifra de un catálogo 100 % sintético. Todos los sintéticos nacen huérfanos de entidad (GET familia → 204, no 404).
 
 **Por qué no importar `scripts/catalog/`.** La heurística C06a (stem + talla + material si acompaña) existía para no contaminar el JSONL real. C06b reimplementa un stem mínimo en `jbg_ai.data` —no copia el paquete de scripts— porque el runtime de `jbg-ai` no debe depender de `openpyxl`.
 
@@ -169,7 +173,7 @@ hash(stem de Name, seed) → bucket
   [0.90, 1.00)  short
 ```
 
-Ratios **por producto**, tolerancia ±5 pp (el LLM decide cuántos hermanos de talla existen; ±3 pp de C06a era sobre un censo fijo de 436). Si el hash deja los ratios fuera, un rebalanceo determinista mueve stems enteros. Semilla por defecto: `20260822`. `generator_version`: `c06b-synth/v1`.
+Ratios **por producto** 70/20/10 (`rich` / `sparse` / `short`), tolerancia ±5 pp. El código asigna el tier **antes** del draft (un slot/familia, un bucket) y se lo pasa al LLM. Después recorta **solo por frases enteras** (nunca a mitad de oración) para acercarse a las medias del JSONL real (`ai_enriched`): `rich` ≥150 (media real ~289; el sintético no inventa texto), `sparse` objetivo ≤115 (media real ~115; una frase entera puede llegar a 140), `short` techo 32 (media real original ~14). Si la primera frase no cabe en el techo, la descripción queda vacía; si tras el recorte el copy no casa con el tier, `generate` pide un redraft de esa pieza. ~20 % de los productos `short` quedan con `description` vacía (stem entero, para no romper familias). Semilla por defecto: `20260822`. `generator_version`: `c06b-synth/v3`.
 
 ### 6 · Contrato JSONL y por qué no hay `product_id`
 
@@ -192,7 +196,7 @@ En C06a `product_id` era un lookup opcional (el xlsx no trae UUID). Aquí el pro
 
 ### 7 · Prompt versionado; no es `assist.py`
 
-**Decisión:** prompt en `ai-service/prompts/catalog-synth/v1` (markdown + JSON schema). Distingue nombre de colección vs público/POS pensado. Pide mix de materiales en ~35 % de las piezas **en la prosa**. Voz de joyero imaginativo: puede inventar piedras y mix (el producto no existe). Prohibido el molde C06a («El anillo con X, en talla Y, en plata de ley…»).
+**Decisión:** prompt versionado en `ai-service/prompts/catalog-synth/` (`v1` y `v2` conservados; la pasada vigente es **`v3`**). Distingue nombre de colección vs público/POS vs tema de línea. El Jaleo = cavalls de Menorca. Pide pieza base **sin talla**, el `text_quality_tier` del lote y ~35 % multi-material **en la prosa**. Voz de joyero imaginativo. Prohibido el molde C06a («El anillo con X, en talla Y, en plata de ley…»).
 
 La pasada real se hace **una vez**. Sin `--regenerate-text`, el CLI no reescribe el JSONL commiteado. El artefacto en git es la fuente; OpenAI no es determinista.
 
@@ -221,7 +225,7 @@ El rol de runtime de `jbg-ai` **no** gana `INSERT` sobre `public`. El CLI de des
 
 ### 9 · `LLM_*` opcionales; OpenAPI quieto
 
-**Decisión:** añadir a `Settings` campos opcionales (`LLM_API_KEY` / `OPENAI_API_KEY`, `LLM_MODEL`, quizá `LLM_BASE_URL`). Ausencia **no** impide cargar settings ni servir `GET /health`. El CLI hace fail-fast si faltan al generar. `canonical_openapi_settings()` no gana campos que filtren al snapshot; `openapi.json` **no cambia**.
+**Decisión:** clave de generate = `JPV_CATALOG_LLM_API_KEY` (y `JPV_CATALOG_LLM_MODEL`), **distinta** de `JPV_RAG_LLM_API_KEY` (C09, contenedor + SSM). Viven en `backend/.env` (plantilla `.env.example`, junto al compose). El CLI las carga; `jbg-ai` **no** recibe `env_file: .env` entero. Ausencia **no** impide `GET /health`. `openapi.json` **no cambia**.
 
 **Por qué no `Field(...)` requerido.** C17 arranca `jbg-ai` sin claves de proveedor. Convertir la API key en requerida rompería el boot y el test de settings mínimas.
 
@@ -242,12 +246,15 @@ El árbol de tests de `ai-service` espeja `src/jbg_ai`. Los tests de este change
 - `test_settings_do_not_require_llm_key_to_boot`
 - `test_api_main_does_not_import_jbg_ai_data`
 - `test_unit_suite_makes_no_provider_calls`
+- `test_fit_description_matches_declared_tier`
+- `test_fit_does_not_leave_half_a_sentence`
+- `test_about_one_fifth_of_short_descriptions_are_emptied`
 
 «Mismas descripciones a igual semilla» **no aplica**. Tests de ingesta: testcontainers Postgres **o** fake de conexión; no requieren Docker para la unidad del reservador/validador.
 
 ### 11 · Sidecar, informe y `.gitignore`
 
-Sidecar `.meta.json`: `generator_version`, `seed`, `model` (proveedor + id), `prompt_version`, `generated_at`, `product_count`, ratios por tier, holgura respecto a ~1.200 totales. Opcional: mapa colección → público/POS pensado (metadato de generación; no es columna .NET).
+Sidecar `.meta.json`: `generator_version`, `seed`, `model` (proveedor + id), `prompt_version`, `generated_at`, `product_count`, ratios por tier, `empty_short_count` / `empty_short_ratio_of_short`, holgura respecto a ~1.200 totales, mix de colecciones sin asignar y de familias léxicas. Opcional: mapa colección → público/POS pensado (metadato de generación; no es columna .NET).
 
 Informe `Documentos/Proyecto Final AIEng/informes/c06b-synthetic-catalog-report.md`: recuentos, nombres de colección **separados** del público pensado, muestras por tier, nota de honestidad (§15: el sintético lo escribe un LLM; las métricas de C24 se desglosan por `data_origin`; el umbral de aceptación sigue siendo la porción real).
 
@@ -263,6 +270,7 @@ Informe `Documentos/Proyecto Final AIEng/informes/c06b-synthetic-catalog-report.
 - **[Riesgo] Alguien apunta el CLI a RDS.** → Mitigación: documentar host 5433; no hay perfil de producción; credenciales solo por entorno. El change no incluye target remoto.
 - **[Riesgo] `Settings` exige la API key y rompe C17.** → Mitigación: campos opcionales; test de boot sin clave; `api.main` no importa `jbg_ai.data`.
 - **[Riesgo] El stem de `Name` agrupa mal y mezcla tiers.** → Mitigación: misma idea que C06a (sufijo de talla); test de hermanos S/M; rebalanceo mueve stems enteros.
+- **[Riesgo] Recortar por caracteres deja el copy a medias.** → Mitigación: el recorte solo conserva frases enteras; un muñón (p. ej. «Una pulsera que.») no valida; si la primera frase no cabe, la descripción queda vacía o se redrafta.
 - **[Trade-off] ±5 pp en ratios** (no ±3). El censo de hermanos lo decide el modelo; un umbral más estrecho fallaría por composición, no por el sorteo.
 - **[Trade-off] Python de desarrollo escribe en `public`.** Aceptable porque no es el proceso `jbg-ai` (misma excepción que C06a).
 - **[Trade-off] Volumen ~1.200 es holgura, no umbral de aceptación exacto.** El sidecar documenta el recuento; no se rechaza un generate por 1.187 vs 1.213.
@@ -289,7 +297,7 @@ Ninguna bloqueante. Residuales con default:
 | # | Tema residual | Opción por defecto |
 |---|---|---|
 | 1 | Valor concreto de `seed` | `20260822` |
-| 2 | `generator_version` / `prompt_version` | `c06b-synth/v1` / `catalog-synth/v1` |
-| 3 | Modelo OpenAI por defecto | setting `LLM_MODEL`; el sidecar registra el id realmente usado |
+| 2 | `generator_version` / `prompt_version` | `c06b-synth/v3` / `catalog-synth/v3` (`v1` y `v2` se conservan) |
+| 3 | Modelo OpenAI por defecto | `gpt-4o` (`JPV_CATALOG_LLM_MODEL`); el sidecar registra `openai:<id>` |
 | 4 | ¿Copiar la heurística C06a desde `scripts/catalog/`? | **No.** Stem mínimo reimplementado en `jbg_ai.data` |
 | 5 | Nombre del tercer tier | `short` (corto o vacío); nunca `empty` ni `original` |
