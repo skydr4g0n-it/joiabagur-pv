@@ -1,0 +1,48 @@
+{
+  "generator_version": "c06b-synth/v3",
+  "seed": "20260822",
+  "model": "openai:gpt-4o",
+  "prompt_version": "catalog-synth/v3",
+  "generated_at": "2026-08-22T20:41:16.957884+00:00",
+  "product_count": 764,
+  "real_count": 436,
+  "hybrid_total": 1200,
+  "target_hybrid_total": 1200,
+  "slack_vs_target": 0,
+  "counts_by_tier": {
+    "rich": 504,
+    "sparse": 173,
+    "short": 87
+  },
+  "ratios_by_tier": {
+    "rich": 65.96858638743456,
+    "sparse": 22.643979057591622,
+    "short": 11.387434554973822
+  },
+  "counts_by_text_provenance": {
+    "synthetic": 764
+  },
+  "ratios_by_text_provenance": {
+    "synthetic": 100.0
+  },
+  "empty_short_count": 22,
+  "empty_short_ratio_of_short": 25.28735632183908,
+  "unassigned_count": 153,
+  "unassigned_ratio": 20.026178010471206,
+  "family_group_count": 87,
+  "family_member_count": 306,
+  "complete_family_product_ratio": 60.130718954248366,
+  "incomplete_family_product_ratio": 39.869281045751634,
+  "collection_audiences": {
+    "El Jaleo": "turista",
+    "Fuego": "hotel",
+    "Cielo estrellado": "atelier clásico",
+    "La Pomada": "tienda clásica",
+    "Tramontana": "diseño menorquín",
+    "Caliza": "diseño menorquín / marino",
+    "Umbra": "hotel",
+    "Filigrana": "atelier clásico",
+    "Marea viva": "aeropuerto / turista",
+    "Coral negro": "hotel"
+  }
+}

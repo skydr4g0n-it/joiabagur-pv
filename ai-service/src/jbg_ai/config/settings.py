@@ -60,6 +60,21 @@ class Settings(BaseSettings):
             "project budget is 5-10 for the whole system, shared with the .NET API"
         ),
     )
+    jpv_catalog_llm_api_key: str | None = Field(
+        default=None,
+        description=(
+            "C06b generate only (JPV_CATALOG_LLM_API_KEY). Distinct from "
+            "JPV_RAG_LLM_API_KEY (C09 runtime). Not required to boot /health."
+        ),
+    )
+    jpv_catalog_llm_model: str | None = Field(
+        default=None,
+        description="Optional model id for the catalog CLI. Absence does not block /health.",
+    )
+    jpv_catalog_llm_base_url: str | None = Field(
+        default=None,
+        description="Optional OpenAI-compatible base URL for the catalog CLI.",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -77,14 +92,20 @@ class Settings(BaseSettings):
             raise ValueError("must not be empty")
         return value
 
-    @field_validator("database_url", mode="before")
+    @field_validator(
+        "database_url",
+        "jpv_catalog_llm_api_key",
+        "jpv_catalog_llm_model",
+        "jpv_catalog_llm_base_url",
+        mode="before",
+    )
     @classmethod
-    def blank_database_url_is_absent(cls, value: object) -> object:
-        """Treat an empty `DATABASE_URL` as unset rather than as a broken URL.
+    def blank_optional_str_is_absent(cls, value: object) -> object:
+        """Treat empty optional strings as unset (DATABASE_URL, LLM_* keys).
 
         Compose and shell profiles export empty strings easily; failing later
-        with an unparseable URL would be a worse error than behaving as if the
-        variable had not been provided at all.
+        with an unparseable URL or a blank key would be a worse error than
+        behaving as if the variable had not been provided at all.
         """
         if isinstance(value, str) and not value.strip():
             return None
@@ -117,4 +138,7 @@ def canonical_openapi_settings() -> Settings:
         # that no environment leaks into the committed contract.
         database_url=None,
         db_pool_size=5,
+        jpv_catalog_llm_api_key=None,
+        jpv_catalog_llm_model=None,
+        jpv_catalog_llm_base_url=None,
     )

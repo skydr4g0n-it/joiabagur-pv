@@ -46,6 +46,11 @@ services:
       context: ../ai-service
       dockerfile: Dockerfile
     container_name: jpv-pv-jbg-ai
+    # Secrets for local CLIs live in `.env` (copy `.env.example`). Compose
+    # reads that file for ${VAR} interpolation automatically. Do NOT add
+    # `env_file: .env` here: it would inject JPV_CATALOG_LLM_* (C06b generate,
+    # host-only) into this runtime process. C09 will pass JPV_RAG_LLM_*
+    # explicitly, one variable at a time. Production: SSM /jpv/prod/* (C17).
     environment:
       APP_ENV: local
       SERVICE_VERSION: 0.1.0

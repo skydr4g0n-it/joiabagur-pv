@@ -306,7 +306,7 @@ Se aplica en **expansión de consulta** ("sortija plata" busca también "anillo 
 
 ### 7.5. Familias: flujo mixto (respuesta a la decisión abierta 4 de la v2)
 
-Crear ~350 familias a mano es inviable, y dejarlas a la IA es lo que la revisión rechaza con razón. El flujo acordado:
+Crear ~350 familias a mano es inviable, y dejarlas a la IA es lo que la revisión rechaza con razón. El flujo acordado *(C06b, 2026-08-22, no adelanta este trabajo: el catálogo híbrido nace sin filas de miembro)*:
 
 1. **La IA propone**: agrupa candidatos por similitud de embedding (umbral alto) + mismo `piece_type` + raíz común de nombre, y genera propuestas con miembros y etiquetas de variante detectadas.
 2. **El admin aprueba, edita o rechaza** en una pantalla de revisión por lotes. Al aprobar se crean `ProductFamily` y `ProductFamilyMember` reales, en .NET.
@@ -383,9 +383,13 @@ El export real llegó el 2026-08-17 con 436 productos: cubre la mitad del volume
    - **`text_provenance: merchant | ai_assisted | synthetic`** — ¿de dónde sale su texto?
 
    *Revisado el 2026-08-17.* Originalmente había un solo eje. El export real llegó con 38,5 caracteres de texto por producto y hubo que asistir su redacción; al hacerlo se vio que la columna respondía a **dos preguntas independientes** y se rompía. Un producto real puede tener texto del comerciante o texto asistido sin dejar de ser real.
-2. **El generador sintético se calibra con lo real, no al revés.** Del export se extraen distribución de precios, convenciones de SKU, mezcla de materiales y tamaño medio de familia; el generador reproduce esas distribuciones. Así el sintético no es "más fácil" por accidente de estilo.
+2. **El generador sintético no clona el estilo del real por accidente, y ya no «calibra» lo que el problema necesita declarado.** Del corpus C06a se toman los SKUs y los nombres de colección **a no reutilizar**. No se heredan distribución de precios, convenciones de SKU ni tamaño medio de familia: con 354 grupos internos ya en el real, copiar esa media (~1,23) evaporaría el caso de variantes, y copiar precios (mediana 72 €, cola a 4.175 €) ancla un LLM que debe razonar pieza a pieza.
 
-   **Excepción, añadida el 2026-08-17: la longitud de descripción no se calibra, se declara.** Heredarla del real daría 100 % de descripciones pobres y no el ~30 % de §8.4, así que las dos reglas se contradecían en cuanto el export resultó ser este. El reparto de calidad —~70 % rico, ~20 % escueto, ~10 % sin descripción— se fija explícitamente en ambos corpus, **sorteado por familia de variantes y no por producto suelto**: si dentro de una familia una talla tuviera texto rico y otra ninguno, el recuperador podría separarlas por riqueza de texto en vez de por talla, que es justo lo que la categoría crítica del golden set pretende medir.
+   **Excepción, añadida el 2026-08-17: la longitud de descripción no se calibra, se declara.** Heredarla del real daría 100 % de descripciones pobres y no el ~30 % de §8.4, así que las dos reglas se contradecían en cuanto el export resultó ser este. El reparto de calidad —~70 % rico, ~20 % escueto, ~10 % sin descripción— se fija explícitamente. En C06a el sorteo es por familia de variantes *interna* (no serializada). En C06b no hay `ProductFamily`: si se declara el mismo reparto, el agrupamiento interno por stem de nombre (tallas en el copy) no se escribe en .NET.
+
+   *Revisado el 2026-08-22, al diseñar C06b.* D1 lo genera un **LLM vía CLI** en `jbg_ai.data` (nombres, descripciones, precios razonados, colecciones nuevas). El código reserva SKUs, sella procedencia y valida tope de 1000 caracteres. No hay ruta HTTP. Las colecciones sintéticas son **altas nuevas** (brief de vitrina de hotel, aeropuerto/turista o tienda clásica), no un campo de canal en `Product`. El ~35 % multi-material vive en la **prosa** para que C09 lo extraiga; el JSONL no lleva `materials[]`.
+
+   *Revisado el 2026-08-22, al generar el JSONL v3.* El 70/20/10 **sigue declarándose** (no se hereda la pobreza textual del export). Dentro de cada bucket, la longitud del copy **sí** se aproxima a las medias del JSONL real enriquecido (`rich` ~289 / `sparse` ~115 / `original` ~14). El recorte es por frases enteras; ~20 % de los `short` quedan vacíos.
 3. **Toda métrica se reporta desglosada por los dos ejes, y también global.** Es la regla que evita el autoengaño. Los productos sintéticos son más limpios y regulares; si el Recall@5 global sale bien pero el de la porción real sale mal, el sistema no sirve y hay que verlo.
 
    **El número que va al README como resultado principal es el de `data_origin: real`, declarando junto a él qué `text_provenance` lo compone.** Mientras esa porción llevaba texto del comerciante, era además el grupo de control honesto del experimento. Desde que su texto está asistido ya no lo es, y el README debe decirlo: la afirmación del proyecto es «funciona sobre un catálogo **realista**», no «sobre un catálogo real». Las métricas de enriquecimiento (§11.5) no se ven afectadas —miden al extractor, no a la verdad del dato—; las de recuperación sí dejan de hablar del negocio tal cual es.
@@ -396,8 +400,8 @@ Y una regla sobre el golden set: **se etiqueta primero sobre productos reales** 
 
 ### 8.2. Estrategia: mundo determinista, texto con IA
 
-- **LLM → lo textual y semántico**: nombres, descripciones, corpus de conocimiento, consultas de operador.
-- **Código determinista con semilla → lo numérico y relacional**: red de POS, propensión producto×POS, simulación de ventas (Poisson con estacionalidad y perfil por hotel), inventario, movimientos, co-ocurrencia.
+- **LLM → lo textual y semántico**: nombres, descripciones, **catálogo sintético D1 (C06b, CLI en `jbg_ai.data`, no un endpoint)**, corpus de conocimiento, consultas de operador.
+- **Código determinista con semilla → lo numérico y relacional**: reserva de SKU y validación del corpus; red de POS, propensión producto×POS, simulación de ventas (Poisson con estacionalidad y perfil por hotel), inventario, movimientos, co-ocurrencia (**C10, mismo paquete, también CLI** — ni la API .NET ni FastAPI).
 
 El histórico así generado es **coherente por construcción** con catálogo y stock, que es lo que necesitan rotación, sustitutos, complementarios, perfil por POS y reposición.
 
@@ -405,11 +409,11 @@ El histórico así generado es **coherente por construcción** con catálogo y s
 
 | # | Dataset | Volumen | Novedades v3 | Alimenta |
 |---|---|---|---|---|
-| D0 | **Catálogo real anonimizado** | **436** (recibido) | **Ancla del corpus y del golden set**; calibra las distribuciones de D1 salvo la longitud de descripción (§8.1.1 regla 2). Su texto se redacta asistido en C06a: `data_origin: real`, `text_provenance: ai_assisted` | Índice, evaluación |
-| D1 | Catálogo sintético | Hasta completar 900-1.200 con D0, ~350 familias | **`materials[]` multivalor** (~35 % con 2+ materiales); distribuciones calibradas con D0 | Índice |
-| D2 | Perfiles IA | = D1 | `materials[]`, confianza por campo, `source: rule\|inferred` | Filtros, revisión |
-| D3 | `SourceText` + embeddings | = D1 | Incluye familia y variante | Búsqueda vectorial |
-| D4 | Familias | ~350 | **`ProductFamily` + miembros**, con 15 % de huérfanos deliberados | Desambiguación, alerta de calidad |
+| D0 | **Catálogo real anonimizado** | **436** (recibido) | **Ancla del corpus y del golden set**. C06a: `data_origin: real`, texto `ai_assisted`/`merchant`. C06b no reutiliza sus SKUs ni sus 28 colecciones | Índice, evaluación |
+| D1 | Catálogo sintético | Hasta completar **~1.200** con D0 (holgura) | LLM+CLI; colecciones **nuevas** (hotel / aeropuerto / clásico); precio razonado; `data_origin`/`text_provenance: synthetic`; ~35 % multi-material **en el texto**. **Sin familias** | Índice |
+| D2 | Perfiles IA | = D0+D1 | `materials[]`, confianza por campo, `source: rule\|inferred` | Filtros, revisión |
+| D3 | `SourceText` + embeddings | = D0+D1 | Incluye familia y variante **cuando C18 las haya aprobado** | Búsqueda vectorial |
+| D4 | Familias | las que C18 apruebe | **`ProductFamily` + miembros**, propuestos por C18. C06b **no** preasigna miembros: el catálogo híbrido nace huérfano | Desambiguación, alerta de calidad |
 | D5 | Corpus de conocimiento | 30-45 docs → 150-250 chunks | Fichas **por material**, no por producto | Citas, faithfulness |
 | D6 | Red de POS | 10-14 | **Marca de origen de suministro** (§14) | Filtros, perfil, reposición |
 | D7 | Inventario por POS | 5.000-9.000 filas | — | Prior de ranking, sustitutos |
@@ -424,9 +428,11 @@ El histórico así generado es **coherente por construcción** con catálogo y s
 
 ### 8.4. Realismo dirigido
 
-Familias confundibles (3-5 variantes con diferencia solo de talla) · **~20 % de descripciones escuetas y ~10 % sin descripción** · 3-4 convenciones de SKU mezcladas · **~35 % de productos multi-material** · **15 % de productos huérfanos de familia** para probar la alerta · colisiones semánticas verificadas (ningún par > 0,97 coseno) · consultas con faltas, abreviaturas y sinónimos · estacionalidad por hotel.
+Familias confundibles (3-5 variantes con diferencia solo de talla **en el nombre**, para que C18 tenga qué agrupar) · **~20 % de descripciones escuetas y ~10 % sin descripción** · SKUs sintéticos en un espacio que no colisiona con el real · **~35 % de productos multi-material en la prosa** · colisiones semánticas verificadas (ningún par > 0,97 coseno) · consultas con faltas, abreviaturas y sinónimos · estacionalidad por hotel.
 
-**Revisado el 2026-08-17.** Donde antes decía «~30 % de descripciones pobres» ahora hay dos tramos, porque «pobre» agrupaba dos casos que el recuperador no trata igual: un texto escueto aporta algo de señal léxica y uno vacío no aporta ninguna. Y **el reparto se sortea por familia de variantes, nunca por producto suelto**: todos los miembros de una familia comparten nivel. Sin esa regla, la riqueza del texto se convierte en un discriminador artificial dentro de la familia y contamina la desambiguación de variantes, que son 10 de las 60-70 consultas del golden set y el caso que este documento llama crítico. La unidad es la familia de variantes y no el tipo de pieza: sobre el catálogo real hay 403 grupos de variantes frente a solo 37 tipos, cuatro de los cuales concentran el 78 % del catálogo.
+**Revisado el 2026-08-17.** Donde antes decía «~30 % de descripciones pobres» ahora hay dos tramos, porque «pobre» agrupaba dos casos que el recuperador no trata igual: un texto escueto aporta algo de señal léxica y uno vacío no aporta ninguna. Y **el reparto se sortea por familia de variantes, nunca por producto suelto**: todos los miembros de una familia comparten nivel. Sin esa regla, la riqueza del texto se convierte en un discriminador artificial dentro de la familia y contamina la desambiguación de variantes, que son 10 de las 60-70 consultas del golden set y el caso que este documento llama crítico. La unidad es la familia de variantes y no el tipo de pieza: sobre el catálogo real hay 354 grupos internos (C06a) frente a tipos de pieza concentrados.
+
+**Revisado el 2026-08-22.** El «15 % de huérfanos deliberados» era ruido **inyectado por el generador** (85 % ya miembros de `ProductFamily`). Eso **chivaba C18**. C06b no escribe pertenencia: reales y sintéticos nacen huérfanos; la alerta de calidad de §7.5 opera sobre lo que C18 no asigne. El ~350 de D4 deja de ser cupo de C06b.
 
 ### 8.5. Calidad, privacidad y trazabilidad
 
@@ -629,7 +635,7 @@ Si el **26 de agosto** (fin de O3) no está la tabla de ablations y el sistema d
 
 ## 15. Limitaciones que el README debe declarar
 
-1. **El corpus es híbrido**: una porción real anonimizada (436 productos), ampliada con datos sintéticos calibrados sobre ella. El README declara el porcentaje exacto de cada origen y **reporta las métricas desglosadas**, con la porción real como resultado principal.
+1. **El corpus es híbrido**: una porción real anonimizada (436 productos), ampliada con sintéticos hasta ~1.200 totales. El README declara el porcentaje exacto de cada origen y **reporta las métricas desglosadas**, con la porción real como resultado principal. Los sintéticos (C06b) los escribe un LLM, con SKUs y colecciones que no reutilizan el ancla real; no son un clon estadístico del export.
 
    **Y el texto de esa porción real no lo escribió el comerciante** *(añadido el 2026-08-17)*. El export llegó con 38,5 caracteres de media entre nombre y descripción —51 productos sin descripción ninguna— y **sin una sola etiqueta de estilo, color u ocasión**, que son campos que el enriquecimiento necesita extraer. Su texto se ha redactado con un LLM que **simula un reconocimiento multimodal de fotografías que no está implementado**: no hay ni una foto en el sistema. La redacción expande la evidencia que sí constaba —el 88 % de los productos ya declaraba tipo de pieza y material— y acota por banda de precio lo que no constaba, pero **los atributos no derivables de esa evidencia son plausibles, no verificados**: un anillo puede figurar con diamantes sin que nadie haya comprobado que los lleva. `SKU`, precio y colección no se tocan en ningún caso y siguen siendo reales.
 

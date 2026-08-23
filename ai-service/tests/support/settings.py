@@ -31,6 +31,9 @@ def build_settings(**overrides: Any) -> Settings:
         "log_level": "WARNING",
         "jwt_secret": TEST_JWT_SECRET,
         "database_url": None,
+        "jpv_catalog_llm_api_key": None,
+        "jpv_catalog_llm_model": None,
+        "jpv_catalog_llm_base_url": None,
     }
     values.update(overrides)
     return Settings(**values)

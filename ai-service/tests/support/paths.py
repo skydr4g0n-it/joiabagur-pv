@@ -11,6 +11,14 @@ from pathlib import Path
 #: `ai-service/` — this file is at `ai-service/tests/support/paths.py`.
 AI_SERVICE_ROOT = Path(__file__).resolve().parents[2]
 
+#: Repository root (parent of `ai-service/`).
+REPO_ROOT = AI_SERVICE_ROOT.parent
+
+#: C06a committed real corpus — occupied SKUs and collection names for C06b.
+REAL_CATALOG_JSONL = (
+    REPO_ROOT / "data" / "catalog" / "real" / "generated" / "catalog-real-enriched.jsonl"
+)
+
 #: The frozen contract snapshot shared with the .NET client.
 OPENAPI_SNAPSHOT = AI_SERVICE_ROOT / "openapi.json"
 

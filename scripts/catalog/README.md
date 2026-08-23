@@ -5,7 +5,8 @@ textual, validar el JSONL e ingerir solo `Description` en `public."Products"`.
 
 No hay cliente LLM. `generator_version`: `c06a-assist/v2`. Semilla por defecto:
 `20260822`. El JSONL no emite campos de familia. El tier `original` copia la
-`Description` del xlsx.
+`Description` del xlsx. El corpus sintético (C06b) no vive aquí: CLI
+`python -m jbg_ai.data` en [`ai-service/src/jbg_ai/data/`](../../ai-service/src/jbg_ai/data/README.md).
 
 ## Requisitos
 
@@ -30,7 +31,8 @@ uv run catalog-pipeline validate --jsonl ..\..\data\catalog\real\generated\catal
 # Spike de agrupación (conteos; no commitea)
 uv run catalog-pipeline spike --source ..\..\data\catalog\real\product-JoiaBagur.xlsx
 
-# Ingesta local: UPDATE Description por SKU. Credenciales solo por entorno.
+# Ingesta local: UPDATE Description por SKU.
+# Preferible: las mismas JPV_PG* de backend/.env (copia de backend/.env.example).
 $env:JPV_PGHOST = "localhost"
 $env:JPV_PGPORT = "5433"
 $env:JPV_PGDATABASE = "joiabagur_pv"
@@ -52,8 +54,9 @@ uv run catalog-pipeline ingest --jsonl ..\..\data\catalog\real\generated\catalog
 | `JPV_PGUSER` | Usuario |
 | `JPV_PGPASSWORD` | Contraseña |
 
-Nunca se commitean credenciales. El compose local documenta `postgres` /
-`password`; eso no vive en el código de los scripts.
+Nunca se commitean credenciales. El sitio canónico en local es `backend/.env`
+(junto a `docker-compose.yml`; plantilla `backend/.env.example`). El compose
+documenta `postgres` / `password`; eso no vive en el código de los scripts.
 
 ## Tests
 
