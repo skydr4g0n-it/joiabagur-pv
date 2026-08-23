@@ -163,6 +163,8 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 .env*.local
+# Secretos locales junto al compose (plantilla: backend/.env.example).
+backend/.env
 
 # Vite
 dist/
@@ -270,3 +272,9 @@ data/catalog/real/*
 # siguen ocultos por el patrón de arriba.
 !data/catalog/real/generated/
 !data/catalog/real/generated/**
+
+# C06b: corpus sintético versionado (JSONL + sidecar). Nada más bajo synthetic/.
+data/catalog/synthetic/*
+!data/catalog/synthetic/.gitkeep
+!data/catalog/synthetic/generated/
+!data/catalog/synthetic/generated/**

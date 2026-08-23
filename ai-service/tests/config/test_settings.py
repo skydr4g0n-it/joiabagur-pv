@@ -158,6 +158,20 @@ def test_blank_database_url_is_treated_as_absent(
     assert get_settings().database_url is None
 
 
+def test_settings_do_not_require_llm_key_to_boot(monkeypatch: pytest.MonkeyPatch) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.delenv("JPV_CATALOG_LLM_API_KEY", raising=False)
+    monkeypatch.delenv("JPV_RAG_LLM_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    get_settings.cache_clear()
+
+    settings = get_settings()
+
+    assert settings.jpv_catalog_llm_api_key is None
+    assert settings.jpv_catalog_llm_model is None
+
+
 def test_settings_reject_non_positive_pool_size(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
