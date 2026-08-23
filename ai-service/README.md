@@ -80,7 +80,7 @@ Rules that C03 must rely on:
 
 With `STUB_MODE=true` (the local and test default) every `/v1` route answers from deterministic fixtures: no LLM, no embeddings, no database, no clock. The same request always returns the same body, so the .NET client can assert its mapping against them.
 
-With `STUB_MODE=false` a route whose real logic does not exist yet answers **501** naming the change that will deliver it (C09 enrich, C13 index, C14 retrieval, C24 evals, C26 substitutes, C30 assist, C35 inventory). Later changes replace handlers one at a time; the contract frozen here is the one they must respect.
+With `STUB_MODE=false` a route whose real logic does not exist yet answers **501** naming the change that will deliver it (C13 index, C14 retrieval, C24 evals, C26 substitutes, C30 assist, C35 inventory). `POST /v1/enrich/products` is C09: the real pipeline, or 503 if `JPV_RAG_LLM_API_KEY` is missing — never 501. Later changes replace handlers one at a time; the contract frozen here is the one they must respect.
 
 ## OpenAPI snapshot
 
@@ -235,7 +235,7 @@ These four tests exist to catch failures that produce **no error at all**: an HN
 
 ## Explicit non-goals
 
-- No real retrieval, enrichment, indexing or agent loops — stubs are replaced route by route in later changes
+- No real retrieval, indexing or agent loops — stubs are replaced route by route in later changes. Enrichment is real when `STUB_MODE=false` (C09)
 - No `POST /v1/retrieval/complementary` or `POST /v1/families/suggest` — later OpenAPI negotiation
 - No rows: the six `ai.*` tables ship empty and are populated by C13 (catalog), C22 (POS projection) and C23 (knowledge)
 - No queries, no similarity search, no ORM models or repositories — typed access is born in C11/C13
@@ -260,6 +260,7 @@ ai-service/
     db/             # lazy async engine, bounded pool
     stubs/          # deterministic fixtures
     data/           # C06b CLI (generate / ingest); not imported by api.main
+    enrichment/     # C09 extractor: vocabs, size regex, LiteLLM port, auditor
   prompts/          # versioned prompts: catalog-synth/v3 (C06b generate) + enrichment/v1 (C09 extract)
   migrations/
     bootstrap.sql   # one-off: extension, schema, dedicated role, grants

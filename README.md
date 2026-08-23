@@ -148,6 +148,7 @@ flowchart TB
 - `ai-service/`: Microservicio Python `jbg-ai` (FastAPI) del Proyecto Final de IA. Contenedor independiente, alcanzable solo desde el backend .NET.
 - `scripts/catalog/`: pipeline offline de C06a (lectura xlsx, JSONL, ingesta local de `Description`). No forma parte de `jbg-ai`.
 - `ai-service/src/jbg_ai/data/`: CLI C06b (`python -m jbg_ai.data generate|ingest`). `api.main` no lo importa.
+- `ai-service/src/jbg_ai/enrichment/`: extractor C09 de `POST /v1/enrich/products` (`STUB_MODE=false`). Prompt en `ai-service/prompts/enrichment/v1.md`.
 - `data/catalog/real/generated/`: corpus JSONL versionado (`data_origin: real`). El xlsx crudo permanece gitignored.
 - `data/catalog/synthetic/generated/`: corpus JSONL sintético (`data_origin: synthetic`; 764 líneas; híbrido 1.200 con el real).
 - `terraform/`: Pila de infraestructura AWS de producción (EC2, RDS, S3, ECR, SSM, OIDC).
@@ -169,7 +170,7 @@ En producción (AWS): EC2 con nginx (TLS) y un contenedor Docker con API .NET + 
 
 - **Backend:** xUnit, Moq, FluentAssertions; tests unitarios de servicios y validadores; tests de integración con Testcontainers (PostgreSQL). Nomenclatura tipo `Method_Scenario_ExpectedResult`. Los controladores críticos (por ejemplo ventas) tienen tests de integración que cubren creación, validación de stock, método de pago y permisos.
 - **Frontend:** Vitest, React Testing Library, MSW para simular API; pruebas de componentes y de flujos; E2E con Playwright (en progreso). Documentación en [Documentos/testing-backend.md](Documentos/testing-backend.md) y [Documentos/testing-frontend.md](Documentos/testing-frontend.md).
-- **Servicio de IA (`jbg-ai`):** pytest con el `TestClient` de FastAPI (`uv run pytest`); cubre autenticación de servicio, conformidad de los contratos, respuestas stub y estabilidad del snapshot OpenAPI. Los tests no llaman a proveedores LLM, APIs de embeddings ni RDS.
+- **Servicio de IA (`jbg-ai`):** pytest con el `TestClient` de FastAPI (`uv run pytest`); cubre autenticación de servicio, conformidad de los contratos, respuestas stub, extracción de catálogo con LLM falso (`tests/enrichment/`) y estabilidad del snapshot OpenAPI. Los tests no llaman a proveedores LLM, APIs de embeddings ni RDS.
 
 ---
 
