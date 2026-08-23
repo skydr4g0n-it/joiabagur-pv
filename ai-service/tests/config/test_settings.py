@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from jbg_ai.config.settings import Settings, get_settings
+from jbg_ai.config.settings import Settings, canonical_openapi_settings, get_settings
 
 
 def test_settings_fail_fast_when_required_env_missing(
@@ -79,6 +79,7 @@ def test_settings_load_with_minimal_env(monkeypatch: pytest.MonkeyPatch) -> None
     assert settings.jwt_ttl_seconds == 300
     assert settings.stub_mode is True
     assert settings.enable_dev_endpoints is True
+    assert settings.jpv_rag_llm_concurrency == 8
 
 
 def test_dev_endpoints_default_off_for_production_profile(
@@ -170,6 +171,42 @@ def test_settings_do_not_require_llm_key_to_boot(monkeypatch: pytest.MonkeyPatch
 
     assert settings.jpv_catalog_llm_api_key is None
     assert settings.jpv_catalog_llm_model is None
+    assert settings.jpv_rag_llm_api_key is None
+    assert settings.jpv_rag_llm_model is None
+    assert settings.jpv_rag_llm_base_url is None
+    assert settings.jpv_rag_llm_concurrency == 8
+
+
+def test_settings_do_not_require_rag_llm_key_to_boot(monkeypatch: pytest.MonkeyPatch) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.delenv("JPV_RAG_LLM_API_KEY", raising=False)
+    monkeypatch.delenv("JPV_RAG_LLM_MODEL", raising=False)
+    monkeypatch.delenv("JPV_RAG_LLM_BASE_URL", raising=False)
+    monkeypatch.delenv("JPV_RAG_LLM_CONCURRENCY", raising=False)
+    get_settings.cache_clear()
+
+    settings = get_settings()
+
+    assert settings.jpv_rag_llm_api_key is None
+    assert settings.jpv_rag_llm_model is None
+    assert settings.jpv_rag_llm_base_url is None
+    assert settings.jpv_rag_llm_concurrency == 8
+
+
+def test_blank_rag_llm_strings_are_treated_as_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.setenv("JPV_RAG_LLM_API_KEY", "   ")
+    monkeypatch.setenv("JPV_RAG_LLM_MODEL", "")
+    monkeypatch.setenv("JPV_RAG_LLM_BASE_URL", " ")
+    monkeypatch.setenv("JPV_RAG_LLM_CONCURRENCY", "")
+    get_settings.cache_clear()
+
+    settings = get_settings()
+
+    assert settings.jpv_rag_llm_api_key is None
+    assert settings.jpv_rag_llm_model is None
+    assert settings.jpv_rag_llm_base_url is None
+    assert settings.jpv_rag_llm_concurrency == 8
 
 
 def test_settings_reject_non_positive_pool_size(
@@ -181,3 +218,12 @@ def test_settings_reject_non_positive_pool_size(
 
     with pytest.raises(ValidationError):
         get_settings()
+
+
+def test_canonical_openapi_settings_pin_rag_keys_to_absent() -> None:
+    settings = canonical_openapi_settings()
+
+    assert settings.jpv_rag_llm_api_key is None
+    assert settings.jpv_rag_llm_model is None
+    assert settings.jpv_rag_llm_base_url is None
+    assert settings.jpv_rag_llm_concurrency == 8

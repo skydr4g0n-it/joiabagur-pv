@@ -138,11 +138,12 @@ Los tokens se reimplementan en `jbg_ai.enrichment` (espejo del conjunto de C06a/
 | Regex de talla | `1.0` | `rule` |
 | Valor con span en name o description | `0.85` | `inferred` |
 | Valor sin span | `0.45` | `inferred` |
+| Lista mixta (peor miembro) | `0.45` | `inferred` |
 | Ausente / `[]` | `0.20` | `inferred` |
 
 El umbral de auto-aprobación de tags de C08 es 0,80: el «con span» pasa; el «sin span» va a revisión en `Routed`. El número que el modelo invente **no se copia**.
 
-Span = el canónico o uno de sus sinónimos aparece, tras normalizar (minúsculas, acentos), en `name` o `description`. Para listas (`materials`, tags), la confianza del campo es la del miembro **peor** evidenciado: una lista mezclada no se auto-aprueba entera.
+Span = el canónico o uno de sus sinónimos aparece, tras normalizar (minúsculas, acentos), en `name` o `description`. Para listas (`materials`, tags), la confianza del campo es la del miembro **peor** evidenciado: una lista mezclada (`plata` con span + `oro` sin span) queda en `0.45` y no se auto-aprueba entera.
 
 **Alternativas descartadas.** *(a) Confiar el `confidence` del LLM:* no es calibrado y C08 lo trataría como verdad. *(b) Un solo 0,70 para todo lo inferido:* no separa evidencia de alucinación y deja los tags justo bajo el umbral o justo sobre él sin motivo.
 
@@ -156,7 +157,7 @@ El stub de C08 **sigue rellenándolos** bajo `STUB_MODE=true`. Los tests de cont
 
 Función pura sobre una lista de perfiles **más** el estrato (del JSONL o de la fixture). El POST de 50 **nunca** responde 422 por estas cifras: no recibe `text_provenance`.
 
-- Unicidad de SKU.
+- Unicidad de SKU (SKU duplicado → fallo nombrado del auditor, no del POST).
 - Todo valor ∈ vocabulario.
 - `materials` vacío solo si el texto no nombra una sustancia.
 - Cobertura de tags = al menos una de las tres listas no vacía:

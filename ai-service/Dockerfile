@@ -19,6 +19,7 @@ RUN uv sync --frozen --no-dev --no-editable
 # revision must not invalidate the dependency layer.
 COPY alembic.ini ./
 COPY migrations ./migrations
+COPY prompts ./prompts
 
 EXPOSE 8000
 

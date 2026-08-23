@@ -136,6 +136,12 @@ Confidence MUST be assigned by a deterministic heuristic over the input text. A 
 - **THEN** materials confidence is `0.20`
 - **AND** `source` is `inferred`
 
+#### Scenario: A mixed list uses the least-evidenced member confidence
+- **GIVEN** a materials list with `plata` present as a span and `oro` asserted without appearing in the text
+- **WHEN** confidences are assigned
+- **THEN** materials confidence is `0.45`
+- **AND** both canonical values remain in the list
+
 ### Requirement: Real profiles leave title, description and family null
 The real extractor MUST set `title`, `description`, `family_id` and `variant_label` to null. It MUST NOT write any column of `Product`. The C08 stub MAY keep filling those fields when `STUB_MODE` is enabled.
 
@@ -186,4 +192,10 @@ A pure auditor MUST evaluate uniqueness of SKU, closed-vocabulary membership, an
 - **GIVEN** a fixture batch whose `ai_assisted` tag coverage is below 90 %
 - **WHEN** the auditor runs
 - **THEN** the auditor reports a failed gate
+- **AND** that failure is not expressed as an HTTP status from `POST /v1/enrich/products`
+
+#### Scenario: Duplicate SKUs fail the auditor
+- **GIVEN** two audit records that share the same SKU
+- **WHEN** the auditor runs
+- **THEN** the auditor reports a failed uniqueness gate
 - **AND** that failure is not expressed as an HTTP status from `POST /v1/enrich/products`

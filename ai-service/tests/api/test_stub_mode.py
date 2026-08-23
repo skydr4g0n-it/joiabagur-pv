@@ -12,6 +12,9 @@ from jbg_ai.api.main import create_app
 from support.sample_requests import V1_REQUESTS
 from support.settings import build_settings
 
+#: C09 delivered `/v1/enrich/products`; remaining frozen routes still 501.
+STUB_ONLY_REQUESTS = [item for item in V1_REQUESTS if item[1] != "/v1/enrich/products"]
+
 
 @pytest.fixture
 def stubs_off_client(issue_token: Callable[..., str]) -> TestClient:
@@ -21,7 +24,7 @@ def stubs_off_client(issue_token: Callable[..., str]) -> TestClient:
     return client
 
 
-@pytest.mark.parametrize(("method", "path", "body"), V1_REQUESTS)
+@pytest.mark.parametrize(("method", "path", "body"), STUB_ONLY_REQUESTS)
 def test_unimplemented_route_returns_501_when_stub_mode_off(
     stubs_off_client: TestClient, method: str, path: str, body: dict[str, Any] | None
 ) -> None:

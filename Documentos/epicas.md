@@ -399,6 +399,8 @@ Construcción del corpus sobre el que opera todo el sistema RAG: perfiles de pro
 
 **Entregable C06b (JSONL).** El corpus sintético vive en [`data/catalog/synthetic/generated/catalog-synthetic.jsonl`](../data/catalog/synthetic/generated/catalog-synthetic.jsonl) (sidecar al lado; `generator_version` `c06b-synth/v3`, `prompt_version` `catalog-synth/v3`). 764 líneas, híbrido 1.200 con el real. Tiers `rich` / `sparse` / `short` (nunca `empty` ni `original`); el copy se recorta por frases enteras y se aproxima a las medias del real. CLI en [`ai-service/src/jbg_ai/data/`](../ai-service/src/jbg_ai/data/README.md). Recuentos, muestras, ingesta local y nota §15: [`Proyecto Final AIEng/informes/c06b-synthetic-catalog-report.md`](Proyecto%20Final%20AIEng/informes/c06b-synthetic-catalog-report.md). Ingesta Docker (`INSERT` en `:5433` / `joiabagur_pv`): 10 colecciones + 764 productos; GET familia sobre un sintético → 204.
 
+**Entregable C09 (extractor).** `POST /v1/enrich/products` con `STUB_MODE=false` corre el pipeline en [`ai-service/src/jbg_ai/enrichment/`](../ai-service/src/jbg_ai/enrichment/) (vocabularios YAML, talla por regex `Name` > `Description`, LiteLLM temp 0, confianza por span). Prompt [`ai-service/prompts/enrichment/v1.md`](../ai-service/prompts/enrichment/v1.md); `prompt_version = enrichment/v1`. Las puertas de lote (unicidad de SKU, vocabulario, cobertura de tags por estrato) viven en el auditor, **fuera del HTTP**: el POST de 50 no responde 422 por esas cifras. Compose y el snapshot se quedan en `STUB_MODE=true` hasta que haya `JPV_RAG_LLM_API_KEY`.
+
 ---
 
 ## Épica 13: Familias de Producto y Desambiguación de Variantes

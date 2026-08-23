@@ -30,8 +30,7 @@ tests/
 └── evals/            # harness, metrics, baselines, scenario replays
 ```
 
-Folders are created **on demand**, not up front. Only `api/`, `config/` and
-`support/` are populated today; the rest are reserved names so nobody invents a
+Folders are created **on demand**, not up front. `api/`, `config/`, `support/`, `db/`, `migrations/`, `data/` and `enrichment/` are populated; the rest are reserved names so nobody invents a
 parallel taxonomy later.
 
 ## Which folder for which change
@@ -108,8 +107,7 @@ uv run --system-certs pytest
 
 ## Current state
 
-Populated after C05: `api/` (8 files), `config/` (1), `db/` (2), `migrations/` (2)
-and `support/`. Everything else is a reserved name. Two settings in
+Populated after C09: `api/` (8 files), `config/` (1), `db/` (2), `migrations/` (2), `data/` (C06b), `enrichment/` (C09) and `support/`. Everything else is a reserved name. Two settings in
 `pyproject.toml` hold the layout together:
 
 - `pythonpath = ["src", "tests"]` — makes `support/` importable from any subfolder.

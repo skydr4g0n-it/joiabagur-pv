@@ -24,17 +24,17 @@ El HTTP **no recibe** `text_provenance` ni `text_quality_tier` (viven en JSONL; 
 
 | Pieza | Estado |
 |---|---|
-| Change OpenSpec `add-catalog-enrichment-pipeline` | **Scaffold** (`.openspec.yaml`); proposal/design/specs/tasks **pendientes** |
-| `ai-service/src/jbg_ai/enrichment/` | **Ausente** |
-| `ai-service/prompts/enrichment/` | **Ausente.** Existe `prompts/catalog-synth/v3.md` (C06b, no reutilizar) |
-| `POST /v1/enrich/products` | Router en `jbg_ai/api/routers/enrich.py`: `get_catalog_principal` + `require_stub_mode(..., "C09 (add-catalog-enrichment-pipeline)")` → stub o **501** |
+| Change OpenSpec `add-catalog-enrichment-pipeline` | Artefactos listos; pipeline implementado (`STUB_MODE=true` conserva el stub) |
+| `ai-service/src/jbg_ai/enrichment/` | Vocabularios YAML, regex, puerto LiteLLM, pipeline, auditor |
+| `ai-service/prompts/enrichment/` | `v1.md` (`prompt_version = enrichment/v1`) |
+| `POST /v1/enrich/products` | Stub si `STUB_MODE=true`; pipeline si `false`. Sin clave RAG → 503 explícito, no 501 |
 | Contrato `ProposedProfile` | C08: `source` + `piece_type` / `stone_type` / `size_label` + tags desglosadas + `prompt_version`. `title`/`description`/`family_id`/`variant_label` opcionales |
 | Stub | `enrich_products_stub`: ciclos deterministas; talla `rule` si `index % 4 == 0`; `prompt_version = "stub"`; rellena title/description/familia |
 | Tests de contrato | `test_enrich_profile_carries_source_per_field`, `test_enrich_stub_exercises_both_provenances`, `test_enrich_reports_prompt_version` — corren contra el stub |
-| `tests/enrichment/` | **Reservada** en `ai-service/tests/README.md`; carpeta aún no creada |
-| `Settings` | `JPV_CATALOG_LLM_*` opcionales (C06b). `JPV_RAG_LLM_*` **nombradas** en comentarios, `.env.example` y tests de env; **no** existen como campos (`API_KEY`, `MODEL`, `BASE_URL`, `CONCURRENCY`) |
-| `jbg_ai.data.llm.OpenAICatalogLlm` | CLI de generate, temp 0,8, `JPV_CATALOG_LLM_*`. **No** importar desde el router. C06b **no** se migra a LiteLLM |
-| `pyproject.toml` | Declara `openai>=1.68.0`. **Añadir `litellm` con versión fijada** (S3: compromiso PyPI marzo 2026). Sin Instructor |
+| `tests/enrichment/` | Suite con `FakeEnrichLlm`; cero sockets a proveedores |
+| `Settings` | `JPV_RAG_LLM_API_KEY` / `MODEL` / `BASE_URL` / `CONCURRENCY` (default 8) opcionales al boot |
+| `jbg_ai.data.llm.OpenAICatalogLlm` | CLI de generate, temp 0,8, `JPV_CATALOG_LLM_*`. **No** se importa desde el router. C06b **no** se migra a LiteLLM |
+| `pyproject.toml` | `litellm==1.98.0` y `pyyaml==6.0.3` fijadas. Sin Instructor |
 | `ai-service/openapi.json` | Congelado. **Este change no lo regenera** |
 | C08 `ProductAiProfileService` | Envía `product_id`, `sku`, `name`, `description`. **No** envía precio, colección ni procedencia. Ignora familia. No aplica title/description a `Product` |
 | `ProfileReviewPolicy` | Sensibles (`piece_type`, `materials`, `stone_type`, `size_label`) inferidos → revisión; `rule` → no; tags ≥ 0,80 → auto |
@@ -129,6 +129,7 @@ Tags comerciales: listas cerradas cortas (color / estilo / ocasión). Estilo **n
 | Regex de talla | `1.0` | `rule` |
 | Valor con span en name o description | `0.85` | `inferred` |
 | Valor sin span | `0.45` | `inferred` |
+| Lista mixta (un miembro con span, otro sin él) | `0.45` (el peor) | `inferred` |
 | Ausente / `[]` | `0.20` | `inferred` |
 
 C08 auto-aprueba tags ≥ 0,80: el «con span» pasa; el «sin span» va a revisión en `Routed`.
@@ -137,7 +138,7 @@ C08 auto-aprueba tags ≥ 0,80: el «con span» pasa; el «sin span» va a revis
 
 Función pura sobre una lista de perfiles **más** el estrato (del JSONL o de la fixture):
 
-- Unicidad de SKU.
+- Unicidad de SKU (`test_batch_fails_when_sku_is_duplicated`).
 - Todo valor ∈ vocabulario.
 - `materials` vacío solo si el texto no nombra una sustancia (el test `test_empty_materials_flags_review_not_default_value` cubre el caso).
 - Cobertura de tags = al menos una de las tres listas no vacía:
@@ -179,6 +180,8 @@ En `ai-service/tests/enrichment/`:
 - `test_piece_type_stores_hypernym_not_hyponym`
 - `test_title_description_and_family_are_null`
 - `test_confidence_follows_evidence_span`
+- `test_mixed_list_uses_least_evidenced_member_confidence` — una sola lista con un miembro con span y otro sin él; el campo toma `0.45`
+- `test_batch_fails_when_sku_is_duplicated` — **sobre el auditor**, no sobre el POST
 - `test_batch_fails_when_tag_coverage_below_threshold` — **sobre el auditor**, no sobre el POST
 - `test_tag_coverage_gate_is_evaluated_per_text_provenance`
 - `test_original_or_short_may_have_empty_tags`
@@ -212,21 +215,21 @@ Los tests de `tests/api/test_contracts.py` **siguen verdes** contra el stub (`ST
 
 ## Definición de Hecho (DoD)
 
-- [ ] `POST /v1/enrich/products` con `STUB_MODE=false` produce perfiles reales (no el ciclo del stub)
-- [ ] Talla `rule` solo por regex sobre `Name`/`Description`; SKU no participa
-- [ ] Vocabularios cerrados respetados; `materials: []` sin evidencia; `hilo` admitido; `stone_type` solo valores del YAML o residual `piedra`; nunca string libre
-- [ ] `title` / `description` / `family_id` / `variant_label` nulos en el extractor real
-- [ ] `prompt_version` ≠ `"stub"`; `usage.model` informado
-- [ ] Auditor de puertas en tests, con estrato; el POST de 50 no falla por cobertura
-- [ ] `JPV_RAG_LLM_*` no bloquean `/health`; `CONCURRENCY` default 8; LiteLLM fijada en `pyproject.toml`
-- [ ] `uv run --system-certs pytest` en verde **sin** sockets a proveedores
-- [ ] `test_openapi_snapshot_is_stable` verde **sin** regenerar el snapshot
-- [ ] Tests de contrato existentes verdes con `STUB_MODE=true`
-- [ ] Specs del change y **`openspec validate --all --strict` con `0 failed`**
-- [ ] `Documentos/epicas.md` (EP12) enlaza HU-AIENG-009; README de `ai-service` actualiza el marcador C09
-- [ ] Sin TODO/FIXME sin tarea de seguimiento
-- [ ] UI: **no aplica**
-- [ ] Migración EF/Alembic: **no aplica**
+- [x] `POST /v1/enrich/products` con `STUB_MODE=false` produce perfiles reales (no el ciclo del stub)
+- [x] Talla `rule` solo por regex sobre `Name`/`Description`; SKU no participa
+- [x] Vocabularios cerrados respetados; `materials: []` sin evidencia; `hilo` admitido; `stone_type` solo valores del YAML o residual `piedra`; nunca string libre
+- [x] `title` / `description` / `family_id` / `variant_label` nulos en el extractor real
+- [x] `prompt_version` ≠ `"stub"`; `usage.model` informado
+- [x] Auditor de puertas en tests, con estrato; el POST de 50 no falla por cobertura
+- [x] `JPV_RAG_LLM_*` no bloquean `/health`; `CONCURRENCY` default 8; LiteLLM fijada en `pyproject.toml`
+- [x] `uv run --system-certs pytest` en verde **sin** sockets a proveedores
+- [x] `test_openapi_snapshot_is_stable` verde **sin** regenerar el snapshot
+- [x] Tests de contrato existentes verdes con `STUB_MODE=true`
+- [x] Specs del change y **`openspec validate --all --strict` con `0 failed`**
+- [x] `Documentos/epicas.md` (EP12) enlaza HU-AIENG-009; README de `ai-service` actualiza el marcador C09
+- [x] Sin TODO/FIXME sin tarea de seguimiento
+- [x] UI: **no aplica**
+- [x] Migración EF/Alembic: **no aplica**
 
 **Verificación posterior (no DoD de este ticket):** un `enrich-batch` AutoBulk local sobre el catálogo Docker, documentado cuando se haga.
 
@@ -282,3 +285,4 @@ Las 1 y 2 de la primera redacción **están cerradas** (2026-08-23): `stone_type
 |---|---|---|
 | 2026-08-23 | `/enrich-us` | Creación a partir de HU-AIENG-009 y de la exploración previa al proposal. Recoge: puertas fuera del HTTP, `piece_type` padres, `hilo` en materials, `stone_type=piedra` residual, confianza por span, title/description nulos, endpoint sin lote AutoBulk en el alcance |
 | 2026-08-23 | exploración | LiteLLM como cliente de runtime (no SDK OpenAI directo; Instructor no entra). `stone_type` cerrado para el modelo / YAML ampliable. Semáforo `JPV_RAG_LLM_CONCURRENCY` default 8. Preguntas 1–2 cerradas |
+| 2026-08-23 | verify follow-up | Tests dedicados de lista mixta (peor miembro) y de unicidad de SKU en el auditor; escenarios de spec homónimos |
