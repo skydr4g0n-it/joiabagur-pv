@@ -46,6 +46,17 @@ def test_health_starts_without_rag_llm_key(minimal_settings: Settings) -> None:
     assert response.status_code == 200
 
 
+def test_health_starts_without_embedding_key(minimal_settings: Settings) -> None:
+    assert minimal_settings.jpv_embedding_api_key is None
+    assert minimal_settings.jpv_embedding_model is None
+    assert minimal_settings.jpv_embedding_batch_size == 64
+    app = create_app(minimal_settings)
+    with TestClient(app) as client:
+        response = client.get("/health")
+
+    assert response.status_code == 200
+
+
 def test_health_generates_trace_id_when_missing(minimal_settings: Settings) -> None:
     app = create_app(minimal_settings)
     with TestClient(app) as client:

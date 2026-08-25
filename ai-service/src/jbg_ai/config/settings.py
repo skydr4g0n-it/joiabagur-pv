@@ -95,6 +95,30 @@ class Settings(BaseSettings):
         gt=0,
         description="In-flight enrichment calls per batch. Default 8.",
     )
+    jpv_embedding_api_key: str | None = Field(
+        default=None,
+        description=(
+            "C11 embeddings (JPV_EMBEDDING_API_KEY). Distinct from "
+            "JPV_RAG_LLM_API_KEY and JPV_CATALOG_LLM_API_KEY. Not required "
+            "to boot /health; required when embedding."
+        ),
+    )
+    jpv_embedding_model: str | None = Field(
+        default=None,
+        description=(
+            "Optional provider-prefixed embedding model "
+            "(e.g. openai/text-embedding-3-small)."
+        ),
+    )
+    jpv_embedding_base_url: str | None = Field(
+        default=None,
+        description="Optional LiteLLM api_base for embeddings (proxy / Azure).",
+    )
+    jpv_embedding_batch_size: int = Field(
+        default=64,
+        gt=0,
+        description="Texts per provider embedding call. Default 64.",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -120,6 +144,9 @@ class Settings(BaseSettings):
         "jpv_rag_llm_api_key",
         "jpv_rag_llm_model",
         "jpv_rag_llm_base_url",
+        "jpv_embedding_api_key",
+        "jpv_embedding_model",
+        "jpv_embedding_base_url",
         mode="before",
     )
     @classmethod
@@ -139,6 +166,13 @@ class Settings(BaseSettings):
     def blank_concurrency_is_default(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
             return 8
+        return value
+
+    @field_validator("jpv_embedding_batch_size", mode="before")
+    @classmethod
+    def blank_embedding_batch_size_is_default(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return 64
         return value
 
 
@@ -175,4 +209,8 @@ def canonical_openapi_settings() -> Settings:
         jpv_rag_llm_model=None,
         jpv_rag_llm_base_url=None,
         jpv_rag_llm_concurrency=8,
+        jpv_embedding_api_key=None,
+        jpv_embedding_model=None,
+        jpv_embedding_base_url=None,
+        jpv_embedding_batch_size=64,
     )

@@ -10,6 +10,7 @@ Python FastAPI microservice for the JoiaBagur Proyecto Final RAG.
 - **C06b** (HU-AIENG-006b) adds the **CLI** `python -m jbg_ai.data` (`generate` / `ingest`) under `jbg_ai.data`. `api.main` does not import it. Generate reads `JPV_CATALOG_LLM_API_KEY` from `backend/.env` (host only; not the RAG key). `GET /health` does not need it. See [`src/jbg_ai/data/README.md`](src/jbg_ai/data/README.md).
 - **C09** (HU-AIENG-009) replaces the enrichment stub when `STUB_MODE=false`: closed vocabularies, size regex on `Name` then `Description` (never SKU), LiteLLM at temperature 0 (`JPV_RAG_LLM_*`), confidence by evidence span, `prompt_version = enrichment/v1`. Batch quality gates live in an auditor, not as HTTP 422. Compose and the OpenAPI snapshot stay on `STUB_MODE=true` until a RAG key exists. See [`prompts/enrichment/v1.md`](prompts/enrichment/v1.md).
 - **C10** (HU-AIENG-010) adds nested CLI `python -m jbg_ai.data world simulate|ingest` under `jbg_ai.data.world`. Simulate is offline (YAML of 12 POS, no Postgres, no LLM). Ingest uses `JPV_PG*` against local Docker and does not touch `"Products"` / `"Collections"` / schema `ai`. Recipe: [`../data/world/pos-profiles.yaml`](../data/world/pos-profiles.yaml). See [`src/jbg_ai/data/README.md`](src/jbg_ai/data/README.md).
+- **C11** (HU-AIENG-011) adds the library `jbg_ai.indexing`: canonical `source-text/v1` (`build_source_text` / `hash_source_text`) and an injectable LiteLLM embedding client (`aembedding`, 1536-d, in-memory cache, batch 64). `api.main` does not import it. `/v1/index/*` stays the C13 stub. `JPV_EMBEDDING_*` are optional at boot; embedding requires its own key and does not fall back to `JPV_RAG_LLM_API_KEY`.
 
 Boundary rule: *Python computes similarity and writes prose; .NET computes numbers and decides.* The service never emits a price or stock figure and never touches schema `public`.
 
@@ -40,10 +41,14 @@ Boundary rule: *Python computes similarity and writes prose; .NET computes numbe
 | `JPV_RAG_LLM_MODEL` | no | — | provider-prefixed id (e.g. `openai/gpt-4o`) |
 | `JPV_RAG_LLM_BASE_URL` | no | — | optional LiteLLM `api_base`; empty = provider default |
 | `JPV_RAG_LLM_CONCURRENCY` | no | `8` | in-flight enrichment calls inside a batch of ≤ 50 |
+| `JPV_EMBEDDING_API_KEY` | no | — | C11 embeddings (LiteLLM). Distinct from `JPV_RAG_LLM_API_KEY`. Absence does not block `/health`; real `embed` requires it |
+| `JPV_EMBEDDING_MODEL` | no | `openai/text-embedding-3-small` in code | provider-prefixed embedding model id |
+| `JPV_EMBEDDING_BASE_URL` | no | — | optional LiteLLM `api_base`; empty = provider default |
+| `JPV_EMBEDDING_BATCH_SIZE` | no | `64` | texts per provider embedding call |
 
 Missing or blank `APP_ENV`, `SERVICE_VERSION` or `JWT_SECRET` aborts startup (fail-fast), so the process never serves `/v1` half-configured.
 
-`DATABASE_URL` is **optional on purpose**. The service must boot with no database — that is a requirement of `ai-service-dev-compose`, not an accident — so the engine is built on first use and never at import time. Under `STUB_MODE` nothing asks for a session, so the container starts fine against a database that has not even been provisioned. LLM keys are not required to boot `/health`; the catalog CLI reads `JPV_CATALOG_LLM_*` from `backend/.env`. Real `POST /v1/enrich/products` (`STUB_MODE=false`) requires `JPV_RAG_LLM_API_KEY` and fails explicitly if it is missing — it does not invent profiles and does not return 501.
+`DATABASE_URL` is **optional on purpose**. The service must boot with no database — that is a requirement of `ai-service-dev-compose`, not an accident — so the engine is built on first use and never at import time. Under `STUB_MODE` nothing asks for a session, so the container starts fine against a database that has not even been provisioned. LLM keys are not required to boot `/health`; the catalog CLI reads `JPV_CATALOG_LLM_*` from `backend/.env`. Real `POST /v1/enrich/products` (`STUB_MODE=false`) requires `JPV_RAG_LLM_API_KEY` and fails explicitly if it is missing — it does not invent profiles and does not return 501. Embedding (`jbg_ai.indexing`) requires `JPV_EMBEDDING_API_KEY` at call time and does not fall back to the RAG LLM key.
 
 ## Frozen endpoints (C02)
 
@@ -263,6 +268,7 @@ ai-service/
     stubs/          # deterministic fixtures
     data/           # C06b generate/ingest + C10 world/; not imported by api.main
     enrichment/     # C09 extractor: vocabs, size regex, LiteLLM port, auditor
+    indexing/       # C11 library: source-text/v1 + LiteLLM embeddings (no HTTP/SQL)
   prompts/          # versioned prompts: catalog-synth/v3 (C06b generate) + enrichment/v1 (C09 extract)
   migrations/
     bootstrap.sql   # one-off: extension, schema, dedicated role, grants

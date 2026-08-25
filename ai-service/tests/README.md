@@ -107,7 +107,7 @@ uv run --system-certs pytest
 
 ## Current state
 
-Populated after C09: `api/` (8 files), `config/` (1), `db/` (2), `migrations/` (2), `data/` (C06b), `enrichment/` (C09) and `support/`. Everything else is a reserved name. Two settings in
+Populated after C11: `api/`, `config/`, `db/`, `migrations/`, `data/` (C06b/C10), `enrichment/` (C09), `indexing/` (C11) and `support/`. Remaining folders are reserved names. Two settings in
 `pyproject.toml` hold the layout together:
 
 - `pythonpath = ["src", "tests"]` — makes `support/` importable from any subfolder.
