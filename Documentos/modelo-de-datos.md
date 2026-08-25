@@ -406,6 +406,8 @@ Catálogo centralizado de productos de la joyería.
 - `CollectionId`: Referencia opcional a la colección
 - `IsActive`: Flag para productos activos/inactivos
 
+El feed HTTP de indexación (`GET /api/ai/index-feed/catalog` y `GET /api/ai/index-feed/pos-availability`) **lee** este catálogo (y el perfil, la familia y el inventario) por la API; **no** añade entidad ni columna. Autenticación: header `X-Index-Feed-Key`. C13 tira (`pull`); no hay push ni tabla outbox.
+
 **Consideraciones Fase 2:**
 - Campo `Price` puede evolucionar a tabla `ProductPriceHistory` para historial de precios
 - Preparado para precios diferentes por punto de venta (nueva tabla `ProductPointOfSalePrice`)

@@ -434,6 +434,7 @@ El corazón del Proyecto Final. Búsqueda que combina la rama vectorial y la lé
 
 **Alcance:**
 - Indexación del catálogo en el esquema `ai` mediante feed paginado con cursor `since` y *tombstones*
+- **C12 (hecho, archivado 2026-08-26):** `GET /api/ai/index-feed/catalog` (página 50) y `GET /api/ai/index-feed/pos-availability` (página 200), autenticados **solo** con header `X-Index-Feed-Key` (`IndexFeed:ApiKey`, ≥ 32 caracteres). Un JWT de usuario o un token C03 responden **401**. **Sin migración EF** y **sin HTTP push** hacia Python; `POST /v1/index/sync` sigue siendo el stub de C13. Spec viva `index-feed`. Runbook AutoBulk: [`informes/c12-catalog-autobulk-runbook.md`](Proyecto%20Final%20AIEng/informes/c12-catalog-autobulk-runbook.md) (se corre **después de este archivo, antes** de aplicar C13; no fue criterio de merge).
 - Recuperación vectorial sobre HNSW y léxica con `ts_rank` en español, fusionadas con RRF
 - Diccionario de sinónimos del dominio aplicado en expansión de consulta, nunca en indexación
 - Prefiltro blando: la disponibilidad penaliza el score pero **nunca excluye** un candidato
@@ -443,6 +444,9 @@ El corazón del Proyecto Final. Búsqueda que combina la rama vectorial y la lé
 - Panel de búsqueda asistida en el frontend
 
 **Changes asociados:** C12, C13, C14, C15, C16, C20, C21, C22, C25
+
+**User Stories:**
+- [HU-AIENG-012: Feeds HTTP de indexación con cursor, tombstones y autenticación de servicio](Historias/AI-Eng/HU-AIENG-012.md) *(C12 — `GET /api/ai/index-feed/catalog` y `.../pos-availability`; API Key `X-Index-Feed-Key`; sin migración / sin push; Python no consume el feed hasta C13)*
 
 ---
 
@@ -524,7 +528,7 @@ Se miden por *changes* de OpenSpec, no por número de historias: la serie `HU-AI
 | Épica | Descripción Breve | Changes | Ruta crítica |
 |-------|-------------------|---------|--------------|
 | **EP11** | Plataforma del Servicio de IA | C01, C02, C03, C05, C17 | 🔴 completa |
-| **EP12** | Corpus y Enriquecimiento del Catálogo | C06a (hecho), C06b (hecho), C08, C09 (hecho), C10 (hecho), C11, C23 | 🔴 parcial |
+| **EP12** | Corpus y Enriquecimiento del Catálogo | C06a (hecho), C06b (hecho), C08, C09 (hecho), C10 (hecho), C11 (hecho), C23 | 🔴 parcial |
 | **EP13** | Familias de Producto y Desambiguación | C07, C18, C28 | 🟢 |
 | **EP14** | Búsqueda Semántica Híbrida | C12, C13, C14, C15, C16, C20, C21, C22, C25 | 🔴 mayoritaria |
 | **EP15** | Venta Asistida, Sustitutos y Agentes | C26, C27, C30, C31, C32, C34, C36 | 🔴 parcial |

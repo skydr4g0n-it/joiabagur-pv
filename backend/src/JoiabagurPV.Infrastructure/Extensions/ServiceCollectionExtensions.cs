@@ -86,6 +86,9 @@ public static class ServiceCollectionExtensions
         // Register product family repositories (EP13)
         services.AddScoped<IProductFamilyRepository, ProductFamilyRepository>();
 
+        // Indexing feed keyset queries (C12). No new tables.
+        services.AddScoped<IIndexFeedRepository, IndexFeedRepository>();
+
         // Register unit of work
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 

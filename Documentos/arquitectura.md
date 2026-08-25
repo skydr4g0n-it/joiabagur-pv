@@ -13,7 +13,7 @@ Arquitectura monolítica simple con backend y frontend separados, desplegados en
 - **Lenguaje**: C#
 - **ORM**: Entity Framework Core
 - **Base de datos**: PostgreSQL 15+
-- **Autenticación**: JWT (JSON Web Tokens)
+- **Autenticación**: JWT (usuarios) y API Key `X-Index-Feed-Key` (feeds de indexación C12)
 - **Contenedorización**: Docker
 - **Logging**: Serilog
 
@@ -42,7 +42,7 @@ Microservicio añadido en el Proyecto Final de IA (changes `init-ai-service-skel
 - **Aislamiento entre puntos de venta**: desde C22 el `pos_id` del token es el **único filtro duro** del recuperador, así que no existe ningún valor comodín. El scope de catálogo se cierra por **dos vías independientes**: el cliente .NET rechaza un scope de catálogo en recuperación antes de emitir la petición, y `jbg-ai` sigue exigiendo `pos_id` en esas rutas (C08)
 - **Contrato**: 8 endpoints `/v1` congelados en `ai-service/openapi.json`, con test de snapshot; `STUB_MODE` sirve respuestas deterministas mientras la lógica real no existe (C02). El de enriquecimiento se renegoció en C08 para que cada valor propuesto declare su **procedencia** (`rule` \| `inferred`) además de su confianza: sin ese dato la revisión híbrida por campo no es implementable
 
-**Frontera de responsabilidad:** Python solo hace cálculo vectorial y generación con LLM; .NET conserva toda la regla de negocio y es la autoridad final sobre precio, stock y permisos. Python **nunca** lee ni escribe el esquema `public` por SQL, y el navegador nunca habla con Python: la SPA llama al backend .NET y este llama a `jbg-ai` con un JWT interno de servicio.
+**Frontera de responsabilidad:** Python solo hace cálculo vectorial y generación con LLM; .NET conserva toda la regla de negocio y es la autoridad final sobre precio, stock y permisos. Python **nunca** lee ni escribe el esquema `public` por SQL, y el navegador nunca habla con Python: la SPA llama al backend .NET y este llama a `jbg-ai` con un JWT interno de servicio. C13 tira (`pull`) de `GET /api/ai/index-feed/*` con `X-Index-Feed-Key`; no hay push HTTP hacia `POST /v1/index/sync` (sigue siendo el stub C13).
 
 ### Infraestructura
 - **Contenedores**: Docker
@@ -152,6 +152,7 @@ Todos comparten la red `jpv-network`, que es la que permitirá a `jbg-ai` alcanz
 |---|---|---|
 | `AiGateway:BaseUrl` | `http://localhost:8001` (puerto publicado) | `http://jbg-ai:8000`, previsto para C17 |
 | `AiGateway:JwtSecret` | Placeholder local, **idéntico** al `JWT_SECRET` del contenedor | Desde SSM en C17 |
+| `IndexFeed:ApiKey` | Placeholder local ≥ 32 caracteres, **distinto** de `Jwt:SecretKey` y de `AiGateway:JwtSecret` | SSM `/jpv/prod/IndexFeed:ApiKey` en C17 |
 
 > El valor de producción presupone una **red Docker definida por el usuario**, que hoy no existe: el despliegue arranca los contenedores en la red *bridge* por defecto, donde Docker no resuelve nombres de contenedor. Crearla, unir ambos contenedores y dejar el puerto de `jbg-ai` sin publicar es prerrequisito de C17, junto con los parámetros `/jpv/prod/AiGateway__BaseUrl` y `/jpv/prod/AiGateway__JwtSecret`.
 
@@ -708,7 +709,7 @@ Para instrucciones detalladas sobre el deploy en AWS, consultar:
 | **CI/CD** | GitHub Actions | Ya en uso, free-tier generoso, actions oficiales AWS |
 | **Servicio de IA** | Microservicio Python separado (`jbg-ai`) | Aísla el ecosistema vectorial/LLM sin contaminar el monolito .NET; se despliega y evoluciona por separado |
 | **Base vectorial** | pgvector sobre la misma RDS, esquema `ai` | Una sola base de datos, filtros SQL nativos y cero infraestructura nueva. La decisión no se justifica por escala (~1.500 vectores) sino por operación |
-| **Frontera Python ↔ .NET** | JWT interno HS256 sobre red Docker interna | Python nunca lee ni escribe `public`; el navegador nunca habla con Python; .NET es la autoridad final sobre precio, stock y permisos |
+| **Frontera Python ↔ .NET** | JWT interno HS256 sobre red Docker interna; C13 tira del feed C12 (`X-Index-Feed-Key`) | Python nunca lee ni escribe `public`; el navegador nunca habla con Python; .NET es la autoridad final sobre precio, stock y permisos |
 | **Moneda** | Euro (EUR, €) | Mercado objetivo español/europeo |
 | **Locale** | es-ES | Formato español para números y fechas |
 

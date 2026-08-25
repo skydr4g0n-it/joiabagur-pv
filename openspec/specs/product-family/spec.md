@@ -1,7 +1,7 @@
 # product-family Specification
 
 ## Purpose
-Groups the products that are one same piece sold in several variants — the same ring in sizes S, M and L — as an editable business entity distinct from a collection: a collection groups by editorial criteria and admits many memberships, whereas a family is excluding and a product belongs to at most one, a rule enforced by the database rather than by an application check. Covers the family's own metadata, membership declared as a complete ordered list with per-member variant labels, retrieval of a product's family and siblings, administrator-only writes against reads open to any authenticated user without point-of-sale filtering, the storage that records whether a family was created by hand or approved from an assisted suggestion, and the schema constraints whose absence would fail silently.
+Groups the products that are one same piece sold in several variants — the same ring in sizes S, M and L — as an editable business entity distinct from a collection: a collection groups by editorial criteria and admits many memberships, whereas a family is excluding and a product belongs to at most one, a rule enforced by the database rather than by an application check. Covers the family's own metadata, membership declared as a complete ordered list with per-member variant labels, stamping `Product.UpdatedAt` of products that enter or leave so a catalog indexing feed can see both, retrieval of a product's family and siblings, administrator-only writes against reads open to any authenticated user without point-of-sale filtering, the storage that records whether a family was created by hand or approved from an assisted suggestion, and the schema constraints whose absence would fail silently.
 
 ## Requirements
 
@@ -92,6 +92,42 @@ The system SHALL replace a family's entire membership from a single declaration.
 
 - **WHEN** a declaration names the same product more than once
 - **THEN** the request is rejected with 400 Bad Request before any database write is attempted
+
+### Requirement: Membership changes stamp the catalog watermark of entering and leaving products
+When family membership is replaced with a list that is not identical to the current members, labels and order, the system SHALL stamp `Product.UpdatedAt` of every product that **enters** the family and every product that **leaves** it, so that an indexing feed whose cursor is `Product.UpdatedAt` can see both. Stamping MUST happen by loading those products and marking them modified (or equivalent) so the existing `SaveChangesAsync` interceptor writes `UpdatedAt`; deleting a membership row MUST NOT be relied on to touch `Product`. A reorder or variant-label change that keeps the same product identifiers MUST stamp those products, because the denormalised variant in the index changed. Declaring an identical list MUST still write nothing, including no `Product` row. Updating only the family's name or description MUST NOT stamp member products: the family's own `UpdatedAt` is the watermark the feed joins on, and membership rows stay untouched.
+
+#### Scenario: A product that leaves a family has its UpdatedAt stamped
+- **GIVEN** a family of three members
+- **WHEN** an administrator declares a list that omits one of them
+- **THEN** the omitted product no longer belongs to the family
+- **AND** that product's `UpdatedAt` is later than it was before the replace
+
+#### Scenario: A product that enters a family has its UpdatedAt stamped
+- **GIVEN** a family and a product that belongs to no family
+- **WHEN** an administrator declares a list that includes that product
+- **THEN** the product belongs to the family
+- **AND** that product's `UpdatedAt` is later than it was before the replace
+
+#### Scenario: A reorder or label change stamps the products that stayed
+- **GIVEN** a family whose two members are products A then B with labels S and M
+- **WHEN** an administrator declares the same two products in a different order or with swapped labels
+- **THEN** the operation succeeds
+- **AND** both products' `UpdatedAt` values are later than they were before the replace
+
+#### Scenario: An identical list still writes nothing, including Product
+- **GIVEN** a family whose current members, labels and order are I
+- **WHEN** an administrator declares exactly I
+- **THEN** the operation succeeds and returns the same family
+- **AND** no membership row is rewritten
+- **AND** no member product's `UpdatedAt` changes
+
+#### Scenario: A metadata rename does not stamp member products
+- **GIVEN** a family with members
+- **WHEN** an administrator updates only the family's name or description
+- **THEN** the new metadata is persisted
+- **AND** membership rows are left untouched
+- **AND** member products' `UpdatedAt` values are left untouched
+- **AND** the family's own `UpdatedAt` is later than it was before the update
 
 ### Requirement: Variant labels distinguish members within their family
 

@@ -195,6 +195,9 @@ public class ApplicationDbContext : DbContext
             if (entry.State == EntityState.Modified)
             {
                 entry.Entity.UpdatedAt = DateTime.UtcNow;
+                // UpdatedAt is ValueGeneratedOnAddOrUpdate, so EF would otherwise omit it
+                // from the UPDATE and the catalog cursor would never move.
+                entry.Property(entity => entity.UpdatedAt).IsModified = true;
             }
         }
 

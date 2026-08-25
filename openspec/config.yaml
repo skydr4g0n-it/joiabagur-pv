@@ -36,7 +36,7 @@ context: |
 
   Key constraints:
   - Max 5-10 DB connections (connection pooling).
-  - Mandatory pagination on all lists (max 50 items/page).
+  - Mandatory pagination on operator lists (max 50 items/page). Index feeds: catalog 50, POS 200.
   - Frontend bundle < 500KB initial load.
   - Stock cannot be negative (application-level validation).
   - Sale.Price is a snapshot, not a reference to current product price.

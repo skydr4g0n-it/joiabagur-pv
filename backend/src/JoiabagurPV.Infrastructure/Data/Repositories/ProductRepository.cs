@@ -108,6 +108,21 @@ public class ProductRepository : Repository<Product>, IProductRepository
         _context.Products.UpdateRange(products);
         return Task.CompletedTask;
     }
+
+    /// <inheritdoc/>
+    public async Task StampUpdatedAtAsync(IEnumerable<Guid> productIds)
+    {
+        var ids = productIds.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        await _context.Products
+            .Where(product => ids.Contains(product.Id))
+            .ExecuteUpdateAsync(setters => setters.SetProperty(product => product.UpdatedAt, now));
+    }
 }
 
 
