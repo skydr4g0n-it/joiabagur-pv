@@ -30,7 +30,7 @@ tests/
 └── evals/            # harness, metrics, baselines, scenario replays
 ```
 
-Folders are created **on demand**, not up front. `api/`, `config/`, `support/`, `db/`, `migrations/`, `data/` and `enrichment/` are populated; the rest are reserved names so nobody invents a
+Folders are created **on demand**, not up front. `api/`, `config/`, `support/`, `db/`, `migrations/`, `data/`, `enrichment/` and `indexing/` are populated; the rest are reserved names so nobody invents a
 parallel taxonomy later.
 
 ## Which folder for which change
@@ -43,7 +43,7 @@ parallel taxonomy later.
 | `migrations/` | C05 |
 | `data/` | C06b (landed: generate/ingest CLI), C10 (landed: `world/`), C23 |
 | `enrichment/` | C09 |
-| `indexing/` | C11, C13, C22, C23 |
+| `indexing/` | C11 (landed: source-text/v1 + embeddings), C13, C22, C23 |
 | `retrieval/` | C14, C18, C20, C21, C22, C25, C26, C27 |
 | `assist/` | C30, C31, C32, C33, C35 |
 | `evals/` | C24, C38 |

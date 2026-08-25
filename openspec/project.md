@@ -63,7 +63,7 @@
 - **Persistence**: SQLAlchemy 2 (async) over psycopg 3, pgvector types, Alembic migrations in `ai-service/migrations/`
 - **Schema ownership**: `ai` only for the `jbg-ai` runtime process. Host CLIs (C06a `scripts/catalog/`, C06b `python -m jbg_ai.data ingest`, C10 `python -m jbg_ai.data world ingest`) are the documented exception: they use `JPV_PG*` against local Docker and do not run inside the service container.
 - **Connection pool**: capped at `DB_POOL_SIZE` (default 5) with no overflow; built lazily, so the service boots with no database
-- **Runtime LLM**: LiteLLM (`litellm==1.98.0`) for C09 enrichment; `JPV_RAG_LLM_*` optional at boot, required when `STUB_MODE=false` on `POST /v1/enrich/products`. Distinct from `JPV_CATALOG_LLM_*` (C06b CLI).
+- **Runtime LLM**: LiteLLM (`litellm==1.98.0`) for C09 enrichment (`acompletion`) and C11 embeddings (`aembedding`). `JPV_RAG_LLM_*` and `JPV_EMBEDDING_*` optional at boot; required at call time on real enrich / embed. Distinct from `JPV_CATALOG_LLM_*` (C06b CLI). No fallback from embedding key to RAG key.
 
 ### Infrastructure
 - **Containers**: Docker, Docker Compose (development)
@@ -354,3 +354,4 @@ Run the `update-docs` command (skill replicated in `.agent/`, `.claude/`, `.code
 - **C06a catalog corpus**: `data/catalog/real/generated/catalog-real-enriched.jsonl` + `scripts/catalog/README.md` + `Documentos/Proyecto Final AIEng/informes/c06a-catalog-enrichment-report.md`
 - **C06b synthetic corpus**: `data/catalog/synthetic/generated/catalog-synthetic.jsonl` + `ai-service/src/jbg_ai/data/README.md` + `Documentos/Proyecto Final AIEng/informes/c06b-synthetic-catalog-report.md`
 - **C10 synthetic world**: `data/world/pos-profiles.yaml` + `ai-service/src/jbg_ai/data/README.md` + `Documentos/Proyecto Final AIEng/informes/c10-synthetic-world-report.md`
+- **C11 source text & embeddings**: `ai-service/src/jbg_ai/indexing/` (`source-text/v1`, LiteLLM 1536-d). HTTP app does not import it. Live spec `catalog-source-text`.

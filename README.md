@@ -149,6 +149,7 @@ flowchart TB
 - `scripts/catalog/`: pipeline offline de C06a (lectura xlsx, JSONL, ingesta local de `Description`). No forma parte de `jbg-ai`.
 - `ai-service/src/jbg_ai/data/`: CLI C06b (`generate|ingest` de catálogo) y C10 (`world simulate|ingest`). `api.main` no lo importa.
 - `ai-service/src/jbg_ai/enrichment/`: extractor C09 de `POST /v1/enrich/products` (`STUB_MODE=false`). Prompt en `ai-service/prompts/enrichment/v1.md`.
+- `ai-service/src/jbg_ai/indexing/`: biblioteca C11 (`source-text/v1` + cliente LiteLLM 1536d). `api.main` no lo importa; `/v1/index/*` sigue siendo el stub C13.
 - `data/catalog/real/generated/`: corpus JSONL versionado (`data_origin: real`). El xlsx crudo permanece gitignored.
 - `data/catalog/synthetic/generated/`: corpus JSONL sintético (`data_origin: synthetic`; 764 líneas; híbrido 1.200 con el real).
 - `data/world/`: receta YAML de 12 POS (`pos-profiles.yaml`, en git). JSONL de ventas y `pg_dump` gitignored.
