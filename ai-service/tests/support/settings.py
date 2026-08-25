@@ -38,6 +38,10 @@ def build_settings(**overrides: Any) -> Settings:
         "jpv_rag_llm_model": None,
         "jpv_rag_llm_base_url": None,
         "jpv_rag_llm_concurrency": 8,
+        "jpv_embedding_api_key": None,
+        "jpv_embedding_model": None,
+        "jpv_embedding_base_url": None,
+        "jpv_embedding_batch_size": 64,
     }
     values.update(overrides)
     return Settings(**values)

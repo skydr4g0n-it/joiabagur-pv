@@ -223,7 +223,7 @@ Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin e
 | **C08** | `add-product-ai-profile-entity` | .NET 🗄️ | C03 | 🟢 | rev. dec. 3, 5 |
 | **C09** | `add-catalog-enrichment-pipeline` | Python | C06a | 🔴 | rev. dec. 3, 5, **17 ago**, **23 ago · archivado** |
 | **C10** | `add-synthetic-world-simulator` | Python | C06a | 🟢 | rev. dec. 8 |
-| **C11** | `add-source-text-and-embedding-client` | Python | C05, C09 | 🔴 | — |
+| **C11** | `add-source-text-and-embedding-client` | Python | C05, C09 | 🟢 | **25 ago · archivado** |
 | **C12** | `add-dotnet-index-feed-endpoints` | .NET | C07, C08 | 🔴 | **rev. dec. 10** |
 | **C13** | `add-product-document-indexer` | Python | C11, C12 | 🔴 | — |
 | **C14** | `add-vector-retrieval-endpoint` | Python | C13 | 🔴 | — |
@@ -389,12 +389,14 @@ Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin e
 
 ---
 
-#### C11 · `add-source-text-and-embedding-client` 🔴
+#### C11 · `add-source-text-and-embedding-client` 🟢
 
 **Objetivo.** `SourceText` canónico, `SourceHash` e idempotencia. Es lo que hace barato y determinista todo el reindexado.
 **Prereq.** C05, C09 · **Zona.** `ai-service/src/jbg_ai/indexing/`
 **Alcance.** Constructor de `doc_text` con orden fijo, **incluyendo materiales (ordenados alfabéticamente para estabilidad del hash), familia y variante**; `source_hash` SHA-256; cliente de embeddings con reintento, batching y caché por hash; `embedding_model`/`embedding_version`.
 **Tests.** `test_source_text_is_stable_for_same_profile`; `test_material_order_does_not_change_hash`; `test_hash_changes_when_family_changes`; `test_embedding_not_recomputed_when_hash_unchanged`.
+
+**Hecho (2026-08-25).** Biblioteca `jbg_ai.indexing`: plantilla `source-text/v1`, SHA-256 del `doc_text` renderizado, LiteLLM `aembedding` 1536d con caché RAM, batch 64 y backoff 429/5xx. `api.main` no importa el paquete; `/v1/index/*` sigue siendo el stub C13. Spec viva `catalog-source-text`.
 
 ---
 

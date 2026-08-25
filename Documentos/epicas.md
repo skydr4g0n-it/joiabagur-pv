@@ -388,13 +388,14 @@ Construcción del corpus sobre el que opera todo el sistema RAG: perfiles de pro
 - Corpus de conocimiento comercial (materiales, tallas, cuidados, políticas), troceado y citable
 - Generador de mundo sintético (CLI `jbg_ai.data.world`, YAML de 12 POS, Poisson, ingest local) para disponer de inventario y ventas coherentes con el catálogo
 
-**Changes asociados:** C06a (hecho), C06b (hecho), C08, C09 (hecho), C10 (hecho), C11, C23
+**Changes asociados:** C06a (hecho), C06b (hecho), C08, C09 (hecho), C10 (hecho), C11 (hecho), C23
 
 **User Stories:**
 - [HU-AIENG-006a: Ingesta del catálogo real y corpus enriquecido versionado](Historias/AI-Eng/HU-AIENG-006a.md) *(C06a — corpus JSONL + informe)*
 - [HU-AIENG-006b: Ampliación sintética del catálogo — LLM, colecciones nuevas e ingesta local](Historias/AI-Eng/HU-AIENG-006b.md) *(C06b — hecho; CLI en `jbg_ai.data`; sin familias)*
 - [HU-AIENG-009: Pipeline de enriquecimiento del catálogo — extracción estructurada con vocabularios cerrados](Historias/AI-Eng/HU-AIENG-009.md) *(C09 — hecho; extractor real de `POST /v1/enrich/products`)*
 - [HU-AIENG-010: Simulador de mundo sintético — POS, inventario e histórico de ventas](Historias/AI-Eng/HU-AIENG-010.md) *(C10 — hecho; CLI `world simulate` / `world ingest`; YAML en git, JSONL gitignored)*
+- [HU-AIENG-011: SourceText canónico y cliente de embeddings con idempotencia por hash](Historias/AI-Eng/HU-AIENG-011.md) *(C11 — hecho; biblioteca `jbg_ai.indexing`, sin HTTP ni SQL)*
 
 **Entregable C06a.** El corpus versionado vive en [`data/catalog/real/generated/catalog-real-enriched.jsonl`](../data/catalog/real/generated/catalog-real-enriched.jsonl) (sidecar `.meta.json` al lado; `generator_version` `c06a-assist/v2`). Cada línea lleva identidad + `data_origin` / `text_provenance` / `text_quality_tier` (`rich` / `sparse` / `original`); **no** emite `variant_group_key`, `variant_label` ni `family_seed`. La pasada de vendedor, los ratios y la limitación §15 están en [`Proyecto Final AIEng/informes/c06a-catalog-enrichment-report.md`](Proyecto%20Final%20AIEng/informes/c06a-catalog-enrichment-report.md). Los scripts son el pipeline offline [`scripts/catalog/`](../scripts/catalog/). El xlsx crudo sigue gitignored.
 
@@ -403,6 +404,8 @@ Construcción del corpus sobre el que opera todo el sistema RAG: perfiles de pro
 **Entregable C09 (extractor).** `POST /v1/enrich/products` con `STUB_MODE=false` corre el pipeline en [`ai-service/src/jbg_ai/enrichment/`](../ai-service/src/jbg_ai/enrichment/) (vocabularios YAML, talla por regex `Name` > `Description`, LiteLLM temp 0, confianza por span). Prompt [`ai-service/prompts/enrichment/v1.md`](../ai-service/prompts/enrichment/v1.md); `prompt_version = enrichment/v1`. Las puertas de lote (unicidad de SKU, vocabulario, cobertura de tags por estrato) viven en el auditor, **fuera del HTTP**: el POST de 50 no responde 422 por esas cifras. Compose y el snapshot se quedan en `STUB_MODE=true` hasta que haya `JPV_RAG_LLM_API_KEY`.
 
 **Entregable C10 (mundo).** Receta en [`data/world/pos-profiles.yaml`](../data/world/pos-profiles.yaml) (`generator_version` `c10-world/v1`, semilla `20260823`). CLI `python -m jbg_ai.data world simulate|ingest` en [`ai-service/src/jbg_ai/data/world/`](../ai-service/src/jbg_ai/data/README.md). Ingesta Docker (`:5433` / `joiabagur_pv`): 12 POS, 3 operadores, 6.720 inventario, 22.961 ventas; `"Products"` intacto. Informe: [`Proyecto Final AIEng/informes/c10-synthetic-world-report.md`](Proyecto%20Final%20AIEng/informes/c10-synthetic-world-report.md). JSONL y dump **gitignored**. `is_supply_source` solo en YAML (columna SQL = C19).
+
+**Entregable C11 (biblioteca de indexación).** Paquete [`ai-service/src/jbg_ai/indexing/`](../ai-service/src/jbg_ai/indexing/) — constructor `source-text/v1` (`build_source_text` / `hash_source_text`) y cliente LiteLLM de embeddings 1536d con caché in-memory, *batch* 64 y backoff. **Sin HTTP ni SQL:** `jbg_ai.api.main` no importa `indexing`; `/v1/index/*` sigue siendo el stub de C13. `JPV_EMBEDDING_*` no bloquean `/health` y no caen a `JPV_RAG_LLM_API_KEY`. Tests en [`ai-service/tests/indexing/`](../ai-service/tests/indexing/). Change OpenSpec [`add-source-text-and-embedding-client`](../openspec/changes/archive/2026-08-25-add-source-text-and-embedding-client/).
 
 ---
 

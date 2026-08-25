@@ -227,3 +227,44 @@ def test_canonical_openapi_settings_pin_rag_keys_to_absent() -> None:
     assert settings.jpv_rag_llm_model is None
     assert settings.jpv_rag_llm_base_url is None
     assert settings.jpv_rag_llm_concurrency == 8
+
+
+def test_settings_do_not_require_embedding_key_to_boot(monkeypatch: pytest.MonkeyPatch) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.delenv("JPV_EMBEDDING_API_KEY", raising=False)
+    monkeypatch.delenv("JPV_EMBEDDING_MODEL", raising=False)
+    monkeypatch.delenv("JPV_EMBEDDING_BASE_URL", raising=False)
+    monkeypatch.delenv("JPV_EMBEDDING_BATCH_SIZE", raising=False)
+    get_settings.cache_clear()
+
+    settings = get_settings()
+
+    assert settings.jpv_embedding_api_key is None
+    assert settings.jpv_embedding_model is None
+    assert settings.jpv_embedding_base_url is None
+    assert settings.jpv_embedding_batch_size == 64
+
+
+def test_blank_embedding_strings_are_treated_as_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.setenv("JPV_EMBEDDING_API_KEY", "   ")
+    monkeypatch.setenv("JPV_EMBEDDING_MODEL", "")
+    monkeypatch.setenv("JPV_EMBEDDING_BASE_URL", " ")
+    monkeypatch.setenv("JPV_EMBEDDING_BATCH_SIZE", "")
+    get_settings.cache_clear()
+
+    settings = get_settings()
+
+    assert settings.jpv_embedding_api_key is None
+    assert settings.jpv_embedding_model is None
+    assert settings.jpv_embedding_base_url is None
+    assert settings.jpv_embedding_batch_size == 64
+
+
+def test_canonical_openapi_settings_pin_embedding_keys_to_absent() -> None:
+    settings = canonical_openapi_settings()
+
+    assert settings.jpv_embedding_api_key is None
+    assert settings.jpv_embedding_model is None
+    assert settings.jpv_embedding_base_url is None
+    assert settings.jpv_embedding_batch_size == 64
