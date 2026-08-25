@@ -444,6 +444,9 @@ El corazón del Proyecto Final. Búsqueda que combina la rama vectorial y la lé
 
 **Changes asociados:** C12, C13, C14, C15, C16, C20, C21, C22, C25
 
+**User Stories:**
+- [HU-AIENG-012: Feeds HTTP de indexación con cursor, tombstones y autenticación de servicio](Historias/AI-Eng/HU-AIENG-012.md) *(C12 — change abierto `add-dotnet-index-feed-endpoints`; feeds .NET, sin sync Python)*
+
 ---
 
 ## Épica 15: Venta Asistida, Sustitutos y Agentes
@@ -524,7 +527,7 @@ Se miden por *changes* de OpenSpec, no por número de historias: la serie `HU-AI
 | Épica | Descripción Breve | Changes | Ruta crítica |
 |-------|-------------------|---------|--------------|
 | **EP11** | Plataforma del Servicio de IA | C01, C02, C03, C05, C17 | 🔴 completa |
-| **EP12** | Corpus y Enriquecimiento del Catálogo | C06a (hecho), C06b (hecho), C08, C09 (hecho), C10 (hecho), C11, C23 | 🔴 parcial |
+| **EP12** | Corpus y Enriquecimiento del Catálogo | C06a (hecho), C06b (hecho), C08, C09 (hecho), C10 (hecho), C11 (hecho), C23 | 🔴 parcial |
 | **EP13** | Familias de Producto y Desambiguación | C07, C18, C28 | 🟢 |
 | **EP14** | Búsqueda Semántica Híbrida | C12, C13, C14, C15, C16, C20, C21, C22, C25 | 🔴 mayoritaria |
 | **EP15** | Venta Asistida, Sustitutos y Agentes | C26, C27, C30, C31, C32, C34, C36 | 🔴 parcial |
