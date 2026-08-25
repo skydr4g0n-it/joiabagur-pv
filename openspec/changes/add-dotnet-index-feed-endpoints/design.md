@@ -227,13 +227,15 @@ El mismo valor viaja en **todas** las páginas de esa lectura. Cambia si un prod
 
 **Decisión:** en `ReplaceMembersAsync`, **después** de calcular altas y bajas y **antes** o junto al `SaveChanges` de miembros:
 
-1. Productos que **salen**: cargar `Product`, `EntityState.Modified` (o un no-op que dispare el interceptor de `UpdatedAt` en `ApplicationDbContext.SaveChangesAsync`).
+1. Productos que **salen**: sellar `Product.UpdatedAt`.
 2. Productos que **entran**: igual, por si su `UpdatedAt` de catálogo es más antiguo que el cursor de C13.
 3. Cortocircuito `AlreadyMatches`: **cero** escrituras, incluido Product. El comentario actual ya dice que reescribir miembros entregaría al feed un cambio que no ocurrió; ahora el mismo argumento cubre Product.
 4. Reorder / cambio de `variantLabel` (mismos `productId`, distinta lista): las altas/bajas de id pueden ser vacías, pero los miembros **sí** se reescriben. Marcar los productos de la lista declarada: su `variantLabel` denormalizado en el índice cambió.
-5. Rename de metadatos (`Update` de nombre/descripción): el `Modified` de `ProductFamily` ya sella `Family.UpdatedAt`; el feed une por ahí. **No** marcar miembros.
+5. Rename de metadatos (`Update` de nombre/descripción): sellar `Family.UpdatedAt`; el feed une por ahí. **No** marcar miembros.
 
 Un `DELETE` de `ProductFamilyMember` **no** toca `Product` por sí solo. Hay que cargar y marcar. No hay navegación `Product → Members`; el servicio ya tiene los ids de la lista anterior y de la declarada.
+
+**Cómo se sella.** `UpdatedAt` está mapeado con `ValueGeneratedOnAddOrUpdate()`, así que un `UPDATE` del change tracker **omite** la columna aunque el interceptor de `SaveChangesAsync` asigne `UtcNow` en memoria. Marcar `EntityState.Modified` no basta y cambiar el mapping abriría diferencia de modelo (fuera de alcance). El sello es `ExecuteUpdateAsync` (`IProductRepository.StampUpdatedAtAsync` / `IProductFamilyRepository.StampUpdatedAtAsync`): equivalente a esta decisión, sin migración. El rename llama al sello de familia por la misma razón.
 
 **Por qué no outbox.** C07 dejó los índices `UpdatedAt` precisamente para este join. El §6.3 ya eligió el watermark.
 
@@ -281,7 +283,7 @@ Runbook `Documentos/Proyecto Final AIEng/informes/c12-catalog-autobulk-runbook.m
 
 - **[Riesgo] Un JWT de usuario o un token C03 abre el feed.** → Mitigación: el controlador no usa `[Authorize]`; el filtro exige `X-Index-Feed-Key`; test de 401 con cliente fresco; fail-fast si la key es corta o falta; tercer secreto, no `AiGateway:JwtSecret`.
 - **[Riesgo] La API Key se loguea o se cuela en Scalar.** → Mitigación: no loguear el header; placeholder local distinto de producción; C17 la pone en SSM.
-- **[Riesgo] Producto que sale de una familia no reindexa.** → Mitigación: marcar `Product` Modified de altas y bajas; test dedicado. C07 lo dejó escrito.
+- **[Riesgo] Producto que sale de una familia no reindexa.** → Mitigación: `StampUpdatedAtAsync` (`ExecuteUpdate`) de altas y bajas; test dedicado de escritura y GET de catálogo. C07 lo dejó escrito.
 - **[Riesgo] Rename de familia no reindexa a los que quedan.** → Mitigación: el JOIN usa `Family.UpdatedAt`; no hace falta tocar miembros.
 - **[Riesgo] Lista idéntica ensucia watermarks y C13 reembebe de balde.** → Mitigación: cortocircuito ya existente, extendido a Product.
 - **[Riesgo] Cursor de un solo timestamp pierde empates.** → Mitigación: keyset `(watermark, id)`.

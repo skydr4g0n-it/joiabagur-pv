@@ -4,6 +4,8 @@ using System.Text.Json;
 using FluentAssertions;
 using JoiabagurPV.Application.Configuration;
 using JoiabagurPV.Application.DTOs.Ai;
+using JoiabagurPV.Application.DTOs.Auth;
+using JoiabagurPV.Application.DTOs.Products;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Enums;
 using JoiabagurPV.Infrastructure.Data;
@@ -20,6 +22,7 @@ public class AiIndexFeedCatalogTests : IAsyncLifetime
     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
 
     private const string Catalog = "/api/ai/index-feed/catalog";
+    private const string Families = "/api/product-families";
 
     private readonly ApiWebApplicationFactory _factory;
     private readonly HttpClient _client;
@@ -180,6 +183,84 @@ public class AiIndexFeedCatalogTests : IAsyncLifetime
         item.GetProperty("materials").ValueKind.Should().Be(JsonValueKind.Array);
     }
 
+    [Fact]
+    public async Task CatalogFeed_Upsert_MapsSourceTextAndIdentifiers()
+    {
+        var collection = await SeedCollectionAsync("Colección feed");
+        var product = await SeedApprovedAsync(
+            "SKU-FEED-MAP-FULL",
+            29.99m,
+            name: "Anillo erizo",
+            collectionId: collection.Id);
+        var familyId = await CreateFamilyAsync("Anillo erizo de mar", ("S", product));
+
+        var page = await GetCatalogAsync();
+        var item = page.Items.Single(i => IdOf(i) == product.Id);
+
+        KindOf(item).Should().Be(IndexFeedKinds.Upsert);
+        item.GetProperty("sku").GetString().Should().Be("SKU-FEED-MAP-FULL");
+        item.GetProperty("name").GetString().Should().Be("Anillo erizo");
+        item.GetProperty("productId").GetGuid().Should().Be(product.Id);
+        item.GetProperty("familyId").GetGuid().Should().Be(familyId);
+        item.GetProperty("familyName").GetString().Should().Be("Anillo erizo de mar");
+        item.GetProperty("variantLabel").GetString().Should().Be("S");
+        item.GetProperty("collectionName").GetString().Should().Be("Colección feed");
+        item.GetProperty("priceBand").GetString().Should().Be("lt-30");
+        item.GetProperty("materials").ValueKind.Should().Be(JsonValueKind.Array);
+    }
+
+    [Fact]
+    public async Task CatalogFeed_AfterReplaceMembers_EmitsLeavingProduct()
+    {
+        var stayer = await SeedApprovedAsync("SKU-FEED-STAY", 40m);
+        var leaver = await SeedApprovedAsync("SKU-FEED-LEAVE", 50m);
+        var familyId = await CreateFamilyAsync("Familia cursor", ("S", stayer), ("M", leaver));
+
+        var before = await GetCatalogAsync();
+        var leaverItem = before.Items.Single(i => IdOf(i) == leaver.Id);
+        leaverItem.GetProperty("familyId").GetGuid().Should().Be(familyId);
+
+        var admin = await AuthenticateAdminAsync();
+        var replace = await admin.PutAsJsonAsync(
+            $"{Families}/{familyId}/members",
+            new ReplaceFamilyMembersRequest
+            {
+                Members = [new ProductFamilyMemberRequest { ProductId = stayer.Id, VariantLabel = "S" }]
+            });
+        replace.EnsureSuccessStatusCode();
+
+        var after = await GetCatalogAsync(SinceOf(leaverItem), leaver.Id);
+        var emitted = after.Items.Single(i => IdOf(i) == leaver.Id);
+        KindOf(emitted).Should().Be(IndexFeedKinds.Upsert);
+        emitted.TryGetProperty("familyId", out var familyIdJson).Should().BeTrue();
+        familyIdJson.ValueKind.Should().Be(JsonValueKind.Null);
+        SinceOf(emitted).Should().BeAfter(SinceOf(leaverItem));
+    }
+
+    [Fact]
+    public async Task CatalogFeed_AfterFamilyRename_EmitsMembersViaFamilyWatermark()
+    {
+        var product = await SeedApprovedAsync("SKU-FEED-RENAME", 40m);
+        var familyId = await CreateFamilyAsync("Nombre viejo", ("S", product));
+
+        var before = await GetCatalogAsync();
+        var item = before.Items.Single(i => IdOf(i) == product.Id);
+        var productWatermarkBefore = await ProductUpdatedAtAsync(product.Id);
+
+        var admin = await AuthenticateAdminAsync();
+        var rename = await admin.PutAsJsonAsync(
+            $"{Families}/{familyId}",
+            new UpdateProductFamilyRequest { Name = "Nombre nuevo" });
+        rename.EnsureSuccessStatusCode();
+
+        var after = await GetCatalogAsync(SinceOf(item), product.Id);
+        var emitted = after.Items.Single(i => IdOf(i) == product.Id);
+        KindOf(emitted).Should().Be(IndexFeedKinds.Upsert);
+        emitted.GetProperty("familyId").GetGuid().Should().Be(familyId);
+        emitted.GetProperty("familyName").GetString().Should().Be("Nombre nuevo");
+        (await ProductUpdatedAtAsync(product.Id)).Should().Be(productWatermarkBefore);
+    }
+
     private static HttpClient FeedClient(ApiWebApplicationFactory factory)
     {
         var client = factory.CreateClient();
@@ -200,13 +281,33 @@ public class AiIndexFeedCatalogTests : IAsyncLifetime
         return (await response.Content.ReadFromJsonAsync<FeedPage>(Json))!;
     }
 
-    private async Task<Product> SeedApprovedAsync(string sku, decimal price) =>
-        await SeedProfileAsync(sku, price, ProfileReviewStatus.Approved);
+    private async Task<Product> SeedApprovedAsync(
+        string sku,
+        decimal price,
+        string? name = null,
+        Guid? collectionId = null) =>
+        await SeedProfileAsync(sku, price, ProfileReviewStatus.Approved, name, collectionId);
 
-    private async Task<Product> SeedProfileAsync(string sku, decimal price, ProfileReviewStatus status)
+    private async Task<Product> SeedProfileAsync(
+        string sku,
+        decimal price,
+        ProfileReviewStatus status,
+        string? name = null,
+        Guid? collectionId = null)
     {
         using var mother = new TestDataMother(_factory.Services);
-        var product = await mother.Product().WithSku(sku).WithPrice(price).CreateAsync();
+        var builder = mother.Product().WithSku(sku).WithPrice(price);
+        if (name is not null)
+        {
+            builder = builder.WithName(name);
+        }
+
+        if (collectionId is not null)
+        {
+            builder = builder.WithCollection(collectionId.Value);
+        }
+
+        var product = await builder.CreateAsync();
 
         mother.Context.ProductAiProfiles.Add(new ProductAiProfile
         {
@@ -237,6 +338,66 @@ public class AiIndexFeedCatalogTests : IAsyncLifetime
             : item.GetProperty("at").GetDateTime();
 
     private static IEnumerable<Guid> IdsOf(FeedPage page) => page.Items.Select(IdOf);
+
+    private async Task<Collection> SeedCollectionAsync(string name)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var collection = new Collection { Name = name };
+        context.Collections.Add(collection);
+        await context.SaveChangesAsync();
+        return collection;
+    }
+
+    private async Task<Guid> CreateFamilyAsync(string name, params (string? Label, Product Product)[] members)
+    {
+        var admin = await AuthenticateAdminAsync();
+        var response = await admin.PostAsJsonAsync(Families, new CreateProductFamilyRequest
+        {
+            Name = name,
+            Members = members
+                .Select(member => new ProductFamilyMemberRequest
+                {
+                    ProductId = member.Product.Id,
+                    VariantLabel = member.Label
+                })
+                .ToList()
+        });
+        response.EnsureSuccessStatusCode();
+        var family = await response.Content.ReadFromJsonAsync<ProductFamilyDto>();
+        return family!.Id;
+    }
+
+    private async Task<HttpClient> AuthenticateAdminAsync()
+    {
+        var loginClient = _factory.CreateClient();
+        var login = await loginClient.PostAsJsonAsync(
+            "/api/auth/login",
+            new LoginRequest { Username = "admin", Password = "Admin123!" });
+        login.EnsureSuccessStatusCode();
+
+        var admin = _factory.CreateClient();
+        foreach (var cookie in login.Headers.GetValues("Set-Cookie"))
+        {
+            var parts = cookie.Split(';')[0].Split('=');
+            if (parts.Length == 2)
+            {
+                admin.DefaultRequestHeaders.Add("Cookie", $"{parts[0]}={parts[1]}");
+            }
+        }
+
+        return admin;
+    }
+
+    private async Task<DateTime> ProductUpdatedAtAsync(Guid productId)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await context.Products
+            .Where(product => product.Id == productId)
+            .Select(product => product.UpdatedAt)
+            .SingleAsync();
+    }
 
     private sealed class FeedPage
     {

@@ -38,9 +38,9 @@
 
 ## 6. Tests de integración y de esquema
 
-- [x] 6.1 Integración del catálogo (cliente con header de API Key; Testcontainers): `CatalogFeed_WithSinceCursor_ReturnsOnlyChangedRows`; `CatalogFeed_EmitsTombstoneWhenProductDeactivated`; `CatalogFeed_ExcludesUnapprovedProfiles`; `CatalogFeed_NeverApprovedProduct_IsAbsent`; `CatalogFeed_EmitsTombstoneWhenProfileUnapproved`; `Feed_ReturnsAggregateHashForDriftDetection` (mismo hash en dos páginas; cambia al salir un indexable); página ≤ 50; payload sin `dataOrigin` / `quantity`. **Validación:** esos tests verdes.
+- [x] 6.1 Integración del catálogo (cliente con header de API Key; Testcontainers): `CatalogFeed_WithSinceCursor_ReturnsOnlyChangedRows`; `CatalogFeed_EmitsTombstoneWhenProductDeactivated`; `CatalogFeed_ExcludesUnapprovedProfiles`; `CatalogFeed_NeverApprovedProduct_IsAbsent`; `CatalogFeed_EmitsTombstoneWhenProfileUnapproved`; `Feed_ReturnsAggregateHashForDriftDetection` (mismo hash en dos páginas; cambia al salir un indexable); página ≤ 50; payload sin `dataOrigin` / `quantity`. Tras verify: `CatalogFeed_Upsert_MapsSourceTextAndIdentifiers`; `CatalogFeed_AfterReplaceMembers_EmitsLeavingProduct`; `CatalogFeed_AfterFamilyRename_EmitsMembersViaFamilyWatermark`. **Validación:** esos tests verdes.
 
-- [x] 6.2 Integración de auth con **cliente HTTP fresco**: `Feed_WithUserJwt_Returns401`; `Feed_WithC03Token_Returns401`; `Feed_MissingApiKey_Returns401`; `Feed_WrongApiKey_Returns401`; `Feed_WithValidApiKey_Returns200`. No reutilizar el `HttpClient` de login. **Validación:** 401 (no 403) en los cuatro negativos; 200 con la key.
+- [x] 6.2 Integración de auth con **cliente HTTP fresco**: `Feed_WithUserJwt_Returns401`; `Feed_WithC03Token_Returns401`; `Feed_MissingApiKey_Returns401`; `Feed_WrongApiKey_Returns401`; `Feed_WithValidApiKey_Returns200`. Tras verify: `Feed_WithPreviousApiKey_Returns200`. No reutilizar el `HttpClient` de login. **Validación:** 401 (no 403) en los cuatro negativos; 200 con la key y con `ApiKeyPrevious`.
 
 - [x] 6.3 Integración del POS: `PosAvailabilityFeed_ReturnsBucketNotExactQuantity` (0 / 1-2 / 3+ y JSON sin `quantity`); `PosAvailabilityFeed_Unassigned_EmitsTombstone`; `PosAvailabilityFeed_SalesWindows_DoNotSubtractReturns`; `PosAvailabilityFeed_PageSize_Is200`. **Validación:** esos tests verdes; catálogo sigue en 50.
 

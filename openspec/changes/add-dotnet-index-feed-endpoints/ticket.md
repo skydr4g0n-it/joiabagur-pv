@@ -58,7 +58,7 @@ Auth: reutilizar `AiGateway:JwtSecret` haría válidos los tokens C03 que Python
 | `JoiabagurPV.Application/Configuration/` | `IndexFeedOptions` (`ApiKey`, `ApiKeyPrevious`), validación al arranque (≥ 32 bytes) |
 | `JoiabagurPV.Application/DTOs/Ai/` | DTOs de catálogo y POS (`kind`, cursor, `aggregateHash`) |
 | `JoiabagurPV.Application/Services/` | `IndexFeedService` (o equivalente) + `PriceBand.From(decimal)` `price-band/v1` |
-| `JoiabagurPV.Application/Services/ProductFamilyService.cs` | Tras `ReplaceMembers`, marcar `Modified` los `Product` que entran **y salen** |
+| `JoiabagurPV.Application/Services/ProductFamilyService.cs` | Tras `ReplaceMembers`, sellar `Product.UpdatedAt` de altas y bajas vía `ExecuteUpdateAsync` |
 | `JoiabagurPV.Infrastructure/Data/Repositories/` | Consultas keyset (catálogo y POS). Sin migración |
 | `backend/.env.example` · `appsettings*.json` | `IndexFeed:ApiKey` (placeholder local). Producción: SSM en **C17**, no aquí |
 | `JoiabagurPV.Tests/` | Unitarios de banda y hash; integración de feeds y 401 (cliente fresco) |
@@ -117,11 +117,11 @@ Clase pura, sin HTTP ni EF. Cortes cerrados en la HU. Precio &lt; 0 no debería 
 
 En `ReplaceMembersAsync`, **después** de calcular altas y bajas y **antes** o junto al `SaveChanges` de miembros:
 
-1. Productos que salen: cargar `Product`, `EntityState.Modified` (o asignar un no-op que dispare el interceptor de `UpdatedAt`).
+1. Productos que salen: sellar `Product.UpdatedAt`.
 2. Productos que entran: igual, por si su `UpdatedAt` de catálogo es antiguo.
 3. Cortocircuito idéntico: **cero** escrituras, incluido Product.
 
-Rename de metadatos: el `Modified` de `ProductFamily` ya sella `Family.UpdatedAt`; el feed une por ahí. No amplificar miembros.
+El sello es `ExecuteUpdateAsync` (`StampUpdatedAtAsync`): `UpdatedAt` es `ValueGeneratedOnAddOrUpdate`, así que un `UPDATE` del tracker omite la columna. Rename de metadatos: sellar `Family.UpdatedAt`; el feed une por ahí. No amplificar miembros.
 
 ### Hash agregado
 
@@ -290,3 +290,4 @@ Default si el apply descubre un detalle menor no listado: la opción más estrec
 | Fecha | Autor | Cambio |
 |---|---|---|
 | 2026-08-25 | `/enrich-us` | Creación a partir de HU-AIENG-012 y de la exploración. Recoge: pull sin push, sin migración, API Key, `price-band/v1`, POS 200, tombstones por `kind`/`reason`, UpdatedAt de altas/bajas, `data_origin`/`text_provenance` fuera, *runbook* AutoBulk como entregable y la corrida fuera |
+| 2026-08-25 | `/opsx:verify` follow-up | Sello de familia documentado como `ExecuteUpdateAsync` (`UpdatedAt` es `ValueGeneratedOnAddOrUpdate`; el tracker omite la columna) |

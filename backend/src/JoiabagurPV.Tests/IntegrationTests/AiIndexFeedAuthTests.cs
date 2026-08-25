@@ -7,6 +7,7 @@ using JoiabagurPV.Application.DTOs.Ai;
 using JoiabagurPV.Application.DTOs.Auth;
 using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Tests.TestHelpers;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JoiabagurPV.Tests.IntegrationTests;
@@ -93,6 +94,19 @@ public class AiIndexFeedAuthTests : IAsyncLifetime
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(IndexFeedOptions.HeaderName, IndexFeedTestKeys.ApiKey);
+
+        var response = await client.GetAsync(Catalog);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Feed_WithPreviousApiKey_Returns200()
+    {
+        using var factory = _factory.WithWebHostBuilder(builder =>
+            builder.UseSetting("IndexFeed:ApiKeyPrevious", IndexFeedTestKeys.PreviousApiKey));
+
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(IndexFeedOptions.HeaderName, IndexFeedTestKeys.PreviousApiKey);
 
         var response = await client.GetAsync(Catalog);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
