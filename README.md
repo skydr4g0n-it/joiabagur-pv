@@ -223,7 +223,7 @@ Otras entidades (ProductPhoto, PaymentMethod, PointOfSalePaymentMethod, Return, 
 
 ## 4. Especificación de la API
 
-A continuación se describen tres endpoints principales en formato OpenAPI (resumen). La API base es `/api` y requiere cabecera `Authorization: Bearer <token>` para endpoints protegidos.
+A continuación se describen tres endpoints principales en formato OpenAPI (resumen). La API base es `/api` y requiere cabecera `Authorization: Bearer <token>` para endpoints protegidos, salvo `GET /api/ai/index-feed/*`, que autentica con `X-Index-Feed-Key`.
 
 ### POST /api/sales — Crear venta
 

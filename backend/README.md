@@ -243,8 +243,11 @@ The system has two roles:
 | `PUT /api/product-families/{id}` | ✅ | ❌ |
 | `PUT /api/product-families/{id}/members` | ✅ | ❌ |
 | `GET /api/products/{id}/family` | ✅ | ✅ |
+| `GET /api/ai/index-feed/catalog` | ❌† | ❌† |
+| `GET /api/ai/index-feed/pos-availability` | ❌† | ❌† |
 
 *Operators see only their assigned points of sale
+† Service API key `X-Index-Feed-Key` only. A user JWT, an `access_token` cookie or a C03 token is **401**.
 **Ownership, not role: only the operator who ran that search may record its selection
 
 ### Product families
@@ -265,7 +268,9 @@ Membership is **declarative, not incremental**. Whatever is absent from the list
 member, each member's position comes from its place in the list — so gaps and duplicate positions
 cannot be expressed — and an empty list dissolves the family without deleting it. Declaring the list
 a family already has writes nothing, which keeps the indexing feed from being handed a change that
-did not happen.
+did not happen. Products that enter or leave (and stayers on a reorder or label change) get
+`Product.UpdatedAt` stamped via `ExecuteUpdateAsync`, so the catalog feed cursor can see them. A
+metadata rename stamps the family only.
 
 A product belongs to **at most one family**, enforced by a unique index rather than by a check in
 code. Declaring one that belongs elsewhere returns `409` naming the products that clash and the
@@ -528,8 +533,12 @@ OpenAPI documentation is served with Scalar (not Swagger UI) at `/scalar/v1` whe
 | `Jwt__RefreshTokenExpirationHours` | Refresh token expiry | 8 |
 | `AiGateway__BaseUrl` | Address of the `jbg-ai` service | Required |
 | `AiGateway__JwtSecret` | HS256 secret for the internal service token — must match the service's `JWT_SECRET` literally | Required |
+| `IndexFeed__ApiKey` | Service key for `GET /api/ai/index-feed/*` (`X-Index-Feed-Key`). Distinct from `Jwt__SecretKey` and `AiGateway__JwtSecret`. Min 32 characters | Required |
+| `IndexFeed__ApiKeyPrevious` | Previous key during rotation. Empty = unset | Optional |
 
 `AiGateway` is validated at start-up, not on first use: if the base address is missing or is not an absolute http/https URI, or the secret is absent or shorter than 32 characters, **the API does not start** and the error names the offending key. That is deliberate — a mismatched secret makes `jbg-ai` answer 401 without disclosing why, so the fault is caught at boot instead of during a request. Set `AiGateway__Enabled=false` to skip registering the client altogether.
+
+`IndexFeed:ApiKey` is validated the same way: missing or shorter than 32 characters stops the host. An empty `IndexFeed:ApiKeyPrevious` is unset; a short non-empty previous key also fails at start-up.
 
 The address differs by environment and neither value is the obvious one: `http://localhost:8001` in development, because the API runs on the host and only sees the port Compose publishes, and `http://jbg-ai:8000` in production, where both containers share a Docker network.
 
