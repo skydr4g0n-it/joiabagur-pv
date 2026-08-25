@@ -157,6 +157,30 @@ def test_retry_on_429() -> None:
     assert len(result.vectors[0]) == EMBEDDING_DIM
 
 
+def test_retry_on_5xx() -> None:
+    calls = {"n": 0}
+
+    async def _batch(texts: list[str]) -> list[list[float]]:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            error = RuntimeError("provider unavailable")
+            error.status_code = 500  # type: ignore[attr-defined]
+            raise error
+        return [[0.0] * EMBEDDING_DIM for _ in texts]
+
+    sleeps: list[float] = []
+
+    async def _sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    client = LiteLlmEmbeddingClient(api_key="sk-test", embed_batch=_batch, sleep=_sleep)
+    result = asyncio.run(client.embed(["anillo"]))
+
+    assert calls["n"] == 2
+    assert sleeps == [0.25]
+    assert len(result.vectors[0]) == EMBEDDING_DIM
+
+
 def test_main_does_not_import_indexing() -> None:
     source = Path(
         __import__("jbg_ai.api.main", fromlist=["main"]).__file__

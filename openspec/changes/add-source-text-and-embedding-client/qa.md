@@ -22,7 +22,7 @@
 
 | Ejecución | Resultado |
 |---|---|
-| Alcance C11 (`tests/indexing` + `tests/config` + `test_health.py` + `test_openapi_snapshot.py`) | **48 passed, 0 failed** (1 warning Starlette/httpx ajeno a C11) |
+| Alcance C11 (`tests/indexing` + `tests/config` + `test_health.py` + `test_openapi_snapshot.py`) | **49 passed, 0 failed** (1 warning Starlette/httpx ajeno a C11). Primera pasada de implementación: 48; el +1 es `test_retry_on_5xx` tras `/opsx:verify` |
 | Primera pasada del mismo alcance, **antes** de quitar el `forbid_network` autouse | **8 failed** — `asyncio.run` en Windows abre `socketpair`/`connect` (ver §8) |
 | `openspec validate --all --strict` | **39 passed, 0 failed** |
 
@@ -38,8 +38,8 @@ uv run --system-certs pytest tests/indexing tests/config tests/api/test_health.p
 
 | Fichero | Nº | Qué cubre |
 |---|---|---|
-| `tests/indexing/test_source_text.py` | 9 | Constante `source-text/v1`, DTO (sku/name, `extra=forbid`), estabilidad byte a byte, orden de materiales/tags, familia, ausentes, precio fuera, UUID de familia fuera |
-| `tests/indexing/test_embeddings.py` | 11 | Version keys, caché, dimensión 384/3072, batch 64, LiteLLM ≠ data/enrich, clave propia, 4xx sin retry, retry 429, `api.main` sin import, stub C13, cero sockets |
+| `tests/indexing/test_source_text.py` | 9 | Constante `source-text/v1`, DTO (sku/name, `extra=forbid`), estabilidad byte a byte, orden de materiales/tags (incluye `occasion_tags`), familia, ausentes, precio fuera, UUID de familia fuera |
+| `tests/indexing/test_embeddings.py` | 12 | Version keys, caché, dimensión 384/3072, batch 64, LiteLLM ≠ data/enrich, clave propia, 4xx sin retry, retry 429, retry 5xx, `api.main` sin import, stub C13, cero sockets |
 | `tests/config/test_settings.py` (ampliado) | +3 | Embedding key no bloquea boot, strings en blanco = unset, `canonical_openapi_settings` pinna embeddings a `None` / batch 64 |
 | `tests/api/test_health.py` (ampliado) | +1 | `GET /health` 200 sin `JPV_EMBEDDING_*` |
 
@@ -56,7 +56,7 @@ uv run --system-certs pytest tests/indexing tests/config tests/api/test_health.p
 | Canonical source text is byte-stable · The same profile produces the same doc_text | `test_source_text_is_stable_for_same_profile` · `test_source_text_version_constant` | ✅ |
 | Source hash is SHA-256 of the rendered document · Hash matches the rendered UTF-8 document | `test_source_text_is_stable_for_same_profile` (`digest == sha256(doc_text.encode("utf-8")).hexdigest()`, 64 hex minúsculas) | ✅ |
 | Material and tag order · Reordered materials share a hash | `test_material_order_does_not_change_hash` (`Materiales: oro, plata`) | ✅ |
-| Material and tag order · Reordered commercial tags share a hash | misma función, rama de `color_tags` / `style_tags` | ✅ |
+| Material and tag order · Reordered commercial tags share a hash | misma función, rama de `color_tags` / `style_tags` / `occasion_tags` (`Ocasiones: diario, fiesta`) | ✅ |
 | Family name change · Introducing a family name changes the hash | `test_hash_changes_when_family_changes` | ✅ |
 | Family name change · Family UUID is not written | `test_family_id_uuid_is_not_in_source_text` · `test_dto_forbids_price_and_provenance_fields` (`family_id` rechazado por `extra=forbid`) | ✅ |
 | Absent fields omitted · Empty optional fields leave no labelled line | `test_absent_fields_are_omitted_not_sentinel` (sin `Piedra:`/`Talla:`/`Familia:`/`Colores:`/`Estilo:`/`Ocasiones:`/`Materiales:`; sin `ninguna`/`n/a`) | ✅ |
@@ -101,7 +101,7 @@ Lista de la ficha C11 y de [ticket.md](ticket.md). Todos existen como `def test_
 | `test_unit_suite_makes_no_provider_calls` | `test_embeddings.py` |
 | `test_openapi_snapshot_is_stable` | `test_openapi_snapshot.py` |
 
-Extras que cubren escenarios de spec no nombrados en la ficha: `test_source_text_version_constant`, `test_dto_rejects_blank_sku_and_name`, `test_dto_forbids_price_and_provenance_fields`, `test_embedding_client_exposes_distinct_version_keys`, `test_embedding_batch_is_split_by_setting`, `test_adapter_does_not_import_data_or_enrich_llm`, `test_validation_4xx_is_not_retried`, `test_retry_on_429`, `test_main_does_not_import_indexing`, `test_index_routes_still_name_c13`, `test_blank_embedding_strings_are_treated_as_unset`, `test_canonical_openapi_settings_pin_embedding_keys_to_absent`, `test_health_starts_without_embedding_key`.
+Extras que cubren escenarios de spec no nombrados en la ficha: `test_source_text_version_constant`, `test_dto_rejects_blank_sku_and_name`, `test_dto_forbids_price_and_provenance_fields`, `test_embedding_client_exposes_distinct_version_keys`, `test_embedding_batch_is_split_by_setting`, `test_adapter_does_not_import_data_or_enrich_llm`, `test_validation_4xx_is_not_retried`, `test_retry_on_429`, `test_retry_on_5xx`, `test_main_does_not_import_indexing`, `test_index_routes_still_name_c13`, `test_blank_embedding_strings_are_treated_as_unset`, `test_canonical_openapi_settings_pin_embedding_keys_to_absent`, `test_health_starts_without_embedding_key`.
 
 ---
 
@@ -137,7 +137,7 @@ Salida **vacía** respecto al alcance de C11 (`a076709` no toca esos paths). `ba
 | 5 · LiteLLM `aembedding`; clave propia; assert 1536 | import perezoso de `aembedding`; `num_retries=0` (el retry es nuestro); `require_embedding_dimension` |
 | 6 · Settings opcionales al boot; pin del snapshot | `jpv_embedding_*` default `None` / batch 64; `canonical_openapi_settings` las pinna |
 
-Retry de proveedor: backoff `0.25 * 2**attempt` en 429/5xx (`test_retry_on_429`); 4xx de validación no se reintenta (`test_validation_4xx_is_not_retried`). **No** L2 extra.
+Retry de proveedor: backoff `0.25 * 2**attempt` en 429 (`test_retry_on_429`) y 5xx (`test_retry_on_5xx`); 4xx de validación no se reintenta (`test_validation_4xx_is_not_retried`). **No** L2 extra.
 
 ---
 
@@ -145,7 +145,7 @@ Retry de proveedor: backoff `0.25 * 2**attempt` en 429/5xx (`test_retry_on_429`)
 
 | Documento | Qué se alineó |
 |---|---|
-| `Documentos/epicas.md` (EP12) | Enlace a HU-AIENG-011 + bloque **Entregable C11** (biblioteca `indexing/`, `source-text/v1`, sin HTTP ni SQL) |
+| `Documentos/epicas.md` (EP12) | Enlace a HU-AIENG-011 + bloque **Entregable C11** (biblioteca `indexing/`, `source-text/v1`, sin HTTP ni SQL). Tras `/opsx:verify`, C11 y la HU pasan de «en curso» a **hecho** |
 | `ai-service/README.md` | Marcador C11; tabla `JPV_EMBEDDING_*`; nota de clave propia vs RAG |
 | `ai-service/tests/README.md` | `indexing/` poblada |
 | `backend/.env.example` | `JPV_EMBEDDING_MODEL=openai/text-embedding-3-small`, `BASE_URL`, `BATCH_SIZE=64` |
@@ -169,7 +169,7 @@ openspec validate --all --strict
 
 C09 ya lo había resuelto: `tests/enrichment/conftest.py` **no** auto-aplica `forbid_network`; el test `test_unit_suite_makes_no_provider_calls` lo pide como fixture y **no** llama a `asyncio.run`. C11 copia ese patrón.
 
-**Corrección:** `tests/indexing/conftest.py` queda como comentario (igual que enrichment). Los tests de `embed()` usan `asyncio.run` **sin** `forbid_network`. El gate de sockets se queda en `test_unit_suite_makes_no_provider_calls` (aserto de import, sin loop). Tras el arreglo: **48 passed**.
+**Corrección:** `tests/indexing/conftest.py` queda como comentario (igual que enrichment). Los tests de `embed()` usan `asyncio.run` **sin** `forbid_network`. El gate de sockets se queda en `test_unit_suite_makes_no_provider_calls` (aserto de import, sin loop). Tras el arreglo de implementación: **48 passed**. Tras las sugerencias de `/opsx:verify`: **49 passed**.
 
 No se cambia el event loop global del servicio: es el mismo hallazgo de plataforma que C05 documentó para psycopg async, y este change no abre sesiones.
 
@@ -181,4 +181,15 @@ No se cambia el event loop global del servicio: es el mismo hallazgo de platafor
 - Suite global de .NET: C11 no la toca; no se midió línea base.
 - Regenerar `openapi.json`: **prohibido** por el change; el snapshot está verde sin regenerar.
 - Llamada real a un proveedor de embeddings: **prohibida** en la suite; el adapter se prueba con `embed_batch` inyectado.
-- `/opsx:verify` formal: no se invocó en esta sesión; el cruce escenario ↔ test está en §2.
+
+---
+
+## 10. Seguimiento de `/opsx:verify`
+
+`/opsx:verify` (2026-08-25): Completeness 14/14, Correctness 13/13, Coherence 6/6; 0 CRITICAL, 0 WARNING. El informe no bloqueó el archivo. Se aplicaron las tres SUGGESTION y se reejecutó el alcance C11: **49 passed**.
+
+| Sugerencia | Qué se hizo |
+|---|---|
+| Test de retry 5xx | `test_retry_on_5xx`: primer lote con `status_code = 500`, backoff 0,25 s, segundo intento resuelve |
+| Permutar `occasion_tags` | `test_material_order_does_not_change_hash` reordena `color_tags` / `style_tags` / `occasion_tags` y aserta `Ocasiones: diario, fiesta` |
+| EP12 «en curso» | `Documentos/epicas.md`: HU-AIENG-011 y C11 marcados **hecho** |

@@ -388,14 +388,14 @@ Construcción del corpus sobre el que opera todo el sistema RAG: perfiles de pro
 - Corpus de conocimiento comercial (materiales, tallas, cuidados, políticas), troceado y citable
 - Generador de mundo sintético (CLI `jbg_ai.data.world`, YAML de 12 POS, Poisson, ingest local) para disponer de inventario y ventas coherentes con el catálogo
 
-**Changes asociados:** C06a (hecho), C06b (hecho), C08, C09 (hecho), C10 (hecho), C11, C23
+**Changes asociados:** C06a (hecho), C06b (hecho), C08, C09 (hecho), C10 (hecho), C11 (hecho), C23
 
 **User Stories:**
 - [HU-AIENG-006a: Ingesta del catálogo real y corpus enriquecido versionado](Historias/AI-Eng/HU-AIENG-006a.md) *(C06a — corpus JSONL + informe)*
 - [HU-AIENG-006b: Ampliación sintética del catálogo — LLM, colecciones nuevas e ingesta local](Historias/AI-Eng/HU-AIENG-006b.md) *(C06b — hecho; CLI en `jbg_ai.data`; sin familias)*
 - [HU-AIENG-009: Pipeline de enriquecimiento del catálogo — extracción estructurada con vocabularios cerrados](Historias/AI-Eng/HU-AIENG-009.md) *(C09 — hecho; extractor real de `POST /v1/enrich/products`)*
 - [HU-AIENG-010: Simulador de mundo sintético — POS, inventario e histórico de ventas](Historias/AI-Eng/HU-AIENG-010.md) *(C10 — hecho; CLI `world simulate` / `world ingest`; YAML en git, JSONL gitignored)*
-- [HU-AIENG-011: SourceText canónico y cliente de embeddings con idempotencia por hash](Historias/AI-Eng/HU-AIENG-011.md) *(C11 — en curso; biblioteca `jbg_ai.indexing`, sin HTTP ni SQL)*
+- [HU-AIENG-011: SourceText canónico y cliente de embeddings con idempotencia por hash](Historias/AI-Eng/HU-AIENG-011.md) *(C11 — hecho; biblioteca `jbg_ai.indexing`, sin HTTP ni SQL)*
 
 **Entregable C06a.** El corpus versionado vive en [`data/catalog/real/generated/catalog-real-enriched.jsonl`](../data/catalog/real/generated/catalog-real-enriched.jsonl) (sidecar `.meta.json` al lado; `generator_version` `c06a-assist/v2`). Cada línea lleva identidad + `data_origin` / `text_provenance` / `text_quality_tier` (`rich` / `sparse` / `original`); **no** emite `variant_group_key`, `variant_label` ni `family_seed`. La pasada de vendedor, los ratios y la limitación §15 están en [`Proyecto Final AIEng/informes/c06a-catalog-enrichment-report.md`](Proyecto%20Final%20AIEng/informes/c06a-catalog-enrichment-report.md). Los scripts son el pipeline offline [`scripts/catalog/`](../scripts/catalog/). El xlsx crudo sigue gitignored.
 

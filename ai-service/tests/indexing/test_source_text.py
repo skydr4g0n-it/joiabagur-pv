@@ -73,8 +73,21 @@ def test_material_order_does_not_change_hash() -> None:
     assert left == right
     assert hash_source_text(left) == hash_source_text(right)
 
-    tags_left = build_source_text(_base(color_tags=["rojo", "beige"], style_tags=["boho", "clasico"]))
-    tags_right = build_source_text(_base(color_tags=["beige", "rojo"], style_tags=["clasico", "boho"]))
+    tags_left = build_source_text(
+        _base(
+            color_tags=["rojo", "beige"],
+            style_tags=["boho", "clasico"],
+            occasion_tags=["diario", "fiesta"],
+        )
+    )
+    tags_right = build_source_text(
+        _base(
+            color_tags=["beige", "rojo"],
+            style_tags=["clasico", "boho"],
+            occasion_tags=["fiesta", "diario"],
+        )
+    )
+    assert "Ocasiones: diario, fiesta" in tags_left
     assert hash_source_text(tags_left) == hash_source_text(tags_right)
 
 
