@@ -434,6 +434,7 @@ El corazón del Proyecto Final. Búsqueda que combina la rama vectorial y la lé
 
 **Alcance:**
 - Indexación del catálogo en el esquema `ai` mediante feed paginado con cursor `since` y *tombstones*
+- **C12 (hecho en código, change abierto hasta archivar):** `GET /api/ai/index-feed/catalog` (página 50) y `GET /api/ai/index-feed/pos-availability` (página 200), autenticados **solo** con header `X-Index-Feed-Key` (`IndexFeed:ApiKey`, ≥ 32 caracteres). Un JWT de usuario o un token C03 responden **401**. **Sin migración EF** y **sin HTTP push** hacia Python; `POST /v1/index/sync` sigue siendo el stub de C13. Runbook AutoBulk: [`informes/c12-catalog-autobulk-runbook.md`](Proyecto%20Final%20AIEng/informes/c12-catalog-autobulk-runbook.md) (se corre **después** de archivar C12, **antes** de aplicar C13; no es criterio de merge).
 - Recuperación vectorial sobre HNSW y léxica con `ts_rank` en español, fusionadas con RRF
 - Diccionario de sinónimos del dominio aplicado en expansión de consulta, nunca en indexación
 - Prefiltro blando: la disponibilidad penaliza el score pero **nunca excluye** un candidato
@@ -445,7 +446,7 @@ El corazón del Proyecto Final. Búsqueda que combina la rama vectorial y la lé
 **Changes asociados:** C12, C13, C14, C15, C16, C20, C21, C22, C25
 
 **User Stories:**
-- [HU-AIENG-012: Feeds HTTP de indexación con cursor, tombstones y autenticación de servicio](Historias/AI-Eng/HU-AIENG-012.md) *(C12 — change abierto `add-dotnet-index-feed-endpoints`; feeds .NET, sin sync Python)*
+- [HU-AIENG-012: Feeds HTTP de indexación con cursor, tombstones y autenticación de servicio](Historias/AI-Eng/HU-AIENG-012.md) *(C12 — `GET /api/ai/index-feed/catalog` y `.../pos-availability`; API Key `X-Index-Feed-Key`; sin migración / sin push; Python no consume el feed hasta C13)*
 
 ---
 

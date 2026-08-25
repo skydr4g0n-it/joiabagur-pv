@@ -1,4 +1,5 @@
 using JoiabagurPV.Infrastructure.Data;
+using JoiabagurPV.Tests.TestHelpers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -40,6 +41,7 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
         builder.UseSetting("Jwt:AccessTokenExpirationMinutes", "60");
         builder.UseSetting("Jwt:RefreshTokenExpirationHours", "8");
         builder.UseSetting("Testing:SkipSwagger", "true");
+        builder.UseSetting("IndexFeed:ApiKey", IndexFeedTestKeys.ApiKey);
         
         // Set the connection string for the test database
         builder.UseSetting("ConnectionStrings:DefaultConnection", _postgresContainer.GetConnectionString());

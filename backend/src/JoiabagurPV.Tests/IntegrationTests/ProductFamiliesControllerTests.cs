@@ -502,6 +502,81 @@ public class ProductFamiliesControllerTests : IAsyncLifetime
         await AssertNoMembershipAsync(_medium.Id);
     }
 
+    [Fact]
+    public async Task ReplaceMembers_LeavingProduct_StampsUpdatedAt()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var familyId = await CreateFamilyAsync(admin, ("S", _small), ("M", _medium), ("L", _large));
+        var before = await ProductUpdatedAtAsync(_large.Id);
+
+        var response = await ReplaceMembersAsync(admin, familyId, ("S", _small), ("M", _medium));
+        response.EnsureSuccessStatusCode();
+
+        (await ProductUpdatedAtAsync(_large.Id)).Should().BeAfter(before);
+        await AssertNoMembershipAsync(_large.Id);
+    }
+
+    [Fact]
+    public async Task ReplaceMembers_EnteringProduct_StampsUpdatedAt()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var familyId = await CreateFamilyAsync(admin, ("S", _small));
+        var before = await ProductUpdatedAtAsync(_medium.Id);
+
+        var response = await ReplaceMembersAsync(admin, familyId, ("S", _small), ("M", _medium));
+        response.EnsureSuccessStatusCode();
+
+        (await ProductUpdatedAtAsync(_medium.Id)).Should().BeAfter(before);
+        await AssertMembershipAsync(_medium.Id, familyId);
+    }
+
+    [Fact]
+    public async Task ReplaceMembers_ReorderOrLabelChange_StampsStayers()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var familyId = await CreateFamilyAsync(admin, ("S", _small), ("M", _medium));
+        var beforeSmall = await ProductUpdatedAtAsync(_small.Id);
+        var beforeMedium = await ProductUpdatedAtAsync(_medium.Id);
+
+        var response = await ReplaceMembersAsync(admin, familyId, ("M", _medium), ("S", _small));
+        response.EnsureSuccessStatusCode();
+
+        (await ProductUpdatedAtAsync(_small.Id)).Should().BeAfter(beforeSmall);
+        (await ProductUpdatedAtAsync(_medium.Id)).Should().BeAfter(beforeMedium);
+    }
+
+    [Fact]
+    public async Task ReplaceMembers_IdenticalList_DoesNotWriteProduct()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var familyId = await CreateFamilyAsync(admin, ("S", _small), ("M", _medium));
+        var beforeSmall = await ProductUpdatedAtAsync(_small.Id);
+        var beforeMedium = await ProductUpdatedAtAsync(_medium.Id);
+
+        var response = await ReplaceMembersAsync(admin, familyId, ("S", _small), ("M", _medium));
+        response.EnsureSuccessStatusCode();
+
+        (await ProductUpdatedAtAsync(_small.Id)).Should().Be(beforeSmall);
+        (await ProductUpdatedAtAsync(_medium.Id)).Should().Be(beforeMedium);
+    }
+
+    [Fact]
+    public async Task ReplaceMembers_Rename_DoesNotStampMemberProducts()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var familyId = await CreateFamilyAsync(admin, ("S", _small), ("M", _medium));
+        var beforeSmall = await ProductUpdatedAtAsync(_small.Id);
+        var beforeFamily = await FamilyUpdatedAtAsync(familyId);
+
+        var response = await admin.PutAsJsonAsync(
+            $"{Endpoint}/{familyId}",
+            new UpdateProductFamilyRequest { Name = "Anillo erizo de mar (renombrado)" });
+        response.EnsureSuccessStatusCode();
+
+        (await ProductUpdatedAtAsync(_small.Id)).Should().Be(beforeSmall);
+        (await FamilyUpdatedAtAsync(familyId)).Should().BeAfter(beforeFamily);
+    }
+
     /// <summary>
     /// The spec says "any family endpoint", so the membership route is asserted too. Fresh clients
     /// on purpose: the one this class holds carries the cookies of its logins.
@@ -613,6 +688,7 @@ public class ProductFamiliesControllerTests : IAsyncLifetime
         public Task<ProductFamily?> GetByProductIdAsync(Guid productId) => _inner.GetByProductIdAsync(productId);
         public Task RemoveMembersAsync(IEnumerable<ProductFamilyMember> members) => _inner.RemoveMembersAsync(members);
         public Task AddMembersAsync(IEnumerable<ProductFamilyMember> members) => _inner.AddMembersAsync(members);
+        public Task StampUpdatedAtAsync(Guid familyId) => _inner.StampUpdatedAtAsync(familyId);
         public IQueryable<ProductFamily> GetAll() => _inner.GetAll();
         public Task<ProductFamily?> GetByIdAsync(Guid id) => _inner.GetByIdAsync(id);
         public Task<ProductFamily> AddAsync(ProductFamily entity) => _inner.AddAsync(entity);
@@ -714,6 +790,26 @@ public class ProductFamiliesControllerTests : IAsyncLifetime
         }
 
         return authenticated;
+    }
+
+    private async Task<DateTime> ProductUpdatedAtAsync(Guid productId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await context.Products
+            .Where(product => product.Id == productId)
+            .Select(product => product.UpdatedAt)
+            .SingleAsync();
+    }
+
+    private async Task<DateTime> FamilyUpdatedAtAsync(Guid familyId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await context.ProductFamilies
+            .Where(family => family.Id == familyId)
+            .Select(family => family.UpdatedAt)
+            .SingleAsync();
     }
 
     private async Task AssertNoMembershipAsync(Guid productId)

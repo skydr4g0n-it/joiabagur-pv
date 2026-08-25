@@ -90,6 +90,10 @@ public static class ServiceCollectionExtensions
         // Register product families (EP13)
         services.AddScoped<IProductFamilyService, ProductFamilyService>();
 
+        // Indexing feeds (catalog + POS). Options are bound separately in AddIndexFeed so
+        // start-up validation runs even if this registration is reused from a test host.
+        services.AddScoped<IIndexFeedService, IndexFeedService>();
+
         // Register background services
         services.AddHostedService<ModelTrainingBackgroundService>();
 
@@ -121,6 +125,40 @@ public static class ServiceCollectionExtensions
                 o => o.MinimumFieldConfidence is >= 0 and <= 1,
                 $"{ProfileReviewOptions.SectionName}:MinimumFieldConfidence must be between 0 and 1.")
             .ValidateOnStart();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Binds and validates the index-feed API key at start-up. A missing or short key must
+    /// stop the host, not surface as a 401 on the first pull.
+    /// </summary>
+    public static IServiceCollection AddIndexFeed(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        services
+            .AddOptions<IndexFeedOptions>()
+            .Bind(configuration.GetSection(IndexFeedOptions.SectionName))
+            .Validate(
+                o => !string.IsNullOrWhiteSpace(o.ApiKey),
+                $"{IndexFeedOptions.SectionName}:ApiKey is not configured. It must be a dedicated service secret, distinct from Jwt:SecretKey and AiGateway:JwtSecret.")
+            .Validate(
+                o => o.ApiKey.Length >= IndexFeedOptions.MinimumSecretLength,
+                $"{IndexFeedOptions.SectionName}:ApiKey is too short; at least {IndexFeedOptions.MinimumSecretLength} characters are required.")
+            .Validate(
+                o => string.IsNullOrWhiteSpace(o.ApiKeyPrevious)
+                     || o.ApiKeyPrevious.Length >= IndexFeedOptions.MinimumSecretLength,
+                $"{IndexFeedOptions.SectionName}:ApiKeyPrevious is set but shorter than {IndexFeedOptions.MinimumSecretLength} characters.")
+            .ValidateOnStart();
+
+        if (services.All(d => d.ServiceType != typeof(TimeProvider)))
+        {
+            services.AddSingleton(TimeProvider.System);
+        }
 
         return services;
     }

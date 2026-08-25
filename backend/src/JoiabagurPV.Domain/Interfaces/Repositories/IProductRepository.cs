@@ -62,6 +62,12 @@ public interface IProductRepository : IRepository<Product>
     /// </summary>
     /// <param name="products">The products to update.</param>
     Task UpdateRangeAsync(IEnumerable<Product> products);
+
+    /// <summary>
+    /// Writes <c>UpdatedAt</c> on the given products in SQL, bypassing the store-generated
+    /// column metadata that would otherwise drop the value from an EF UPDATE.
+    /// </summary>
+    Task StampUpdatedAtAsync(IEnumerable<Guid> productIds);
 }
 
 

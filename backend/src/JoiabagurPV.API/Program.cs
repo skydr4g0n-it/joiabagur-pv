@@ -31,6 +31,10 @@ builder.Services.AddAiGateway(builder.Configuration);
 // cannot be satisfied.
 builder.Services.AddProfileReview(builder.Configuration);
 
+// Index-feed API key. Validated at start-up for the same reason as the gateway secret: a
+// missing or short key must stop the host, not look like a 401 from the first C13 pull.
+builder.Services.AddIndexFeed(builder.Configuration);
+
 // Add API services
 builder.Services.AddApiServices(builder.Configuration);
 

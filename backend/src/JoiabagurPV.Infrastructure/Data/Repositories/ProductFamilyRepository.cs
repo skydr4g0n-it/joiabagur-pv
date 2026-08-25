@@ -66,4 +66,13 @@ public class ProductFamilyRepository : Repository<ProductFamily>, IProductFamily
         _context.ProductFamilyMembers.AddRange(members);
         return Task.CompletedTask;
     }
+
+    /// <inheritdoc/>
+    public async Task StampUpdatedAtAsync(Guid familyId)
+    {
+        var now = DateTime.UtcNow;
+        await _context.ProductFamilies
+            .Where(family => family.Id == familyId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(family => family.UpdatedAt, now));
+    }
 }

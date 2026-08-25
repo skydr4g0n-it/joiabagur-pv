@@ -54,4 +54,10 @@ public interface IProductFamilyRepository : IRepository<ProductFamily>
     /// and fails with a concurrency error that names neither the entity nor the cause.
     /// </remarks>
     Task AddMembersAsync(IEnumerable<ProductFamilyMember> members);
+
+    /// <summary>
+    /// Writes <c>UpdatedAt</c> on a family in SQL so a metadata rename moves the catalog
+    /// watermark without rewriting membership rows.
+    /// </summary>
+    Task StampUpdatedAtAsync(Guid familyId);
 }

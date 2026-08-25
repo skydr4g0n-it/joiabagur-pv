@@ -76,6 +76,7 @@ public class ProductFamilyService : IProductFamilyService
         // Tracked entity: the change tracker already holds the two edited properties, and marking
         // the root Modified would only widen the update to columns nobody touched.
         await _unitOfWork.SaveChangesAsync();
+        await _familyRepository.StampUpdatedAtAsync(family.Id);
 
         _logger.LogInformation("product_family_renamed {FamilyId}", family.Id);
 
@@ -100,6 +101,17 @@ public class ProductFamilyService : IProductFamilyService
         }
 
         await GuardAgainstOtherFamiliesAsync(declared, family.Id);
+
+        // The feed's catalog cursor is Product.UpdatedAt (plus profile and family). Deleting a
+        // membership row does not touch Product, so a product that leaves would vanish from the
+        // join and never appear after `since`. An entering product with an old watermark would
+        // be skipped on an incremental pull. Stamp those products via ExecuteUpdate: UpdatedAt
+        // is ValueGeneratedOnAddOrUpdate, so a tracker UPDATE would omit the column. A reorder
+        // or label change keeps the same identifiers, so the enter/leave sets are empty —
+        // stamp the declared list instead, because variantLabel in the index changed.
+        await StampCatalogWatermarkAsync(
+            family.Members.Select(member => member.ProductId).ToList(),
+            declared);
 
         // Replaced wholesale rather than reconciled row by row. Matching on product and updating in
         // place would preserve each row's identity — which nothing references — at the cost of
@@ -161,6 +173,32 @@ public class ProductFamilyService : IProductFamilyService
 
         await _familyRepository.AddMembersAsync(fresh);
         await SaveTranslatingMembershipRaceAsync(declared);
+    }
+
+    /// <summary>
+    /// Stamps <c>Product.UpdatedAt</c> for entering and leaving products via SQL.
+    /// Same identifiers with a different order or label stamp the declared list.
+    /// </summary>
+    private async Task StampCatalogWatermarkAsync(
+        IReadOnlyCollection<Guid> previousIds,
+        List<ProductFamilyMemberRequest> declared)
+    {
+        var declaredIds = declared.Select(member => member.ProductId).ToList();
+        var previousSet = previousIds.ToHashSet();
+        var declaredSet = declaredIds.ToHashSet();
+
+        var toStamp = previousSet.Except(declaredSet).Concat(declaredSet.Except(previousSet)).ToList();
+        if (toStamp.Count == 0)
+        {
+            toStamp = declaredIds;
+        }
+
+        if (toStamp.Count == 0)
+        {
+            return;
+        }
+
+        await _productRepository.StampUpdatedAtAsync(toStamp);
     }
 
     // ── Membership rules ──────────────────────────────────────────────────────────────────────
