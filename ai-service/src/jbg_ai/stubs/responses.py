@@ -338,7 +338,9 @@ def index_sync_stub(request: IndexSyncRequest, principal: ServicePrincipal) -> I
         deleted=0,
         failed=0,
         since=request.since,
+        since_id=request.since_id,
         cursor=_NEXT_CURSOR,
+        cursor_id=None,
         trace_id=principal.trace_id,
     )
 

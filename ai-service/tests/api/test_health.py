@@ -57,6 +57,17 @@ def test_health_starts_without_embedding_key(minimal_settings: Settings) -> None
     assert response.status_code == 200
 
 
+def test_health_starts_without_index_feed_key(minimal_settings: Settings) -> None:
+    assert minimal_settings.jpv_index_feed_base_url is None
+    assert minimal_settings.jpv_index_feed_api_key is None
+    assert minimal_settings.jpv_index_sync_time_budget_seconds == 180
+    app = create_app(minimal_settings)
+    with TestClient(app) as client:
+        response = client.get("/health")
+
+    assert response.status_code == 200
+
+
 def test_health_generates_trace_id_when_missing(minimal_settings: Settings) -> None:
     app = create_app(minimal_settings)
     with TestClient(app) as client:

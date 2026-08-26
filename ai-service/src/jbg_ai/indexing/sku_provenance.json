@@ -1,0 +1,4802 @@
+{
+  "SKU01": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU02": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU03": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU04": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU05": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU06": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU07": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU08": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU09": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU10": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU100": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1000": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1001": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1002": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1003": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1004": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1005": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1006": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1007": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1008": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1009": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU101": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU1010": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1011": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1012": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1013": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1014": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1015": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1016": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1017": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1018": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1019": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU102": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1020": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1021": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1022": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1023": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1024": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1025": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1026": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1027": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1028": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1029": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU103": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1030": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1031": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1032": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1033": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1034": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1035": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1036": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1037": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1038": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1039": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU104": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1040": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1041": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1042": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1043": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1044": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1045": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1046": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1047": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1048": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1049": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU105": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1050": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1051": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1052": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1053": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1054": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1055": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1056": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1057": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1058": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1059": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU106": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1060": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1061": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1062": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1063": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1064": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1065": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1066": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1067": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1068": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1069": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU107": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1070": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1071": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1072": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1073": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1074": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1075": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1076": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1077": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1078": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1079": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU108": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1080": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1081": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1082": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1083": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1084": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1085": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1086": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1087": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1088": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1089": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU109": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1090": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1091": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1092": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1093": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1094": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1095": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1096": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1097": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1098": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1099": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU11": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU110": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1100": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1101": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1102": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1103": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1104": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1105": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1106": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1107": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1108": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1109": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU111": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1110": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1111": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1112": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1113": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1114": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1115": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1116": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1117": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1118": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1119": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU112": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1120": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1121": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1122": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1123": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1124": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1125": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1126": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1127": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1128": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1129": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU113": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1130": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1131": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1132": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1133": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1134": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1135": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1136": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1137": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1138": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1139": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU114": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1140": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1141": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1142": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1143": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1144": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1145": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1146": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1147": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1148": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1149": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU115": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1150": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1151": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1152": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1153": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1154": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1155": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1156": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1157": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1158": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1159": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU116": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1160": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1161": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1162": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1163": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1164": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1165": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1166": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1167": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1168": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1169": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU117": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1170": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1171": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1172": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1173": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1174": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1175": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1176": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1177": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1178": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1179": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU118": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1180": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1181": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1182": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1183": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1184": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1185": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1186": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1187": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1188": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1189": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU119": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU1190": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1191": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1192": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1193": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1194": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1195": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1196": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1197": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1198": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1199": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU12": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU120": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU1200": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1201": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1202": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU1203": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU121": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU122": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU123": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU124": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU125": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU126": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU127": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU128": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU129": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU13": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU130": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU131": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU132": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU133": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU134": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU136": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU137": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU138": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU139": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU14": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU140": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU141": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU142": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU143": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU144": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU145": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU146": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU147": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU148": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU149": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU15": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU150": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU151": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU152": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU153": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU154": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU155": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU156": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU157": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU158": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU159": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU16": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU160": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU161": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU162": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU163": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU164": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU165": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU166": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU167": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU168": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU169": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU17": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU170": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU171": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU172": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU173": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU174": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU175": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU176": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU177": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU178": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU179": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU18": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU180": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU181": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU182": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU183": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU184": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU185": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU186": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU187": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU188": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU189": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU19": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU190": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU191": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU192": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU193": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU194": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU195": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU196": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU197": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU198": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU199": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU20": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU200": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU201": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU202": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU203": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU204": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU205": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU206": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU207": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU208": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU209": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU21": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU210": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU211": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU212": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU213": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU214": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU215": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU216": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU217": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU218": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU219": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU22": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU220": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU221": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU222": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU223": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU224": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU225": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU226": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU227": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU228": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU229": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU23": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU230": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU231": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU232": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU233": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU234": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU235": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU236": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU237": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU238": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU239": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU24": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU240": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU241": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU242": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU243": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU244": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU245": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU246": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU247": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU248": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU249": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU25": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU250": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU251": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU252": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU253": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU254": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU255": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU256": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU257": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU258": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU259": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU26": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU260": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU261": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU262": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU263": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU264": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU265": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU266": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU267": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU268": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU269": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU27": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU270": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU271": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU272": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU273": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU274": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU275": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU276": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU277": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU278": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU279": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU28": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU280": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU281": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU282": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU283": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU284": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU285": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU286": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU287": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU288": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU289": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU29": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU290": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU291": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU292": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU293": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU294": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU295": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU296": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU297": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU298": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU299": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU30": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU300": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU301": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU302": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU303": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU304": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU305": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU306": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU307": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU308": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU309": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU31": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU310": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU311": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU312": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU313": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU314": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU315": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU316": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU317": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU318": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU319": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU32": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU320": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU321": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU322": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU323": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU324": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU325": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU326": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU327": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU328": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU329": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU33": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU330": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU331": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU332": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU333": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU334": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU335": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU336": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU337": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU338": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU339": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU34": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU340": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU341": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU342": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU343": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU344": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU345": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU346": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU347": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU348": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU349": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU35": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU350": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU351": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU352": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU353": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU354": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU355": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU356": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU357": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU358": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU359": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU36": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU360": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU361": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU362": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU363": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU364": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU365": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU366": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU367": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU368": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU369": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU37": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU370": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU371": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU372": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU373": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU374": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU375": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU376": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU377": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU378": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU379": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU38": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU380": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU381": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU382": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU383": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU384": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU385": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU386": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU387": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU388": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU389": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU39": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU390": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU391": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU392": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU393": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU394": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU395": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU396": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU397": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU398": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU399": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU40": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU401": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU402": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU403": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU404": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU405": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU406": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU407": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU408": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU409": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU41": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU410": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU411": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU412": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU413": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU414": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU415": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU416": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU417": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU419": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU42": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU420": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU421": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU422": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU423": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU424": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU425": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU426": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU427": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU428": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU429": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU43": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU430": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU431": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU432": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU433": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU434": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU435": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU436": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU437": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU438": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU439": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU44": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU440": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU441": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU442": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU443": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU444": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU445": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU446": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU447": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU448": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU449": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU45": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU450": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU451": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU452": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU453": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU454": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU455": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU456": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU457": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU458": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU459": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU46": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU460": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU461": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU462": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU463": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU464": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU465": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU466": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU467": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU468": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU469": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU47": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU470": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU471": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU472": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU473": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU474": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU475": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU476": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU477": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU478": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU479": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU48": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU480": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU481": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU482": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU483": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU484": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU485": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU486": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU487": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU488": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU489": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU49": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU490": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU491": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU492": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU493": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU494": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU495": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU496": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU497": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU498": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU499": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU50": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU500": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU501": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU502": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU503": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU504": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU505": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU506": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU507": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU508": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU509": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU51": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU510": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU511": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU512": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU513": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU514": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU515": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU516": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU517": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU518": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU519": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU52": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU520": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU521": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU522": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU523": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU524": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU525": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU526": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU527": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU528": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU529": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU53": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU530": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU531": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU532": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU533": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU534": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU535": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU536": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU537": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU538": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU539": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU54": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU540": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU541": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU542": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU543": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU544": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU545": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU546": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU547": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU548": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU549": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU55": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU550": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU551": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU552": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU553": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU554": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU555": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU556": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU557": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU558": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU559": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU56": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU560": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU561": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU562": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU563": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU564": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU565": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU566": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU567": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU568": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU569": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU57": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU570": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU571": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU572": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU573": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU574": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU575": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU576": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU577": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU578": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU579": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU58": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU580": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU581": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU582": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU583": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU584": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU585": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU586": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU587": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU588": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU589": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU59": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU590": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU591": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU592": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU593": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU594": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU595": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU596": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU597": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU598": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU599": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU60": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU600": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU601": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU602": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU603": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU604": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU605": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU606": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU607": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU608": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU609": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU61": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU610": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU611": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU612": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU613": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU614": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU615": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU616": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU617": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU618": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU619": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU62": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU620": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU621": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU622": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU623": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU624": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU625": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU626": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU627": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU628": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU629": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU63": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU630": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU631": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU632": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU633": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU634": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU635": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU636": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU637": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU638": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU639": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU64": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU640": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU641": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU642": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU643": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU644": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU645": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU646": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU647": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU648": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU649": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU65": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU650": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU651": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU652": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU653": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU654": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU655": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU656": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU657": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU658": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU659": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU66": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU660": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU661": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU662": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU663": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU664": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU665": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU666": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU667": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU668": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU669": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU67": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU670": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU671": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU672": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU673": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU674": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU675": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU676": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU677": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU678": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU679": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU68": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU680": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU681": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU682": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU683": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU684": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU685": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU686": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU687": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU688": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU689": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU69": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU690": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU691": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU692": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU693": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU694": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU695": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU696": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU697": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU698": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU699": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU70": {
+    "data_origin": "real",
+    "text_provenance": "merchant"
+  },
+  "SKU700": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU701": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU702": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU703": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU704": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU705": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU706": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU707": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU708": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU709": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU71": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU710": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU711": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU712": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU713": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU714": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU715": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU716": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU717": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU718": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU719": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU72": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU720": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU721": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU722": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU723": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU724": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU725": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU726": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU727": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU728": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU729": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU73": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU730": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU731": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU732": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU733": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU734": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU735": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU736": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU737": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU738": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU739": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU74": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU740": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU741": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU742": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU743": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU744": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU745": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU746": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU747": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU748": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU749": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU75": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU750": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU751": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU752": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU753": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU754": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU755": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU756": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU757": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU758": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU759": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU76": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU760": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU761": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU762": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU763": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU764": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU765": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU766": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU767": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU768": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU769": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU77": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU770": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU771": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU772": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU773": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU774": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU775": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU776": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU777": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU778": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU779": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU78": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU780": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU781": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU782": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU783": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU784": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU785": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU786": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU787": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU788": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU789": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU79": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU790": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU791": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU792": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU793": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU794": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU795": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU796": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU797": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU798": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU799": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU80": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU800": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU801": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU802": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU803": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU804": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU805": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU806": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU807": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU808": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU809": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU81": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU810": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU811": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU812": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU813": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU814": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU815": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU816": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU817": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU818": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU819": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU82": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU820": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU821": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU822": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU823": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU824": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU825": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU826": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU827": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU828": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU829": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU83": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU830": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU831": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU832": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU833": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU834": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU835": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU836": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU837": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU838": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU839": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU84": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU840": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU841": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU842": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU843": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU844": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU845": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU846": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU847": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU848": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU849": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU85": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU850": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU851": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU852": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU853": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU854": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU855": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU856": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU857": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU858": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU859": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU86": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU860": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU861": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU862": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU863": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU864": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU865": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU866": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU867": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU868": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU869": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU87": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU870": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU871": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU872": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU873": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU874": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU875": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU876": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU877": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU878": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU879": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU88": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU880": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU881": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU882": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU883": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU884": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU885": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU886": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU887": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU888": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU889": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU89": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU890": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU891": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU892": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU893": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU894": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU895": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU896": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU897": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU898": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU899": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU90": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU900": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU901": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU902": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU903": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU904": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU905": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU906": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU907": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU908": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU909": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU91": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU910": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU911": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU912": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU913": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU914": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU915": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU916": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU917": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU918": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU919": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU92": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU920": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU921": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU922": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU923": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU924": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU925": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU926": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU927": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU928": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU929": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU93": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU930": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU931": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU932": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU933": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU934": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU935": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU936": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU937": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU938": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU939": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU94": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU940": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU941": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU942": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU943": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU944": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU945": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU946": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU947": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU948": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU949": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU95": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU950": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU951": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU952": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU953": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU954": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU955": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU956": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU957": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU958": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU959": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU96": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU960": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU961": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU962": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU963": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU964": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU965": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU966": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU967": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU968": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU969": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU97": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU970": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU971": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU972": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU973": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU974": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU975": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU976": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU977": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU978": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU979": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU98": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU980": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU981": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU982": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU983": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU984": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU985": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU986": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU987": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU988": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU989": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU99": {
+    "data_origin": "real",
+    "text_provenance": "ai_assisted"
+  },
+  "SKU990": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU991": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU992": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU993": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU994": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU995": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU996": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU997": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU998": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  },
+  "SKU999": {
+    "data_origin": "synthetic",
+    "text_provenance": "synthetic"
+  }
+}

@@ -26,14 +26,18 @@ def _insert_product(connection: sa.Connection, **overrides: object) -> None:
         "doc_text": "anillo de plata",
         "source_hash": "0" * 64,
         "data_origin": "real",
+        "text_provenance": "merchant",
     }
     values.update(overrides)
     connection.execute(
         sa.text(
             """
             INSERT INTO ai.product_document
-                (product_id, sku, name, doc_text, source_hash, data_origin)
-            VALUES (:product_id, :sku, :name, :doc_text, :source_hash, :data_origin)
+                (product_id, sku, name, doc_text, source_hash, data_origin, text_provenance)
+            VALUES (
+                :product_id, :sku, :name, :doc_text, :source_hash, :data_origin,
+                :text_provenance
+            )
             """
         ),
         values,
