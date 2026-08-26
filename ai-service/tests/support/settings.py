@@ -42,6 +42,9 @@ def build_settings(**overrides: Any) -> Settings:
         "jpv_embedding_model": None,
         "jpv_embedding_base_url": None,
         "jpv_embedding_batch_size": 64,
+        "jpv_index_feed_base_url": None,
+        "jpv_index_feed_api_key": None,
+        "jpv_index_sync_time_budget_seconds": 180,
     }
     values.update(overrides)
     return Settings(**values)

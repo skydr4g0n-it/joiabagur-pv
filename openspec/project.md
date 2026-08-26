@@ -355,5 +355,6 @@ Run the `update-docs` command (skill replicated in `.agent/`, `.claude/`, `.code
 - **C06a catalog corpus**: `data/catalog/real/generated/catalog-real-enriched.jsonl` + `scripts/catalog/README.md` + `Documentos/Proyecto Final AIEng/informes/c06a-catalog-enrichment-report.md`
 - **C06b synthetic corpus**: `data/catalog/synthetic/generated/catalog-synthetic.jsonl` + `ai-service/src/jbg_ai/data/README.md` + `Documentos/Proyecto Final AIEng/informes/c06b-synthetic-catalog-report.md`
 - **C10 synthetic world**: `data/world/pos-profiles.yaml` + `ai-service/src/jbg_ai/data/README.md` + `Documentos/Proyecto Final AIEng/informes/c10-synthetic-world-report.md`
-- **C11 source text & embeddings**: `ai-service/src/jbg_ai/indexing/` (`source-text/v1`, LiteLLM 1536-d). HTTP app does not import it. Live spec `catalog-source-text`.
+- **C11 source text & embeddings**: `ai-service/src/jbg_ai/indexing/` (`source-text/v1`, LiteLLM 1536-d). `api.main` does not import it; the index router does (C13). Live spec `catalog-source-text`.
 - **C12 index feed**: `GET /api/ai/index-feed/catalog` and `.../pos-availability`; live spec `index-feed`. Runbook `Documentos/Proyecto Final AIEng/informes/c12-catalog-autobulk-runbook.md`.
+- **C13 catalog indexer**: `POST /v1/index/sync` / `GET /v1/index/status` pull the catalog feed; committed `sku_provenance.json`; live spec `product-document-indexer`.

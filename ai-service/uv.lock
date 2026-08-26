@@ -928,6 +928,7 @@ dependencies = [
     { name = "alembic" },
     { name = "bcrypt" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "litellm" },
     { name = "openai" },
     { name = "pgvector" },
@@ -941,7 +942,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "pytest" },
     { name = "testcontainers" },
 ]
@@ -951,6 +951,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.14" },
     { name = "bcrypt", specifier = ">=4.2.0" },
     { name = "fastapi", specifier = ">=0.141.1" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "litellm", specifier = "==1.98.0" },
     { name = "openai", specifier = ">=1.68.0" },
     { name = "pgvector", specifier = ">=0.3.6" },
@@ -964,7 +965,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "httpx", specifier = ">=0.28.1" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "testcontainers", extras = ["postgres"], specifier = ">=4.9" },
 ]

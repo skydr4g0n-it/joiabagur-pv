@@ -1,0 +1,254 @@
+"""Injectable catalog/POS index-feed client. C13 drains catalog only."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+from decimal import Decimal
+from typing import Literal, Protocol
+from uuid import UUID
+
+import httpx
+
+from jbg_ai.indexing.source_text import ProductSourceText
+from jbg_ai.indexing.sync_errors import IndexFeedConfigError
+
+CATALOG_PATH = "/api/ai/index-feed/catalog"
+POS_PATH = "/api/ai/index-feed/pos-availability"
+FEED_KEY_HEADER = "X-Index-Feed-Key"
+FEED_TIMEOUT_SECONDS = 10.0
+
+
+@dataclass(frozen=True)
+class FeedCursor:
+    since: datetime
+    since_id: UUID
+
+
+@dataclass(frozen=True)
+class CatalogUpsertItem:
+    kind: Literal["upsert"]
+    product_id: UUID
+    source_text: ProductSourceText
+    family_id: UUID | None
+    price: Decimal
+    price_band: str
+    is_active: bool
+    watermark: datetime
+
+
+@dataclass(frozen=True)
+class CatalogTombstoneItem:
+    kind: Literal["tombstone"]
+    product_id: UUID
+    reason: str
+    at: datetime
+
+
+CatalogFeedItem = CatalogUpsertItem | CatalogTombstoneItem
+
+
+@dataclass(frozen=True)
+class CatalogFeedPage:
+    items: list[CatalogFeedItem]
+    next_cursor: FeedCursor | None
+    has_more: bool
+    page_size: int
+    aggregate_hash: str
+
+
+@dataclass(frozen=True)
+class PosFeedPage:
+    items: list[dict[str, object]]
+    next_cursor: FeedCursor | None
+    has_more: bool
+    page_size: int
+    aggregate_hash: str
+
+
+class IndexFeedClient(Protocol):
+    """Async port. Implementations must not open sockets unless they are the httpx adapter."""
+
+    async def fetch_catalog_page(
+        self, since: datetime | None, since_id: UUID | None
+    ) -> CatalogFeedPage: ...
+
+    async def fetch_pos_page(
+        self, since: datetime | None, since_id: UUID | None
+    ) -> PosFeedPage: ...
+
+
+def _parse_datetime(value: object) -> datetime:
+    if isinstance(value, datetime):
+        return value
+    text = str(value)
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    return datetime.fromisoformat(text)
+
+
+def _parse_cursor(raw: object) -> FeedCursor | None:
+    if not raw or not isinstance(raw, dict):
+        return None
+    since = raw.get("since")
+    since_id = raw.get("sinceId", raw.get("since_id"))
+    if since is None or since_id is None:
+        return None
+    return FeedCursor(since=_parse_datetime(since), since_id=UUID(str(since_id)))
+
+
+def _as_str_list(value: object) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    return []
+
+
+def parse_catalog_item(raw: dict[str, object]) -> CatalogFeedItem:
+    kind = str(raw.get("kind") or "upsert")
+    if kind == "tombstone":
+        return CatalogTombstoneItem(
+            kind="tombstone",
+            product_id=UUID(str(raw["productId"])),
+            reason=str(raw.get("reason") or ""),
+            at=_parse_datetime(raw["at"]),
+        )
+    if kind != "upsert":
+        raise ValueError(f"unknown catalog feed kind: {kind}")
+    source = ProductSourceText(
+        sku=str(raw["sku"]),
+        name=str(raw["name"]),
+        description=_optional_str(raw.get("description")),
+        collection_name=_optional_str(raw.get("collectionName")),
+        piece_type=_optional_str(raw.get("pieceType")),
+        materials=_as_str_list(raw.get("materials")),
+        stone_type=_optional_str(raw.get("stoneType")),
+        size_label=_optional_str(raw.get("sizeLabel")),
+        family_name=_optional_str(raw.get("familyName")),
+        variant_label=_optional_str(raw.get("variantLabel")),
+        color_tags=_as_str_list(raw.get("colorTags")),
+        style_tags=_as_str_list(raw.get("styleTags")),
+        occasion_tags=_as_str_list(raw.get("occasionTags")),
+    )
+    family_raw = raw.get("familyId")
+    return CatalogUpsertItem(
+        kind="upsert",
+        product_id=UUID(str(raw["productId"])),
+        source_text=source,
+        family_id=UUID(str(family_raw)) if family_raw else None,
+        price=Decimal(str(raw.get("price", "0"))),
+        price_band=str(raw.get("priceBand") or ""),
+        is_active=bool(raw.get("isActive", True)),
+        watermark=_parse_datetime(raw["watermark"]),
+    )
+
+
+def _optional_str(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def parse_catalog_page(payload: dict[str, object]) -> CatalogFeedPage:
+    items_raw = payload.get("items") or []
+    if not isinstance(items_raw, list):
+        raise ValueError("catalog feed page items must be a list")
+    items = [parse_catalog_item(item) for item in items_raw if isinstance(item, dict)]
+    return CatalogFeedPage(
+        items=items,
+        next_cursor=_parse_cursor(payload.get("nextCursor")),
+        has_more=bool(payload.get("hasMore", False)),
+        page_size=int(payload.get("pageSize") or 0),
+        aggregate_hash=str(payload.get("aggregateHash") or ""),
+    )
+
+
+def parse_pos_page(payload: dict[str, object]) -> PosFeedPage:
+    items_raw = payload.get("items") or []
+    items = [item for item in items_raw if isinstance(item, dict)] if isinstance(items_raw, list) else []
+    return PosFeedPage(
+        items=items,
+        next_cursor=_parse_cursor(payload.get("nextCursor")),
+        has_more=bool(payload.get("hasMore", False)),
+        page_size=int(payload.get("pageSize") or 0),
+        aggregate_hash=str(payload.get("aggregateHash") or ""),
+    )
+
+
+def _query_params(since: datetime | None, since_id: UUID | None) -> dict[str, str]:
+    if since is None and since_id is None:
+        return {}
+    params: dict[str, str] = {}
+    if since is not None:
+        params["since"] = since.isoformat()
+    if since_id is not None:
+        params["sinceId"] = str(since_id)
+    return params
+
+
+class HttpxIndexFeedClient:
+    """httpx adapter. Sends `X-Index-Feed-Key`; never logs the key."""
+
+    def __init__(
+        self,
+        client: httpx.AsyncClient,
+        api_key: str,
+        *,
+        catalog_path: str = CATALOG_PATH,
+        pos_path: str = POS_PATH,
+    ) -> None:
+        self._client = client
+        self._api_key = api_key
+        self._catalog_path = catalog_path
+        self._pos_path = pos_path
+
+    def _headers(self) -> dict[str, str]:
+        return {FEED_KEY_HEADER: self._api_key}
+
+    async def _get_json(
+        self,
+        path: str,
+        since: datetime | None,
+        since_id: UUID | None,
+        *,
+        unavailable: str,
+    ) -> dict[str, object]:
+        try:
+            response = await self._client.get(
+                path,
+                headers=self._headers(),
+                params=_query_params(since, since_id),
+            )
+        except httpx.TransportError as exc:
+            raise IndexFeedConfigError(unavailable) from exc
+        if response.status_code >= 500:
+            raise IndexFeedConfigError(unavailable)
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("feed page must be an object")
+        return payload
+
+    async def fetch_catalog_page(
+        self, since: datetime | None, since_id: UUID | None
+    ) -> CatalogFeedPage:
+        payload = await self._get_json(
+            self._catalog_path,
+            since,
+            since_id,
+            unavailable="catalog feed is unavailable",
+        )
+        return parse_catalog_page(payload)
+
+    async def fetch_pos_page(
+        self, since: datetime | None, since_id: UUID | None
+    ) -> PosFeedPage:
+        payload = await self._get_json(
+            self._pos_path,
+            since,
+            since_id,
+            unavailable="POS feed is unavailable",
+        )
+        return parse_pos_page(payload)

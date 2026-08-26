@@ -36,6 +36,7 @@ EXPECTED_TABLES = {
     "pos_projection",
     "co_occurrence",
     "sync_failure",
+    "sync_checkpoint",
 }
 
 #: Both embedding columns must be reachable by the cosine operator `<=>`.
@@ -199,7 +200,7 @@ def test_gin_index_exists_on_searchable_column(
 
 
 @pytest.mark.parametrize(
-    "column", ["family_id", "piece_type", "price_band", "data_origin"]
+    "column", ["family_id", "piece_type", "price_band", "data_origin", "text_provenance"]
 )
 def test_structural_filter_column_has_btree_index(
     migrated: sa.Engine, column: str

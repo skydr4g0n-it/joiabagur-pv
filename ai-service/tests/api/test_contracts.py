@@ -191,6 +191,8 @@ def test_index_sync_and_status_expose_counters_and_drift(
     assert sync["upserted"] >= 0
     assert sync["skipped"] >= 0
     assert sync["cursor"]
+    assert "since_id" in sync
+    assert "cursor_id" in sync
 
     status = client.get("/v1/index/status", headers=auth_headers).json()
 

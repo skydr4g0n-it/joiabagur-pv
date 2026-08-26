@@ -188,11 +188,13 @@ def test_main_does_not_import_indexing() -> None:
     assert "jbg_ai.indexing" not in source
 
 
-def test_index_routes_still_name_c13() -> None:
+def test_index_routes_use_catalog_principal() -> None:
     source = (
         AI_SERVICE_ROOT / "src" / "jbg_ai" / "api" / "routers" / "index.py"
     ).read_text(encoding="utf-8")
-    assert 'DELIVERED_BY = "C13 (add-product-document-indexer)"' in source
+    assert "get_catalog_principal" in source
+    assert "require_stub_mode" not in source
+    assert "jbg_ai.indexing" in source
 
 
 def test_unit_suite_makes_no_provider_calls(forbid_network: None) -> None:

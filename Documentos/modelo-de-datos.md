@@ -1155,12 +1155,13 @@ Consecuencias visibles en el modelo:
 
 | Tabla | Contenido | Notas de modelado |
 |---|---|---|
-| `ai.product_document` | Una fila por producto, sin *chunking* | `materials text[]` para filtro por solape; `embedding vector(1536)` **nulable** (la fila puede preceder al cálculo); `tsv` **generada** con `to_tsvector('spanish', doc_text)`; `data_origin` (`real`/`synthetic`) porque toda métrica se reporta desglosada |
+| `ai.product_document` | Una fila por producto, sin *chunking* | `materials text[]` para filtro por solape; `embedding vector(1536)` **nulable** a nivel de esquema (C05); el escritor C13 no inserta una fila visible sin vector 1536; `tsv` **generada** con `to_tsvector('spanish', doc_text)`; `data_origin` (`real`/`synthetic`); `text_provenance` NOT NULL (`merchant`/`ai_assisted`/`synthetic`, CHECK, C13) |
 | `ai.knowledge_document` | Conocimiento comercial **general**, nunca por producto | `doc_type`: material, talla, guion de venta, política, FAQ |
 | `ai.knowledge_chunk` | Fragmentos del anterior | FK intra-esquema con **borrado en cascada**; `(document_id, chunk_index)` único; `metadata jsonb` |
 | `ai.pos_projection` | Prior de ranking por punto de venta | PK `(pos_id, product_id)`; **`qty_bucket` (`0`/`1-2`/`3+`), nunca la cantidad exacta**: la proyección puede estar desfasada y el número real lo pone .NET |
 | `ai.co_occurrence` | Señal de complementarios | PK por el par más `CHECK (product_a < product_b)`: sin esa orientación única, cada par se almacenaría dos veces |
-| `ai.sync_failure` | Lotes de sincronización fallidos | Un lote fallido no bloquea a los demás; se reintenta con backoff |
+| `ai.sync_failure` | Ítems de sincronización fallidos | Un ítem fallido no bloquea a los demás; cola de reintento, **no** bookmark. C13 añade `cursor_since_id` y `product_id` |
+| `ai.sync_checkpoint` | Bookmark keyset por feed | Una fila `catalog`: `watermark`, `since_id`, `last_full_sync_at`, `last_incremental_sync_at`, `last_aggregate_hash`, `indexed_count`. La deriva de conjunto (`GET /v1/index/status`) compara el SHA-256 de los `product_id` indexados con `aggregateHash` de **una** GET a la primera página del feed |
 
 **Vocabularios cerrados con `CHECK`, nunca con tipos enumerados.** Un tipo enumerado sobrevive al borrado de su tabla, de modo que revertir la migración lo deja huérfano y la siguiente aplicación falla con «el tipo ya existe» — semanas después y sin nada que apunte a la causa.
 
@@ -1170,7 +1171,7 @@ Consecuencias visibles en el modelo:
 |---|---|---|
 | **HNSW `vector_cosine_ops`** | `product_document.embedding`, `knowledge_chunk.embedding` | Alineado con el operador de distancia coseno de las consultas. **Desalinearlo desactiva el índice sin dar ningún error**: PostgreSQL cae a recorrido secuencial en silencio. Parámetros explícitos `m = 16`, `ef_construction = 128` |
 | **GIN** | `materials`, ambas `tsv`, `knowledge_chunk.metadata` | Solape y contención sobre arrays, búsqueda léxica en español y filtros sobre JSON |
-| **B-tree** | `family_id`, `piece_type`, `price_band`, `data_origin`, `pos_projection.product_id`, `sync_failure.next_retry_at` | Filtros estructurales, desglose de métricas y cola de reintentos |
+| **B-tree** | `family_id`, `piece_type`, `price_band`, `data_origin`, `text_provenance`, `pos_projection.product_id`, `sync_failure.next_retry_at` | Filtros estructurales, desglose de métricas (origen y procedencia del texto) y cola de reintentos |
 
 A la escala del proyecto (~1.200-1.500 vectores) ningún índice mejora una latencia medible: se declaran porque tenerlos no cuesta nada y añadirlos con datos dentro sí. HNSW se elige en lugar de IVFFlat por dos motivos operativos: **puede construirse sobre tablas vacías** —IVFFlat necesita entrenamiento previo con datos— y no degrada su recall en silencio a medida que el corpus crece.
 

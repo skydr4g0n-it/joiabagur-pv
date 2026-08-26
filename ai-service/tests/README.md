@@ -37,13 +37,13 @@ parallel taxonomy later.
 
 | Folder | Changes that will land here |
 |---|---|
-| `api/` | C01 (health), C02 (contracts, service auth, stubs, snapshot), C08 (enrichment provenance, catalog-scoped auth) |
-| `config/` | C01, C02 (settings, canonical OpenAPI profile) |
+| `api/` | C01 (health), C02 (contracts, service auth, stubs, snapshot), C08 (enrichment provenance, catalog-scoped auth), C13 (landed: `/v1/index/*` real) |
+| `config/` | C01, C02 (settings, canonical OpenAPI profile), C13 (feed settings) |
 | `db/` | C05 (engine, bounded pool, boot without a database) |
-| `migrations/` | C05 |
+| `migrations/` | C05, C13 (landed: `text_provenance`, `sync_checkpoint`) |
 | `data/` | C06b (landed: generate/ingest CLI), C10 (landed: `world/`), C23 |
 | `enrichment/` | C09 |
-| `indexing/` | C11 (landed: source-text/v1 + embeddings), C13, C22, C23 |
+| `indexing/` | C11 (landed: source-text/v1 + embeddings), C13 (landed: catalog drain + `sku_provenance.json`), C22, C23 |
 | `retrieval/` | C14, C18, C20, C21, C22, C25, C26, C27 |
 | `assist/` | C30, C31, C32, C33, C35 |
 | `evals/` | C24, C38 |
@@ -107,7 +107,7 @@ uv run --system-certs pytest
 
 ## Current state
 
-Populated after C11: `api/`, `config/`, `db/`, `migrations/`, `data/` (C06b/C10), `enrichment/` (C09), `indexing/` (C11) and `support/`. Remaining folders are reserved names. Two settings in
+Populated after C13: `api/`, `config/`, `db/`, `migrations/`, `data/` (C06b/C10), `enrichment/` (C09), `indexing/` (C11 + C13) and `support/`. Remaining folders are reserved names. Two settings in
 `pyproject.toml` hold the layout together:
 
 - `pythonpath = ["src", "tests"]` — makes `support/` importable from any subfolder.

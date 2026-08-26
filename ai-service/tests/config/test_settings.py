@@ -268,3 +268,39 @@ def test_canonical_openapi_settings_pin_embedding_keys_to_absent() -> None:
     assert settings.jpv_embedding_model is None
     assert settings.jpv_embedding_base_url is None
     assert settings.jpv_embedding_batch_size == 64
+
+
+def test_settings_do_not_require_index_feed_key_to_boot(monkeypatch: pytest.MonkeyPatch) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.delenv("JPV_INDEX_FEED_BASE_URL", raising=False)
+    monkeypatch.delenv("JPV_INDEX_FEED_API_KEY", raising=False)
+    monkeypatch.delenv("JPV_INDEX_SYNC_TIME_BUDGET_SECONDS", raising=False)
+    get_settings.cache_clear()
+
+    settings = get_settings()
+
+    assert settings.jpv_index_feed_base_url is None
+    assert settings.jpv_index_feed_api_key is None
+    assert settings.jpv_index_sync_time_budget_seconds == 180
+
+
+def test_blank_index_feed_strings_are_treated_as_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.setenv("JPV_INDEX_FEED_BASE_URL", "   ")
+    monkeypatch.setenv("JPV_INDEX_FEED_API_KEY", "")
+    monkeypatch.setenv("JPV_INDEX_SYNC_TIME_BUDGET_SECONDS", "")
+    get_settings.cache_clear()
+
+    settings = get_settings()
+
+    assert settings.jpv_index_feed_base_url is None
+    assert settings.jpv_index_feed_api_key is None
+    assert settings.jpv_index_sync_time_budget_seconds == 180
+
+
+def test_canonical_openapi_settings_pin_index_feed_keys_to_absent() -> None:
+    settings = canonical_openapi_settings()
+
+    assert settings.jpv_index_feed_base_url is None
+    assert settings.jpv_index_feed_api_key is None
+    assert settings.jpv_index_sync_time_budget_seconds == 180

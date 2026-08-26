@@ -119,6 +119,31 @@ class Settings(BaseSettings):
         gt=0,
         description="Texts per provider embedding call. Default 64.",
     )
+    jpv_index_feed_base_url: str | None = Field(
+        default=None,
+        description=(
+            "C13 catalog index feed (JPV_INDEX_FEED_BASE_URL). .NET API origin "
+            "for GET /api/ai/index-feed/catalog. Distinct from JWT_SECRET. "
+            "Not required to boot /health; required for a real catalog sync."
+        ),
+    )
+    jpv_index_feed_api_key: str | None = Field(
+        default=None,
+        description=(
+            "C13 catalog index feed (JPV_INDEX_FEED_API_KEY). Sent as "
+            "X-Index-Feed-Key. Distinct from JWT_SECRET and JPV_EMBEDDING_*. "
+            "Not required to boot /health; required for a real catalog sync. "
+            "Must not fall back to JWT_SECRET."
+        ),
+    )
+    jpv_index_sync_time_budget_seconds: int = Field(
+        default=180,
+        gt=0,
+        description=(
+            "Wall-clock budget for one catalog drain (HTTP or CLI). Default 180. "
+            "Checked after each item; exhaustion persists a resume cursor."
+        ),
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -147,6 +172,8 @@ class Settings(BaseSettings):
         "jpv_embedding_api_key",
         "jpv_embedding_model",
         "jpv_embedding_base_url",
+        "jpv_index_feed_base_url",
+        "jpv_index_feed_api_key",
         mode="before",
     )
     @classmethod
@@ -173,6 +200,13 @@ class Settings(BaseSettings):
     def blank_embedding_batch_size_is_default(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
             return 64
+        return value
+
+    @field_validator("jpv_index_sync_time_budget_seconds", mode="before")
+    @classmethod
+    def blank_index_sync_time_budget_is_default(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return 180
         return value
 
 
@@ -213,4 +247,7 @@ def canonical_openapi_settings() -> Settings:
         jpv_embedding_model=None,
         jpv_embedding_base_url=None,
         jpv_embedding_batch_size=64,
+        jpv_index_feed_base_url=None,
+        jpv_index_feed_api_key=None,
+        jpv_index_sync_time_budget_seconds=180,
     )

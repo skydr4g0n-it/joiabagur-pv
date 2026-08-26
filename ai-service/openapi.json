@@ -583,6 +583,7 @@
         "properties": {
           "batch_size": {
             "default": 100,
+            "description": "Ignored; catalog feed page size is the server-fixed 50",
             "maximum": 1000.0,
             "minimum": 1.0,
             "title": "Batch Size",
@@ -590,7 +591,7 @@
           },
           "full": {
             "default": false,
-            "description": "Force a full re-index",
+            "description": "Force a full re-index; ignores body and checkpoint",
             "title": "Full",
             "type": "boolean"
           },
@@ -604,8 +605,21 @@
                 "type": "null"
               }
             ],
-            "description": "Cursor of the previous sync; null requests a full pass",
+            "description": "Watermark of the catalog feed keyset; null with since_id null",
             "title": "Since"
+          },
+          "since_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Second component of the catalog feed keyset; not required when since is null",
+            "title": "Since Id"
           }
         },
         "title": "IndexSyncRequest",
@@ -623,8 +637,21 @@
                 "type": "null"
               }
             ],
-            "description": "Cursor to send on the next sync",
+            "description": "Watermark to send on the next sync",
             "title": "Cursor"
+          },
+          "cursor_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Keyset id to send on the next sync",
+            "title": "Cursor Id"
           },
           "deleted": {
             "minimum": 0.0,
@@ -646,10 +673,24 @@
                 "type": "null"
               }
             ],
-            "description": "Cursor the run started from",
+            "description": "Watermark the run started from",
             "title": "Since"
           },
+          "since_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Keyset id the run started from",
+            "title": "Since Id"
+          },
           "skipped": {
+            "description": "Items whose embedding was omitted",
             "minimum": 0.0,
             "title": "Skipped",
             "type": "integer"
@@ -1705,6 +1746,9 @@
           },
           "501": {
             "description": "Not implemented yet; delivered in a later change"
+          },
+          "503": {
+            "description": "Catalog sync cannot run: missing JPV_INDEX_FEED_BASE_URL, JPV_INDEX_FEED_API_KEY, JPV_EMBEDDING_API_KEY, sku_provenance.json, or the catalog feed did not respond"
           }
         },
         "security": [
@@ -1757,6 +1801,9 @@
           },
           "501": {
             "description": "Not implemented yet; delivered in a later change"
+          },
+          "503": {
+            "description": "Catalog sync cannot run: missing JPV_INDEX_FEED_BASE_URL, JPV_INDEX_FEED_API_KEY, JPV_EMBEDDING_API_KEY, sku_provenance.json, or the catalog feed did not respond"
           }
         },
         "security": [
