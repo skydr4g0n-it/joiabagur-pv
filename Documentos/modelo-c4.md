@@ -89,7 +89,7 @@ El sistema está compuesto por cinco contenedores principales: una aplicación w
   - Evaluación offline (golden set, métricas de recuperación y generación)
 - **Lo que NO hace**: no calcula precio, stock ni permisos; no escribe ni lee el esquema `public` por SQL; no atiende al navegador
 - **Despliegue**: contenedor Docker en la misma EC2, en red interna; **el puerto no se publica en nginx**. En desarrollo, servicio `jbg-ai` del Compose (`8001` → 8000)
-- **Estado actual**: contrato congelado (C02) — 8 endpoints `/v1` con modelos Pydantic completos, JWT interno HS256 y `openapi.json` versionado. Las respuestas son stubs deterministas bajo `STUB_MODE`; la lógica real llega change a change (C09, C13, C14, C24, C26, C30, C35)
+- **Estado actual**: contrato congelado (C02) — 8 endpoints `/v1` con modelos Pydantic completos, JWT interno HS256 y `openapi.json` versionado. Las respuestas son stubs deterministas bajo `STUB_MODE`; enriquecimiento (C09) e índice de catálogo (C13) son reales cuando `STUB_MODE=false`. El resto llega change a change (C14, C24, C26, C30, C35)
 
 > **Regla de frontera (diseño §6.2):** *Python calcula parecidos y redacta; .NET calcula números y decide.* El backend .NET actúa de **hidratador** y es la autoridad final: descarta cualquier candidato que ya no cumpla las reglas de negocio.
 

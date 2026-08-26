@@ -42,7 +42,7 @@ Microservicio añadido en el Proyecto Final de IA (changes `init-ai-service-skel
 - **Aislamiento entre puntos de venta**: desde C22 el `pos_id` del token es el **único filtro duro** del recuperador, así que no existe ningún valor comodín. El scope de catálogo se cierra por **dos vías independientes**: el cliente .NET rechaza un scope de catálogo en recuperación antes de emitir la petición, y `jbg-ai` sigue exigiendo `pos_id` en esas rutas (C08)
 - **Contrato**: 8 endpoints `/v1` congelados en `ai-service/openapi.json`, con test de snapshot; `STUB_MODE` sirve respuestas deterministas mientras la lógica real no existe (C02). El de enriquecimiento se renegoció en C08 para que cada valor propuesto declare su **procedencia** (`rule` \| `inferred`) además de su confianza: sin ese dato la revisión híbrida por campo no es implementable
 
-**Frontera de responsabilidad:** Python solo hace cálculo vectorial y generación con LLM; .NET conserva toda la regla de negocio y es la autoridad final sobre precio, stock y permisos. Python **nunca** lee ni escribe el esquema `public` por SQL, y el navegador nunca habla con Python: la SPA llama al backend .NET y este llama a `jbg-ai` con un JWT interno de servicio. C13 tira (`pull`) de `GET /api/ai/index-feed/*` con `X-Index-Feed-Key`; no hay push HTTP hacia `POST /v1/index/sync` (sigue siendo el stub C13).
+**Frontera de responsabilidad:** Python solo hace cálculo vectorial y generación con LLM; .NET conserva toda la regla de negocio y es la autoridad final sobre precio, stock y permisos. Python **nunca** lee ni escribe el esquema `public` por SQL, y el navegador nunca habla con Python: la SPA llama al backend .NET y este llama a `jbg-ai` con un JWT interno de servicio. C13 tira (`pull`) de `GET /api/ai/index-feed/catalog` con `X-Index-Feed-Key` desde `POST /v1/index/sync`; no hay push HTTP .NET → Python ni dreno del feed POS.
 
 ### Infraestructura
 - **Contenedores**: Docker
@@ -142,7 +142,7 @@ El fichero real levanta la base de datos, pgAdmin y el servicio de IA. El backen
 |---|---|---|---|
 | `postgres` | `pgvector/pgvector:pg15` | `5433` → 5432 | Imagen con **pgvector**. El esquema `ai`, la extensión y el rol dedicado los crea `ai-service/migrations/bootstrap.sql`, **una vez y con privilegios de administrador**; levantar Compose no los crea |
 | `pgadmin` | `dpage/pgadmin4` | `8080` → 80 | Administración de la BD |
-| `jbg-ai` | build de `../ai-service` | `8001` → 8000 | Variables: `APP_ENV`, `SERVICE_VERSION`, `LOG_LEVEL`, `JWT_SECRET` (placeholder local; en producción desde SSM en C17), `STUB_MODE` y `DATABASE_URL` (apunta a `postgres:5432` por nombre de red, no al puerto publicado). Sin `depends_on`: el motor es perezoso y el contenedor arranca aunque la base no esté aprovisionada |
+| `jbg-ai` | build de `../ai-service` | `8001` → 8000 | Variables: `APP_ENV`, `SERVICE_VERSION`, `LOG_LEVEL`, `JWT_SECRET` (placeholder local; en producción desde SSM en C17), `STUB_MODE`, `DATABASE_URL` (apunta a `postgres:5432` por nombre de red, no al puerto publicado) y `JPV_INDEX_FEED_*` / tope 180 s (C13; URL `http://host.docker.internal:5056`, key distinta de `JWT_SECRET`). Sin `depends_on`: el motor es perezoso y el contenedor arranca aunque la base no esté aprovisionada |
 
 Todos comparten la red `jpv-network`, que es la que permitirá a `jbg-ai` alcanzar Postgres sin exponer puertos adicionales.
 
@@ -392,14 +392,14 @@ joiabagur-pv/
 │   ├── src/                             # pages, components, services, hooks, providers, routing, types
 │   ├── e2e/                             # Playwright
 │   └── package.json
-├── ai-service/                          # Microservicio de IA (C01–C11)
+├── ai-service/                          # Microservicio de IA (C01–C13)
 │   ├── src/jbg_ai/
 │   │   ├── api/                         # main.py (create_app), auth.py, deps.py, middleware.py, routers/, schemas/
 │   │   ├── config/                      # settings.py (pydantic-settings)
 │   │   ├── db/                          # motor perezoso, pool acotado (C05)
 │   │   ├── data/                        # CLI C06b; api.main no lo importa
 │   │   ├── enrichment/                  # extractor C09 (vocabularios, talla, LiteLLM, auditor)
-│   │   ├── indexing/                    # C11: source-text/v1 + embeddings LiteLLM; api.main no lo importa
+│   │   ├── indexing/                    # C11 source-text/embeddings (congelado) + C13 feed/orquestador/mapa; api.main no lo importa
 │   │   └── stubs/                       # respuestas deterministas bajo STUB_MODE
 │   ├── prompts/                         # catalog-synth/v3 (C06b) + enrichment/v1 (C09)
 │   ├── openapi.json                     # snapshot versionado del contrato

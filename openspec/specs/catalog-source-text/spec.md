@@ -1,7 +1,7 @@
 # catalog-source-text Specification
 
 ## Purpose
-Canonical `source-text/v1` renderer and SHA-256 `source_hash` for catalog `doc_text`, plus an injectable LiteLLM embedding client (1536-d, in-process cache, batch, backoff) in `jbg_ai.indexing`. The HTTP app does not import the library; C13/C14/C23 reuse it without reimplementing.
+Canonical `source-text/v1` renderer and SHA-256 `source_hash` for catalog `doc_text`, plus an injectable LiteLLM embedding client (1536-d, in-process cache, batch, backoff) in `jbg_ai.indexing`. `jbg_ai.api.main` does not import the library; the index router and later C14/C23 reuse it without reimplementing.
 
 ## Requirements
 
@@ -123,13 +123,16 @@ Calling `embed` without `JPV_EMBEDDING_API_KEY` MUST fail with an explicit domai
 - **AND** the RAG LLM key is not used
 
 ### Requirement: The HTTP application does not import the indexing library
-`jbg_ai.api.main` MUST NOT import `jbg_ai.indexing`. `POST /v1/index/sync` and `GET /v1/index/status` MUST remain the C13 stub (or HTTP 501 when `STUB_MODE` is false). The OpenAPI snapshot MUST NOT be regenerated. The library MUST NOT write rows to `ai.product_document` and MUST NOT add an Alembic or EF Core migration.
+`jbg_ai.api.main` MUST NOT import `jbg_ai.indexing`. Catalog index synchronisation MAY import the package from the index router. The source-text renderer and the embedding adapter MUST remain free of HTTP and SQL. `indexing/embeddings.py` MUST NOT be edited by the catalog indexer. Writing `ai.product_document`, adding the C13 Alembic revision, and regenerating `ai-service/openapi.json` are the catalog indexer's responsibility, not the source-text library's.
 
-#### Scenario: The service HTTP surface is unchanged
-- **WHEN** this change is implemented
-- **THEN** `jbg_ai.api.main` does not import `jbg_ai.indexing`
-- **AND** `POST /v1/index/sync` is still the C13 stub or 501
-- **AND** `ai-service/openapi.json` is unchanged
+#### Scenario: The application factory stays decoupled from indexing
+- **WHEN** `jbg_ai.api.main` is inspected
+- **THEN** its source does not mention `jbg_ai.indexing`
+
+#### Scenario: embeddings.py stays frozen
+- **WHEN** the catalog indexer is implemented
+- **THEN** `indexing/embeddings.py` is unchanged relative to the C11 freeze
+- **AND** `build_source_text` / `hash_source_text` still have no HTTP or SQL dependency
 
 ### Requirement: The indexing unit suite makes no provider or database calls
 Tests under `ai-service/tests/indexing/` MUST inject a fake `EmbeddingClient`. They MUST NOT open sockets to embedding providers, LLM providers or RDS. They MUST NOT use a database marker or Testcontainers.
