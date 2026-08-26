@@ -18,11 +18,13 @@ class FakeEnrichLlm:
         default: EnrichmentExtraction | None = None,
         by_sku: Callable[[EnrichProductInput], EnrichmentExtraction] | None = None,
         delay: float = 0.0,
+        errors: dict[str, Exception] | None = None,
     ) -> None:
         self.responses = responses or {}
         self.default = default or EnrichmentExtraction()
         self.by_sku = by_sku
         self.delay = delay
+        self.errors = errors or {}
         self.calls: list[EnrichProductInput] = []
         self.in_flight = 0
         self.max_in_flight = 0
@@ -37,6 +39,8 @@ class FakeEnrichLlm:
         if self.delay:
             await asyncio.sleep(self.delay)
         try:
+            if product.sku in self.errors:
+                raise self.errors[product.sku]
             if self.by_sku is not None:
                 return self.by_sku(product)
             return self.responses.get(product.sku, self.default)

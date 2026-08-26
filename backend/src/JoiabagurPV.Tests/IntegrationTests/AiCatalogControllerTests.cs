@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using FluentAssertions;
 using JoiabagurPV.Application.DTOs.Ai;
 using JoiabagurPV.Application.DTOs.Auth;
@@ -126,6 +127,35 @@ public class AiCatalogControllerTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// The AutoBulk runbook sends the member name. Without a string enum converter
+    /// the body does not bind and the action used to throw ArgumentNullException.
+    /// </summary>
+    [Fact]
+    public async Task EnrichBatch_AcceptsReviewModeAsAutoBulkString()
+    {
+        using var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+                services.AddScoped<IAiGatewayClient>(_ => new SucceedingGateway(_product.Id))));
+
+        var admin = await AuthenticateAgainstAsync(factory, "admin", "Admin123!");
+        var payload =
+            $$"""{"productIds":["{{_product.Id}}"],"reviewMode":"AutoBulk","force":false}""";
+
+        var response = await admin.PostAsync(
+            Endpoint,
+            new StringContent(payload, Encoding.UTF8, "application/json"));
+
+        response.StatusCode.Should().Be(
+            HttpStatusCode.OK,
+            "the runbook sends AutoBulk as a member name, not only as the integer 2");
+
+        var body = await response.Content.ReadFromJsonAsync<EnrichBatchResponse>();
+        body!.Requested.Should().Be(1);
+        body.Enriched.Should().Be(1);
+        body.Profiles.Should().ContainSingle(profile => profile.ReviewStatus == "Approved");
+    }
+
+    /// <summary>
     /// There is no read surface on this capability, and that is a property worth asserting
     /// rather than a note in a document: reading, approving and measuring profiles belong
     /// elsewhere, and a route added "just for a counter" is how that boundary erodes.
@@ -248,6 +278,37 @@ public class AiCatalogControllerTests : IAsyncLifetime
         body.Enriched.Should().Be(0);
 
         await AssertProfileCountAsync(1, "the winner's profile is the only one, and it survived");
+    }
+
+    /// <summary>Returns one proposal so the string-enum bind can be asserted end to end.</summary>
+    private sealed class SucceedingGateway(Guid productId) : IAiGatewayClient
+    {
+        public Task<AiSearchResponse> SearchAsync(
+            AiSearchRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AiEnrichResponse> EnrichAsync(
+            AiEnrichRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AiEnrichResponse
+            {
+                Profiles =
+                [
+                    new AiProposedProfile
+                    {
+                        ProductId = productId.ToString(),
+                        Sku = "SKU-ENRICH-1",
+                        Materials = new AiProposedList
+                        {
+                            Value = ["plata"], Confidence = 0.9, Source = AiFieldSource.Inferred
+                        },
+                        ColorTags = new AiProposedList { Confidence = 0.9, Source = AiFieldSource.Inferred },
+                        StyleTags = new AiProposedList { Confidence = 0.9, Source = AiFieldSource.Inferred },
+                        OccasionTags = new AiProposedList { Confidence = 0.9, Source = AiFieldSource.Inferred }
+                    }
+                ],
+                PromptVersion = "enrichment/v1",
+                Usage = new AiUsage()
+            });
     }
 
     /// <summary>A gateway that only knows how to fail, in the way the test chooses.</summary>

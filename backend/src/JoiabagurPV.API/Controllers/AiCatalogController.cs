@@ -58,12 +58,19 @@ public class AiCatalogController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> EnrichBatch(
-        [FromBody] EnrichBatchRequest request,
+        [FromBody] EnrichBatchRequest? request,
         CancellationToken cancellationToken)
     {
         if (!_currentUserService.UserId.HasValue)
         {
             return Unauthorized(new { message = "User not authenticated." });
+        }
+
+        // SuppressModelStateInvalidFilter is on: a body that does not bind still
+        // reaches the action as null, and FluentValidation then throws ArgumentNullException.
+        if (request is null)
+        {
+            return BadRequest(new { errors = new[] { "A batch body is required." } });
         }
 
         // Validated explicitly: this project registers validators but wires no automatic

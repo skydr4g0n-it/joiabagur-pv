@@ -114,6 +114,137 @@ def test_real_mode_does_not_use_stub_cycle(issue_token) -> None:
     assert fake.calls
 
 
+def test_defaults_remain_gpt4o_and_concurrency_8() -> None:
+    from jbg_ai.enrichment.constants import (
+        DEFAULT_RAG_LLM_CONCURRENCY,
+        DEFAULT_RAG_LLM_MODEL,
+        MAX_ENRICH_PROVIDER_ATTEMPTS,
+    )
+
+    assert DEFAULT_RAG_LLM_MODEL == "openai/gpt-4o"
+    assert DEFAULT_RAG_LLM_CONCURRENCY == 8
+    assert MAX_ENRICH_PROVIDER_ATTEMPTS == 4
+    source = Path(__import__("jbg_ai.enrichment.llm", fromlist=["llm"]).__file__).read_text(
+        encoding="utf-8"
+    )
+    assert '"num_retries": 0' in source
+
+
+def test_retry_on_429() -> None:
+    calls = {"n": 0}
+    extraction = EnrichmentExtraction(piece_type="anillo")
+
+    async def _complete(product: EnrichProductInput, prompt: str) -> str:
+        _ = product, prompt
+        calls["n"] += 1
+        if calls["n"] == 1:
+            error = RuntimeError("rate limited")
+            error.status_code = 429  # type: ignore[attr-defined]
+            raise error
+        return extraction.model_dump_json()
+
+    sleeps: list[float] = []
+
+    async def _sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    client = LiteLlmEnrichClient(
+        api_key="sk-test", complete=_complete, sleep=_sleep, max_attempts=4
+    )
+    product = EnrichProductInput(product_id="P-1", sku="SKU-1", name="Anillo")
+    got = asyncio.run(client.extract(product, "prompt"))
+
+    assert got.piece_type == "anillo"
+    assert calls["n"] == 2
+    assert sleeps == [2.0]
+
+
+def test_retry_on_rate_limit_error_by_type_name() -> None:
+    class RateLimitError(Exception):
+        pass
+
+    calls = {"n": 0}
+    extraction = EnrichmentExtraction(materials=["plata"])
+
+    async def _complete(product: EnrichProductInput, prompt: str) -> str:
+        _ = product, prompt
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RateLimitError("tpm")
+        return extraction.model_dump_json()
+
+    sleeps: list[float] = []
+
+    async def _sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    client = LiteLlmEnrichClient(
+        api_key="sk-test", complete=_complete, sleep=_sleep
+    )
+    product = EnrichProductInput(product_id="P-1", sku="SKU-1", name="Pulsera")
+    got = asyncio.run(client.extract(product, "prompt"))
+
+    assert got.materials == ["plata"]
+    assert calls["n"] == 2
+    assert sleeps == [2.0]
+
+
+def test_non_retryable_error_is_not_retried() -> None:
+    calls = {"n": 0}
+
+    async def _complete(product: EnrichProductInput, prompt: str) -> str:
+        _ = product, prompt
+        calls["n"] += 1
+        error = RuntimeError("bad request")
+        error.status_code = 400  # type: ignore[attr-defined]
+        raise error
+
+    sleeps: list[float] = []
+
+    async def _sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    client = LiteLlmEnrichClient(
+        api_key="sk-test", complete=_complete, sleep=_sleep
+    )
+    product = EnrichProductInput(product_id="P-1", sku="SKU-1", name="Anillo")
+    try:
+        asyncio.run(client.extract(product, "prompt"))
+    except RuntimeError as exc:
+        assert "bad request" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError")
+
+    assert calls["n"] == 1
+    assert sleeps == []
+
+
+def test_one_failed_extract_does_not_drop_the_rest_of_the_batch() -> None:
+    async def _run() -> None:
+        fake = FakeEnrichLlm(
+            default=EnrichmentExtraction(piece_type="anillo"),
+            errors={"SKU-FAIL": RuntimeError("rate limited")},
+        )
+        settings = build_settings(
+            stub_mode=False,
+            jpv_rag_llm_api_key="sk-test",
+            jpv_rag_llm_concurrency=8,
+        )
+        request = EnrichRequest(
+            products=[
+                EnrichProductInput(product_id="P-1", sku="SKU-1", name="Anillo"),
+                EnrichProductInput(product_id="P-2", sku="SKU-FAIL", name="Colgante"),
+                EnrichProductInput(product_id="P-3", sku="SKU-3", name="Pulsera"),
+            ]
+        )
+        principal = ServicePrincipal(user_id="u-1", role="Operator", trace_id="t-1")
+        response = await enrich_products(request, principal, settings, fake)
+        assert [profile.sku for profile in response.profiles] == ["SKU-1", "SKU-3"]
+        assert len(fake.calls) == 3
+
+    asyncio.run(_run())
+
+
 def test_real_mode_without_key_fails_explicitly(issue_token) -> None:
     settings = build_settings(stub_mode=False, jpv_rag_llm_api_key=None)
     app = create_app(settings)

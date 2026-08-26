@@ -282,7 +282,24 @@ async def enrich_products(
         async with semaphore:
             return await enrich_one(product, llm, prompt, vocabs)
 
-    profiles = list(await asyncio.gather(*[_guarded(product) for product in request.products]))
+    # One product that 429s must not 500 the other forty-nine. .NET already
+    # counts a missing proposal as Failed and keeps the rest of the batch.
+    outcomes = await asyncio.gather(
+        *[_guarded(product) for product in request.products],
+        return_exceptions=True,
+    )
+    profiles: list[ProposedProfile] = []
+    for product, outcome in zip(request.products, outcomes, strict=True):
+        if isinstance(outcome, BaseException):
+            if not isinstance(outcome, Exception):
+                raise outcome
+            logger.warning(
+                "enrich_one_failed sku=%s error=%s",
+                product.sku,
+                outcome,
+            )
+            continue
+        profiles.append(outcome)
     return EnrichResponse(
         profiles=profiles,
         usage=Usage(model=llm.model_id),

@@ -1,8 +1,17 @@
+using System.Text.Json.Serialization;
+
 namespace JoiabagurPV.Application.DTOs.Ai;
 
 /// <summary>
 /// How a batch decides the review status of the profiles it produces.
 /// </summary>
+/// <remarks>
+/// Bound with <see cref="JsonStringEnumConverter{TEnum}"/> so the runbook body
+/// <c>"reviewMode":"AutoBulk"</c> deserializes. Integer values (2) still bind:
+/// <c>allowIntegerValues</c> defaults to true. Applied on the enum, not on global
+/// <c>AddJsonOptions</c>, so the rest of the API keeps emitting numeric enums.
+/// </remarks>
+[JsonConverter(typeof(JsonStringEnumConverter<ProfileReviewMode>))]
 public enum ProfileReviewMode
 {
     /// <summary>
