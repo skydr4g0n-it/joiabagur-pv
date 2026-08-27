@@ -12,8 +12,13 @@ from jbg_ai.api.main import create_app
 from support.sample_requests import V1_REQUESTS
 from support.settings import build_settings
 
-#: C09 delivered enrich; C13 delivered index. Remaining frozen routes still 501.
-_REAL_WHEN_STUBS_OFF = {"/v1/enrich/products", "/v1/index/sync", "/v1/index/status"}
+#: C09 delivered enrich; C13 delivered index; C14 delivered product retrieval.
+_REAL_WHEN_STUBS_OFF = {
+    "/v1/enrich/products",
+    "/v1/index/sync",
+    "/v1/index/status",
+    "/v1/retrieval/products",
+}
 STUB_ONLY_REQUESTS = [item for item in V1_REQUESTS if item[1] not in _REAL_WHEN_STUBS_OFF]
 
 
@@ -41,10 +46,10 @@ def test_unimplemented_route_returns_501_when_stub_mode_off(
 
 def test_501_message_names_the_delivering_change(stubs_off_client: TestClient) -> None:
     response = stubs_off_client.post(
-        "/v1/retrieval/products", json={"query": "anillo", "top_k": 1}
+        "/v1/retrieval/substitutes", json={"product_id": "P-0001", "top_k": 1}
     )
 
-    assert "C14" in response.json()["detail"]
+    assert "C26" in response.json()["detail"]
 
 
 def test_authentication_still_precedes_the_stub_guard(stubs_off_client: TestClient) -> None:

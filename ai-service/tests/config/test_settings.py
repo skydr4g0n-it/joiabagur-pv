@@ -304,3 +304,47 @@ def test_canonical_openapi_settings_pin_index_feed_keys_to_absent() -> None:
     assert settings.jpv_index_feed_base_url is None
     assert settings.jpv_index_feed_api_key is None
     assert settings.jpv_index_sync_time_budget_seconds == 180
+
+
+def test_settings_do_not_require_retrieval_threshold_to_boot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.delenv("JPV_RETRIEVAL_DISTANCE_THRESHOLD", raising=False)
+    get_settings.cache_clear()
+
+    settings = get_settings()
+
+    assert settings.jpv_retrieval_distance_threshold == 0.65
+
+
+def test_blank_retrieval_threshold_is_treated_as_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.setenv("JPV_RETRIEVAL_DISTANCE_THRESHOLD", "   ")
+    get_settings.cache_clear()
+
+    assert get_settings().jpv_retrieval_distance_threshold == 0.65
+
+
+def test_settings_reject_retrieval_threshold_outside_cosine_domain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _minimal_env(monkeypatch)
+    get_settings.cache_clear()
+
+    monkeypatch.setenv("JPV_RETRIEVAL_DISTANCE_THRESHOLD", "0")
+    with pytest.raises(ValidationError):
+        get_settings()
+
+    monkeypatch.setenv("JPV_RETRIEVAL_DISTANCE_THRESHOLD", "2.1")
+    get_settings.cache_clear()
+    with pytest.raises(ValidationError):
+        get_settings()
+
+
+def test_canonical_openapi_settings_pin_retrieval_threshold() -> None:
+    settings = canonical_openapi_settings()
+
+    assert settings.jpv_retrieval_distance_threshold == 0.65

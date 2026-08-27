@@ -30,14 +30,14 @@ tests/
 └── evals/            # harness, metrics, baselines, scenario replays
 ```
 
-Folders are created **on demand**, not up front. `api/`, `config/`, `support/`, `db/`, `migrations/`, `data/`, `enrichment/` and `indexing/` are populated; the rest are reserved names so nobody invents a
+Folders are created **on demand**, not up front. `api/`, `config/`, `support/`, `db/`, `migrations/`, `data/`, `enrichment/`, `indexing/` and `retrieval/` are populated; the rest are reserved names so nobody invents a
 parallel taxonomy later.
 
 ## Which folder for which change
 
 | Folder | Changes that will land here |
 |---|---|
-| `api/` | C01 (health), C02 (contracts, service auth, stubs, snapshot), C08 (enrichment provenance, catalog-scoped auth), C13 (landed: `/v1/index/*` real) |
+| `api/` | C01 (health), C02 (contracts, service auth, stubs, snapshot), C08 (enrichment provenance, catalog-scoped auth), C13 (landed: `/v1/index/*` real), C14 (landed: `/v1/retrieval/products` real) |
 | `config/` | C01, C02 (settings, canonical OpenAPI profile), C13 (feed settings) |
 | `db/` | C05 (engine, bounded pool, boot without a database) |
 | `migrations/` | C05, C13 (landed: `text_provenance`, `sync_checkpoint`) |
@@ -107,7 +107,7 @@ uv run --system-certs pytest
 
 ## Current state
 
-Populated after C13: `api/`, `config/`, `db/`, `migrations/`, `data/` (C06b/C10), `enrichment/` (C09), `indexing/` (C11 + C13) and `support/`. Remaining folders are reserved names. Two settings in
+Populated after C14: `api/`, `config/`, `db/`, `migrations/`, `data/` (C06b/C10), `enrichment/` (C09), `indexing/` (C11 + C13), `retrieval/` (C14) and `support/`. Remaining folders are reserved names. Two settings in
 `pyproject.toml` hold the layout together:
 
 - `pythonpath = ["src", "tests"]` — makes `support/` importable from any subfolder.

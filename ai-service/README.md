@@ -12,6 +12,7 @@ Python FastAPI microservice for the JoiaBagur Proyecto Final RAG.
 - **C10** (HU-AIENG-010) adds nested CLI `python -m jbg_ai.data world simulate|ingest` under `jbg_ai.data.world`. Simulate is offline (YAML of 12 POS, no Postgres, no LLM). Ingest uses `JPV_PG*` against local Docker and does not touch `"Products"` / `"Collections"` / schema `ai`. Recipe: [`../data/world/pos-profiles.yaml`](../data/world/pos-profiles.yaml). See [`src/jbg_ai/data/README.md`](src/jbg_ai/data/README.md).
 - **C11** (HU-AIENG-011) adds the library `jbg_ai.indexing`: canonical `source-text/v1` (`build_source_text` / `hash_source_text`) and an injectable LiteLLM embedding client (`aembedding`, 1536-d, in-memory cache, batch 64). `api.main` does not import it. `JPV_EMBEDDING_*` are optional at boot; embedding requires its own key and does not fall back to `JPV_RAG_LLM_API_KEY`.
 - **C13** (HU-AIENG-013) replaces the `/v1/index/*` stub when `STUB_MODE=false`: catalog feed pull (`X-Index-Feed-Key`, keyset `since`/`since_id`), committed `src/jbg_ai/indexing/sku_provenance.json`, skip-embed upsert, tombstones, checkpoint, CLI `python -m jbg_ai.indexing sync [--full]`. Auth is `get_catalog_principal` (no `pos_id`). The POS feed method exists on the client and is **not** called. `indexing/embeddings.py` is not edited. OpenAPI adds `since_id` / `cursor_id`.
+- **C14** (HU-AIENG-014) replaces the `/v1/retrieval/products` stub when `STUB_MODE=false`: query embed with the C11 `LiteLlmEmbeddingClient` (`max_attempts=1`; `indexing/embeddings.py` unchanged), cosine `<=>` over HNSW, distance threshold `JPV_RETRIEVAL_DISTANCE_THRESHOLD` (default 0.65), overfetch after the threshold. `mode=hybrid`/`lexical` run the vector branch until C21. Missing key, `DATABASE_URL` or compatible index → 503, not 501. Substitutes stay 501 (C26). OpenAPI snapshot is not regenerated.
 
 Boundary rule: *Python computes similarity and writes prose; .NET computes numbers and decides.* The service never emits a price or stock figure and never touches schema `public`.
 
@@ -49,10 +50,11 @@ Boundary rule: *Python computes similarity and writes prose; .NET computes numbe
 | `JPV_INDEX_FEED_BASE_URL` | no | — | C13 catalog feed origin. Distinct from `JWT_SECRET`. Absence does not block `/health`; real sync requires it |
 | `JPV_INDEX_FEED_API_KEY` | no | — | C13 `X-Index-Feed-Key`. Distinct from `JWT_SECRET` and `JPV_EMBEDDING_*`. Never falls back to `JWT_SECRET` |
 | `JPV_INDEX_SYNC_TIME_BUDGET_SECONDS` | no | `180` | wall-clock budget for one catalog drain; blank → 180 |
+| `JPV_RETRIEVAL_DISTANCE_THRESHOLD` | no | `0.65` | C14 cosine-distance cutoff `(0, 2]`. Absence does not block `/health`; blank → 0.65. Distinct from `JPV_EMBEDDING_*` |
 
 Missing or blank `APP_ENV`, `SERVICE_VERSION` or `JWT_SECRET` aborts startup (fail-fast), so the process never serves `/v1` half-configured.
 
-`DATABASE_URL` is **optional on purpose**. The service must boot with no database — that is a requirement of `ai-service-dev-compose`, not an accident — so the engine is built on first use and never at import time. Under `STUB_MODE` nothing asks for a session, so the container starts fine against a database that has not even been provisioned. LLM keys are not required to boot `/health`; the catalog CLI reads `JPV_CATALOG_LLM_*` from `backend/.env`. Real `POST /v1/enrich/products` (`STUB_MODE=false`) requires `JPV_RAG_LLM_API_KEY` and fails explicitly if it is missing — it does not invent profiles and does not return 501. Embedding (`jbg_ai.indexing`) requires `JPV_EMBEDDING_API_KEY` at call time and does not fall back to the RAG LLM key. Real `POST /v1/index/sync` requires `JPV_INDEX_FEED_BASE_URL`, `JPV_INDEX_FEED_API_KEY` and `JPV_EMBEDDING_API_KEY` (and the committed `sku_provenance.json`) and answers **503** naming the missing setting — never 501, and never `JWT_SECRET` as the feed key.
+`DATABASE_URL` is **optional on purpose**. The service must boot with no database — that is a requirement of `ai-service-dev-compose`, not an accident — so the engine is built on first use and never at import time. Under `STUB_MODE` nothing asks for a session, so the container starts fine against a database that has not even been provisioned. LLM keys are not required to boot `/health`; the catalog CLI reads `JPV_CATALOG_LLM_*` from `backend/.env`. Real `POST /v1/enrich/products` (`STUB_MODE=false`) requires `JPV_RAG_LLM_API_KEY` and fails explicitly if it is missing — it does not invent profiles and does not return 501. Embedding (`jbg_ai.indexing`) requires `JPV_EMBEDDING_API_KEY` at call time and does not fall back to the RAG LLM key. Real `POST /v1/index/sync` requires `JPV_INDEX_FEED_BASE_URL`, `JPV_INDEX_FEED_API_KEY` and `JPV_EMBEDDING_API_KEY` (and the committed `sku_provenance.json`) and answers **503** naming the missing setting — never 501, and never `JWT_SECRET` as the feed key. Real `POST /v1/retrieval/products` requires `JPV_EMBEDDING_API_KEY` and `DATABASE_URL` (and a compatible index) and answers **503** naming the missing dependency — never 501, and never 200 with `low_confidence` for an empty compatible index.
 
 ## Frozen endpoints (C02)
 
@@ -91,7 +93,7 @@ Rules that C03 must rely on:
 
 With `STUB_MODE=true` (the local and test default) every `/v1` route answers from deterministic fixtures: no LLM, no embeddings, no database, no clock. The same request always returns the same body, so the .NET client can assert its mapping against them.
 
-With `STUB_MODE=false` a route whose real logic does not exist yet answers **501** naming the change that will deliver it (C14 retrieval, C24 evals, C26 substitutes, C30 assist, C35 inventory). `POST /v1/enrich/products` is C09: the real pipeline, or 503 if `JPV_RAG_LLM_API_KEY` is missing — never 501. `POST /v1/index/sync` and `GET /v1/index/status` are C13: the catalog drain, or 503 if feed/embed settings or `sku_provenance.json` are missing — never 501. Later changes replace handlers one at a time; the contract frozen here is the one they must respect.
+With `STUB_MODE=false` a route whose real logic does not exist yet answers **501** naming the change that will deliver it (C24 evals, C26 substitutes, C30 assist, C35 inventory). `POST /v1/enrich/products` is C09: the real pipeline, or 503 if `JPV_RAG_LLM_API_KEY` is missing — never 501. `POST /v1/index/sync` and `GET /v1/index/status` are C13: the catalog drain, or 503 if feed/embed settings or `sku_provenance.json` are missing — never 501. `POST /v1/retrieval/products` is C14: the vector retriever, or 503 if `JPV_EMBEDDING_API_KEY`, `DATABASE_URL` or a compatible index is missing — never 501. Substitutes stay 501 until C26. Later changes replace remaining handlers one at a time; the contract frozen here is the one they must respect.
 
 ## OpenAPI snapshot
 
@@ -246,11 +248,10 @@ These four tests exist to catch failures that produce **no error at all**: an HN
 
 ## Explicit non-goals
 
-- No real retrieval or agent loops — stubs are replaced route by route in later changes. Enrichment is real when `STUB_MODE=false` (C09). Catalog index sync is real when `STUB_MODE=false` (C13)
+- No real retrieval or agent loops — stubs are replaced route by route in later changes. Enrichment is real when `STUB_MODE=false` (C09). Catalog index sync is real when `STUB_MODE=false` (C13). Product retrieval is real when `STUB_MODE=false` (C14): vector only until C21, distance threshold 0.65, no `query_log`, `indexing/embeddings.py` and `openapi.json` unchanged. Substitutes stay stub/501 (C26)
 - No `POST /v1/retrieval/complementary` or `POST /v1/families/suggest` — later OpenAPI negotiation
 - `ai.product_document` is written by C13 from the catalog feed; `ai.pos_projection` stays empty until C22; `ai.knowledge_*` until C23
-- No queries, no similarity search — typed retrieval is C14
-- No `ai.eval_*` tables (C24) and no `ai.query_log` (unassigned; see the change's open questions)
+- No `ai.eval_*` tables (C24) and no `ai.query_log` (unassigned; C14 logs `stage=embed|search` with `trace_id` instead)
 - No SQL access to schema `public`, ever
 - No production deploy, SSM, enriched health or `CREATE EXTENSION` on RDS (C17)
 - No production tuning: `halfvec`, `hnsw.iterative_scan`, `CREATE INDEX CONCURRENTLY` and the `VACUUM`/`REINDEX` cycle are deliberate omissions at ~1,500 vectors, not oversights
@@ -274,6 +275,7 @@ ai-service/
     data/           # C06b generate/ingest + C10 world/; not imported by api.main
     enrichment/     # C09 extractor: vocabs, size regex, LiteLLM port, auditor
     indexing/       # C11 source-text/embeddings (frozen) + C13 feed client, repo, orchestrator, sku_provenance.json
+    retrieval/      # C14 vector retriever: embed max_attempts=1, <=> HNSW, body filters
   prompts/          # versioned prompts: catalog-synth/v3 (C06b generate) + enrichment/v1 (C09 extract)
   migrations/
     bootstrap.sql   # one-off: extension, schema, dedicated role, grants
@@ -284,6 +286,7 @@ ai-service/
     config/         # settings and fail-fast validation
     data/           # C06b catalog CLI + C10 world/ (no provider sockets)
     migrations/     # schema, indexes, reversibility (marked `db`)
+    retrieval/      # C14 vector retriever (fakes; no provider sockets)
     support/        # shared helpers and injectable fakes
   alembic.ini       # no connection string: read from DATABASE_URL
   openapi.json      # versioned contract snapshot
