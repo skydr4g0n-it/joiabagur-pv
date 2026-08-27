@@ -1,7 +1,7 @@
 # ai-service-runtime Specification
 
 ## Purpose
-Runnable `jbg-ai` process behavior: fail-fast settings, public health with version, structured logging with `trace_id`, in-process smoke tests without external AI or production DB, and optional `JPV_RAG_LLM_*`, `JPV_EMBEDDING_*` and `JPV_INDEX_FEED_*` settings that MUST NOT block boot or `GET /health`.
+Runnable `jbg-ai` process behavior: fail-fast settings, public health with version, structured logging with `trace_id`, in-process smoke tests without external AI or production DB, and optional `JPV_RAG_LLM_*`, `JPV_EMBEDDING_*`, `JPV_INDEX_FEED_*` and `JPV_RETRIEVAL_DISTANCE_THRESHOLD` settings that MUST NOT block boot or `GET /health`.
 ## Requirements
 ### Requirement: Service exposes public health with version
 The `jbg-ai` service SHALL expose `GET /health` without authentication. The response MUST be HTTP 200 when the process is running and MUST include an OK status indicator and the configured service version (`SERVICE_VERSION`).
@@ -156,5 +156,27 @@ The `ai-service` test suite MUST verify health and settings fail-fast using Fast
 - **THEN** the response status is 503
 - **AND** the detail names `JPV_INDEX_FEED_API_KEY`
 - **AND** `JWT_SECRET` is not sent as `X-Index-Feed-Key`
+
+### Requirement: Retrieval distance threshold does not block process boot
+`JPV_RETRIEVAL_DISTANCE_THRESHOLD` MUST be optional when settings load. When omitted or supplied as a blank string it MUST default to 0.65. A configured value MUST be greater than 0 and MUST NOT exceed 2 (the cosine distance domain of pgvector `<=>`). Absence of this setting MUST NOT prevent the process from starting or from serving `GET /health`. The setting MUST stay distinct from `JWT_SECRET`, `JPV_EMBEDDING_*`, `JPV_RAG_LLM_*`, `JPV_INDEX_FEED_*` and `JPV_CATALOG_LLM_*`. `/health` MUST NOT perform a retrieval query. `canonical_openapi_settings` MUST pin the threshold to 0.65 so a process environment value does not leak into the committed OpenAPI snapshot.
+
+#### Scenario: Health starts without a retrieval threshold
+- **GIVEN** `APP_ENV`, `SERVICE_VERSION` and `JWT_SECRET` are set
+- **AND** `JPV_RETRIEVAL_DISTANCE_THRESHOLD` is omitted
+- **WHEN** settings load and a client calls `GET /health`
+- **THEN** settings load successfully
+- **AND** `JPV_RETRIEVAL_DISTANCE_THRESHOLD` is 0.65
+- **AND** the response status is 200
+
+#### Scenario: Blank retrieval threshold is treated as the default
+- **GIVEN** `JPV_RETRIEVAL_DISTANCE_THRESHOLD` is present as an empty or whitespace string
+- **WHEN** settings load
+- **THEN** the threshold is 0.65
+- **AND** the process can serve `GET /health`
+
+#### Scenario: Canonical OpenAPI settings pin the retrieval threshold
+- **WHEN** `canonical_openapi_settings` is built
+- **THEN** the retrieval distance threshold is 0.65
+- **AND** no process environment value leaks into the committed OpenAPI snapshot
 
 

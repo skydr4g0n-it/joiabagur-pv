@@ -411,11 +411,11 @@ C4Component
 
 ### 3.3 Componentes del Servicio de IA
 
-El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y generación, y servicios transversales. **Estado actual (C05):** existen la fábrica de aplicación, el health, el middleware de trazas, los seis routers de dominio con sus esquemas congelados, la capa de stubs deterministas, la dependencia de autenticación de servicio y la **capa de persistencia** —esquema `ai` con sus seis tablas vacías, migraciones Alembic y motor con pool acotado—. La capa de recuperación y generación sigue planificada en los changes C09–C38.
+El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y generación, y servicios transversales. **Estado actual (C14):** existen la fábrica de aplicación, el health, el middleware de trazas, los seis routers de dominio con sus esquemas congelados, la capa de stubs deterministas, la dependencia de autenticación de servicio, la **capa de persistencia** (esquema `ai` con pgvector, migraciones Alembic y motor con pool acotado), el **extractor de enriquecimiento (C09)**, el **indexador de `product_document` (C13)** y el **retriever vectorial de `POST /v1/retrieval/products` (C14)** — umbral 0,65, hybrid/lexical = vector hasta C21. Sustitutos, assist, inventory, evals y la fusión RRF siguen planificados.
 
 #### Routers de Dominio (`/v1/*`)
 
-- **Retrieval Router**: búsqueda de productos y sustitutos sobre el índice vectorial, con sobre-recuperación y abstención por umbral.
+- **Retrieval Router**: búsqueda de productos y sustitutos sobre el índice vectorial, con sobre-recuperación y abstención por umbral. **Products existe (C14, vector-only hasta C21); substitutes sigue 501 (C26).**
 - **Assist Router**: generación de respuesta estructurada agrupada por familia, con avisos calculados por reglas y citas verificables.
 - **Inventory Router**: propuestas de reposición, traslado y rotación generadas por el agente de inventario.
 - **Enrich Router**: extracción estructurada de perfiles de producto con confianza por campo.
@@ -424,7 +424,7 @@ El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y 
 
 #### Capa de Recuperación y Generación
 
-- **Hybrid Retriever**: fusiona búsqueda vectorial (HNSW sobre pgvector) y léxica (`ts_rank` en español con expansión de sinónimos) mediante RRF.
+- **Hybrid Retriever**: fusiona búsqueda vectorial (HNSW sobre pgvector) y léxica (`ts_rank` en español con expansión de sinónimos) mediante RRF. **Pendiente C21; C14 ejecuta solo la rama vectorial.**
 - **Query Analyzer**: extrae por reglas las restricciones estructurales de la consulta (banda de precio, tipo de pieza, talla, materiales).
 - **Embedding Client**: genera embeddings solo cuando cambia el `source_hash`, con versionado por modelo.
 - **Generation Service**: redacta el argumentario a partir de metadatos aprobados y chunks del corpus, emitiendo `{{price}}` y `{{stock}}` como placeholders que resuelve .NET.
@@ -436,7 +436,7 @@ El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y 
 - **Settings**: configuración por entorno con pydantic-settings y *fail-fast* de variables obligatorias. **Existe (C01).**
 - **TraceId Middleware**: propaga `trace_id` desde la cabecera o el claim del JWT hacia los logs estructurados. **Existe (C01).**
 - **Service Auth Dependency**: valida el JWT interno HS256 y construye el `ServicePrincipal`; el scope del token prevalece sobre el body. **Existe (C02).**
-- **Stub Layer**: respuestas deterministas bajo `STUB_MODE`; con el flag desactivado, la ruta sin implementación real responde 501. **Existe (C02).**
+- **Stub Layer**: respuestas deterministas bajo `STUB_MODE`; con el flag desactivado, la ruta sin implementación real responde 501. **Existe (C02).** Excepciones reales: enrich (C09), index (C13), `POST /v1/retrieval/products` (C14).
 - **Service Auth Dependency**: valida el JWT interno HS256 y construye el `ServicePrincipal`; el scope del token prevalece sobre el body.
 - **Stub Layer**: respuestas deterministas bajo `STUB_MODE` para que .NET integre sin LLM ni base de datos.
 - **Eval Harness**: golden set, métricas de recuperación y validador anti-alucinación (ejecución offline).
