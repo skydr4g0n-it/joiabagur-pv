@@ -91,7 +91,7 @@ Rules that C03 must rely on:
 
 With `STUB_MODE=true` (the local and test default) every `/v1` route answers from deterministic fixtures: no LLM, no embeddings, no database, no clock. The same request always returns the same body, so the .NET client can assert its mapping against them.
 
-With `STUB_MODE=false` a route whose real logic does not exist yet answers **501** naming the change that will deliver it (C14 retrieval, C24 evals, C26 substitutes, C30 assist, C35 inventory). `POST /v1/enrich/products` is C09: the real pipeline, or 503 if `JPV_RAG_LLM_API_KEY` is missing — never 501. `POST /v1/index/sync` and `GET /v1/index/status` are C13: the catalog drain, or 503 if feed/embed settings or `sku_provenance.json` are missing — never 501. Later changes replace handlers one at a time; the contract frozen here is the one they must respect.
+With `STUB_MODE=false` a route whose real logic does not exist yet answers **501** naming the change that will deliver it (C24 evals, C26 substitutes, C30 assist, C35 inventory). `POST /v1/enrich/products` is C09: the real pipeline, or 503 if `JPV_RAG_LLM_API_KEY` is missing — never 501. `POST /v1/index/sync` and `GET /v1/index/status` are C13: the catalog drain, or 503 if feed/embed settings or `sku_provenance.json` are missing — never 501. `POST /v1/retrieval/products` is C14: the vector retriever, or 503 if `JPV_EMBEDDING_API_KEY`, `DATABASE_URL` or a compatible index is missing — never 501. Substitutes stay 501 until C26. Later changes replace remaining handlers one at a time; the contract frozen here is the one they must respect.
 
 ## OpenAPI snapshot
 
@@ -246,11 +246,10 @@ These four tests exist to catch failures that produce **no error at all**: an HN
 
 ## Explicit non-goals
 
-- No real retrieval or agent loops — stubs are replaced route by route in later changes. Enrichment is real when `STUB_MODE=false` (C09). Catalog index sync is real when `STUB_MODE=false` (C13)
+- No real retrieval or agent loops — stubs are replaced route by route in later changes. Enrichment is real when `STUB_MODE=false` (C09). Catalog index sync is real when `STUB_MODE=false` (C13). Product retrieval is real when `STUB_MODE=false` (C14): vector only until C21, distance threshold 0.65, no `query_log`, `indexing/embeddings.py` and `openapi.json` unchanged. Substitutes stay stub/501 (C26)
 - No `POST /v1/retrieval/complementary` or `POST /v1/families/suggest` — later OpenAPI negotiation
 - `ai.product_document` is written by C13 from the catalog feed; `ai.pos_projection` stays empty until C22; `ai.knowledge_*` until C23
-- No queries, no similarity search — typed retrieval is C14
-- No `ai.eval_*` tables (C24) and no `ai.query_log` (unassigned; see the change's open questions)
+- No `ai.eval_*` tables (C24) and no `ai.query_log` (unassigned; C14 logs `stage=embed|search` with `trace_id` instead)
 - No SQL access to schema `public`, ever
 - No production deploy, SSM, enriched health or `CREATE EXTENSION` on RDS (C17)
 - No production tuning: `halfvec`, `hnsw.iterative_scan`, `CREATE INDEX CONCURRENTLY` and the `VACUUM`/`REINDEX` cycle are deliberate omissions at ~1,500 vectors, not oversights
@@ -274,6 +273,7 @@ ai-service/
     data/           # C06b generate/ingest + C10 world/; not imported by api.main
     enrichment/     # C09 extractor: vocabs, size regex, LiteLLM port, auditor
     indexing/       # C11 source-text/embeddings (frozen) + C13 feed client, repo, orchestrator, sku_provenance.json
+    retrieval/      # C14 vector retriever: embed max_attempts=1, <=> HNSW, body filters
   prompts/          # versioned prompts: catalog-synth/v3 (C06b generate) + enrichment/v1 (C09 extract)
   migrations/
     bootstrap.sql   # one-off: extension, schema, dedicated role, grants
@@ -284,6 +284,7 @@ ai-service/
     config/         # settings and fail-fast validation
     data/           # C06b catalog CLI + C10 world/ (no provider sockets)
     migrations/     # schema, indexes, reversibility (marked `db`)
+    retrieval/      # C14 vector retriever (fakes; no provider sockets)
     support/        # shared helpers and injectable fakes
   alembic.ini       # no connection string: read from DATABASE_URL
   openapi.json      # versioned contract snapshot

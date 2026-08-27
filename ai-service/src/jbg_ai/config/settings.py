@@ -144,6 +144,18 @@ class Settings(BaseSettings):
             "Checked after each item; exhaustion persists a resume cursor."
         ),
     )
+    jpv_retrieval_distance_threshold: float = Field(
+        default=0.65,
+        gt=0,
+        le=2,
+        description=(
+            "C14 cosine-distance cutoff for POST /v1/retrieval/products "
+            "(JPV_RETRIEVAL_DISTANCE_THRESHOLD). Optional at boot; default 0.65. "
+            "Domain is pgvector cosine distance (0, 2]. Distinct from "
+            "JWT_SECRET, JPV_EMBEDDING_*, JPV_RAG_LLM_*, JPV_INDEX_FEED_* "
+            "and JPV_CATALOG_LLM_*. Not required to boot /health."
+        ),
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -209,6 +221,13 @@ class Settings(BaseSettings):
             return 180
         return value
 
+    @field_validator("jpv_retrieval_distance_threshold", mode="before")
+    @classmethod
+    def blank_retrieval_threshold_is_default(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return 0.65
+        return value
+
 
 @lru_cache
 def get_settings() -> Settings:
@@ -250,4 +269,5 @@ def canonical_openapi_settings() -> Settings:
         jpv_index_feed_base_url=None,
         jpv_index_feed_api_key=None,
         jpv_index_sync_time_budget_seconds=180,
+        jpv_retrieval_distance_threshold=0.65,
     )

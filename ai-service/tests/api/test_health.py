@@ -68,6 +68,15 @@ def test_health_starts_without_index_feed_key(minimal_settings: Settings) -> Non
     assert response.status_code == 200
 
 
+def test_health_starts_without_retrieval_threshold(minimal_settings: Settings) -> None:
+    assert minimal_settings.jpv_retrieval_distance_threshold == 0.65
+    app = create_app(minimal_settings)
+    with TestClient(app) as client:
+        response = client.get("/health")
+
+    assert response.status_code == 200
+
+
 def test_health_generates_trace_id_when_missing(minimal_settings: Settings) -> None:
     app = create_app(minimal_settings)
     with TestClient(app) as client:
