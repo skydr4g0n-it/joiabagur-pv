@@ -29,15 +29,31 @@ namespace JoiabagurPV.Application.Services;
 /// incident is not.
 /// </para>
 /// </remarks>
-public class AssistedSearchCandidateCache : IAssistedSearchCandidateCache
+public class AssistedSearchCandidateCache : IAssistedSearchCandidateCache, IDisposable
 {
-    private readonly IMemoryCache _cache;
+    private readonly MemoryCache _cache;
     private readonly IOptionsMonitor<AiSearchOptions> _options;
 
-    public AssistedSearchCandidateCache(IMemoryCache cache, IOptionsMonitor<AiSearchOptions> options)
+    /// <summary>
+    /// Builds the cache with a real entry cap.
+    /// </summary>
+    /// <remarks>
+    /// A dedicated instance rather than the shared <c>IMemoryCache</c>, and that is not
+    /// incidental: <c>SizeLimit</c> is a property of the cache, not of the entry, so setting it
+    /// on the shared one would force every other consumer — the dashboard among them — to start
+    /// declaring a size on entries that never had one, and those writes would throw.
+    ///
+    /// The cap is read once, at construction. Changing it needs a restart, unlike the list of
+    /// enabled points of sale: that one exists to be flipped without a redeploy, this one is a
+    /// memory bound nobody tunes live.
+    /// </remarks>
+    public AssistedSearchCandidateCache(IOptionsMonitor<AiSearchOptions> options)
     {
-        _cache = cache;
         _options = options;
+        _cache = new MemoryCache(new MemoryCacheOptions
+        {
+            SizeLimit = Math.Max(1, options.CurrentValue.CandidateCacheSize)
+        });
     }
 
     /// <inheritdoc/>
@@ -87,11 +103,22 @@ public class AssistedSearchCandidateCache : IAssistedSearchCandidateCache
                 AbsoluteExpirationRelativeToNow =
                     TimeSpan.FromSeconds(options.CandidateCacheTtlSeconds),
 
-                // The shared memory cache has no size limit configured, so a size is only
-                // meaningful if one is set. Sliding expiration is deliberately absent: a query
-                // repeated for ten minutes should re-ask the retriever, not pin a stale ranking.
+                // One unit per cached candidate set, so the configured limit reads as a number
+                // of searches rather than as an opaque weight. Required: with SizeLimit set, an
+                // entry without a size throws.
+                Size = 1,
+
+                // Sliding expiration is deliberately absent: a query repeated for ten minutes
+                // should re-ask the retriever, not pin a stale ranking indefinitely.
                 Priority = CacheItemPriority.Low
             });
+    }
+
+    /// <summary>Disposes the dedicated cache instance.</summary>
+    public void Dispose()
+    {
+        _cache.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     /// <summary>

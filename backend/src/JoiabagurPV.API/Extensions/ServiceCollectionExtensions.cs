@@ -134,14 +134,28 @@ public static class ServiceCollectionExtensions
                 .GetSection(AiSearchOptions.SectionName)
                 .Get<AiSearchOptions>() ?? new AiSearchOptions();
 
+            // In testing the limit is raised out of the way so the policy does not interfere
+            // with the rest of the suite — unless a test configures one explicitly, which is how
+            // the policy itself becomes testable. Without that escape hatch the only way to
+            // exercise it would be to issue ten thousand requests.
+            var configuredPermitLimit = configuration
+                .GetValue<int?>($"{AiSearchOptions.SectionName}:{nameof(AiSearchOptions.RateLimitPermitLimit)}");
+
+            var permitLimit = configuredPermitLimit
+                              ?? (isTestingEnvironment ? 10_000 : searchOptions.RateLimitPermitLimit);
+
             options.AddPolicy(RateLimitPolicies.AiSearch, httpContext =>
                 RateLimitPartition.GetFixedWindowLimiter(
+                    // Requires HttpContext.User, which the authentication middleware populates.
+                    // Program.cs runs UseRateLimiter after UseAuthentication for that reason; if
+                    // it ran before, this would silently read an empty principal and partition
+                    // every operator of a shop into the one address they share behind the proxy.
                     partitionKey: httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                                   ?? httpContext.Connection.RemoteIpAddress?.ToString()
                                   ?? "unknown",
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
-                        PermitLimit = isTestingEnvironment ? 10_000 : searchOptions.RateLimitPermitLimit,
+                        PermitLimit = permitLimit,
                         Window = TimeSpan.FromSeconds(searchOptions.RateLimitWindowSeconds),
                         QueueLimit = 0
                     }));

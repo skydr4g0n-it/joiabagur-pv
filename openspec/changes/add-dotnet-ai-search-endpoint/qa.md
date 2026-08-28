@@ -30,8 +30,10 @@
 |---|---|
 | **Baseline** — suite completa sobre el árbol previo a la implementación | **829 tests · 775 passed · 54 failed** · 20 m 34 s |
 | **Después** — suite completa con C15 implementado | **874 tests · 826 passed · 48 failed** · 20 m 50 s |
-| Alcance C15, unitarios (`AssistedSearchServiceTests`) | **32 passed, 0 failed**, 1 s |
+| **Tras los arreglos de `/opsx:verify`** (§10) | **882 tests · 833 passed · 49 failed** · 14 m 41 s |
+| Alcance C15, unitarios (`AssistedSearchServiceTests`) | **35 passed, 0 failed**, 1 s |
 | Alcance C15, integración (`AiSearchControllerTests`) | **15 passed, 0 failed**, 52 s |
+| Alcance C15, limitación (`AiSearchRateLimitTests`) | **3 passed, 0 failed**, 20 s |
 | `openspec validate --all --strict` | **43 passed, 0 failed** |
 
 Comandos:
@@ -69,17 +71,18 @@ El baseline no necesitó `git stash push -u`: en ese momento el árbol de trabaj
 | Baseline (suite completa) | 10 | A |
 | Después (suite completa) | 4 | B |
 | **Aislada, código actual** | **7** | **C — distinto de A y de B** |
+| Tras los arreglos de §10 (suite completa) | 4 | **D — distinto de A, B y C** |
 
-Ninguno de los 4 «nuevos» fallos aparece al ejecutar la clase sola, y `Operator_ViewStock_ForAssignedPOS_ShouldSucceed` —que «dejó de fallar» en la suite— sí falla en aislamiento. Tres ejecuciones, tres conjuntos distintos. Es la inestabilidad por orden que documenta *Estado de la suite: fallos conocidos* en [testing-backend.md](../../../Documentos/testing-backend.md), y C15 no toca ningún servicio, repositorio ni tabla que esa clase use.
+Ninguno de los 4 «nuevos» fallos aparece al ejecutar la clase sola, y `Operator_ViewStock_ForAssignedPOS_ShouldSucceed` —que «dejó de fallar» en la suite— sí falla en aislamiento. Cuatro ejecuciones, cuatro conjuntos distintos. Es la inestabilidad por orden que documenta *Estado de la suite: fallos conocidos* en [testing-backend.md](../../../Documentos/testing-backend.md), y C15 no toca ningún servicio, repositorio ni tabla que esa clase use.
 
 ### 1.2. Desglose de tests nuevos
 
 | Fichero | Nº | Qué cubre |
 |---|---|---|
-| `UnitTests/Application/AssistedSearchServiceTests.cs` | **32** | Hidratación autoritativa y deriva de SKU; ventana máxima en una llamada; página corta sin segunda llamada; orden de recuperación y truncado; abstención vs página vacía tras hidratar; stock cero conservado; una sola consulta de hidratación; degradación por los tres tipos de excepción; términos OR y ruido de un carácter; flag por POS y `Disabled`; telemetría con la lista mostrada; `RetrievalMs` en todos los orígenes; telemetría que falla; caché con POS en la clave, normalización y consulta no en claro; embudo; consulta fuera de logs de producción; permisos de operador, admin y POS inactivo; ámbito por token |
+| `UnitTests/Application/AssistedSearchServiceTests.cs` | **35** | Hidratación autoritativa y deriva de SKU; ventana máxima en una llamada; página corta sin segunda llamada; orden de recuperación y truncado; abstención vs página vacía tras hidratar; stock cero conservado; una sola consulta de hidratación; degradación por los tres tipos de excepción; términos OR y ruido de un carácter; flag por POS y `Disabled`; telemetría con la lista mostrada; `RetrievalMs` en todos los orígenes; telemetría que falla; caché con POS en la clave, normalización y consulta no en claro; embudo; consulta fuera de logs de producción; permisos de operador, admin y POS inactivo; ámbito por token; fallo de gateway sin clasificar; embudo degradado no capado a la página; cota real de la caché |
 | `IntegrationTests/AiSearchControllerTests.cs` | **15** | Contra PostgreSQL real: degradación efectiva, coincidencia por término, tolerancia a caracteres reservados, búsqueda por SKU, precio y stock del catálogo, stock cero conservado, descarte de lo no asignado / inactivo, cantidad del POS y no la suma, evento registrado, 400 sin POS y con consulta en blanco, 403 de operador, admin sobre cualquier POS activo, POS inactivo, 401 anónimo |
 
-**45 tests nuevos** (32 + 15 = 47 métodos ejecutados; 874 − 829 = 45 porque `[Theory]` con tres `InlineData` cuenta como tres y el desglose ya los incluye). Ningún test nuevo llama al servicio de IA, a un proveedor de embeddings ni a la red: el gateway es un doble en los unitarios y, en integración, simplemente no está configurado.
+**53 tests nuevos** (35 unitarios + 15 de integración + 3 de limitación; 882 − 829 = 53). Tres de ellos —§10— nacieron de `/opsx:verify`. Ningún test nuevo llama al servicio de IA, a un proveedor de embeddings ni a la red: el gateway es un doble en los unitarios y, en integración, simplemente no está configurado.
 
 ---
 
@@ -122,8 +125,8 @@ Ninguno de los 4 «nuevos» fallos aparece al ejecutar la clase sola, y `Operato
 | Cost is bounded · A repeated query does not pay for a second embedding | `Search_RepeatedQueryHitsCandidateCache_WithoutSecondEmbedding` (`Times.Once` gateway) | ✅ |
 | Cost is bounded · A cache hit still hydrates | mismo test: `HydrateAsync` `Times.Exactly(2)` | ✅ |
 | Cost is bounded · The cache key separates points of sale | `Search_CacheKeyIncludesPointOfSale` | ✅ |
-| Cost is bounded · The rate policy is partitioned by user | inspección de código; la política usa `ClaimTypes.NameIdentifier` | ⚠️ **sin test** — ver §8.4 |
-| Cost is bounded · Exceeding the rate policy is not reported as AI unavailability | inspección de código; `RejectionStatusCode = 429` global | ⚠️ **sin test** — ver §8.4 |
+| Cost is bounded · The rate policy is partitioned by user | `Search_RateLimitIsPartitionedByUser_NotByNetworkOrigin` — **estaba incumplido**, ver §10.1 | ✅ |
+| Cost is bounded · Exceeding the rate policy is not reported as AI unavailability | `Search_RateLimitRejection_IsNotReportedAsAiUnavailability` · `Search_WhenTheLimitIsExceeded_Returns429` | ✅ |
 | Funnel observable · The funnel is emitted per search | `Search_EmitsTheFunnelPerSearch` (nivel Information, `PointOfSaleId`, `Candidates` 30, `Survived` 12, `Displayed` 10, `TraceId`) | ✅ |
 | Funnel observable · No new columns are added | `git status` de `Migrations/` vacío (§4) | ✅ |
 | Funnel observable · The query stays out of production logs | `Search_QueryStaysOutOfProductionLogs` (ausente en ≥ Information, presente en Debug) | ✅ |
@@ -137,7 +140,7 @@ Ninguno de los 4 «nuevos» fallos aparece al ejecutar la clase sola, y `Operato
 | ídem · The origins are separable in analysis | `SearchOrigin` con tres valores explícitos y estables (1/2/3); los dos previos conservan su número | ✅ |
 | ídem · Adding the third origin needs no schema change | `git status` de `Migrations/` vacío; la columna es entera y no cambia de tipo | ✅ |
 
-**Totales:** 38 (`ai-assisted-search`) + 4 (`ai-search-telemetry`) = **42 escenarios**. **38 con test directo**, 2 verificados por diff, **2 sin test** (§8.4) y 2 parciales o delegados (§8.3).
+**Totales:** 38 (`ai-assisted-search`) + 4 (`ai-search-telemetry`) = **42 escenarios**. **40 con test directo**, 2 verificados por diff. Los 2 que quedaban sin test los cubre `AiSearchRateLimitTests` tras §10; siguen 2 parciales o delegados (§8.3).
 
 ---
 
@@ -162,6 +165,7 @@ Ninguno de los 4 «nuevos» fallos aparece al ejecutar la clase sola, y `Operato
 | `Search_OperatorCannotChooseUnassignedPos` | unitario + integración | ✅ |
 | `Search_WhenTelemetryFails_StillReturnsResults` | unitario | ✅ |
 | Integración con Testcontainers | `AiSearchControllerTests`, 15 tests | ✅ |
+| — *(añadidos por `/opsx:verify`, §10)* | `AiSearchRateLimitTests`, 3 tests · `Search_WhenGatewayThrowsAnUnclassifiedFailure_StillDegrades` · `Search_DegradedFunnelCountsMatchesNotJustTheDisplayedPage` · `Search_CandidateCacheIsBoundedByTheConfiguredSize` | ✅ |
 
 **Todos los nombres de la ficha existen y están en verde.** Extras no exigidos por la ficha: `Search_PreservesRetrievalOrder_AndTruncatesToPageSize`, `Search_WhenRetrieverAbstains_ReportsLowConfidenceAndStaysAvailable`, `Search_WhenNothingSurvivesHydration_IsNotReportedAsAbstention`, `Search_WhenCredentialsRejected_LogsAtErrorLevel`, `Fallback_DropsSingleCharacterNoise`, `Search_WhenFeatureFlagOn_ForThatPointOfSaleOnly_UsesAssistedPath`, `Search_RecordsTheSearch_WithTheDisplayedListNotTheCandidateWindow`, `Search_RecordsRetrievalDuration_OnEveryOrigin`, `Search_CacheKeyIgnoresTriviallyDifferentSpellings`, `Search_CacheKeyDoesNotCarryTheQueryInClear`, `Search_EmitsTheFunnelPerSearch`, `Search_QueryStaysOutOfProductionLogs`, `Search_WithoutPointOfSale_ReturnsBadRequest`, `Search_WhenPointOfSaleInactive_IsRefused`, `Search_SendsThePointOfSaleThroughTheScope_NotTheBody`, `Fallback_ToleratesReservedCharactersInTheQuery`, `Fallback_FindsByExactSku`, `Search_DropsWhatThisPointOfSaleDoesNotCarry`, `Search_QuantityIsTheOneAtThatPointOfSale`, `Search_RecordsTheSearchEvent`, `Search_WithBlankQuery_ReturnsBadRequest`, `Search_WhenUnauthenticated_Returns401`.
 
@@ -254,14 +258,13 @@ El SQL verificado quedó recogido en `design.md`, sección *Open Questions*.
 - **«The recorded duration excludes the recording».** El servicio captura `TotalMs` antes de llamar a la telemetría, y el test comprueba que `TotalMs` no es nulo — pero no aísla el coste de la escritura, que con un doble es de microsegundos. La garantía es estructural (orden de las sentencias), no medida.
 - **«An episode identifier always exists».** C15 propaga el identificador que llega y no genera ninguno: generarlo es responsabilidad de la capability de telemetría, que ya lo tiene probado en C04. No se duplicó el test.
 
-### 8.4. Dos escenarios **sin test** — la política de peticiones
+### 8.4. Dos escenarios sin test — **y el hueco contenía un defecto**
 
-`The rate policy is partitioned by user` y `Exceeding the rate policy is not reported as AI unavailability` están verificados **por inspección de código**, no por test:
+En la primera pasada, `The rate policy is partitioned by user` y `Exceeding the rate policy is not reported as AI unavailability` quedaron verificados **por inspección de código**, con este motivo escrito: probarlos exige emitir más peticiones que el límite, y el entorno de test lo fija en 10.000 para que la política no interfiera con el resto de la suite.
 
-- La partición usa `ClaimTypes.NameIdentifier` con caída a la dirección de red, y `RejectionStatusCode` es 429 global del `RateLimiter`.
-- Probarlo requiere emitir más peticiones que el límite, y el entorno de test fija el límite en **10.000** —igual que hace `LoginRateLimit`— precisamente para que la política no interfiera con el resto de la suite. Un test real exigiría una configuración de host distinta.
+**`/opsx:verify` demostró que la inspección era insuficiente.** Miró la política y no el orden del pipeline. Ver §11.
 
-Es un hueco reconocido, no un olvido. `RateLimitingTests` ya existe en el repositorio y sería el sitio natural si se decide cubrirlo.
+Ambos escenarios tienen ya test de integración en `AiSearchRateLimitTests`.
 
 ### 8.5. `CreateClient()` en el constructor es carga estructural
 
@@ -361,9 +364,49 @@ No es un defecto de C15 —la degradación funcionó exactamente como debe, y é
 
 ---
 
-## 10. Fuera de esta pasada (no DoD)
+## 10. `/opsx:verify` — ejecutado, y encontró un defecto
 
-- `/opsx:verify` sobre este change.
+Scorecard inicial: Completeness 43/43 tareas · Correctness 12/13 requisitos · Coherence 6/7 decisiones. **1 CRITICAL, 2 WARNING, 2 SUGGESTION.** Los cuatro accionables se corrigieron; el quinto (W2) lo cierra el test que exigía C1.
+
+### 10.1. 🔴 C1 · La limitación particionaba por **IP**, no por usuario
+
+`app.UseRateLimiter()` corría **antes** de `app.UseAuthentication()`, así que el limitador leía un principal vacío, `FindFirst(ClaimTypes.NameIdentifier)` devolvía `null` y la clave caía a la dirección de red. Detrás del proxy inverso toda una tienda comparte una: **un operador podía agotar el cupo de sus compañeros**, que es exactamente lo que D5 razonaba para no particionar por IP.
+
+Fallaba **en silencio**: sin error, sin log, sin test en rojo. Sólo la clave equivocada.
+
+| | |
+|---|---|
+| **Arreglo** | `UseRateLimiter()` movido detrás de `UseAuthentication()` / `UseAuthorization()`, con el motivo escrito en `Program.cs` y en la propia política |
+| **`LoginRateLimit`** | No se ve afectada: particiona por dirección, disponible en cualquier punto, y para un intento anónimo el middleware de autenticación no encuentra token y no hace nada apreciable antes del limitador |
+| **Testabilidad** | El override de entorno de test pasa a respetar un `AiSearch:RateLimitPermitLimit` configurado explícitamente. Sin esa vía, ejercitar la política exigiría diez mil peticiones |
+| **Regresión cubierta** | `AiSearchRateLimitTests`, 3 tests sobre un host con límite 2 y ventana de 300 s |
+
+**Se comprobó que el test detecta el defecto**, que es lo único que hace útil a un test de regresión: reintroduciendo el orden erróneo, `Search_RateLimitIsPartitionedByUser_NotByNetworkOrigin` **falla**, y sólo ése — los otros dos siguen verdes porque no dependen de la clave. Restaurado el arreglo, 3/3.
+
+### 10.2. 🟠 W1 · `CandidateCacheSize` se validaba al arranque y no acotaba nada
+
+La opción se documentaba como *«Maximum number of cached candidate sets»*, se validaba (`> 0`) y no la leía nadie: la caché no tenía cota de entradas. Contradecía D5 («tamaño acotado»). Un mando que parece una cota y no lo es es peor que no tenerlo.
+
+**Arreglo:** instancia **dedicada** de `MemoryCache` con `SizeLimit`, y `Size = 1` por entrada para que el límite se lea como número de búsquedas. Dedicada y no la compartida a propósito: `SizeLimit` es propiedad de la caché, no de la entrada, así que ponerlo en la compartida obligaría al resto de consumidores —el dashboard entre ellos— a declarar tamaño en entradas que nunca lo tuvieron, y esas escrituras lanzarían.
+
+Test: `Search_CandidateCacheIsBoundedByTheConfiguredSize`.
+
+### 10.3. 🔵 S1 · La garantía de degradación era enumerativa
+
+El servicio capturaba las tres subclases concretas de `AiGatewayException`. Correcto hoy, frágil mañana: una cuarta subclase añadida por un change posterior escaparía y rompería la búsqueda, justo lo que el requisito prohíbe.
+
+**Arreglo:** cláusula final sobre el tipo abstracto, con log de error nombrando el tipo. Test: `Search_WhenGatewayThrowsAnUnclassifiedFailure_StillDegrades`.
+
+### 10.4. 🔵 S2 · `survivedHydration` no era comparable entre orígenes
+
+La vía degradada pedía `take = pageSize`, así que ese contador nunca superaba la página y siempre igualaba a `displayed`. El embudo existe para comparar orígenes; con eso, en la mitad de los casos no comparaba nada.
+
+**Arreglo:** el buscador degradado pide la **misma ventana** que sobre-recupera la vía asistida y se trunca después. Ahora «supervivientes» significa lo mismo en ambos caminos — cuánto de esta tienda casó. Test: `Search_DegradedFunnelCountsMatchesNotJustTheDisplayedPage`.
+
+---
+
+## 11. Fuera de esta pasada (no DoD)
+
 - Panel del operador (C16) y despliegue del servicio (C17).
 - Rama léxica del híbrido, RRF y sinónimos (C20/C21); prefiltro por punto de venta (C22).
 - Arreglar el singleton del cliente de embeddings en `ai-service` — **deuda anotada** para C21/C22, que ya trabajan en esa zona. C15 no cruza a Python.
@@ -373,6 +416,6 @@ No es un defecto de C15 —la degradación funcionó exactamente como debe, y é
 
 ## Veredicto
 
-**Sin regresiones.** Comparación nombre a nombre contra el baseline: **cero** tests rotos por este change; el delta cae íntegramente en una clase cuya inestabilidad por orden se verificó ejecutándola en aislamiento y obteniendo un tercer conjunto de fallos distinto. Alcance C15: **32 + 15 = 47 métodos, 0 fallos**. `openspec validate --all --strict` **43/0**. Diffs vacíos en `ai-service/`, `openapi.json`, `IAiGatewayClient`, `frontend/`, migraciones y buscador preexistente. **42/43 tareas**; 38 de 42 escenarios con test directo.
+**Sin regresiones.** Comparación nombre a nombre contra el baseline: **cero** tests rotos por este change; el delta cae íntegramente en una clase cuya inestabilidad por orden se verificó ejecutándola en aislamiento y obteniendo un tercer conjunto de fallos distinto. Alcance C15: **35 + 15 + 3 = 53 métodos, 0 fallos**. `openspec validate --all --strict` **43/0**. Diffs vacíos en `ai-service/`, `openapi.json`, `IAiGatewayClient`, `frontend/`, migraciones y buscador preexistente. **43/43 tareas**; **42 de 42 escenarios** con test directo o comprobación nombrada.
 
-**Dos escenarios de la política de peticiones quedan sin test** por la razón escrita en §8.4. La verificación con el mundo sembrado (§9) **se ejecutó**: el corte de recall es real y está medido —0 % de páginas cortas en CIU-CENTRE frente al 37,5 % en FORNELLS—, los tres orígenes se persisten y la línea base para C22 sale de la tabla sin columnas nuevas. Con eso declarado, listo para `/opsx:verify` y archivado.
+`/opsx:verify` encontró un defecto crítico —la limitación particionaba por IP en vez de por usuario, por el orden del middleware— y dos huecos menores; los cuatro están corregidos y cubiertos por test en §10, y se comprobó que el test de regresión falla al reintroducir el defecto. Ya no quedan escenarios sin test. La verificación con el mundo sembrado (§9) **se ejecutó**: el corte de recall es real y está medido —0 % de páginas cortas en CIU-CENTRE frente al 37,5 % en FORNELLS—, los tres orígenes se persisten y la línea base para C22 sale de la tabla sin columnas nuevas. Con eso, **listo para archivar**.

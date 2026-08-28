@@ -52,7 +52,6 @@ public static class AiSearchServiceCollectionExtensions
             // is exactly the failure mode being removed.
             .ValidateOnStart();
 
-        services.AddMemoryCache();
         services.AddSingleton<IAssistedSearchCandidateCache, AssistedSearchCandidateCache>();
         services.AddScoped<IAssistedSearchService, AssistedSearchService>();
 

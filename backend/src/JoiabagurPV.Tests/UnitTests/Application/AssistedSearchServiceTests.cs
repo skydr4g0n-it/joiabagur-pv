@@ -470,12 +470,30 @@ public class AssistedSearchServiceTests
     }
 
     [Fact]
+    public void Search_CandidateCacheIsBoundedByTheConfiguredSize()
+    {
+        _options.CandidateCacheSize = 2;
+        using var cache = new AssistedSearchCandidateCache(OptionsMonitor());
+
+        var keys = Enumerable.Range(0, 40)
+            .Select(i => cache.BuildKey(PointOfSaleId, $"consulta {i}", new AiSearchFilters(), 20))
+            .ToList();
+
+        foreach (var key in keys)
+        {
+            cache.Set(key, new AiSearchResponse());
+        }
+
+        // The cap has to actually cap. Before this was wired, the option validated at start-up,
+        // read as a bound in configuration, and did nothing — which is worse than not having it.
+        var retained = keys.Count(key => cache.TryGet(key, out _));
+        retained.Should().BeLessThan(keys.Count);
+    }
+
+    [Fact]
     public void Search_CacheKeyIncludesPointOfSale()
     {
-        var cache = new AssistedSearchCandidateCache(
-            new Microsoft.Extensions.Caching.Memory.MemoryCache(
-                new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()),
-            OptionsMonitor());
+        var cache = new AssistedSearchCandidateCache(OptionsMonitor());
 
         var filters = new AiSearchFilters();
 
@@ -491,10 +509,7 @@ public class AssistedSearchServiceTests
     [Fact]
     public void Search_CacheKeyIgnoresTriviallyDifferentSpellings()
     {
-        var cache = new AssistedSearchCandidateCache(
-            new Microsoft.Extensions.Caching.Memory.MemoryCache(
-                new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()),
-            OptionsMonitor());
+        var cache = new AssistedSearchCandidateCache(OptionsMonitor());
 
         var one = cache.BuildKey(PointOfSaleId, "  Anillo   de PLATA ", new AiSearchFilters(), 20);
         var other = cache.BuildKey(PointOfSaleId, "anillo de plata", new AiSearchFilters(), 20);
@@ -505,16 +520,64 @@ public class AssistedSearchServiceTests
     [Fact]
     public void Search_CacheKeyDoesNotCarryTheQueryInClear()
     {
-        var cache = new AssistedSearchCandidateCache(
-            new Microsoft.Extensions.Caching.Memory.MemoryCache(
-                new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()),
-            OptionsMonitor());
+        var cache = new AssistedSearchCandidateCache(OptionsMonitor());
 
         var key = cache.BuildKey(PointOfSaleId, "regalo para Marta Soler", new AiSearchFilters(), 20);
 
         // Free text an operator typed. A cache key is one of the places nobody remembers to redact.
         key.Should().NotContain("Marta");
         key.Should().NotContain("regalo");
+    }
+
+    [Fact]
+    public async Task Search_WhenGatewayThrowsAnUnclassifiedFailure_StillDegrades()
+    {
+        // A subclass the service does not name. Today none exists beyond the three it catches;
+        // this fixes the guarantee structurally, so a later change adding a fourth cannot make
+        // the search fail on a fault the AI is responsible for.
+        _gateway
+            .Setup(g => g.SearchAsync(It.IsAny<AiSearchRequest>(), It.IsAny<AiCallScope>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new UnknownGatewayFailure());
+
+        LexicalReturns(Row(Guid.NewGuid()));
+
+        var result = await CreateService().SearchAsync(Request(), UserId, "Operator", isAdmin: false);
+
+        result.Outcome.Should().Be(AssistedSearchOutcome.Success);
+        result.Response!.AiAvailable.Should().BeFalse();
+        result.Response.Results.Should().ContainSingle();
+        _logs.Entries.Should().Contain(entry => entry.Level == LogLevel.Error);
+    }
+
+    [Fact]
+    public async Task Search_DegradedFunnelCountsMatchesNotJustTheDisplayedPage()
+    {
+        _gateway
+            .Setup(g => g.SearchAsync(It.IsAny<AiSearchRequest>(), It.IsAny<AiCallScope>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new AiUnavailableException("circuit open"));
+
+        // Twenty five products of this shop match the terms; ten are displayed.
+        LexicalReturns(Enumerable.Range(0, 25).Select(_ => Row(Guid.NewGuid())).ToArray());
+
+        var request = Request();
+        request.PageSize = 10;
+
+        var result = await CreateService().SearchAsync(request, UserId, "Operator", isAdmin: false);
+
+        result.Response!.Results.Should().HaveCount(10);
+
+        // Not 10. Capping the search at the page size would make "survived" trivially equal to
+        // "displayed" on this path and leave the two origins incomparable in the very analysis
+        // the funnel exists for.
+        result.Response.SurvivedHydration.Should().Be(25);
+
+        _repository.Verify(
+            r => r.SearchLexicalAsync(
+                It.IsAny<IReadOnlyList<string>>(),
+                PointOfSaleId,
+                AiSearchRequest.OverRetrievalCap,
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     // ---------------------------------------------------------------- observability
@@ -640,10 +703,7 @@ public class AssistedSearchServiceTests
             .AddProvider(_logs));
 
         IAssistedSearchCandidateCache cache = realCache
-            ? new AssistedSearchCandidateCache(
-                new Microsoft.Extensions.Caching.Memory.MemoryCache(
-                    new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()),
-                OptionsMonitor())
+            ? new AssistedSearchCandidateCache(OptionsMonitor())
             : new NoCache();
 
         return new AssistedSearchService(
@@ -717,6 +777,10 @@ public class AssistedSearchServiceTests
         PrimaryPhotoFileName = "photo.jpg",
         CollectionName = "Tramontana"
     };
+
+    /// <summary>A gateway failure the service does not name, to prove the base-class catch.</summary>
+    private sealed class UnknownGatewayFailure()
+        : AiGatewayException("a failure mode invented by a later change");
 
     /// <summary>Cache that never hits, so most tests exercise the retrieval path directly.</summary>
     private sealed class NoCache : IAssistedSearchCandidateCache

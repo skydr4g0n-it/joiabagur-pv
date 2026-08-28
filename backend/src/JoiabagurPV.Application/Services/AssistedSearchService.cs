@@ -90,7 +90,14 @@ public class AssistedSearchService : IAssistedSearchService
             // candidate list. Leaving this null would make the assisted and degraded populations
             // incomparable, which is the one thing the origin column exists to enable.
             var lexicalStartedAt = _timeProvider.GetTimestamp();
-            rows = await DegradedAsync(request, pageSize, cancellationToken);
+
+            // Asked for the same window the assisted path uses, not for the page size. What the
+            // funnel calls "survived" then means the same thing on both paths — how much of this
+            // shop matched — instead of being trivially equal to the displayed count whenever the
+            // AI is not answering, which would make the two origins incomparable in exactly the
+            // analysis the funnel exists for. The extra rows cost nothing at this catalog size
+            // and are truncated away below.
+            rows = await DegradedAsync(request, LexicalWindow(options), cancellationToken);
             retrieval = retrieval with { RetrievalMs = ElapsedMs(lexicalStartedAt) };
         }
 
@@ -219,6 +226,20 @@ public class AssistedSearchService : IAssistedSearchService
 
             return Retrieval.Degraded();
         }
+        catch (AiGatewayException exception)
+        {
+            // Final clause over the abstract base, so the guarantee is structural rather than
+            // enumerative. The three cases above cover every subclass that exists today; this
+            // one is what keeps "the search never fails because of the AI" true the day a later
+            // change adds a fourth, which would otherwise escape and break the search.
+            _logger.LogError(
+                exception,
+                "Assisted search degraded: unclassified gateway failure of type {FailureType}. TraceId={TraceId}",
+                exception.GetType().Name,
+                _traceContext.CurrentTraceId);
+
+            return Retrieval.Degraded();
+        }
     }
 
     /// <summary>
@@ -259,7 +280,7 @@ public class AssistedSearchService : IAssistedSearchService
     /// </summary>
     private async Task<IReadOnlyList<AssistedSearchRow>> DegradedAsync(
         AssistedSearchRequest request,
-        int pageSize,
+        int take,
         CancellationToken cancellationToken)
     {
         var terms = Tokenize(request.Query);
@@ -269,8 +290,16 @@ public class AssistedSearchService : IAssistedSearchService
         }
 
         return await _repository.SearchLexicalAsync(
-            terms, request.PointOfSaleId, pageSize, cancellationToken);
+            terms, request.PointOfSaleId, take, cancellationToken);
     }
+
+    /// <summary>
+    /// Rows the degraded searcher asks for: the same window the assisted path over-retrieves,
+    /// so the funnel counts the same thing on both origins.
+    /// </summary>
+    private static int LexicalWindow(AiSearchOptions options) =>
+        AiSearchRequest.OverRetrievalCount(
+            Math.Clamp(options.CandidateWindow, 1, AiSearchRequest.MaxTopK));
 
     /// <summary>
     /// Builds the page: relevance order from the retriever, truth from the catalog, truncated to
