@@ -284,3 +284,6 @@ data/world/generated/*
 !data/world/generated/.gitkeep
 data/world/backups/*
 !data/world/backups/.gitkeep
+
+# Test run artifacts (dotnet test --logger trx)
+TestResults/

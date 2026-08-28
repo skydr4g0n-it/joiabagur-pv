@@ -25,5 +25,20 @@ public enum SearchOrigin
     /// Results produced by the existing lexical searcher, because the AI service was
     /// unavailable and the circuit breaker degraded the request.
     /// </summary>
-    LexicalFallback = 2
+    LexicalFallback = 2,
+
+    /// <summary>
+    /// Results produced without consulting the AI service at all, because assisted search is
+    /// switched off for that point of sale.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately not folded into <see cref="LexicalFallback"/>. That value exists to measure
+    /// how often the AI service fails; recording a search that never reached it would make a
+    /// period with the feature switched off read as a period of repeated failures — the exact
+    /// confusion the origin column was introduced to prevent.
+    ///
+    /// It is also the control arm: with this value, switching the feature on for some points of
+    /// sale and not others is a comparison the database can answer.
+    /// </remarks>
+    Disabled = 3
 }

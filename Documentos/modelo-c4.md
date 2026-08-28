@@ -211,6 +211,10 @@ Viven en la misma capa de aplicación que los anteriores; se listan aparte porqu
 
 - **AI Gateway Client** (C03, C08): cliente tipado hacia `jbg-ai`, con una familia de ruta por tipo de llamada y **cortacircuitos aislados entre ellas**, de modo que un enriquecimiento lento no pueda empujar la búsqueda del operador a su vía léxica degradada.
 
+- **Assisted Search Service** (C15): orquesta la búsqueda del operador tras `POST /api/ai/search`. Pide a `jbg-ai` la **ventana máxima que el contrato puede producir en una sola llamada** y no repite: el recuperador aplica su umbral antes del límite de filas, así que volver a pedir devolvería lo mismo cobrando un segundo embedding. Después hidrata, trunca a la página pedida conservando el orden de relevancia, y registra la telemetría. **Ningún fallo del servicio de IA rompe la búsqueda**: todos degradan al buscador léxico propio y se reportan al llamante.
+
+- **Assisted Search Repository** (C15): las dos lecturas que sostienen lo anterior, ambas en una sola consulta. La **hidratación autoritativa** parte de `Inventory` y no de `Product`, de modo que la regla de visibilidad —hay inventario activo en ese punto de venta— es la forma de la consulta y no una condición que alguien pueda olvidar; la cantidad cero se conserva y se marca. Y el **buscador degradado**, con texto completo en español calculado en consulta —sin índice ni cambio de esquema—, que casa cualquier término y ordena por relevancia léxica.
+
 #### Servicios Compartidos
 
 - **File Storage Service**: Abstracción para almacenamiento de archivos (local en desarrollo, S3/Blob Storage en producción), gestión de fotos de productos y ventas.
@@ -252,6 +256,8 @@ C4Component
         Component(reviewPolicy, "Profile Review Policy", "C#", "Revisión híbrida por campo (C08) · clase pura")
         Component(familyService, "Product Family Service", "C#", "Familias de producto y pertenencia declarativa (C07)")
         Component(aiGatewayClient, "AI Gateway Client", "C#", "Cliente tipado hacia jbg-ai (C03, C08) · breakers aislados por familia de ruta")
+        Component(assistedSearchService, "Assisted Search Service", "C#", "Búsqueda asistida (C15) · ventana máxima en una llamada, hidratación autoritativa, degradación acotada")
+        Component(assistedSearchRepo, "Assisted Search Repository", "C#", "Hidratación conjunta por POS y buscador léxico español en consulta (C15)")
         
         Component(fileStorageService, "File Storage Service", "C#", "Abstracción de almacenamiento de archivos")
         Component(stockValidationService, "Stock Validation Service", "C#", "Validación de stock disponible")

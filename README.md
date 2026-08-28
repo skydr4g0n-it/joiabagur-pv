@@ -51,7 +51,7 @@ El producto tiene como propósito ofrecer una solución integral de gestión par
 - **Gestión de métodos de pago:** Lista general (Efectivo, Bizum, Transferencia, Tarjeta TPV propio/punto de venta, PayPal), asignación por punto de venta y registro del método en cada venta.
 - **Gestión de usuarios:** Roles Administrador y Operador, autenticación con usuario y contraseña, operadores asociados a puntos de venta concretos.
 - **Otras funcionalidades:** Devoluciones, ajustes manuales de inventario, historial de ventas y movimientos de stock, dashboard con estadísticas y stock crítico.
-- **Búsqueda semántica y venta asistida (en desarrollo):** Proyecto Final del Máster de IA. Añade búsqueda semántica sobre el catálogo, sugerencia de sustitutos y argumentario de venta asistido, mediante el microservicio `jbg-ai`. A día de hoy están congelados el contrato HTTP y la autenticación entre servicios, el backend .NET ya dispone del cliente tipado que los consume —con timeouts, reintento único y cortacircuitos— y la capa de persistencia vectorial está lista: esquema `ai` con pgvector, migraciones propias e índices HNSW por similitud coseno. La recuperación vectorial de `POST /v1/retrieval/products` está entregada (C14); la hidratación .NET, el panel de operador y la fusión híbrida se entregan en changes posteriores.
+- **Búsqueda semántica y venta asistida (en desarrollo):** Proyecto Final del Máster de IA. Añade búsqueda semántica sobre el catálogo, sugerencia de sustitutos y argumentario de venta asistido, mediante el microservicio `jbg-ai`. A día de hoy están congelados el contrato HTTP y la autenticación entre servicios, el backend .NET ya dispone del cliente tipado que los consume —con timeouts, reintento único y cortacircuitos— y la capa de persistencia vectorial está lista: esquema `ai` con pgvector, migraciones propias e índices HNSW por similitud coseno. La recuperación vectorial de `POST /v1/retrieval/products` (C14) y el endpoint .NET de búsqueda asistida con hidratación autoritativa (C15) están entregados: el operador puede buscar en lenguaje natural y recibir resultados con el precio y el stock reales de su tienda. El panel de operador y la fusión híbrida se entregan en changes posteriores.
 
 ### 1.3. Diseño y experiencia de usuario
 
@@ -223,7 +223,7 @@ Otras entidades (ProductPhoto, PaymentMethod, PointOfSalePaymentMethod, Return, 
 
 ## 4. Especificación de la API
 
-A continuación se describen tres endpoints principales en formato OpenAPI (resumen). La API base es `/api` y requiere cabecera `Authorization: Bearer <token>` para endpoints protegidos, salvo `GET /api/ai/index-feed/*`, que autentica con `X-Index-Feed-Key`.
+A continuación se describen cuatro endpoints principales en formato OpenAPI (resumen). La API base es `/api` y requiere cabecera `Authorization: Bearer <token>` para endpoints protegidos, salvo `GET /api/ai/index-feed/*`, que autentica con `X-Index-Feed-Key`.
 
 ### POST /api/sales — Crear venta
 
@@ -307,6 +307,33 @@ Devuelve productos con stock bajo (por defecto cantidad ≤ 2) paginados. Solo r
 - `totalCount`, `page`, `pageSize`, `totalPages`.
 
 **401 Unauthorized** / **403 Forbidden** si no autenticado o no administrador.
+
+---
+
+### POST /api/ai/search — Búsqueda asistida
+
+Busca en el catálogo con lenguaje natural. El servicio de IA propone candidatos y **el backend pone la verdad**: precio, stock y qué tiene esa tienda salen de PostgreSQL, nunca de la respuesta de la IA.
+
+**Request body**
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| query | string | Consulta en lenguaje natural. Obligatoria, máximo 500 caracteres |
+| pointOfSaleId | uuid | **Obligatorio para todos los roles.** El operador debe estar asignado; el administrador puede elegir cualquiera activo |
+| pageSize | int | Resultados a mostrar (1–50, por defecto 10) |
+| searchSessionId | uuid | Agrupa las reformulaciones de un mismo episodio. El servidor genera uno si falta |
+| materials, category | — | Filtros rápidos opcionales |
+
+**Response 200 OK**
+
+- `results`: array de `{ productId, sku, name, price, quantityAtPointOfSale, hasStock, primaryPhotoUrl, collectionName, score, matchReasons, familyId, variantLabel }`, **en el orden de relevancia recibido**.
+- `searchEventId`: identificador del evento de telemetría, para reportar después la selección.
+- `aiAvailable`, `lowConfidence`: distinguen los **tres** «sin resultados» — la IA se abstuvo, la tienda no tiene ninguno de los candidatos, o la IA no atendió la búsqueda.
+- `candidatesReturned`, `survivedHydration`: embudo de la recuperación.
+
+**400 Bad Request** sin punto de venta, con consulta vacía o si el punto de venta no está activo. **403 Forbidden** si el operador no está asignado a él. **429 Too Many Requests** al superar el límite por usuario.
+
+La búsqueda **nunca falla por culpa de la IA**: cualquier fallo del servicio degrada a un buscador léxico acotado al mismo punto de venta y se reporta con `aiAvailable: false`.
 
 ---
 

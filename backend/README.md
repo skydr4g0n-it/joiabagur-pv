@@ -236,6 +236,7 @@ The system has two roles:
 | `POST /api/inventory/import` | ✅ | ❌ |
 | `POST /api/inventory/adjustment` | ✅ | ❌ |
 | `GET /api/inventory/import-template` | ✅ | ❌ |
+| `POST /api/ai/search` | ✅‡ | ✅* |
 | `POST /api/ai/search-events/{id}/selection` | ✅** | ✅** |
 | `POST /api/ai/catalog/enrich-batch` | ✅ | ❌ |
 | `POST /api/product-families` | ✅ | ❌ |
@@ -248,6 +249,7 @@ The system has two roles:
 
 *Operators see only their assigned points of sale
 † Service API key `X-Index-Feed-Key` only. A user JWT, an `access_token` cookie or a C03 token is **401**.
+‡ Assisted search requires a concrete point of sale in the body, for every role. Operators are checked against their assignments; administrators hold none, so they may pick any **active** point of sale — an inactive one is **400** for everyone. The request-rate policy is partitioned by user, not by network address.
 **Ownership, not role: only the operator who ran that search may record its selection
 
 ### Product families
@@ -535,10 +537,16 @@ OpenAPI documentation is served with Scalar (not Swagger UI) at `/scalar/v1` whe
 | `AiGateway__JwtSecret` | HS256 secret for the internal service token — must match the service's `JWT_SECRET` literally | Required |
 | `IndexFeed__ApiKey` | Service key for `GET /api/ai/index-feed/*` (`X-Index-Feed-Key`). Distinct from `Jwt__SecretKey` and `AiGateway__JwtSecret`. Min 32 characters | Required |
 | `IndexFeed__ApiKeyPrevious` | Previous key during rotation. Empty = unset | Optional |
+| `AiSearch__EnabledPointOfSaleIds__0`, `__1`, … | Points of sale where assisted search uses the AI path. Reloaded without a redeploy | Empty |
+| `AiSearch__EnabledByDefault` | Whether points of sale absent from that list use the AI path | false |
+| `AiSearch__CandidateWindow` | Page size requested from `jbg-ai`, which is the over-retrieval dial. 20 saturates the service's cap of 60 candidates | 20 |
+| `AiSearch__RateLimitPermitLimit` / `AiSearch__RateLimitWindowSeconds` | Requests one user may issue per window | 30 / 60 |
 
 `AiGateway` is validated at start-up, not on first use: if the base address is missing or is not an absolute http/https URI, or the secret is absent or shorter than 32 characters, **the API does not start** and the error names the offending key. That is deliberate — a mismatched secret makes `jbg-ai` answer 401 without disclosing why, so the fault is caught at boot instead of during a request. Set `AiGateway__Enabled=false` to skip registering the client altogether.
 
 `IndexFeed:ApiKey` is validated the same way: missing or shorter than 32 characters stops the host. An empty `IndexFeed:ApiKeyPrevious` is unset; a short non-empty previous key also fails at start-up.
+
+`AiSearch` is also validated at start-up, and its list of enabled points of sale is read through `IOptionsMonitor` so a shop can be switched on or off without a redeploy — which is the whole reason the switch lives in configuration instead of in a column on `PointOfSale`. It holds no secret, so nothing of it goes to SSM. The default is **not enabled**: turning assisted search on for a shop is an explicit act.
 
 The address differs by environment and neither value is the obvious one: `http://localhost:8001` in development, because the API runs on the host and only sees the port Compose publishes, and `http://jbg-ai:8000` in production, where both containers share a Docker network.
 

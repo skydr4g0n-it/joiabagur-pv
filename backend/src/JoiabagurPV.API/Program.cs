@@ -35,6 +35,11 @@ builder.Services.AddProfileReview(builder.Configuration);
 // missing or short key must stop the host, not look like a 401 from the first C13 pull.
 builder.Services.AddIndexFeed(builder.Configuration);
 
+// Assisted search (C15). Bound through IOptionsMonitor because the per-point-of-sale switch has
+// to be flippable without a redeploy: that reloadability is why it lives in configuration rather
+// than in a column.
+builder.Services.AddAssistedSearch(builder.Configuration);
+
 // Add API services
 builder.Services.AddApiServices(builder.Configuration);
 
@@ -99,15 +104,25 @@ app.UseWhen(context =>
     appBuilder.UseHttpsRedirection();
 });
 
-// Add rate limiting
-app.UseRateLimiter();
-
 // Add middleware
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // Add authentication and authorization
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Rate limiting, deliberately AFTER authentication.
+//
+// A policy that partitions by user needs HttpContext.User, and that is populated by the
+// authentication middleware. Running the limiter first does not fail: it silently reads an
+// empty principal and falls back to the network address, so the assisted-search policy would
+// partition by IP — and behind the reverse proxy an entire shop shares one, which is exactly
+// what that policy exists to avoid.
+//
+// LoginRateLimit is unaffected: it partitions by address, available at any point in the
+// pipeline, and for an anonymous login attempt the authentication middleware finds no token
+// and does essentially nothing before the limiter runs.
+app.UseRateLimiter();
 
 // Map controllers
 app.MapControllers();
