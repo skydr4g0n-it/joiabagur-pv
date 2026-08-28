@@ -1,0 +1,282 @@
+## ADDED Requirements
+
+### Requirement: Assisted search is exposed through a single authenticated endpoint
+
+The backend SHALL expose exactly one operation for assisted catalog search: a write-free POST under the AI namespace, alongside the other AI capabilities and without a version segment in its route, since versioning is applied at the boundary with the separately deployed AI service and not between a client and an API that ship together.
+
+The endpoint MUST require authentication. The request MUST carry the operator's natural-language query, a point of sale, and the page size the caller wants. It MAY carry a search-episode identifier and catalog-side filters. The query length MUST be bounded by the maximum the frozen AI contract declares for its own query field, rather than by an independently chosen limit.
+
+Request validation MUST be invoked explicitly by the endpoint. Registering a validator without invoking it is worse than having none, because it looks like validation.
+
+#### Scenario: A valid request is served
+- **WHEN** an authenticated caller posts a query, a point of sale it may use, and a page size
+- **THEN** the endpoint answers with a result list, the identifiers of the recorded search, and the state of the assisted path
+
+#### Scenario: An invalid request is rejected before any work is done
+- **WHEN** a request carries a blank query or a page size above the allowed maximum
+- **THEN** the endpoint answers with a validation error
+- **AND** no call is issued to the AI service
+- **AND** no search event is recorded
+
+#### Scenario: An unauthenticated request is refused
+- **WHEN** an unauthenticated caller posts a search request
+- **THEN** the endpoint refuses it
+- **AND** no call is issued to the AI service
+
+### Requirement: Every assisted search is scoped to one concrete point of sale
+
+The system SHALL require a concrete point of sale on every assisted search and MUST NOT infer one when several are possible or substitute a wildcard when none is supplied. A request without a point of sale MUST be rejected as invalid.
+
+An operator MUST be refused, without the search being executed, when the requested point of sale is not one they are assigned to. An administrator MAY search on any active point of sale, since administrators hold no assignments and the capability would otherwise be undemonstrable without creating artificial ones; an inactive point of sale MUST be refused for every role.
+
+The point-of-sale scope sent to the AI service MUST come from the validated scope and MUST NOT be taken from the request body, so that the retriever's scope cannot be influenced by the caller.
+
+#### Scenario: A request without a point of sale is invalid
+- **WHEN** a request omits the point of sale
+- **THEN** the endpoint answers with a validation error
+- **AND** the error states that assisted search requires a point of sale
+
+#### Scenario: An operator cannot search on a point of sale they are not assigned to
+- **WHEN** an operator requests a point of sale outside their assignments
+- **THEN** the request is forbidden
+- **AND** no call is issued to the AI service
+- **AND** no search event is recorded
+
+#### Scenario: An administrator may search on any active point of sale
+- **WHEN** an administrator requests a point of sale they hold no assignment for and which is active
+- **THEN** the search is executed for that point of sale
+
+#### Scenario: An inactive point of sale is refused for every role
+- **WHEN** any caller requests an inactive point of sale
+- **THEN** the request is refused
+- **AND** no call is issued to the AI service
+
+### Requirement: The candidate window is requested once and never re-requested
+
+The system SHALL ask the AI service for the largest candidate window its over-retrieval rule can produce, in a single call per search, and MUST NOT issue a second retrieval call because too few candidates survived hydration.
+
+The requested page size MUST come from configuration rather than being hard-coded, and MUST be capped by the maximum the frozen contract accepts.
+
+A second call is forbidden because the retriever applies its confidence threshold before its result limit: when fewer candidates come back than the over-retrieval rule allows, the threshold was the binding constraint and a larger request would return the same rows while charging a second query embedding. The system MUST therefore answer with however many results survived, even when that is fewer than the requested page size.
+
+#### Scenario: One retrieval call per search
+- **WHEN** a search is served by the assisted path
+- **THEN** exactly one retrieval call is issued to the AI service
+
+#### Scenario: A short page does not trigger a second call
+- **WHEN** hydration leaves fewer results than the requested page size
+- **THEN** no further retrieval call is issued
+- **AND** the surviving results are returned
+- **AND** the response is not an error
+
+#### Scenario: The requested window is configured, not hard-coded
+- **WHEN** the search service is constructed
+- **THEN** the candidate window comes from configuration
+- **AND** it does not exceed the maximum page size the frozen contract accepts
+
+### Requirement: The backend is the authority on price, stock and availability
+
+The system SHALL hydrate every candidate returned by the AI service against the transactional catalog before showing it, and MUST take price, quantity, name, photo and collection from that hydration rather than from the AI response, which is required never to carry them.
+
+A candidate MUST be discarded when the product is inactive, when it has no inventory record at the point of sale of the search, or when that inventory record is inactive, since inventory assignment is what determines that a product belongs to a point of sale.
+
+A candidate whose quantity is zero MUST be kept and marked as out of stock. Availability weights a result; it never removes it. Suppressing it would turn a sale-saving answer — the shop carries the piece and is out of it — into a silent gap.
+
+The quantity reported MUST be the quantity at the point of sale of the search, not the sum across every point of sale the caller can access.
+
+Hydration MUST be performed with a set-based query over the whole candidate list. Resolving inventory or photos one candidate at a time is forbidden, because the candidate window makes it two orders of magnitude of round trips inside a request that competes with the retrieval time budget.
+
+When the identifier the index reports for a product differs from the one the catalog holds, the catalog value MUST prevail and the divergence MUST be logged.
+
+#### Scenario: Price and stock come from the catalog
+- **WHEN** results are built for a hydrated candidate
+- **THEN** its price and quantity come from the transactional catalog
+- **AND** they do not come from the AI response
+
+#### Scenario: A candidate no longer available at the point of sale is dropped
+- **WHEN** a candidate has no inventory record at the point of sale of the search, or its inventory record is inactive, or the product is inactive
+- **THEN** it does not appear in the results
+
+#### Scenario: A candidate with no stock is kept and marked
+- **WHEN** a candidate is assigned to the point of sale with a quantity of zero
+- **THEN** it appears in the results
+- **AND** it is marked as having no stock
+
+#### Scenario: The quantity is the one at that point of sale
+- **WHEN** a product has stock at several points of sale the caller can access
+- **THEN** the quantity reported is the one at the point of sale of the search
+
+#### Scenario: Hydration does not query per candidate
+- **WHEN** a full candidate window is hydrated
+- **THEN** the number of queries issued does not grow with the number of candidates
+
+### Requirement: Results are truncated to the requested page in retrieval order
+
+The system SHALL return at most the requested page size and MUST preserve the relevance order in which the AI service returned the candidates. It MUST NOT re-sort the surviving results, because the rank is the measurement of retrieval quality and re-sorting would make it measure the backend instead.
+
+#### Scenario: More survivors than the page size
+- **WHEN** more candidates survive hydration than the requested page size
+- **THEN** the response carries exactly the requested page size
+- **AND** the results keep the order in which the AI service returned them
+
+### Requirement: A failing AI service degrades the search, never breaks it
+
+The system SHALL answer successfully when the AI service cannot serve the retrieval, whatever the reason: an open circuit, an exhausted time budget, a transport failure, a route with no implementation, or credentials the service rejected. Every one of these MUST fall back to the degraded searcher and MUST be reported to the caller as the assisted path being unavailable. A credential failure MUST additionally be logged at error level, since it is a configuration fault that would otherwise pass unnoticed behind a working search.
+
+The system MUST NOT surface a failure of the AI service as a failed search.
+
+#### Scenario: An unavailable AI service falls back
+- **WHEN** the retrieval call fails because the circuit is open, the time budget is exhausted, or the transport failed
+- **THEN** the response is successful
+- **AND** it reports the assisted path as unavailable
+- **AND** the results come from the degraded searcher
+
+#### Scenario: A credential failure degrades and is logged
+- **WHEN** the AI service rejects the credentials
+- **THEN** the response is successful and reports the assisted path as unavailable
+- **AND** the failure is logged at error level
+
+### Requirement: The degraded searcher matches terms and is scoped to the point of sale
+
+The degraded searcher SHALL match any individual term of the operator's query rather than the query string as a whole, because a natural-language query never appears verbatim in a product name and a whole-string match would return an empty list on every degraded search — a silent outage wearing a successful response.
+
+It MUST restrict its results to products with active inventory at the point of sale of the search, so that the degraded path and the assisted path answer about the same shop and remain comparable in analysis.
+
+It MUST order results by lexical relevance and MUST NOT use relevance as an exclusion criterion.
+
+It MUST NOT require a new index or a schema change, and MUST NOT modify the behaviour of the pre-existing catalog search used by other screens.
+
+#### Scenario: A natural-language query returns results
+- **WHEN** the degraded searcher is given a multi-word natural-language query whose full string matches no product
+- **THEN** products matching individual terms are returned
+- **AND** the result list is not empty when such products exist at that point of sale
+
+#### Scenario: The degraded searcher is scoped to the point of sale
+- **WHEN** a product matches the query but has no active inventory at the point of sale of the search
+- **THEN** it does not appear in the degraded results
+
+#### Scenario: The pre-existing catalog search is untouched
+- **WHEN** the pre-existing catalog search endpoint is called
+- **THEN** it behaves as it did before this capability existed
+
+### Requirement: Assisted search can be switched off per point of sale
+
+The system SHALL decide per point of sale whether the assisted path is used, from configuration that can be reloaded without redeploying, and MUST default to not enabled so that enabling is an explicit act.
+
+When it is switched off, the system MUST serve the search without consulting the AI service at all, MUST report the assisted path as unavailable, and MUST record the search with the origin that means the AI service was never consulted, distinct from the one that means it was consulted and failed.
+
+Storing this decision MUST NOT require a schema change.
+
+#### Scenario: A disabled point of sale never reaches the AI service
+- **WHEN** a search is requested for a point of sale where assisted search is switched off
+- **THEN** no retrieval call is issued
+- **AND** the response reports the assisted path as unavailable
+- **AND** the results come from the pre-existing catalog search
+
+#### Scenario: The disabled path is distinguishable from the degraded one
+- **WHEN** a search served with assisted search switched off is recorded
+- **THEN** its origin is the disabled one
+- **AND** it is not recorded as a degraded search
+
+### Requirement: The three empty outcomes are distinguishable
+
+The system SHALL let the caller tell apart the three situations that produce no results, because a single empty list would make the interface state something untrue in two of the three cases:
+
+- the AI service answered and nothing cleared its confidence threshold;
+- the AI service returned candidates and none of them survived hydration at that point of sale;
+- the assisted path did not serve the search at all.
+
+The response MUST therefore carry both whether the assisted path served the search and whether the retriever abstained.
+
+#### Scenario: Abstention is reported as such
+- **WHEN** the AI service answers with no candidates and low confidence
+- **THEN** the response reports the assisted path as available and the retrieval as low confidence
+
+#### Scenario: An empty page after hydration is not abstention
+- **WHEN** the AI service returns candidates and none survives hydration
+- **THEN** the response reports the assisted path as available and the retrieval as not low confidence
+- **AND** the result list is empty
+
+#### Scenario: A degraded empty page is neither
+- **WHEN** the degraded searcher finds nothing
+- **THEN** the response reports the assisted path as unavailable
+
+### Requirement: Every served search is recorded, and recording it can never break it
+
+The system SHALL record every search it serves through the assisted-search telemetry capability, and MUST do so after hydrating and truncating, so that what is stored is the list the operator was shown rather than the raw candidate window.
+
+It MUST pass the effective filters, the origin of the results, the correlation identifier, the duration of obtaining the candidates, the total handling duration, and the search-episode identifier supplied by the caller, generating one when the caller supplies none.
+
+The total handling duration MUST be captured before the recording call, so that the recorded duration does not include the recording itself.
+
+The identifier of the recorded event MUST be returned to the caller so a later selection can be attributed to this search. The recording operation never throws and may report no identifier; the system MUST tolerate that and answer normally.
+
+#### Scenario: The displayed list is what gets recorded
+- **WHEN** a search returning a truncated page is recorded
+- **THEN** the recorded result list is the truncated page, in display order
+- **AND** it is not the full candidate window
+
+#### Scenario: The recorded duration excludes the recording
+- **WHEN** a search is recorded
+- **THEN** the total handling duration was captured before the recording call was made
+
+#### Scenario: A telemetry failure does not fail the search
+- **WHEN** recording the search reports no identifier
+- **THEN** the search still answers successfully
+- **AND** the response carries no search event identifier
+
+#### Scenario: An episode identifier always exists
+- **WHEN** a request carries no search-episode identifier
+- **THEN** the recorded event carries one generated by the server
+
+### Requirement: The cost of a search is bounded
+
+The system SHALL bound what an assisted search can spend, because every one of them charges a query embedding and an operator holding a key or a mis-tuned client can issue many in seconds.
+
+It MUST cache the candidates the AI service returned for a short, configurable lifetime, storing only their identifiers and scores. It MUST NOT cache hydrated values: hydration MUST be performed again on a cache hit, so that a cached search can never serve a stale price or a stale stock figure.
+
+The cache key MUST include the point of sale, even while retrieval is independent of it, so that the key does not silently become a cross-point-of-sale leak when the retriever gains a point-of-sale filter.
+
+It MUST apply a request-rate policy to the endpoint, partitioned by user rather than by network origin, because a whole shop shares one origin behind the reverse proxy. Exceeding it MUST be reported distinguishably from the AI service being unavailable.
+
+#### Scenario: A repeated query does not pay for a second embedding
+- **WHEN** the same query is issued twice from the same point of sale within the cache lifetime
+- **THEN** the second search issues no retrieval call to the AI service
+
+#### Scenario: A cache hit still hydrates
+- **WHEN** a search is served from cached candidates and the stock of one of them changed in between
+- **THEN** the response reports the current stock
+
+#### Scenario: The cache key separates points of sale
+- **WHEN** the same query is issued from two different points of sale
+- **THEN** the cached entry of one is not served to the other
+
+#### Scenario: The rate policy is partitioned by user
+- **WHEN** two users of the same shop issue searches from the same network origin
+- **THEN** their requests are counted separately
+
+#### Scenario: Exceeding the rate policy is not reported as AI unavailability
+- **WHEN** a caller exceeds the request-rate policy
+- **THEN** the response reports too many requests
+- **AND** it is not a successful response reporting the assisted path as unavailable
+
+### Requirement: The retrieval funnel is observable without new storage
+
+The system SHALL emit, for every served search, a structured event carrying the correlation identifier, the point of sale, how many candidates the AI service returned, how many survived hydration and how many were displayed, so that the loss caused by filtering by point of sale after retrieval is measurable per point of sale.
+
+This instrumentation MUST NOT require new persisted columns. The proportion of searches that do not fill a page is derivable from the displayed-result count and the point of sale that telemetry already persists, and separating abstention from an empty page after hydration is derivable by joining on the correlation identifier with the retrieval stage logs of the AI service.
+
+The operator's query text MUST NOT appear in any event at information level or above.
+
+#### Scenario: The funnel is emitted per search
+- **WHEN** a search is served
+- **THEN** a structured event carries the correlation identifier, the point of sale, the candidate count, the survivor count and the displayed count
+
+#### Scenario: No new columns are added
+- **WHEN** the persisted schema is compared before and after this capability
+- **THEN** it is unchanged
+- **AND** no migration was generated
+
+#### Scenario: The query stays out of production logs
+- **WHEN** the funnel event is emitted
+- **THEN** the operator's query text does not appear in it
