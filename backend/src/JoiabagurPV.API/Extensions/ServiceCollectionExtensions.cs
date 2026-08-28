@@ -1,9 +1,11 @@
 using JoiabagurPV.API.Services;
+using JoiabagurPV.Application.Configuration;
 using JoiabagurPV.Application.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Threading.RateLimiting;
@@ -11,10 +13,24 @@ using System.Threading.RateLimiting;
 namespace JoiabagurPV.API.Extensions;
 
 /// <summary>
+/// Names of the rate-limiting policies, so registration and the controllers that opt into them
+/// cannot drift apart over a string literal.
+/// </summary>
+public static class RateLimitPolicies
+{
+    /// <summary>Login attempts, partitioned by network origin.</summary>
+    public const string Login = "LoginRateLimit";
+
+    /// <summary>Assisted search, partitioned by user.</summary>
+    public const string AiSearch = "AiSearchRateLimit";
+}
+
+/// <summary>
 /// Extension methods for configuring API services.
 /// </summary>
 public static class ServiceCollectionExtensions
 {
+
     /// <summary>
     /// Adds API services to the dependency injection container.
     /// </summary>
@@ -103,6 +119,30 @@ public static class ServiceCollectionExtensions
                         // Use high limit for tests, normal limit for production
                         PermitLimit = isTestingEnvironment ? 1000 : 30,
                         Window = TimeSpan.FromMinutes(10),
+                        QueueLimit = 0
+                    }));
+
+            // Assisted search (C15). Partitioned by user, not by network origin: behind the
+            // reverse proxy an entire shop shares one address, so an IP partition would let one
+            // operator exhaust the allowance of their colleagues. The login policy partitions by
+            // address because it runs before there is a user to partition by.
+            //
+            // This is a cost control before it is a security control: every assisted search
+            // charges a query embedding, and a key held down or a mis-tuned debounce turns into
+            // a bill.
+            var searchOptions = configuration
+                .GetSection(AiSearchOptions.SectionName)
+                .Get<AiSearchOptions>() ?? new AiSearchOptions();
+
+            options.AddPolicy(RateLimitPolicies.AiSearch, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                                  ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                                  ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = isTestingEnvironment ? 10_000 : searchOptions.RateLimitPermitLimit,
+                        Window = TimeSpan.FromSeconds(searchOptions.RateLimitWindowSeconds),
                         QueueLimit = 0
                     }));
         });

@@ -165,13 +165,15 @@ The system SHALL decide per point of sale whether the assisted path is used, fro
 
 When it is switched off, the system MUST serve the search without consulting the AI service at all, MUST report the assisted path as unavailable, and MUST record the search with the origin that means the AI service was never consulted, distinct from the one that means it was consulted and failed.
 
+The results MUST come from the same non-assisted searcher the degraded path uses, and MUST NOT come from the pre-existing catalog search. The pre-existing searcher reports stock summed across every point of sale the caller can access and is not scoped to one shop, so serving it here would break this endpoint's own guarantee that the quantity shown is the quantity at the point of sale of the search — and would do so only for the points of sale where the feature happens to be switched off, which is the hardest kind of inconsistency to notice.
+
 Storing this decision MUST NOT require a schema change.
 
 #### Scenario: A disabled point of sale never reaches the AI service
 - **WHEN** a search is requested for a point of sale where assisted search is switched off
 - **THEN** no retrieval call is issued
 - **AND** the response reports the assisted path as unavailable
-- **AND** the results come from the pre-existing catalog search
+- **AND** the results come from the non-assisted searcher, scoped to that point of sale
 
 #### Scenario: The disabled path is distinguishable from the degraded one
 - **WHEN** a search served with assisted search switched off is recorded

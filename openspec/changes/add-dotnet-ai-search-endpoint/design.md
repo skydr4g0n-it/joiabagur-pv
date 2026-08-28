@@ -102,9 +102,12 @@ Como `sobre_recuperación(k) = min(k × 3, 60)`, pedir 20 satura el tope. La con
 | Leer el índice del esquema vectorial desde el backend | Comparte cuatro eslabones con la cadena que acaba de fallar —índice poblado, indexador al día, canal de alimentación, credencial del proveedor—, así que dejaría de ser un camino alternativo para ser un segundo camino principal. Y acoplaría el backend a migraciones del otro servicio sin ninguna prueba que lo detecte: un renombrado de columna rompería en ejecución, en silencio |
 | Reutilizar el buscador clásico tal cual | Coste cero y valor cero, por lo dicho arriba |
 
-**Trampa que el diseño fija por escrito.** La conversión de texto a consulta que conjunta los términos devuelve cero sobre este corpus, con lo que se habría reproducido el fallo del buscador clásico con mejor tecnología. La consulta degradada **debe** usar semántica de alternativa. La relevancia léxica **ordena**; no filtra.
+**Dos trampas que el diseño fija por escrito.**
 
-**Verificación previa.** La traducción de estas funciones por el proveedor de acceso a datos se comprueba en una prueba corta antes de construir sobre ella. Caída controlada si no traduce limpiamente: alternativa de términos sobre identificador, nombre y descripción, ordenada por número de términos que casan. La forma del resultado y los tests no cambian.
+1. **Semántica.** La conversión de texto a consulta que conjunta los términos devuelve cero sobre este corpus, con lo que se habría reproducido el fallo del buscador clásico con mejor tecnología. La consulta degradada **debe** usar semántica de alternativa. La relevancia léxica **ordena**; no filtra.
+2. **Robustez ante entrada libre** *(añadida tras la verificación de la tarea 1.1)*. Existen dos conversiones de texto a consulta: la estricta y la tolerante. La estricta **lanza excepción** ante sintaxis malformada —un operador booleano o un paréntesis sueltos—, y aquí los términos proceden de texto escrito por el operador: una consulta con un carácter reservado convertiría el camino degradado en un error del servidor, justo en el momento en que ese camino es lo único que queda en pie. Se usa la **tolerante**, que nunca falla ante entrada arbitraria, y se usa **en las dos posiciones** —coincidencia y ordenación—, que además deben compartir la misma consulta de texto para que la relevancia sea coherente con lo que se filtró.
+
+**Verificación previa.** Comprobada antes de construir sobre ella: ambas construcciones se traducen íntegramente a SQL, sin evaluación en cliente y sin materializar el catálogo. El SQL resultante está recogido en *Open Questions*. La caída controlada prevista no ha hecho falta.
 
 ### D4. Activación por punto de venta en configuración, y un tercer origen de telemetría
 
@@ -203,4 +206,17 @@ El despliegue es aditivo: endpoint nuevo, sin consumidores hasta el change del p
 
 Ninguna pendiente de producto: las doce decisiones abiertas se cerraron en la sesión de exploración y están recogidas en el ticket y en la revisión fechada del plan.
 
-Queda una incógnita técnica acotada, con salida prevista: si el proveedor de acceso a datos no traduce las funciones de texto completo, el camino degradado cae a la alternativa de términos descrita en D3 sin cambiar contrato, forma de respuesta ni tests.
+**Resuelta — traducción de las funciones de texto completo (tarea 1.1).** Verificado sobre el proveedor de acceso a datos del proyecto: ambas construcciones se traducen íntegramente a SQL, sin evaluación en cliente y sin materializar el catálogo.
+
+```sql
+-- coincidencia
+WHERE to_tsvector('spanish', p."Name" || ' ' || COALESCE(p."Description", ''))
+      @@ websearch_to_tsquery('spanish', <términos unidos por OR>)
+
+-- ordenación
+ORDER BY ts_rank(to_tsvector('spanish', ...), <misma consulta de texto>) DESC
+```
+
+La caída prevista en D3 **no hace falta**.
+
+La verificación añade una restricción que el diseño no había anticipado y que se incorpora a D3: **la conversión a consulta de texto debe ser la tolerante a entrada libre**, no la estricta. La estricta lanza excepción ante sintaxis malformada —un `&`, un `|` o un paréntesis suelto—, y los términos proceden de texto que escribe el operador, así que una consulta con un carácter reservado convertiría el camino degradado en un error del servidor: exactamente el escenario en el que el camino degradado es lo único que queda. La tolerante nunca falla ante entrada arbitraria y se usa **en las dos posiciones**, coincidencia y ordenación, que además deben compartir la misma consulta de texto para que la relevancia sea coherente con lo que se filtró.

@@ -89,6 +89,11 @@ public static class ServiceCollectionExtensions
         // Indexing feed keyset queries (C12). No new tables.
         services.AddScoped<IIndexFeedRepository, IndexFeedRepository>();
 
+        // Assisted search reads (C15): set-based hydration and the degraded Spanish full-text
+        // searcher. No new tables and no index: at this catalog size an inverted index would buy
+        // stemming rather than speed, and the stemming is obtained without it.
+        services.AddScoped<IAssistedSearchRepository, AssistedSearchRepository>();
+
         // Register unit of work
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 

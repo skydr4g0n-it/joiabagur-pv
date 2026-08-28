@@ -35,6 +35,11 @@ builder.Services.AddProfileReview(builder.Configuration);
 // missing or short key must stop the host, not look like a 401 from the first C13 pull.
 builder.Services.AddIndexFeed(builder.Configuration);
 
+// Assisted search (C15). Bound through IOptionsMonitor because the per-point-of-sale switch has
+// to be flippable without a redeploy: that reloadability is why it lives in configuration rather
+// than in a column.
+builder.Services.AddAssistedSearch(builder.Configuration);
+
 // Add API services
 builder.Services.AddApiServices(builder.Configuration);
 
