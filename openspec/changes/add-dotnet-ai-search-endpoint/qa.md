@@ -1,7 +1,8 @@
 # QA — C15 `add-dotnet-ai-search-endpoint`
 
 > Registro de las comprobaciones **realmente ejecutadas** sobre la implementación del change, con sus resultados.
-> **Fecha:** 2026-08-28 · **Rama:** `c15-add-dotnet-ai-search-endpoint` · **Commits de artefactos (HEAD, sin commit de implementación aún):** `52394b2` (HU + ticket + §0 del plan), `f733412` (proposal, design, specs, tasks)
+> **Fecha:** 2026-08-28 · **Rama:** `c15-add-dotnet-ai-search-endpoint`
+> **Commits:** `52394b2` (HU + ticket + §0 del plan) · `f733412` (proposal, design, specs, tasks) · `fd7e52d` (implementación, tests y este registro). La §9 se ejecutó **después** de `fd7e52d`, sobre ese mismo código.
 > **Idioma:** cuerpo en español, identificadores técnicos en inglés, por coherencia con [ticket.md](ticket.md) y con la HU.
 
 ---
@@ -274,9 +275,94 @@ La verificación de traducción se hizo con dos tests que fuerzan un fallo para 
 
 ---
 
-## 9. Fuera de esta pasada (no DoD)
+## 9. Verificación con el mundo sembrado (tarea 9.3) — **ejecutada**
 
-- **Tarea 9.3 · verificación manual con el mundo sembrado.** Búsqueda real desde `op-ciutadella` (cobertura 0,78) y `op-fornells` (0,22) con el índice local poblado, comprobando que la segunda devuelve página corta y que el embudo lo refleja. Requiere `jbg-ai` levantado y los datos de C10 en la base local. La ficha la declara **fuera del DoD de merge**; es la que enseñaría el corte de recall en vivo.
+Ejecutada el mismo día, después del commit de implementación `fd7e52d`. Es la única comprobación de esta pasada que sale de los tests y toca el sistema entero: base local con el mundo de C10, `jbg-ai` en modo real contra el índice poblado, backend en `localhost:5056`, y peticiones HTTP autenticadas como los operadores de demo.
+
+### 9.1. Montaje
+
+| Pieza | Estado |
+|---|---|
+| `jpv-pv-postgres` | 1.200 productos · 12 POS · 6.720 inventarios · 1.200 documentos indexados, **todos con embedding** |
+| `jpv-pv-jbg-ai` | **Reconstruido**: la imagen tenía 47 h y era **anterior a C14**, así que `STUB_MODE=false` devolvía 501. Tras reconstruir, retriever vectorial real |
+| Embeddings | `openai/text-embedding-3-small`, llamadas reales y facturables (una por búsqueda no cacheada; coste por consulta despreciable) |
+| Backend | `dotnet run` con `AiSearch__EnabledPointOfSaleIds` = CIU-CENTRE y FORNELLS |
+| Al terminar | `jbg-ai` devuelto a `STUB_MODE=true`, que es lo que describe el compose commiteado. Override efímero y cookies eliminados |
+
+### 9.2. La cobertura real confirma la aritmética del diseño
+
+El diseño predijo los supervivientes a partir de `round(coverage × 1200)` y un 8 % de inventario inactivo. Contra la base:
+
+| POS | Activos predichos | **Activos reales** | % catálogo |
+|---|---|---|---|
+| CIU-CENTRE | 861 | **871** | 72,6 % |
+| MAO-AIR | 420 | **416** | 34,7 % |
+| FORNELLS | 243 | **241** | 20,1 % |
+
+### 9.3. El corte de recall, medido
+
+Misma consulta desde los dos operadores, `pageSize = 10`. **`candidatesReturned` es 60 en todas**: la ventana máxima del contrato, en una sola llamada, confirmada de extremo a extremo.
+
+| Consulta | CIU-CENTRE surv./most. | FORNELLS surv./most. |
+|---|---|---|
+| un anillo de plata para regalar | 32 / **10** | 8 / **8** |
+| collar elegante para una boda | 48 / 10 | 14 / 10 |
+| pendientes de oro con piedra azul | 44 / 10 | 14 / 10 |
+| pulsera de plata con motivos marinos | 42 / 10 | 22 / 10 |
+| algo dorado para el día de la madre | 42 / 10 | 15 / 10 |
+
+Media de supervivientes: CIU-CENTRE **41,6** (predicho 43), FORNELLS **14,6** (predicho 12,1).
+
+### 9.4. La correlación con el ranking, medida
+
+`Colección Sa Mesquida` son piezas de caracola: 23 en catálogo y **cero** en FORNELLS. El diseño predijo que una consulta alineada con una colección que ese POS apenas tiene caería muy por debajo de su media estadística. Se cumple:
+
+| Consulta | CIU-CENTRE surv./most. | FORNELLS surv./most. |
+|---|---|---|
+| pendientes con motivo de caracola | 40 / 10 | **5 / 5** |
+| joya con forma de concha marina | 42 / 10 | 11 / 10 |
+| anillo de filigrana tradicional menorquina | 32 / 10 | 8 / 8 |
+
+Cinco supervivientes de 60 es **menos de la mitad** de la media de FORNELLS. El descarte no adelgaza uniformemente: se concentra donde el ranking apunta.
+
+### 9.5. La línea base sale de lo ya persistido
+
+Consultando **sólo** `ProductSearchEvents`, sin columnas nuevas y sin parsear JSON, que es lo que sostiene D7:
+
+| POS | Origen | Búsquedas | Media result. | **% páginas cortas** | RetrievalMs | TotalMs |
+|---|---|---|---|---|---|---|
+| CIU-CENTRE | 1 · Assisted | 11 | 10,0 | **0,0 %** | 264 | 314 |
+| CIU-CENTRE | 2 · LexicalFallback | 4 | 10,0 | 0,0 % | 229 | 824 |
+| FORNELLS | 1 · Assisted | 8 | 8,9 | **37,5 %** | 360 | 370 |
+| FORNELLS | 2 · LexicalFallback | 4 | 10,0 | 0,0 % | 38 | 67 |
+
+Ésa es la cifra «antes» de la ablation de C22: **0 % frente a 37,5 % de páginas sin llenar**, con el mismo endpoint y el mismo día.
+
+`TotalMs − RetrievalMs` da el **coste de la hidratación**: 50 ms en CIU-CENTRE y 10 ms en FORNELLS — el número que §0 del plan decía que nadie conoce hoy y que el README querría defender.
+
+### 9.6. Los tres orígenes y los rechazos
+
+| Comprobación | Resultado |
+|---|---|
+| Los tres orígenes persistidos | `1` × 19, `2` × 8, `3` × 1 |
+| `RetrievalMs` nulo | **0 filas** en los tres orígenes — la corrección de §8.2 se sostiene en producción |
+| `TraceId` nulo | 0 filas |
+| Admin sobre POS con el flag apagado | `aiAvailable: false`, cero llamadas a la IA, origen `3` |
+| Admin sobre POS inactivo (`HT-ARTRUTX`) | **400** «El punto de venta no existe o no está activo» |
+| Operador sobre POS ajeno | **403** |
+| Petición sin punto de venta | **400** «La búsqueda asistida requiere un punto de venta» |
+| Eventos registrados por peticiones rechazadas | **0** |
+
+### 9.7. Hallazgo de latencia
+
+La **primera** llamada tras arrancar el contenedor tardó **799 ms** de extremo a extremo y agotó justo el presupuesto de 800 ms de C03, degradando la búsqueda. Las siguientes: **265–275 ms** (embed 160–197 ms, búsqueda vectorial 20–33 ms). El coste es el establecimiento de la conexión con el proveedor en la primera llamada del proceso.
+
+No es un defecto de C15 —la degradación funcionó exactamente como debe, y ésa es la prueba de que funciona— pero **conviene anotarlo para C17**: en producción, el primer operador que busque tras un despliegue puede recibir resultados degradados. Un calentamiento al arrancar el contenedor lo evitaría, y es del change de despliegue, no de éste.
+
+---
+
+## 10. Fuera de esta pasada (no DoD)
+
 - `/opsx:verify` sobre este change.
 - Panel del operador (C16) y despliegue del servicio (C17).
 - Rama léxica del híbrido, RRF y sinónimos (C20/C21); prefiltro por punto de venta (C22).
@@ -289,4 +375,4 @@ La verificación de traducción se hizo con dos tests que fuerzan un fallo para 
 
 **Sin regresiones.** Comparación nombre a nombre contra el baseline: **cero** tests rotos por este change; el delta cae íntegramente en una clase cuya inestabilidad por orden se verificó ejecutándola en aislamiento y obteniendo un tercer conjunto de fallos distinto. Alcance C15: **32 + 15 = 47 métodos, 0 fallos**. `openspec validate --all --strict` **43/0**. Diffs vacíos en `ai-service/`, `openapi.json`, `IAiGatewayClient`, `frontend/`, migraciones y buscador preexistente. **42/43 tareas**; 38 de 42 escenarios con test directo.
 
-**Dos escenarios de la política de peticiones quedan sin test** por la razón escrita en §8.4, y la verificación manual con el mundo sembrado sigue pendiente. Con eso declarado, listo para `/opsx:verify` y archivado.
+**Dos escenarios de la política de peticiones quedan sin test** por la razón escrita en §8.4. La verificación con el mundo sembrado (§9) **se ejecutó**: el corte de recall es real y está medido —0 % de páginas cortas en CIU-CENTRE frente al 37,5 % en FORNELLS—, los tres orígenes se persisten y la línea base para C22 sale de la tabla sin columnas nuevas. Con eso declarado, listo para `/opsx:verify` y archivado.

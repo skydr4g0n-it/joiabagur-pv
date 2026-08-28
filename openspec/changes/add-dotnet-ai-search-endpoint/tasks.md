@@ -65,5 +65,5 @@
 
 - [x] 9.1 `openspec validate --all --strict` → 0 failed (el delta toca una spec ya activa, así que no basta validar este change)
 - [x] 9.2 Enlazar HU-AIENG-015 en `Documentos/epicas.md` (EP14)
-- [ ] 9.3 Verificación posterior, fuera del DoD de merge: búsqueda real desde `op-ciutadella` y desde `op-fornells` con el índice local poblado, comprobando que la segunda devuelve página corta y que el embudo lo refleja
+- [x] 9.3 Verificación posterior, fuera del DoD de merge: búsqueda real desde `op-ciutadella` y desde `op-fornells` con el índice local poblado, comprobando que la segunda devuelve página corta y que el embudo lo refleja
 - [x] 9.4 Revisar que no queda TODO ni FIXME sin tarea de seguimiento, y que no hay diff en `ai-service/`, `ai-service/openapi.json`, `IAiGatewayClient`, `frontend/` ni migraciones
