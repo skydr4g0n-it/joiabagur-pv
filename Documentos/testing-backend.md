@@ -202,6 +202,26 @@ Sobre los dos primeros conviene una precisión que ahorra tests engañosos. Al p
 > El procedimiento y el detalle de las dos pasadas están en
 > `openspec/changes/archive/2026-08-17-add-product-family-entity/qa.md` §1.1.
 
+> **Actualización del 2026-08-28, sobre `c15-add-dotnet-ai-search-endpoint`.** La suite tiene ahora
+> **882 tests**. La línea base de ese change dio **829 y 54**; tras implementarlo, **874 y 48**; y
+> tras una segunda tanda de arreglos, **882 y 49**.
+>
+> La aportación de esta cuarta medición es sobre la **misma clase de siempre**. `InventoryIntegrationTests`
+> produjo **cuatro conjuntos distintos de fallos en cuatro ejecuciones**: 10 en la línea base, 4 tras
+> implementar, **7 al ejecutarla en aislamiento sobre ese mismo código**, y 4 otra vez —con nombres
+> diferentes— tras los arreglos. La pasada en aislamiento es la que zanja el asunto: ninguno de los
+> cuatro «fallos nuevos» de la suite completa aparecía al correr la clase sola, y uno que «había
+> dejado de fallar» sí fallaba allí.
+>
+> Es también un aviso sobre el propio procedimiento. Los recuentos de esta tanda **bajaron** —de 54
+> a 48— y aun así el change contenía un defecto real, encontrado por revisión y no por la suite: la
+> política de limitación de peticiones particionaba por dirección de red en vez de por usuario,
+> porque `UseRateLimiter()` corría antes de `UseAuthentication()`. Un número que mejora no dice nada,
+> ni sobre la salud de la suite ni sobre la del código.
+>
+> El procedimiento y las cuatro pasadas están en
+> `openspec/changes/archive/2026-08-28-add-dotnet-ai-search-endpoint/qa.md` §1.1 y §10.
+
 ### Por qué se acumularon sin que nadie los viera
 
 Los dos árboles se comportan de forma muy distinta, y esa es la clave:

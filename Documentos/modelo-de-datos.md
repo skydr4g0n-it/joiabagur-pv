@@ -469,7 +469,7 @@ Registra cada búsqueda asistida ejecutada y, si la hubo, la selección que el o
 - `FiltersJson`: `jsonb` con los filtros **efectivos** enviados a recuperación, `{}` si no hubo
 - `ResultsJson`: `jsonb` con la lista **mostrada**, proyectada a `{ productId, sku, rank, score, matchReasons }`, `[]` si vacía
 - `ResultsCount`: resultados realmente mostrados, con independencia de cuántos se almacenaron
-- `SearchOrigin`: `Assisted = 1` | `LexicalFallback = 2` — distingue la ruta asistida de la degradada al buscador léxico
+- `SearchOrigin`: `Assisted = 1` | `LexicalFallback = 2` | `Disabled = 3` — distingue la ruta asistida, la degradada porque la IA no respondió, y la que **no llegó a consultarla** porque la búsqueda asistida está apagada en ese punto de venta. Los tres son valores separados a propósito: registrar el tercero como el segundo haría que una temporada con la función apagada se leyera como una temporada de caídas de la IA, que es justo lo que esta columna existe para evitar
 - `TraceId`: correlación con los logs del salto .NET↔Python
 - `RetrievalMs`, `TotalMs`: obtener candidatos y servir la petición completa; su diferencia mide la hidratación
 - `SelectedProductId`, `SelectedFromRank`, `SelectedAt`: la selección, todos nullable
