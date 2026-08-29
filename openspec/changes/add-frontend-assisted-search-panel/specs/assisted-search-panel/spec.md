@@ -197,13 +197,16 @@ The results MUST still be displayed: a short page is not an error state.
 
 ### Requirement: The retrieval funnel is visible to administrators only
 
-The panel SHALL offer, to administrators only, a collapsed block carrying the correlation identifier and the candidate, survivor and displayed counts the response returns.
+The panel SHALL offer, to administrators only, a collapsed block carrying the candidate, survivor and displayed counts the response returns, together with the identifier of the recorded search event when there is one.
+
+That identifier, and not the correlation identifier of the call, is what the block can show: the response deliberately does not carry a correlation identifier — it exists only in the structured funnel log of the backend — whereas the search event identifier is the key that joins what the administrator is looking at to what telemetry persisted about it.
 
 It MUST NOT be shown to operators, for whom it is noise, and MUST be collapsed by default.
 
 #### Scenario: An administrator can inspect the funnel
 - **WHEN** an administrator runs a search
-- **THEN** a collapsed block with the correlation identifier and the three funnel counts is available
+- **THEN** a collapsed block with the three funnel counts is available
+- **AND** it carries the identifier of the recorded search event when the response returned one
 
 #### Scenario: An operator never sees the funnel
 - **WHEN** an operator runs a search

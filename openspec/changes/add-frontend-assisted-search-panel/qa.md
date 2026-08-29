@@ -89,15 +89,16 @@ Mismo código, distinto conjunto de rojos. Es la razón por la que comparar el n
 |---|---|
 | **Baseline** — árbol limpio en `HEAD` | **482 tests · 364 passed · 118 failed** · 40 ficheros (17 en rojo) · 252 s |
 | **Después** — C16 implementado | **525 tests · 412 passed · 113 failed** · 44 ficheros (14 en rojo) |
+| **Tras los arreglos de `/opsx:verify`** (§9) | **529 tests · 416 passed · 113 failed** · 44 ficheros (14 en rojo) |
 | `npm run build` | **✓ built in 1 m 29 s** |
 
-525 − 482 = **43 tests nuevos**, exactamente los añadidos.
+529 − 482 = **47 tests nuevos**, exactamente los añadidos. El número de rojos no se mueve entre las dos últimas pasadas, y el conjunto de nombres tampoco.
 
 ### 2.1. Comparación nombre a nombre
 
 | | Resultado |
 |---|---|
-| Fallan **después** y no antes | **Ninguno.** Cero regresiones |
+| Fallan **después** y no antes | **Ninguno.** Cero regresiones, comprobado en las dos pasadas: la de la implementación y la posterior a los arreglos de `/opsx:verify` |
 | Fallaban **antes** y ya no | 5, todos en ficheros que este change **no toca**: `points-of-sale.test.tsx`, `products/create.test.tsx` (×2), `users.test.tsx`, `image-recognition.service.test.ts` |
 
 Los cinco que dejan de fallar son el mismo fenómeno de orden que en .NET: añadir cuatro ficheros de test desplaza la ejecución. Ninguno está en la ruta de C16.
@@ -106,7 +107,8 @@ Los cinco que dejan de fallar son el mismo fenómeno de orden que en .NET: añad
 
 | Fichero | Tests | Qué cubre |
 |---|---|---|
-| `pages/sales/__tests__/assisted.test.tsx` | **27** | Coste del disparo, filtros, orden recibido, los cuatro «sin resultados», página corta, episodio, selección, punto de venta y rol, embudo, respuesta obsoleta |
+| `pages/sales/__tests__/assisted.test.tsx` | **29** | Coste del disparo, filtros, orden recibido, los cuatro «sin resultados», página corta, episodio *(los tres escenarios)*, selección, punto de venta y rol, embudo, respuesta obsoleta |
+| `pages/sales/__tests__/sales-index.test.tsx` | **+2** | La tercera tarjeta y su destino, y que «Escanear Código» sigue siendo la primera opción *(fichero preexistente, ampliado)* |
 | `services/ai-search.service.test.ts` | **9** | Rutas relativas y mapeo de `429` / `403` / `400` (array y diccionario) / genérico; `reportSelection` que resuelve en vez de rechazar |
 | `lib/materials-vocabulary.test.ts` | **4** | Fijación de los nueve términos canónicos y los ocho tipos de pieza |
 | `pages/sales/__tests__/new-attribution.test.tsx` | **3** | El arrastre hasta la línea del carrito, y que no se atribuye si el producto cambió |
@@ -119,7 +121,7 @@ Los cinco que dejan de fallar son el mismo fenómeno de orden que en .NET: añad
 
 | Requisito | Cubierto por |
 |---|---|
-| Entrada del flujo de venta, ruta propia | `sales/index.tsx` (tercera tarjeta), `routes.tsx`, `app-routing-setup.tsx`; escenario de entrega verificado en `new-attribution.test.tsx` |
+| Entrada del flujo de venta, ruta propia | `should show "Buscar con Ayuda" tile linking to the assisted search panel` y `should keep "Escanear Código" as the first entry option` *(añadidos por `/opsx:verify`, §9.2)*; escenario de entrega verificado en `new-attribution.test.tsx` |
 | Una búsqueda sólo cuando se pide | `should not issue a search request when the operator types without submitting`, `…when the operator submits`, `…when an example query is activated`, `…when a quick filter is toggled`, `should clear the results when the point of sale changes` |
 | Filtros sobre el vocabulario cerrado | `should allow selecting multiple materials in quick filters` (comprueba término canónico, no etiqueta), `should clear every active filter…`, más los 4 de fijación del vocabulario |
 | Ámbito de punto de venta por rol | `should hide the point of sale selector when the operator has a single assignment`, `should offer only active points of sale…`, `should report a forbidden point of sale as an access problem` |
@@ -127,8 +129,8 @@ Los cinco que dejan de fallar son el mismo fenómeno de orden que en .NET: añad
 | Explicación con lo que hay | `should render results with reason when search succeeds` (comprueba además que `vector` **no** aparece), `should not render a size when the variant label is absent` |
 | Los cuatro «sin resultados» | `should distinguish abstention from empty assortment`, `should say the shop carries none of it…`, `should show legacy results banner when ai is unavailable`, `should show a rate limit message when the server answers 429` |
 | Página corta declarada | `should declare a short page when fewer results survive than requested` |
-| Embudo sólo para administradores | `should show the funnel block to an administrator`, `should hide the funnel block from an operator` |
-| Un episodio por visita | `should keep the search session id across reformulations in one panel visit` |
+| Embudo sólo para administradores | `should show the funnel block to an administrator` —reforzado en §9.1 para afirmar que está colapsado, los tres contadores y el identificador del **evento**—, `should hide the funnel block from an operator` |
+| Un episodio por visita | `should keep the search session id across reformulations in one panel visit`, `should keep the search session id when the point of sale changes` y `should start a new search session id when the panel is opened again` *(los dos últimos, añadidos por `/opsx:verify`, §9.3)* |
 | Selección inmediata y no bloqueante | `should emit search event when a result is selected`, `should not block navigation when reporting the selection fails`, `should skip the selection report when no search event id was returned` |
 | La búsqueda viaja hasta la caja | `should carry the search event id into the sale flow…`, `should carry the search event id into the cart line…`, `should carry no attribution when the product did not come from assisted search` |
 | Respuesta obsoleta descartada | `should ignore a stale response when the point of sale changed` |
@@ -366,8 +368,61 @@ Decenas de errores preexistentes en las plantillas de Metronic (`lucide-react` s
 El `--all --strict` es obligatorio y no basta la forma de un solo change: hay dos deltas sobre specs archivadas (`sales-management` y `ai-assisted-search`).
 
 ---
+## 9. `/opsx:verify` — ejecutado, y encontró un requisito insatisfacible
 
-## 9. Fuera de esta pasada (no DoD)
+Ejecutado sobre la implementación ya commiteada (`76aa34f`). Resultado: **1 crítico, 2 avisos, 1 sugerencia**. Los cuatro corregidos.
+
+### 9.1. 🔴 C1 · El embudo exigía un identificador de correlación que la respuesta no lleva
+
+La spec de la capacidad decía, en el requisito del embudo:
+
+> …a collapsed block carrying **the correlation identifier** and the candidate, survivor and displayed counts…
+
+y su escenario lo repetía, y `design.md` D8 también. **`AssistedSearchResponse` no tiene `TraceId`**: C15 lo dejó deliberadamente fuera del contrato y vive sólo en su log estructurado del embudo. Lo que el panel pinta es el **identificador del evento de búsqueda**, que es otra cosa.
+
+Archivar así habría sincronizado en `openspec/specs/` un requisito vivo que el código no cumple **y no puede cumplir** sin reabrir el contrato de C15. Es exactamente la clase de defecto que este change existe para cerrar en `ai-search-telemetry` — una spec archivada como cumplida sin camino por el que cumplirse— y se coló en el mismo change que la denuncia.
+
+**Corregido en la spec y en el diseño, no en el código.** El identificador del evento es además el correcto en el fondo: es la clave que une lo que el administrador ve en pantalla con la fila que la telemetría persistió, sin salir de la base de datos. Cruzar con los logs de ambos servicios sigue siendo posible uniendo esa fila por `TraceId`, que es como C15 previó el cruce. Se descartó añadir `traceId` a la respuesta: reabre un contrato cerrado y una decisión explícita a cambio de una etiqueta en un bloque de diagnóstico.
+
+El test del embudo se reforzó para afirmar lo que la spec corregida exige: que está **colapsado** —los contadores no están en pantalla hasta que el administrador los pide—, los tres contadores, y el identificador del evento.
+
+### 9.2. 🟠 W1 · El punto de entrada de la funcionalidad no lo afirmaba ningún test
+
+Dos escenarios lo exigían —`Sales landing page with three entry methods` del delta de `sales-management` y `The panel is reachable from the sales landing page` de la capacidad nueva— y `sales-index.test.tsx` tenía exactamente tres tests, ninguno de los cuales mencionaba la tarjeta nueva.
+
+Agravante: ese fichero ya estaba **1/3 en rojo** en la línea base, así que si la tarjeta desapareciera nadie lo notaría — el fichero seguiría rojo por otra razón.
+
+**Corregido** con dos tests: uno que afirma la tarjeta **y su destino** —`getByRole('link', …)` con `href`, porque cada tarjeta repite su nombre en el título y en el botón y una consulta por texto casa dos veces—, y otro que fija que «Escanear Código» sigue siendo la primera opción, que es lo que la spec de `sales-management` pide y lo que añadir una tercera tarjeta puede reordenar sin que se note.
+
+### 9.3. 🟠 W2 · Dos de los tres escenarios del episodio no tenían test
+
+Cubierto estaba `Reformulations share the episode`. Sin cubrir, `Changing the shop does not start a new episode` y `A new visit is a new episode`.
+
+El primero era el que podía regresar en silencio: reiniciar el identificador en el manejador de cambio de punto de venta es un sitio plausible donde ponerlo, y ningún test habría fallado — cada cambio de tienda habría pasado a contar como un episodio nuevo, que es justo el falso abandono que B2 existe para evitar.
+
+**Corregido** con `should keep the search session id when the point of sale changes` (que afirma además que el punto de venta sí cambió, para que el test no pase por no haber cambiado nada) y `should start a new search session id when the panel is opened again`, que desmonta y remonta.
+
+### 9.4. 🔵 S1 · `useRef(crypto.randomUUID())` generaba un identificador por render
+
+El argumento de `useRef` se evalúa en cada render aunque sólo se conserve el primero. No era un fallo de corrección —el valor guardado es estable, y el test lo demostraba— pero es trabajo desperdiciado en cada pulsación de tecla, en la página cuyo argumento entero es no desperdiciar trabajo por pulsación.
+
+**Corregido** con inicialización perezosa (`useRef<string | null>(null)` más `??=`), y el identificador añadido a las dependencias del `useCallback` para que la lista describa lo que la función lee y no lo que resulta que cambia.
+
+### 9.5. Lo que la verificación confirmó que sí estaba bien
+
+- **Completeness:** 70/70 tareas, y las marcas se corresponden con código real. Los 16 requisitos tienen implementación localizable.
+- **Correctness:** 60 de los 64 escenarios ya tenían test o verificación manual detrás antes de esta pasada; los cuatro restantes son los de W1 y W2.
+- **Coherence:** D1 a D7 seguidas y verificables en el código. Ningún `debounce` en el panel, comprobado por búsqueda directa.
+- **Alcance negativo:** sin migración, sin diff en `ai-service/`, en el contrato congelado, en `IAiGatewayClient` ni en `/api/v1/products/search`.
+
+### 9.6. Lo que la verificación **no** arregló, a propósito
+
+`sales-index.test.tsx > should show "Escanear Código" tile` sigue fallando con `Found multiple elements`, como en la línea base. Es un defecto preexistente del test —la tarjeta repite su nombre en el título y en el botón— y no lo toca este change: arreglarlo enturbiaría la comparación nombre a nombre que sostiene todo este registro. El test nuevo que se añadió dos líneas más abajo demuestra el patrón correcto para quien vaya a arreglarlo.
+
+---
+
+
+## 10. Fuera de esta pasada (no DoD)
 
 - **Vídeo o captura del panel.** El comportamiento está cubierto por 27 tests de componente y por la §6 contra datos reales, pero nadie ha mirado la pantalla renderizada en un navegador.
 - **Verificación de la política de peticiones en caliente.** Superar el límite exige 31 búsquedas, es decir 31 embeddings facturados. Queda cubierta por `AiSearchRateLimitTests` y por el test de panel del `429`.
@@ -378,7 +433,11 @@ El `--all --strict` es obligatorio y no basta la forma de un solo change: hay do
 
 ## Veredicto
 
-**Listo para archivar**, con dos salvedades que no bloquean y quedan registradas:
+**Listo para archivar.** `/opsx:verify` encontró un requisito insatisfacible y tres huecos de cobertura; los cuatro están corregidos (§9) y la validación vuelve a dar **44 passed, 0 failed**.
+
+Dos salvedades que no bloquean y quedan registradas:
 
 1. **`RetrievalTimeoutMs` está en 2500 ms y debe volver a 800 ms** cuando C21 o C22 conviertan el cliente de embeddings en singleton. Anotado en `appsettings.json`, en `AiGatewayOptions` y en `DEFERRED_TASKS.md`. Dejarlo así indefinidamente convierte el presupuesto en decorado.
-2. **El baseline rojo del frontend no está documentado** en `CLAUDE.md`. No es de este change arreglarlo, pero quien venga detrás lo va a tropezar.
+2. **Un fallo preexistente sigue en pie** en `sales-index.test.tsx`, un fichero que este change amplía. Se deja a propósito (§9.6): arreglarlo enturbiaría la comparación nombre a nombre.
+
+La observación de la pasada anterior —que el baseline rojo del frontend no estaba documentado en `CLAUDE.md`— **ya está atendida**: hay sección propia allí y el inventario completo en `Documentos/testing-frontend.md`.

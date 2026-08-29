@@ -161,9 +161,13 @@ Y no se renuncia a nada: el presupuesto de recuperación es de 800 ms más hidra
 
 ### D8. El embudo se enseña, pero sólo a quien puede interpretarlo
 
-**Decisión.** Un bloque plegable, colapsado por defecto y visible únicamente con rol de administrador, muestra el identificador de correlación y los tres contadores del embudo que la respuesta ya trae.
+**Decisión.** Un bloque plegable, colapsado por defecto y visible únicamente con rol de administrador, muestra los tres contadores del embudo que la respuesta ya trae y el **identificador del evento de búsqueda** cuando lo haya.
 
-**Por qué.** Al operador no le sirve y le distrae. Al administrador le permite cruzar una búsqueda concreta con los registros de ambos servicios, y es evidencia directa para la sección de evaluación y para el checklist de entrega, a coste casi nulo porque los tres números ya viajan en la respuesta.
+**Por qué ese identificador y no el de correlación.** La respuesta **no lleva identificador de correlación**: C15 lo dejó deliberadamente fuera del contrato y vive sólo en su log estructurado del embudo. Lo que sí viaja es el identificador del evento, que además es el más útil de los dos aquí — es la clave que une lo que el administrador está viendo en pantalla con la fila que la telemetría persistió, sin salir de la base de datos. Cruzar con los logs de ambos servicios sigue siendo posible uniendo esa fila por `TraceId`, que es como C15 previó el cruce.
+
+**Alternativa descartada.** Añadir `traceId` a `AssistedSearchResponse` daría el dato directamente, pero reabre un contrato ya cerrado —y una decisión explícita de C15— a cambio de una etiqueta en un bloque de diagnóstico.
+
+**Por qué sólo administradores.** Al operador no le sirve y le distrae. Al administrador es evidencia directa para la sección de evaluación y para el checklist de entrega, a coste casi nulo porque todo lo que pinta ya viaja en la respuesta.
 
 ## Flujo
 

@@ -377,6 +377,54 @@ describe('AssistedSalesSearchPage — episode, selection and attribution', () =>
     expect(calls[1][0].searchSessionId).toBe(calls[0][0].searchSessionId);
   });
 
+  it('should keep the search session id when the point of sale changes', async () => {
+    const user = userEvent.setup();
+    vi.mocked(pointOfSaleService.getPointsOfSale).mockResolvedValue([POS_ONE, POS_TWO]);
+    renderPanel();
+    await ready();
+
+    const field = screen.getByLabelText('¿Qué busca el cliente?');
+    await user.type(field, 'anillo');
+    await user.click(screen.getByRole('button', { name: /^Buscar$/ }));
+    await waitFor(() => expect(aiSearchService.search).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByLabelText('Punto de venta'));
+    await user.click(await screen.findByRole('option', { name: 'Fornells' }));
+
+    await user.click(screen.getByRole('button', { name: /^Buscar$/ }));
+    await waitFor(() => expect(aiSearchService.search).toHaveBeenCalledTimes(2));
+
+    const calls = vi.mocked(aiSearchService.search).mock.calls;
+    // Changing shop is still the same visit. Resetting the episode here — a plausible place to
+    // put the reset — would turn every shop switch into a false abandoned query.
+    expect(calls[1][0].searchSessionId).toBe(calls[0][0].searchSessionId);
+    expect(calls[1][0].pointOfSaleId).not.toBe(calls[0][0].pointOfSaleId);
+  });
+
+  it('should start a new search session id when the panel is opened again', async () => {
+    const user = userEvent.setup();
+    const first = renderPanel();
+    await ready();
+
+    await user.type(screen.getByLabelText('¿Qué busca el cliente?'), 'anillo');
+    await user.click(screen.getByRole('button', { name: /^Buscar$/ }));
+    await waitFor(() => expect(aiSearchService.search).toHaveBeenCalledTimes(1));
+
+    first.unmount();
+
+    renderPanel();
+    await waitFor(() => expect(pointOfSaleService.getPointsOfSale).toHaveBeenCalledTimes(2));
+
+    await user.type(screen.getByLabelText('¿Qué busca el cliente?'), 'pendientes');
+    await user.click(screen.getByRole('button', { name: /^Buscar$/ }));
+    await waitFor(() => expect(aiSearchService.search).toHaveBeenCalledTimes(2));
+
+    const calls = vi.mocked(aiSearchService.search).mock.calls;
+    // A new visit is a new episode: there is nothing to group between two visits that each
+    // ended in a selection.
+    expect(calls[1][0].searchSessionId).not.toBe(calls[0][0].searchSessionId);
+  });
+
   it('should emit search event when a result is selected', async () => {
     const user = userEvent.setup();
     renderPanel();
@@ -471,9 +519,18 @@ describe('AssistedSalesSearchPage — point of sale and role', () => {
     await user.click(screen.getByRole('button', { name: /^Buscar$/ }));
 
     const funnel = await screen.findByTestId('assisted-search-funnel');
+
+    // Collapsed by default: the counts are not on screen until the administrator asks.
+    expect(within(funnel).queryByText('Candidatos: 12')).not.toBeInTheDocument();
+
     await user.click(within(funnel).getByRole('button'));
     expect(within(funnel).getByText('Candidatos: 12')).toBeInTheDocument();
     expect(within(funnel).getByText('Supervivientes: 1')).toBeInTheDocument();
+    expect(within(funnel).getByText('Mostrados: 1')).toBeInTheDocument();
+
+    // The search event identifier, not a correlation identifier: the response deliberately does
+    // not carry one. This is the key that joins what is on screen to the persisted telemetry row.
+    expect(within(funnel).getByText('Evento: event-1')).toBeInTheDocument();
   });
 
   it('should clear the results when the point of sale changes', async () => {

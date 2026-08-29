@@ -39,4 +39,29 @@ describe('SalesPage', () => {
     renderWithProviders(<SalesPage />);
     expect(screen.queryByText('Reconocimiento de Imagen')).not.toBeInTheDocument();
   });
+
+  it('should show "Buscar con Ayuda" tile linking to the assisted search panel', () => {
+    renderWithProviders(<SalesPage />);
+
+    // Queried as a link rather than by text: each tile repeats its name in the title and in its
+    // button, so a plain text query matches twice. The destination is also the half that matters
+    // — a tile that renders but leads nowhere is the failure worth catching.
+    const tile = screen.getByRole('link', { name: /Buscar con Ayuda/i });
+
+    expect(tile).toBeInTheDocument();
+    expect(tile).toHaveAttribute('href', '/sales/new/assisted');
+  });
+
+  it('should keep "Escanear Código" as the first entry option', () => {
+    renderWithProviders(<SalesPage />);
+
+    const tiles = screen
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href'))
+      .filter((href) => href?.startsWith('/sales/new'));
+
+    // The spec of sales-management pins scanning as the primary option, and adding a third tile
+    // is exactly the kind of change that quietly reorders them.
+    expect(tiles[0]).toBe('/sales/new/scan');
+  });
 });

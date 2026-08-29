@@ -75,8 +75,14 @@ export function AssistedSalesSearchPage() {
    * The episode exists so the reformulations of a visit are not counted as abandoned queries,
    * and reformulations happen inside a visit. Two visits that each end in a selection are two
    * legitimate episodes with nothing to group between them.
+   *
+   * Initialised lazily: `useRef(crypto.randomUUID())` would evaluate a fresh identifier on every
+   * render and throw all of them away, which is a keystroke's worth of waste on a page whose
+   * whole point is not to waste work per keystroke.
    */
-  const searchSessionId = useRef(crypto.randomUUID());
+  const sessionRef = useRef<string | null>(null);
+  sessionRef.current ??= crypto.randomUUID();
+  const searchSessionId = sessionRef.current;
 
   /**
    * Guards against out-of-order responses: submit, change shop, submit again, and the first
@@ -125,7 +131,7 @@ export function AssistedSalesSearchPage() {
         query: trimmed,
         pointOfSaleId,
         pageSize: PAGE_SIZE,
-        searchSessionId: searchSessionId.current,
+        searchSessionId,
         materials,
         category: category || undefined,
       });
@@ -150,7 +156,9 @@ export function AssistedSalesSearchPage() {
           setState({ kind: 'error', message: outcome.message });
       }
     },
-    [pointOfSaleId, materials, category],
+    // searchSessionId is stable for the life of the panel; listed so the dependency array
+    // describes what the callback actually reads rather than what happens to change.
+    [pointOfSaleId, materials, category, searchSessionId],
   );
 
   const handleSubmit = () => runSearch(query);
