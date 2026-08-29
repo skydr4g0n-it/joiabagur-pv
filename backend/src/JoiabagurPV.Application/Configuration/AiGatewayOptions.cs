@@ -34,7 +34,23 @@ public class AiGatewayOptions
     public int TokenTtlSeconds { get; set; } = 300;
 
     /// <summary>Time budget for a retrieval call, in milliseconds.</summary>
-    public int RetrievalTimeoutMs { get; set; } = 800;
+    /// <remarks>
+    /// <para>
+    /// The design specifies 800 ms (§6.4). Raised to 2500 ms during C16 because measurement
+    /// against the seeded world with real retrieval showed the assisted path degrading on
+    /// <em>every</em> search at 800 ms: the AI service builds its embedding client per request,
+    /// so the in-memory cache never hits and each search pays a full cold round trip to the
+    /// embedding provider.
+    /// </para>
+    /// <para>
+    /// <strong>Temporary.</strong> When that client becomes a singleton — the change that already
+    /// works inside the retrieval package — measure again and put this back to 800 ms. A budget
+    /// this loose stops protecting the search from a slow provider, and with the single retry it
+    /// turns the worst case into roughly five seconds of an operator waiting for a degraded
+    /// answer.
+    /// </para>
+    /// </remarks>
+    public int RetrievalTimeoutMs { get; set; } = 2500;
 
     /// <summary>
     /// Time budget for a generative call, in milliseconds. Reserved for the assist client

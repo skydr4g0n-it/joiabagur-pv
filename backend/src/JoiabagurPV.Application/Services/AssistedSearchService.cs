@@ -366,6 +366,10 @@ public class AssistedSearchService : IAssistedSearchService
                     : await _fileStorage.GetUrlAsync(row.PrimaryPhotoFileName, "products"),
                 CollectionName = row.CollectionName,
                 Score = candidate?.Score,
+                // From the candidate, never from hydration: these are index signals that explain
+                // the match, not catalog truth. Empty on the degraded and disabled paths, where
+                // there is no candidate because no retriever ran.
+                Materials = candidate?.Materials ?? [],
                 MatchReasons = candidate?.MatchReasons ?? [],
                 FamilyId = candidate?.FamilyId,
                 VariantLabel = candidate?.VariantLabel

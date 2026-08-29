@@ -75,6 +75,28 @@ public class AssistedSearchResultDto
     /// <summary>Signals that matched, for explaining the result to the operator.</summary>
     public List<string> MatchReasons { get; set; } = [];
 
+    /// <summary>
+    /// Materials the retriever recognised for this piece.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Not hydrated and not authoritative.</strong> These come from the enriched index,
+    /// not from the transactional catalog, and they are the same values a caller may filter on.
+    /// They exist to explain a match — never to describe stock, price or availability, which
+    /// remain the exclusive product of hydration.
+    /// </para>
+    /// <para>
+    /// This is the only explanatory signal available today: <see cref="MatchReasons"/> is a
+    /// single constant value for every result until the lexical branch exists, so without this
+    /// a caller has nothing with which to tell an operator why a piece was proposed.
+    /// </para>
+    /// <para>
+    /// Empty rather than absent when the retriever reported none, and empty on the degraded and
+    /// disabled paths, where no retriever ran.
+    /// </para>
+    /// </remarks>
+    public List<string> Materials { get; set; } = [];
+
     /// <summary>Family the product belongs to, when the index knows one.</summary>
     public string? FamilyId { get; set; }
 

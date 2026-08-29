@@ -44,10 +44,16 @@ import type { Product } from '@/types/product.types';
 import type { PointOfSale } from '@/types/point-of-sale.types';
 import type { PaymentMethod } from '@/types/payment-method.types';
 
-// State passed from image recognition page
+// State passed from the image recognition, scanning and assisted search pages
 interface LocationState {
   productId?: string;
   photoDataUrl?: string;
+  /**
+   * Assisted search this product was chosen from, carried through to the till so the sale can be
+   * attributed to the search that originated it. Absent for every other entry method, and an
+   * identifier the server cannot resolve degrades to no attribution rather than failing the sale.
+   */
+  searchEventId?: string;
 }
 
 export function ManualSalesPage() {
@@ -265,6 +271,19 @@ export function ManualSalesPage() {
     availableStock !== null &&
     availableStock >= quantity;
 
+  /**
+   * The assisted search this sale is attributed to, if any.
+   *
+   * Only while the selected product still is the one that search handed over: if the operator
+   * arrives from the panel and then picks a different product by SKU, that sale did not come
+   * from the search, and attributing it anyway would inflate the conversion metric with sales
+   * the panel never produced.
+   */
+  const attributedSearchEventId =
+    selectedProduct && selectedProduct.id === locationState?.productId
+      ? locationState?.searchEventId
+      : undefined;
+
   // Handle sale submission
   const handleSubmitSale = async () => {
     if (!selectedProduct || !isFormValid) return;
@@ -278,6 +297,7 @@ export function ManualSalesPage() {
         quantity,
         price: isPriceOverridden ? effectivePrice : undefined,
         notes: notes || undefined,
+        searchEventId: attributedSearchEventId,
       });
 
       toast.success('Venta registrada exitosamente');
@@ -317,6 +337,7 @@ export function ManualSalesPage() {
       pointOfSaleName: selectedPos.name,
       paymentMethodId: selectedPaymentMethodId,
       paymentMethodName: selectedPaymentMethod.name,
+      searchEventId: attributedSearchEventId,
     });
 
     if (added) {

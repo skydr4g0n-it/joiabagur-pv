@@ -14,6 +14,12 @@ export interface CreateSaleRequest {
   notes?: string;
   photoBase64?: string;
   photoFileName?: string;
+  /**
+   * Assisted search this sale originated from, when it did.
+   * Absent for scanning, SKU search and image recognition. An identifier the server cannot
+   * resolve degrades to no attribution — it never fails the sale.
+   */
+  searchEventId?: string;
 }
 
 /**
@@ -241,6 +247,12 @@ export interface CartLine {
   photoBase64?: string;
   photoFileName?: string;
   addedAt: string;
+  /**
+   * Assisted search this line originated from, carried through the cart so the attribution
+   * survives until checkout. The cart persists for ten hours; an identifier from nine hours ago
+   * still attributes the sale, and that is correct — it is what happened.
+   */
+  searchEventId?: string;
 }
 
 /**
@@ -262,6 +274,11 @@ export interface BulkSaleLineRequest {
   price?: number;
   photoBase64?: string;
   photoFileName?: string;
+  /**
+   * Assisted search this line originated from. Per line rather than per checkout: each line may
+   * come from a different search, or from none.
+   */
+  searchEventId?: string;
 }
 
 /**

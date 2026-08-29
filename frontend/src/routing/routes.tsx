@@ -36,6 +36,7 @@ export const ROUTES = {
     NEW: '/sales/new',
     NEW_SCAN: '/sales/new/scan',
     NEW_IMAGE: '/sales/new/image',
+    NEW_ASSISTED: '/sales/new/assisted',
     CART: '/sales/cart',
     HISTORY: '/sales/history',
     DETAIL: (id: string) => `/sales/${id}`,

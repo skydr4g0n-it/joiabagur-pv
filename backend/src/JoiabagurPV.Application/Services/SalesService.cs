@@ -24,6 +24,7 @@ public class SalesService : ISalesService
     private readonly IFileStorageService _fileStorageService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDashboardService _dashboardService;
+    private readonly IRepository<ProductSearchEvent> _searchEventRepository;
 
     public SalesService(
         ISaleRepository saleRepository,
@@ -36,7 +37,8 @@ public class SalesService : ISalesService
         IInventoryService inventoryService,
         IFileStorageService fileStorageService,
         IUnitOfWork unitOfWork,
-        IDashboardService dashboardService)
+        IDashboardService dashboardService,
+        IRepository<ProductSearchEvent> searchEventRepository)
     {
         _saleRepository = saleRepository ?? throw new ArgumentNullException(nameof(saleRepository));
         _salePhotoRepository = salePhotoRepository ?? throw new ArgumentNullException(nameof(salePhotoRepository));
@@ -49,6 +51,44 @@ public class SalesService : ISalesService
         _fileStorageService = fileStorageService ?? throw new ArgumentNullException(nameof(fileStorageService));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
         _dashboardService = dashboardService ?? throw new ArgumentNullException(nameof(dashboardService));
+        _searchEventRepository = searchEventRepository ?? throw new ArgumentNullException(nameof(searchEventRepository));
+    }
+
+    /// <summary>
+    /// Resolves the assisted search a sale may be attributed to.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Returns the identifier only when the event exists <em>and</em> belongs to the user making
+    /// the sale. Ownership is checked for the same reason the selection endpoint checks it, and
+    /// with the same absence of an administrator exception: a search event is the record of what
+    /// one specific person did, so letting a caller attribute their sale to somebody else's
+    /// search would corrupt the adoption metrics without leaving a trace.
+    /// </para>
+    /// <para>
+    /// Anything unusable degrades to <c>null</c>. It is never a validation error and never fails
+    /// the sale: attribution is analytics, and refusing a sale over it would turn a measurement
+    /// into a till outage.
+    /// </para>
+    /// <para>
+    /// The check is explicit rather than delegated to the foreign key. The declared delete
+    /// behaviour sets the reference to null when the <em>event</em> is deleted; an insert
+    /// carrying an unknown identifier would instead violate the constraint and abort the whole
+    /// transaction of the sale, which is the opposite of degrading.
+    /// </para>
+    /// </remarks>
+    private async Task<Guid?> ResolveAttributionAsync(Guid? searchEventId, Guid userId)
+    {
+        if (!searchEventId.HasValue || searchEventId.Value == Guid.Empty)
+        {
+            return null;
+        }
+
+        var belongsToUser = await _searchEventRepository
+            .GetAll()
+            .AnyAsync(e => e.Id == searchEventId.Value && e.UserId == userId);
+
+        return belongsToUser ? searchEventId : null;
     }
 
     /// <inheritdoc/>
@@ -211,6 +251,11 @@ public class SalesService : ISalesService
                     originalProductPrice = null;
                 }
 
+                // Attribution to the assisted search that originated this sale, if any.
+                // Resolved before building the sale so that an unusable identifier is simply
+                // absent rather than able to interfere with anything else.
+                var searchEventId = await ResolveAttributionAsync(request.SearchEventId, userId);
+
                 // Create Sale record
                 var sale = new Sale
                 {
@@ -223,6 +268,7 @@ public class SalesService : ISalesService
                     PriceWasOverridden = priceWasOverridden,
                     OriginalProductPrice = originalProductPrice,
                     Notes = request.Notes,
+                    SearchEventId = searchEventId,
                     SaleDate = DateTime.UtcNow
                 };
 
@@ -547,6 +593,10 @@ public class SalesService : ISalesService
                         originalProductPrice = null;
                     }
 
+                    // Attribution is resolved per line: each line of a checkout may come from a
+                    // different search, or from none at all.
+                    var lineSearchEventId = await ResolveAttributionAsync(line.SearchEventId, userId);
+
                     var sale = new Sale
                     {
                         ProductId = line.ProductId,
@@ -558,6 +608,7 @@ public class SalesService : ISalesService
                         PriceWasOverridden = priceWasOverridden,
                         OriginalProductPrice = originalProductPrice,
                         Notes = request.Notes,
+                        SearchEventId = lineSearchEventId,
                         BulkOperationId = bulkOperationId,
                         SaleDate = DateTime.UtcNow
                     };

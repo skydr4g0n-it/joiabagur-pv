@@ -694,6 +694,43 @@ public class AssistedSearchServiceTests
         captured.Kind.Should().Be(AiCallScopeKind.PointOfSale);
     }
 
+    [Fact]
+    public async Task Search_CarriesTheMaterialsTheRetrieverReported_NotHydratedOnes()
+    {
+        var id = Guid.NewGuid();
+        var candidate = Candidate(id);
+        candidate.Materials = ["plata", "perla"];
+
+        GatewayReturns(candidate);
+        HydrationReturns(Row(id));
+
+        var result = await CreateService().SearchAsync(Request(), UserId, "Operator", isAdmin: false);
+
+        // The only explanatory signal available: match reasons are a single constant value for
+        // every result until the lexical branch exists, so without this the panel has nothing
+        // true to tell the operator about why a piece was proposed.
+        result.Response!.Results.Should().ContainSingle()
+            .Which.Materials.Should().Equal("plata", "perla");
+    }
+
+    [Fact]
+    public async Task Search_WhenDegraded_ReturnsAnEmptyMaterialListRatherThanNone()
+    {
+        _gateway
+            .Setup(g => g.SearchAsync(It.IsAny<AiSearchRequest>(), It.IsAny<AiCallScope>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new AiUnavailableException("circuit open"));
+
+        LexicalReturns(Row(Guid.NewGuid()));
+
+        var result = await CreateService().SearchAsync(Request(), UserId, "Operator", isAdmin: false);
+
+        // Empty and present, not absent: there is no candidate on this path because no retriever
+        // ran, and a caller must not have to tell "no materials" apart from "no field".
+        result.Response!.AiAvailable.Should().BeFalse();
+        result.Response.Results.Should().ContainSingle()
+            .Which.Materials.Should().NotBeNull().And.BeEmpty();
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private AssistedSearchService CreateService(bool realCache = false)
