@@ -218,6 +218,26 @@ Sobre los dos primeros conviene una precisión que ahorra tests engañosos. Al p
 > política de limitación de peticiones particionaba por dirección de red en vez de por usuario,
 > porque `UseRateLimiter()` corría antes de `UseAuthentication()`. Un número que mejora no dice nada,
 > ni sobre la salud de la suite ni sobre la del código.
+
+> **Actualización del 2026-08-29, sobre `c16-add-frontend-assisted-search-panel`.** La suite tiene
+> ahora **890 tests**. Línea base **882 y 48**; tras implementar, **890 y 49**; tras corregir un test
+> propio, **890 y 49** otra vez.
+>
+> Esta quinta medición aporta la **prueba directa** de lo que las cuatro anteriores venían
+> sospechando. Se ejecutó dos veces la suite completa **sobre el mismo código** y los conjuntos de
+> fallos difirieron en **trece nombres**, todos confinados a tres clases: `InventoryIntegrationTests`,
+> `PaymentMethodsControllerTests` y `ReturnsControllerTests`. No es que el conjunto «se mueva a
+> veces»: se mueve entre dos pasadas idénticas, y siempre dentro de las mismas clases.
+>
+> El recuento subió de 48 a 49 y aun así **no había ninguna regresión**: de los siete fallos nuevos,
+> seis eran ese churn y uno era un test recién escrito que fallaba por una razón legítima —borraba
+> ventas para aislar una comparación, y una venta está referenciada por su movimiento de inventario—.
+> La comparación por nombres lo separó en un minuto; el recuento habría dicho «has roto algo».
+>
+> Aviso para quien escriba tests aquí: **no borres ventas**. `FK_InventoryMovements_Sales_SaleId` lo
+> impide, y el error llega como un `DbUpdateException` genérico cuyo detalle PostgreSQL redacta salvo
+> que la cadena de conexión pida `Include Error Detail`. Para observar dos ventas por separado,
+> créalas consecutivamente y compáralas entre sí.
 >
 > El procedimiento y las cuatro pasadas están en
 > `openspec/changes/archive/2026-08-28-add-dotnet-ai-search-endpoint/qa.md` §1.1 y §10.

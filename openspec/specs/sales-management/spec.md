@@ -5,7 +5,9 @@ TBD - created by archiving change add-sales-and-image-recognition. Update Purpos
 ## Requirements
 ### Requirement: Sales Registration with Entry Methods
 
-The system SHALL allow operators to register sales using two methods: barcode/QR code scanning (replacing image recognition) or manual product selection (with optional photo). The image recognition entry point is removed from the UI, but its backend controllers and frontend components remain intact in the codebase. All methods validate stock availability, payment method assignment, operator authorization, and point-of-sale price policy before creating sale records.
+The system SHALL allow operators to register sales using three methods: barcode/QR code scanning (replacing image recognition), manual product selection (with optional photo), or assisted natural-language search. The image recognition entry point is removed from the UI, but its backend controllers and frontend components remain intact in the codebase. All methods validate stock availability, payment method assignment, operator authorization, and point-of-sale price policy before creating sale records.
+
+Assisted search is an entry method rather than a sale flow of its own: it selects a product and hands it to the manual sale flow, which continues to own quantity, payment method, price policy and stock validation. The behaviour of the panel itself is specified by the assisted-search-panel capability.
 
 #### Scenario: Create sale with barcode/QR scanning successfully
 
@@ -29,6 +31,13 @@ The system SHALL allow operators to register sales using two methods: barcode/QR
 - **AND** the `new-image.tsx` React component remains in the codebase
 - **AND** the image recognition route (`/sales/new/image`) still resolves if accessed directly
 
+#### Scenario: Create sale from an assisted search selection
+
+- **WHEN** authenticated operator selects a product from the assisted search panel
+- **THEN** the manual sale flow opens with that product pre-selected
+- **AND** quantity, payment method, price policy and stock validation behave exactly as in manual entry
+- **AND** the created sale carries the search event it originated from
+
 #### Scenario: Create manual sale without photo
 
 - **WHEN** authenticated operator searches and selects product by SKU or name
@@ -50,10 +59,10 @@ The system SHALL allow operators to register sales using two methods: barcode/QR
 - **AND** creates SalePhoto with compressed photo
 - **AND** creates InventoryMovement and updates stock atomically
 
-#### Scenario: Sales landing page with two entry methods
+#### Scenario: Sales landing page with three entry methods
 
 - **WHEN** authenticated operator navigates to the sales landing page
-- **THEN** two entry options are displayed: "Escanear código" (barcode/QR) and "Registro manual"
+- **THEN** three entry options are displayed: "Escanear código" (barcode/QR), "Registro manual" and assisted search
 - **AND** "Escanear código" is displayed as the first/primary option
 - **AND** "Reconocimiento de imagen" is no longer shown
 
@@ -446,3 +455,47 @@ The system SHALL assign a `BulkOperationId` to each successful bulk checkout and
 - **WHEN** a bulk checkout succeeds
 - **THEN** all created sales include the same `BulkOperationId`
 - **AND** the bulk response returns that identifier for auditing and support workflows
+
+### Requirement: A sale may declare the assisted search it originated from
+
+The sale creation API SHALL accept an optional reference to the search event a sale originated from, on the single-sale request and on each line of the bulk request, and MUST persist it on the created sale.
+
+The reference MUST be per line rather than per operation, because each line of a bulk checkout may come from a different search — or from no search at all.
+
+The reference MUST be optional. A sale started by scanning, by SKU search or by any other entry method MUST be created with no attribution and MUST remain valid.
+
+Before persisting the reference the system MUST verify that the referenced search event exists **and belongs to the user creating the sale**. Ownership is checked for the same reason the selection endpoint checks it, with no administrator exception: a search event records what one specific person did, and letting a caller attribute their sale to somebody else's search would corrupt the adoption metrics without leaving a trace.
+
+A reference that is unknown, or that belongs to another user, MUST degrade the attribution to none. It MUST NOT produce a validation error, MUST NOT fail the sale, and MUST NOT alter the price, the stock movement or any other part of the sale. Attribution is analytics; refusing a sale over it would turn a measurement into a till outage.
+
+The verification MUST be performed explicitly rather than delegated to the database relationship: the declared delete behaviour governs deletion of the event, whereas an insert carrying an unknown identifier would abort the transaction of the sale instead of degrading.
+
+This requirement introduces no schema change: the column, its index and its foreign key already exist.
+
+#### Scenario: A sale is attributed to its originating search
+- **WHEN** a sale is created with a reference to a search event that exists and belongs to the caller
+- **THEN** the created sale carries that reference
+
+#### Scenario: Each bulk line carries its own attribution
+- **WHEN** a bulk checkout is submitted with a different search event reference on two of its lines and none on a third
+- **THEN** each created sale carries the reference of its own line
+- **AND** the third is created with no attribution
+
+#### Scenario: An unknown reference degrades to no attribution
+- **WHEN** a sale is created with a reference to a search event that does not exist
+- **THEN** the sale is created successfully
+- **AND** it carries no attribution
+- **AND** no validation error is returned
+
+#### Scenario: A reference to another user's search degrades to no attribution
+- **WHEN** a sale is created with a reference to a search event belonging to a different user
+- **THEN** the sale is created successfully
+- **AND** it carries no attribution
+
+#### Scenario: Attribution never changes the rest of the sale
+- **WHEN** a sale is created with an unusable search event reference
+- **THEN** the price, the inventory movement and the stock update are exactly what they would have been with no reference at all
+
+#### Scenario: A sale with no originating search stays valid
+- **WHEN** a sale is created with no search event reference
+- **THEN** the sale is created with no attribution

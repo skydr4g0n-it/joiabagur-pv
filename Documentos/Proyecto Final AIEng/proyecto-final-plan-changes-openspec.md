@@ -303,8 +303,8 @@ Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin e
 | **C12** | `add-dotnet-index-feed-endpoints` | .NET | C07, C08 | 🔴 | **rev. dec. 10**, **26 ago · archivado** |
 | **C13** | `add-product-document-indexer` | Python | C11, C12 | 🔴 | **26 ago · archivado** |
 | **C14** | `add-vector-retrieval-endpoint` | Python | C13 | 🔴 | **27 ago · archivado** |
-| **C15** | `add-dotnet-ai-search-endpoint` | .NET | C03, C14 | 🔴 | **rev. dec. 11** |
-| **C16** | `add-frontend-assisted-search-panel` | Frontend + .NET | C15 | 🔴 | **rev. 29 ago** |
+| **C15** | `add-dotnet-ai-search-endpoint` | .NET | C03, C14 | 🔴 | **rev. dec. 11**, **28 ago · archivado** |
+| **C16** | `add-frontend-assisted-search-panel` | Frontend + .NET | C15 | 🔴 | **rev. 29 ago · archivado** |
 | **C17** | `add-ai-service-deployment` | Infra | C15 | 🔴 | — |
 | **C18** | `add-family-suggestion-and-review` | Python + .NET + FE | C07, C13 | 🟢 | **rev. dec. 2** |
 | **C19** | `add-demand-signal-service` | .NET 🗄️ | C10 | 🟢 | **rev. dec. 6** |
@@ -515,7 +515,7 @@ Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin e
 
 ---
 
-#### C15 · `add-dotnet-ai-search-endpoint` 🔴
+#### C15 · `add-dotnet-ai-search-endpoint` 🔴 *(archivado 2026-08-28)*
 
 **Objetivo.** El endpoint del frontend, con **hidratación autoritativa** y degradación. Implementa la decisión 11: la verdad la pone .NET.
 **Prereq.** C03, C14 · **Zona.** `API/Controllers/`, `Application/`, `Tests/` *(sin migración: C15 no es 🗄️)* · **Lleva `design.md`**
@@ -531,9 +531,15 @@ Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin e
 | **A3** | El servicio de C04 **no lanza nunca**: devuelve `Guid?`. C15 solo tiene que tolerar el nulo y responder igual — la búsqueda nunca falla por culpa de la telemetría |
 | **A4** | Aplicar una política de limitación de peticiones a `POST /api/ai/search`. **Es cuestión de coste antes que de seguridad:** un `debounce` mal ajustado o un dedo apoyado en una tecla genera llamadas de embedding facturables, y §12 se compromete a que el coste esté instrumentado y reportado |
 
+**Hecho (2026-08-28).** `POST /api/ai/search` en `AiSearchController`, sin versión en la ruta. Ventana máxima del contrato en **una sola llamada** (`top_k = 20` → 60 candidatos) y **sin repetición**. Hidratación autoritativa en una consulta conjunta que parte de `Inventory` y no de `Product`: descarta lo no asignado o inactivo, **conserva la cantidad cero** marcándola, y devuelve la cantidad de ese punto de venta. Buscador degradado propio con `to_tsvector('spanish', …)` calculado en consulta —sin índice, sin migración—, semántica OR y orden por `ts_rank`; usa la conversión **tolerante** (`websearch_to_tsquery`) en coincidencia y ordenación, porque la estricta lanza ante un `&` suelto y convertiría el único camino que queda en pie en un error del servidor. Flag por POS en configuración con `IOptionsMonitor` y **`SearchOrigin.Disabled = 3`**. Caché de candidatos con el POS en la clave más limitación por `userId`. Punto de venta **obligatorio**; el admin puede elegir cualquiera **activo**. Embudo en log estructurado, sin columnas nuevas. Specs vivas: `ai-assisted-search` (nueva, 12 requisitos y 38 escenarios) y `ai-search-telemetry` (`## MODIFIED` por el tercer origen).
+
+**`/opsx:verify` encontró un defecto crítico que la suite no vio:** la limitación particionaba por **dirección de red y no por usuario**, porque `UseRateLimiter()` corría antes que `UseAuthentication()` y la clave de partición se leía sin identidad. Corregido, con test de regresión que se comprobó **reintroduciendo el defecto** para verificar que falla. Más tres huecos menores: `CandidateCacheSize` se validaba al arranque sin acotar nada (instancia dedicada de `MemoryCache` con `SizeLimit`), la garantía de degradación era enumerativa (cláusula final sobre el tipo abstracto) y `survivedHydration` no era comparable entre orígenes (el camino degradado pide la misma ventana y se trunca después).
+
+**Verificación con el mundo sembrado:** el corte de recall es real y está medido — **0 % de páginas cortas en CIU-CENTRE frente al 37,5 % en FORNELLS**, con medias de supervivientes de 41,6 y 14,6 contra las 43 y 12,1 que predijo el diseño. Change [`2026-08-28-add-dotnet-ai-search-endpoint`](../../openspec/changes/archive/2026-08-28-add-dotnet-ai-search-endpoint/).
+
 ---
 
-#### C16 · `add-frontend-assisted-search-panel` 🔴
+#### C16 · `add-frontend-assisted-search-panel` 🔴 *(archivado 2026-08-29)*
 
 **Objetivo.** Punto de entrada del operador: panel "Buscar con ayuda" en el flujo de venta.
 **Prereq.** C15 · **Zona.** `frontend/src/`, más dos tramos pequeños en `Application/` y `Tests/` del backend *(sin migración: C16 no es 🗄️)* · **Lleva `design.md`**
@@ -557,6 +563,8 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 **Lo que C16 ya *no* tiene que hacer** *(y que la ficha v3 daba por suyo)*: emitir un evento al abandonar la búsqueda, calcular y enviar el rank 1-based de la lista mostrada, reportar el origen de los resultados, y medir el tiempo hasta la selección. Las cuatro las cubre el servidor.
 
 **Lo que C16 no puede hacer todavía, y no disimula** *(2026-08-29)*: el «motivo» real —`match_reasons` es la cadena literal `["vector"]` hasta C21—, la talla —`variantLabel` lo puebla C18—, y distinguir «asistencia desactivada en este punto de venta» de «la IA se cayó», porque la API devuelve `aiAvailable: false` en ambos casos aunque la telemetría sí los separe.
+
+**Hecho (2026-08-29).** Panel en `/sales/new/assisted` con tercera tarjeta en el hub y entrega al flujo manual por estado de navegación. **Envío explícito**, nunca `debounce`: la clave de la caché de C15 incluye la consulta completa, así que ningún prefijo acierta y a 400 ms se agotan las 30 peticiones/min en cinco consultas. Filtros de material y tipo de pieza sobre el vocabulario cerrado replicado con test de fijación; no disparan solos. Insignia de origen y chips de materiales en lugar de `matchReasons`; talla condicional. **Cuatro** estados sin resultados —el `429` incluido— más el aviso de página corta. Embudo colapsado sólo para admin. **Tramo .NET sin migración:** `SearchEventId` opcional en `CreateSaleRequest` y `BulkSaleLineRequest`, asignado tras comprobar **existencia y propiedad**; desconocido o ajeno → nulo, la venta nunca falla. Cierra el requisito de atribución de `ai-search-telemetry`, archivado como cumplido y sin camino por el que cumplirse. `materials` en `AssistedSearchResultDto`. **`AiGateway:RetrievalTimeoutMs` 800 → 2500 ms, temporal**: medido contra el mundo sembrado, a 800 ms la vía asistida degradaba en *todas* las búsquedas; revertir cuando C21/C22 hagan singleton el cliente de embeddings (anotado en `DEFERRED_TASKS.md`). Verificación manual con recuperación real: CIU-CENTRE 60 → 32 → página llena, FORNELLS 60 → 8 → **página corta**, confirmando la aritmética de C15. Specs vivas `assisted-search-panel` (nueva), `sales-management` y `ai-assisted-search`. Change [`2026-08-29-add-frontend-assisted-search-panel`](../../openspec/changes/archive/2026-08-29-add-frontend-assisted-search-panel/).
 
 ---
 
