@@ -131,6 +131,9 @@ export function SalesCartPage() {
             price: l.price !== undefined && l.price !== l.productPrice ? l.price : undefined,
             photoBase64: l.photoBase64,
             photoFileName: l.photoFileName,
+            // Per line, not per checkout: each line may come from a different assisted search,
+            // or from none. The server degrades an unresolvable one to no attribution.
+            searchEventId: l.searchEventId,
           })),
         },
         idempotencyKey,

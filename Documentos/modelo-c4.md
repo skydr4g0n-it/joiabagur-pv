@@ -215,6 +215,8 @@ Viven en la misma capa de aplicación que los anteriores; se listan aparte porqu
 
 - **Assisted Search Repository** (C15): las dos lecturas que sostienen lo anterior, ambas en una sola consulta. La **hidratación autoritativa** parte de `Inventory` y no de `Product`, de modo que la regla de visibilidad —hay inventario activo en ese punto de venta— es la forma de la consulta y no una condición que alguien pueda olvidar; la cantidad cero se conserva y se marca. Y el **buscador degradado**, con texto completo en español calculado en consulta —sin índice ni cambio de esquema—, que casa cualquier término y ordena por relevancia léxica.
 
+- **Atribución de la venta a la búsqueda** (C16, en `Sales Service`): el ciclo que abre `POST /api/ai/search` se cierra en la caja. `POST /api/sales` y **cada línea** de `POST /api/sales/bulk` aceptan un `searchEventId` opcional, que sólo se persiste tras comprobar que el evento existe **y pertenece a quien vende** —la misma regla de propiedad, sin excepción de administrador, que aplica el registro de la selección—. Lo que no cuadra degrada a atribución nula: nunca un error de validación, nunca una venta fallida, y nada más de la venta cambia. La comprobación es explícita y no se delega en la clave foránea, cuyo comportamiento de borrado gobierna la eliminación del evento y, ante una inserción con un identificador inexistente, abortaría la transacción entera en lugar de degradar.
+
 #### Servicios Compartidos
 
 - **File Storage Service**: Abstracción para almacenamiento de archivos (local en desarrollo, S3/Blob Storage en producción), gestión de fotos de productos y ventas.
@@ -330,6 +332,8 @@ El Frontend está organizado en módulos funcionales, servicios y componentes co
 - **Sale Module**: Componentes para registro de ventas (manual y con reconocimiento), selección de método de pago, validación de stock, edición manual de precio cuando el POS lo permite, indicador de precio modificado en historial/detalle, confirmación de venta.
 
 - **Image Recognition Module**: Captura de fotos desde cámara móvil, integración con TensorFlow.js/ONNX.js, procesamiento de imágenes, visualización de sugerencias, manejo de errores de reconocimiento.
+
+- **Assisted Search Module** (C16): Panel «Buscar con ayuda» en `/sales/new/assisted`, tercera vía de entrada a una venta junto al escaneo y el registro manual. Consulta en lenguaje natural con **envío explícito** —nunca al teclear, porque cada búsqueda no cacheada cuesta un embedding facturado—, consultas de ejemplo, filtros rápidos de material y tipo de pieza sobre el vocabulario cerrado del enriquecimiento, punto de venta resuelto por rol, y resultados **en el orden que dio el backend** con su precio y su stock. Distingue en pantalla los cuatro modos de no encontrar nada —abstención, sin surtido en esa tienda, asistencia no disponible y cuota agotada— y declara la página corta. Embudo de recuperación reservado a administradores. Entrega el producto elegido al flujo de venta manual por estado de navegación, arrastrando el identificador de la búsqueda hasta la caja.
 
 - **Return Module**: Registro de devoluciones, búsqueda de venta original, asociación con venta, registro de motivo.
 

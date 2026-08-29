@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ScanLine, PenLine, History, ShoppingCart } from 'lucide-react';
+import { ScanLine, PenLine, History, ShoppingCart, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,7 +42,7 @@ export function SalesPage() {
       </div>
 
       {/* Registration Options */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Barcode/QR Scanning */}
         <Card className="cursor-pointer transition-shadow hover:shadow-lg">
           <Link to={ROUTES.SALES.NEW_SCAN}>
@@ -94,6 +94,35 @@ export function SalesPage() {
               </div>
               <Button className="mt-4 w-full">
                 Registrar Venta Manual
+              </Button>
+            </CardContent>
+          </Link>
+        </Card>
+
+        {/* Assisted natural-language search. Third entry method: it selects a product and hands
+            it to the manual flow, which keeps owning quantity, payment method and stock. */}
+        <Card className="cursor-pointer transition-shadow hover:shadow-lg">
+          <Link to={ROUTES.SALES.NEW_ASSISTED}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Buscar con Ayuda
+              </CardTitle>
+              <CardDescription>
+                Describe la pieza con tus palabras y encuentra lo que hay en tu tienda
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="space-y-1 text-sm text-muted-foreground">
+                  <p>• Búsqueda en lenguaje natural</p>
+                  <p>• Filtros por material y tipo de pieza</p>
+                  <p>• Precio y stock reales de tu punto de venta</p>
+                </div>
+                <Sparkles className="h-12 w-12 text-muted-foreground/50" />
+              </div>
+              <Button className="mt-4 w-full">
+                Buscar con Ayuda
               </Button>
             </CardContent>
           </Link>

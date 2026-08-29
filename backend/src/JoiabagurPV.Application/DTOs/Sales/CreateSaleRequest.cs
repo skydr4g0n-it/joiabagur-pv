@@ -47,4 +47,16 @@ public class CreateSaleRequest
     /// Original file name for the photo.
     /// </summary>
     public string? PhotoFileName { get; set; }
+
+    /// <summary>
+    /// Optional assisted search this sale originated from.
+    /// </summary>
+    /// <remarks>
+    /// Optional on purpose: a sale started by scanning or by SKU search has no search behind it
+    /// and stays perfectly valid. An identifier that is unknown, or that belongs to a different
+    /// user, degrades the attribution to none — it is never a validation error and never fails
+    /// the sale. Attribution is analytics; refusing a sale over it would turn a measurement into
+    /// a till outage.
+    /// </remarks>
+    public Guid? SearchEventId { get; set; }
 }

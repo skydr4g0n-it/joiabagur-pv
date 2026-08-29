@@ -535,6 +535,7 @@ OpenAPI documentation is served with Scalar (not Swagger UI) at `/scalar/v1` whe
 | `Jwt__RefreshTokenExpirationHours` | Refresh token expiry | 8 |
 | `AiGateway__BaseUrl` | Address of the `jbg-ai` service | Required |
 | `AiGateway__JwtSecret` | HS256 secret for the internal service token — must match the service's `JWT_SECRET` literally | Required |
+| `AiGateway__RetrievalTimeoutMs` | Time budget for a retrieval call. **Temporarily 2500 rather than the 800 ms the design specifies**: measured against the seeded world, at 800 ms the assisted path degraded on *every* search, because the AI service rebuilds its embedding client per request and so never gets a cache hit. Put back to 800 once that is fixed — see `openspec/DEFERRED_TASKS.md` | 2500 |
 | `IndexFeed__ApiKey` | Service key for `GET /api/ai/index-feed/*` (`X-Index-Feed-Key`). Distinct from `Jwt__SecretKey` and `AiGateway__JwtSecret`. Min 32 characters | Required |
 | `IndexFeed__ApiKeyPrevious` | Previous key during rotation. Empty = unset | Optional |
 | `AiSearch__EnabledPointOfSaleIds__0`, `__1`, … | Points of sale where assisted search uses the AI path. Reloaded without a redeploy | Empty |
@@ -547,6 +548,8 @@ OpenAPI documentation is served with Scalar (not Swagger UI) at `/scalar/v1` whe
 `IndexFeed:ApiKey` is validated the same way: missing or shorter than 32 characters stops the host. An empty `IndexFeed:ApiKeyPrevious` is unset; a short non-empty previous key also fails at start-up.
 
 `AiSearch` is also validated at start-up, and its list of enabled points of sale is read through `IOptionsMonitor` so a shop can be switched on or off without a redeploy — which is the whole reason the switch lives in configuration instead of in a column on `PointOfSale`. It holds no secret, so nothing of it goes to SSM. The default is **not enabled**: turning assisted search on for a shop is an explicit act.
+
+`POST /api/sales` and each line of `POST /api/sales/bulk` accept an optional `searchEventId`, which attributes the sale to the assisted search it came from and closes the loop that `POST /api/ai/search` opens. The identifier is only stored once the event is verified to exist **and to belong to the user making the sale** — the same ownership rule the selection endpoint applies, and for the same reason. Anything unusable degrades to no attribution: never a validation error, never a failed sale, and nothing else about the sale changes. The check is explicit rather than delegated to the foreign key, whose declared delete behaviour governs deletion of the event and would, on an insert carrying an unknown identifier, abort the whole transaction instead of degrading.
 
 The address differs by environment and neither value is the obvious one: `http://localhost:8001` in development, because the API runs on the host and only sees the port Compose publishes, and `http://jbg-ai:8000` in production, where both containers share a Docker network.
 

@@ -51,11 +51,11 @@ El producto tiene como propósito ofrecer una solución integral de gestión par
 - **Gestión de métodos de pago:** Lista general (Efectivo, Bizum, Transferencia, Tarjeta TPV propio/punto de venta, PayPal), asignación por punto de venta y registro del método en cada venta.
 - **Gestión de usuarios:** Roles Administrador y Operador, autenticación con usuario y contraseña, operadores asociados a puntos de venta concretos.
 - **Otras funcionalidades:** Devoluciones, ajustes manuales de inventario, historial de ventas y movimientos de stock, dashboard con estadísticas y stock crítico.
-- **Búsqueda semántica y venta asistida (en desarrollo):** Proyecto Final del Máster de IA. Añade búsqueda semántica sobre el catálogo, sugerencia de sustitutos y argumentario de venta asistido, mediante el microservicio `jbg-ai`. A día de hoy están congelados el contrato HTTP y la autenticación entre servicios, el backend .NET ya dispone del cliente tipado que los consume —con timeouts, reintento único y cortacircuitos— y la capa de persistencia vectorial está lista: esquema `ai` con pgvector, migraciones propias e índices HNSW por similitud coseno. La recuperación vectorial de `POST /v1/retrieval/products` (C14) y el endpoint .NET de búsqueda asistida con hidratación autoritativa (C15) están entregados: el operador puede buscar en lenguaje natural y recibir resultados con el precio y el stock reales de su tienda. El panel de operador y la fusión híbrida se entregan en changes posteriores.
+- **Búsqueda semántica y venta asistida (en desarrollo):** Proyecto Final del Máster de IA. Añade búsqueda semántica sobre el catálogo, sugerencia de sustitutos y argumentario de venta asistido, mediante el microservicio `jbg-ai`. A día de hoy están congelados el contrato HTTP y la autenticación entre servicios, el backend .NET ya dispone del cliente tipado que los consume —con timeouts, reintento único y cortacircuitos— y la capa de persistencia vectorial está lista: esquema `ai` con pgvector, migraciones propias e índices HNSW por similitud coseno. La recuperación vectorial de `POST /v1/retrieval/products` (C14) y el endpoint .NET de búsqueda asistida con hidratación autoritativa (C15) están entregados: el operador puede buscar en lenguaje natural y recibir resultados con el precio y el stock reales de su tienda. **El panel del operador (C16) también está entregado**: describe la pieza con sus palabras, distingue en pantalla los cuatro modos de no encontrar nada —la IA no encontró, la tienda no lo tiene, la asistencia no está sirviendo, o se han hecho demasiadas búsquedas seguidas— y arrastra la búsqueda hasta la caja, de modo que la venta queda atribuida a la consulta que la originó. La fusión híbrida se entrega en changes posteriores.
 
 ### 1.3. Diseño y experiencia de usuario
 
-El usuario aterriza en la pantalla de login; tras autenticarse, accede al dashboard (estadísticas globales para administradores o por punto de venta para operadores). Desde la navegación puede: registrar ventas de forma manual (`/sales/new`) o con reconocimiento por imagen (`/sales/new/image`), consultar historial de ventas con filtros y paginación, gestionar productos e inventario (catálogo, importación Excel, stock por POS, ajustes), configurar puntos de venta y métodos de pago, y (solo administradores) acceder al dashboard de modelo de IA y al listado de stock crítico con paginación. La interfaz está optimizada para uso en móvil en el punto de venta (cámara, gestos) y es responsive para administradores. La moneda es euro (EUR) con formato español.
+El usuario aterriza en la pantalla de login; tras autenticarse, accede al dashboard (estadísticas globales para administradores o por punto de venta para operadores). Desde la navegación puede: registrar ventas de forma manual (`/sales/new`), escaneando el código de barras o QR (`/sales/new/scan`), buscando con ayuda en lenguaje natural (`/sales/new/assisted`) o con reconocimiento por imagen (`/sales/new/image`), consultar historial de ventas con filtros y paginación, gestionar productos e inventario (catálogo, importación Excel, stock por POS, ajustes), configurar puntos de venta y métodos de pago, y (solo administradores) acceder al dashboard de modelo de IA y al listado de stock crítico con paginación. La interfaz está optimizada para uso en móvil en el punto de venta (cámara, gestos) y es responsive para administradores. La moneda es euro (EUR) con formato español.
 
 *Se añadirá un videotutorial en esta sección.*
 
@@ -229,6 +229,8 @@ A continuación se describen cuatro endpoints principales en formato OpenAPI (re
 
 Crea una venta validando stock, método de pago asignado al POS y que el usuario esté asignado al punto de venta (o sea administrador). Actualiza inventario en la misma transacción.
 
+`searchEventId` es opcional y atribuye la venta a la búsqueda asistida de la que procede. Se comprueba que el evento exista **y pertenezca a quien vende**; un identificador desconocido o ajeno deja la atribución nula, sin error de validación y sin alterar nada más de la venta. `POST /api/sales/bulk` lo acepta **por línea**, porque cada línea de un carrito puede venir de una búsqueda distinta o de ninguna.
+
 **Request (application/json)**
 
 | Campo            | Tipo    | Requerido | Descripción                                      |
@@ -241,6 +243,7 @@ Crea una venta validando stock, método de pago asignado al POS y que el usuario
 | notes            | string  | No        | Notas (máx. 500 caracteres)                      |
 | photoBase64      | string  | No        | Foto en Base64 (opcional)                         |
 | photoFileName    | string  | No        | Nombre original del archivo de la foto           |
+| searchEventId    | uuid    | No        | Búsqueda asistida que originó la venta           |
 
 **Responses**
 

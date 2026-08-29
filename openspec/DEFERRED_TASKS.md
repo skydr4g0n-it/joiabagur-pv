@@ -210,6 +210,57 @@ This document tracks all tasks that have been deferred to future phases or epics
 
 ---
 
+---
+
+## Active Change: `add-frontend-assisted-search-panel` (C16)
+
+### Restore the retrieval time budget to 800 ms
+
+**Status:** Budget temporarily raised from **800 ms to 2500 ms** in
+`backend/src/JoiabagurPV.API/appsettings.json` and in the default of
+`AiGatewayOptions.RetrievalTimeoutMs`.
+
+**Why it was raised.** Measured on 2026-08-29 against the seeded world with real retrieval
+(`STUB_MODE=false`, 1.200 documents with embeddings):
+
+| Budget | Outcome |
+|---|---|
+| 800 ms (design §6.4) | `ai_gateway_call_failed timeout 1956 2` → `LexicalFallback` on **every** search |
+| 2500 ms | Served assisted in **0,86 s** and **0,31 s** end to end |
+
+At 800 ms the assisted path never serves: the feature would ship looking healthy —
+HTTP 200, results on screen — while silently answering from the degraded lexical searcher
+every single time. That is the failure mode C15 designed the origin column to make visible,
+and it would have reached production undetected.
+
+**The actual cause, which this does not fix.**
+[`ai-service/src/jbg_ai/api/routers/retrieval.py`](../ai-service/src/jbg_ai/api/routers/retrieval.py)
+constructs a `LiteLlmEmbeddingClient` **per request**, so the in-memory embedding cache frozen
+in C11 is born empty and dies with the response. Retrieval never gets a cache hit, and every
+search pays a full cold round trip to the embedding provider. The debt was recorded when C15
+was designed and assigned to **C21 or C22**, which already work inside `retrieval/`; the fix is
+roughly three lines in `main.py` making that client a singleton.
+
+**What to do when C21/C22 land.**
+
+1. Make the embedding client a singleton in the AI service.
+2. **Measure again** against the seeded world, both cold and warm.
+3. Put `RetrievalTimeoutMs` back to **800 ms** in `appsettings.json` **and** in the
+   `AiGatewayOptions` default — the two must not drift apart.
+4. Confirm with the funnel log that `Origin=Assisted` and not `LexicalFallback`.
+
+**Why not leave it at 2500 ms.** A budget that no longer bites stops being a budget. With the
+single retry of C03 the worst case before degrading becomes roughly **five seconds** of an
+operator standing at the till waiting for an answer that will arrive degraded anyway — worse
+for the shop than failing fast into the lexical searcher. The 800 ms of §6.4 exists to bound
+that wait, not to be comfortable.
+
+**References:** `openspec/changes/add-frontend-assisted-search-panel/qa.md` §6 ·
+[design §6.4](../Documentos/Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) ·
+C15 `design.md`, *Risks / Trade-offs*
+
+---
+
 ## Implementation Guidance
 
 When implementing deferred tasks:
@@ -222,5 +273,5 @@ When implementing deferred tasks:
 
 ---
 
-**Last Updated:** 2026-01-11
+**Last Updated:** 2026-08-29
 **Maintained By:** Development Team
