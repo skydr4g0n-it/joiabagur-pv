@@ -58,6 +58,34 @@ here, because they look like application bugs and are not:
 The full inventory — root causes, and why a tree of 270 tests went unrun for weeks — is under
 *Estado de la suite: fallos conocidos* in [Documentos/testing-backend.md](Documentos/testing-backend.md).
 
+## Frontend test suite: same story, and it catches people out harder
+
+`npm run test` in `frontend/` **also comes back red before you touch anything**: measured on
+2026-08-29, **118 failures of 482 tests, across 17 of the 40 files**. The method is identical
+to the backend's — baseline first, then compare the failing **test names**, never the count.
+
+It catches people out harder than the backend one for two reasons. Nobody expects a frontend
+suite to be red, and `vitest` exits **0** when you pipe it (`npm run test | tail` reports the
+exit code of `tail`), so a green shell prompt says nothing at all. Read the summary line.
+
+Three traps, all of which look like your bug and are not:
+
+- **`useCart must be used within a CartProvider`** (and `useAuth` / `AuthProvider`). Rendering a
+  page component drags in whatever context it consumes. This alone accounts for roughly a third
+  of the red: `pages/sales/__tests__/new.test.tsx` fails **11 of 11** and
+  `pages/products/edit.test.tsx` **27 of 27**, for nothing but this. Wrap in the provider, or
+  mock the hook — `pages/sales/__tests__/cart.test.tsx` is the file to copy.
+- **MSW does not fail an unhandled request.** `src/test/setup.ts` starts the server with
+  `onUnhandledRequest: 'warn'`, so a call with no handler prints a warning and returns nothing.
+  A test can pass having asserted nothing at all. Declare handlers explicitly, or mock the
+  service module with `vi.mock` — which is what the service tests here already do.
+- **`tsc --noEmit` is not a gate.** It reports dozens of pre-existing errors in the Metronic
+  template files (`lucide-react` missing exports, absent modules, `chart.tsx`). Filter its output
+  to your own files. The real gate is `npm run build`.
+
+The full inventory — the five root causes and which files each one accounts for — is under
+*Estado de la suite: fallos conocidos* in [Documentos/testing-frontend.md](Documentos/testing-frontend.md).
+
 ## ai-service (jbg-ai)
 
 - `uv sync` and `uv run` need `--system-certs` on this machine, otherwise PyPI fails with

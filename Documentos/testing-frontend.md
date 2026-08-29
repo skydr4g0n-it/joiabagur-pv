@@ -288,6 +288,80 @@ describe('ProductCard', () => {
 
 ---
 
+## ⚠️ Estado de la suite: fallos conocidos
+
+*Medido el 2026-08-29 sobre `c16-add-frontend-assisted-search-panel`, con el árbol de trabajo idéntico a `HEAD` para aislar la línea base. Node + Vitest 4 + jsdom.*
+
+**482 tests, 118 fallos, en 17 de los 40 ficheros.** Duración: 252 s. Ninguno tiene que ver con el código de producción: son defectos de los propios tests, mocks incompletos y aserciones que se quedaron atrás cuando la interfaz cambió. Se documentan aquí por la misma razón que los del backend — sin este registro, cada persona que ejecuta la suite pierde una hora concluyendo que ha roto algo — y por una razón más, que el backend no tiene.
+
+> **`vitest` sale con código 0 si canalizas su salida.** `npm run test | tail` devuelve el código de `tail`, no el de la suite. Un prompt verde no significa nada: hay que leer la línea de resumen.
+
+### La comparación válida es por nombres, igual que en el backend
+
+```powershell
+# Línea base, antes de tocar nada
+npm run test
+
+# Después
+npm run test
+```
+
+Tu cambio está limpio si el **conjunto de nombres** que falla es el mismo, no si coincide el número. Y el número tampoco es estable aquí: añadir ficheros de test desplaza el orden de ejecución, y con él un puñado de fallos dependientes del orden. En la pasada de C16, con 43 tests nuevos añadidos, **cinco tests que fallaban dejaron de fallar** sin que nadie tocara sus ficheros.
+
+### Los 17 ficheros en rojo
+
+| Fichero | Fallos | Causa dominante |
+|---|---|---|
+| `pages/products/edit.test.tsx` | **27 / 27** | A · `useAuth must be used within an AuthProvider` |
+| `services/__tests__/ml-edge-cases.test.ts` | 23 / 27 | B · mock de TensorFlow.js incompleto |
+| `services/__tests__/image-recognition.service.test.ts` | 15 / 40 | B + C |
+| `pages/products/components/product-photo-upload.test.tsx` | 12 / 35 | E · aserciones desactualizadas |
+| `pages/sales/__tests__/new.test.tsx` | **11 / 11** | A · `useCart must be used within a CartProvider` |
+| `pages/sales/__tests__/new-image.test.tsx` | 8 / 17 | A · `useCart` |
+| `pages/payment-methods/payment-methods.test.tsx` | 4 / 13 | E |
+| `services/__tests__/model-training.service.test.ts` | 4 / 10 | C + `canvas.addEventListener is not a function` |
+| `pages/products/__tests__/edit.test.tsx` | 4 / 4 | D · `vi.mock` sin factoría |
+| `pages/products/create.test.tsx` | 2 / 25 | C · timeout |
+| `services/product.service.test.ts` | 2 / 10 | D |
+| `pages/points-of-sale/points-of-sale.test.tsx` | 1 / 17 | C |
+| `pages/sales/__tests__/sales-index.test.tsx` | 1 / 3 | E · `Found multiple elements` |
+| `pages/sales/__tests__/scan.test.tsx` | 1 / 2 | E |
+| `pages/users/users.test.tsx` | 1 / 12 | C |
+| `services/auth.service.test.ts` | 1 / 8 | E |
+| `services/payment-method.service.test.ts` | 1 / 11 | E |
+
+### Las cinco causas raíz
+
+**A · La página se renderiza sin su proveedor de contexto.** La más numerosa: alrededor de un tercio del rojo. Renderizar un componente de página arrastra todos los contextos que consume, y si falta uno el hook lanza. `new.test.tsx` falla **entero** por `useCart`, y `products/edit.test.tsx` **entero** por `useAuth`. No es un fallo de la aplicación: es que el test monta el componente desnudo.
+
+*Cómo se escribe bien:* envolver en el proveedor real, o mockear el hook. [`pages/sales/__tests__/cart.test.tsx`](../frontend/src/pages/sales/__tests__/cart.test.tsx) —que está en verde— es el fichero a copiar: mockea `@/providers/cart-provider` con un objeto de estado que el test controla.
+
+**B · El mock global de TensorFlow.js se quedó corto.** `src/test/setup.ts` mockea `@tensorflow/tfjs` con `createTensorFlowMock()`, y ese doble no exporta todo lo que el código bajo prueba usa: `No "memory" export is defined on the "@tensorflow/tfjs" mock`. Afecta a los dos ficheros de aprendizaje automático.
+
+**C · Timeouts de 10 s.** 27 ocurrencias, y en su mayoría **consecuencia** de A y B: cuando el render lanza, el `waitFor` que lo sigue espera algo que nunca va a aparecer y agota el reloj. Perseguir el timeout suele ser perseguir el síntoma.
+
+**D · `vi.mock` sin factoría deja los miembros en `undefined`.** `vi.mock('@/services/product.service')` sin segundo argumento produce un módulo cuyos miembros son `undefined`, y el test revienta con `Cannot read properties of undefined (reading 'getProduct')`. Hay que pasar la factoría, o usar `vi.mocked(...)` sobre un mock automático que sí exista.
+
+**E · Aserciones que la interfaz dejó atrás.** `Unable to find an element with the text …`, `Found multiple elements …`, `toBeDisabled()` sobre un elemento que ya no lo está. Son textos y roles que cambiaron sin que nadie actualizara el test.
+
+### La trampa que no da error: MSW en modo aviso
+
+[`src/test/setup.ts`](../frontend/src/test/setup.ts) arranca el servidor así:
+
+```ts
+server.listen({ onUnhandledRequest: 'warn' });
+```
+
+Una petición sin manejador **no rompe el test**: imprime un aviso y devuelve nada. Un test puede pasar entero sin haber probado absolutamente nada, y el aviso se pierde entre las 118 líneas de rojo preexistente. El comentario del propio fichero explica por qué está así —`'error'` rompería los tests unitarios que no hacen llamadas—, pero la consecuencia hay que conocerla.
+
+*Cómo se escribe bien:* declarar los manejadores explícitamente para las rutas que el componente llama, o —lo que hace la mayoría de los tests de servicio de este repositorio— mockear el módulo del servicio con `vi.mock` y afirmar sobre `toHaveBeenCalledWith`, que es una comprobación que no puede pasar por accidente.
+
+### `tsc --noEmit` no es una puerta
+
+Devuelve decenas de errores preexistentes en los ficheros de plantilla de Metronic: `lucide-react` sin exportar `ShieldUser`, `VectorSquare` o `PanelTopBottomDashed`, módulos ausentes (`@/components/image-input`, `embla-carousel-react`), y tipos rotos en `chart.tsx` y `data-grid-table.tsx`. Filtra su salida a tus propios ficheros antes de sacar conclusiones. **La puerta real es `npm run build`**, que sí pasa en verde.
+
+---
+
 ## 🔗 Recursos Externos
 
 - [Vitest Documentation](https://vitest.dev/)
