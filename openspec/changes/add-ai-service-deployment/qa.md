@@ -357,6 +357,44 @@ en ECR, script invocado en el anfitrión, y las tareas 9.1–9.6 completas. El
 certificado se emitió en ese primer despliegue manual y persiste en su volumen,
 así que la primera ejecución del workflow no consume ninguno.
 
+### Cómo se cerró 8.6, y el sexto defecto
+
+Se empujó C17 a `demo` y el disparador `on: push` lanzó la ejecución. **La
+primera falló**, y por un defecto introducido en este mismo change:
+
+```
+tar: frontend/src/components/layouts/layout-1: Cannot unlink: Directory not empty
+```
+
+`--unlink-first` desenlaza **cada entrada** antes de extraerla, directorios
+incluidos, y `unlink` sobre un directorio no vacío falla. Con las cuarenta
+carpetas de plantillas de Metronic bajo `frontend/src/components/layouts/`, el
+refresco del paquete abortaba y con él el despliegue entero.
+
+La bandera se añadió pensando en que `tar` no truncara `deploy.sh` mientras se
+ejecutaba — y era **innecesaria por construcción**: el motivo de que el refresco
+viva en el workflow y no dentro de `deploy.sh` es precisamente que nada de ese
+árbol se está ejecutando mientras se reemplaza. Una precaución contra un riesgo
+que el diseño ya había eliminado, y que rompía el caso normal.
+
+Retirada la bandera, la **segunda ejecución pasó entera**, incluida la
+verificación desde dentro del anfitrión. Y la comprobación que de verdad cierra
+el asunto: tras ese despliegue automatizado —que sobreescribió el parche manual
+de `compose.demo.yaml` con la versión de GitHub— la búsqueda por la URL pública
+siguió devolviendo `aiAvailable: true` con 60 candidatos. El arreglo del §9.bis.2
+es ya del repositorio, no de una edición en el anfitrión.
+
+### Y un séptimo, de camino: deriva perpetua en el proveedor OIDC
+
+El `apply` que añadió `ec2:DescribeInstances` modificó **dos** recursos, no uno.
+El segundo era el proveedor OIDC: la configuración declara `thumbprint_list = []`
+y AWS la rellena sola, de modo que cada `apply` proponía vaciarla otra vez.
+Comprobado con la API inmediatamente después: seguía devolviendo `ab9d0263…`.
+
+Corregido con `ignore_changes = [thumbprint_list]`. No era un fallo funcional,
+pero un plan que siempre anuncia un cambio es un plan que se deja de leer — y
+este módulo apoya su garantía de aislamiento en que alguien lea los planes.
+
 ---
 
 ## 10. Lo que NO se ha podido verificar, y por qué
