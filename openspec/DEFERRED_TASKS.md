@@ -350,6 +350,53 @@ magnitude or if a generative route lands.
 
 ---
 
+## Descubierto el 2026-08-30: **este repositorio no tiene CI**
+
+**Estado: hallazgo, no tarea de C17.** Merece un change propio; se anota aquí para que no
+se pierda.
+
+`test-backend.yml` y `test-frontend.yml` **no se han ejecutado nunca**, ni una vez:
+
+```
+gh run list --workflow=test-backend.yml   -> NUNCA SE HA EJECUTADO
+gh run list --workflow=test-frontend.yml  -> NUNCA SE HA EJECUTADO
+```
+
+Ambos disparan sobre `branches: [main, develop]`, y **ninguna de esas dos ramas existe**. Las
+del repositorio son `master`, `ai-eng` —donde se integra de verdad: el PR #21 mergeó ahí— y
+`demo`. Los workflows están bien escritos, sus filtros de ruta son razonables, y son inertes.
+
+Es la misma firma que C17 encontró siete veces en un día: algo que aparenta funcionar y no se
+ejecuta. Aquí el coste acumulado es mayor que el de cualquiera de aquéllos, porque significa
+que **ningún cambio de este proyecto ha pasado por una comprobación automática antes de
+integrarse**.
+
+### Lo que hay que hacer, y en qué orden
+
+1. **Corregir las ramas**: `pull_request: branches: [ai-eng, master]` más `push` sobre las
+   mismas. Es el arreglo de una línea que enciende la CI.
+2. **Sólo entonces**, decidir si la CI puede ser una puerta. Hoy **no puede**, y el motivo
+   está en `CLAUDE.md`: la suite de backend arrastra **53 fallos preexistentes** y la de
+   frontend **116**. Una puerta sobre una suite roja no es una puerta; es un bloqueo
+   permanente que alguien terminará saltándose. Poner la CI en verde es el trabajo de verdad,
+   y es un change en sí mismo.
+3. Mantener la **lista blanca** (`paths:`) en los tests, al contrario que en los despliegues.
+   Un test que sobra cuesta minutos; un despliegue que falta deja el entorno corriendo código
+   viejo en silencio. Los dos filtros fallan hacia lados distintos a propósito.
+4. Al hacer la CI obligatoria, cuidado con la trampa conocida: un workflow **omitido** por
+   filtro de rutas nunca reporta su estado, y una comprobación requerida que no reporta deja
+   el PR bloqueado para siempre. Se resuelve con un trabajo acompañante que siempre se ejecuta
+   y publica el mismo nombre de comprobación.
+
+### Y el despliegue de producción, que sigue sin filtro
+
+`deploy-aws-ec2.yml` redespliega la tienda ante **cualquier** cambio, incluido uno que sólo
+toque documentación. Se le aplica el mismo razonamiento que a `deploy-demo.yml`, pero **C17 no
+lo toca**: su propia especificación exige que el flujo de despliegue de producción quede
+inalterado, y hay un escenario que lo verifica. Corresponde a otro change.
+
+---
+
 ## Implementation Guidance
 
 When implementing deferred tasks:
