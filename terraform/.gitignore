@@ -9,8 +9,3 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
-
-# Planes guardados (terraform plan -out=...). Artefacto binario de una
-# ejecucion concreta, con los valores de las variables dentro.
-tfplan
-*.tfplan

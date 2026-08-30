@@ -422,6 +422,41 @@ Sign in as the **operator** account, run a natural-language search from
 the degraded lexical path. A degraded badge with results still looks like it
 works, which is precisely why it has to be read rather than assumed.
 
+## 5.7 Two ways to leave the demo quietly broken
+
+Both were found by verifying C17 against the live environment, and both share the shape this
+whole change is built to defend against: **the site keeps answering 200 with plausible
+results**, so nobody notices.
+
+### Stopping the AI container by hand does not undo itself
+
+`restart: unless-stopped` deliberately does **not** restart a container that an operator
+stopped — that is the difference between `unless-stopped` and `always`, and it is the right
+default. So after a `docker stop jbg-demo-ai` or `docker kill jbg-demo-ai`, the container stays
+down until someone starts it.
+
+The environment survives that, which is the point of D18: the proxy, the API and the database
+keep serving, and assisted search degrades to the lexical path. It also means the demo looks
+fine. Verified: with the AI container down, a search returned **HTTP 200 with ten results** and
+`aiAvailable: false`.
+
+> If you stop it to debug, **start it again yourself**. And read `aiAvailable`, not the result
+> count, when checking whether the assisted path is alive.
+
+### Restarting outside `deploy.sh` skips the warm-up
+
+`docker start jbg-demo-ai` brings the container back but does not run the warm-up call that
+`deploy.sh` makes. The AI service builds its embedding client per request, so the first searches
+pay a full cold round trip — measured after a bare restart at **5124 ms across two attempts**,
+past the 2500 ms gateway budget, and therefore degraded.
+
+It heals on its own: four consecutive queries went 0,84 → 0,42 s and reported
+`aiAvailable: true` throughout. But it degrades **exactly when someone opens the demo for the
+first time after a restart**, which is the worst possible moment.
+
+> After restarting the AI container by hand, run one throwaway search before showing anything —
+> or redeploy through `deploy.sh`, which warms it for you.
+
 ## 6. Moving to a purchased domain
 
 Nothing is rebuilt. The hostname is configuration end to end:

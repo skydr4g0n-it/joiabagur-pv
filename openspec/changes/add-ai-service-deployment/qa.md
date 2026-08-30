@@ -418,4 +418,47 @@ Y de paso, contra la URL pública: TLS válido emitido por Let's Encrypt para el
 
 ### Lo que sigue abierto
 
-**Sólo la tarea 8.6**, y no por un bloqueo externo sino por el orden en que ocurrieron las cosas: el entorno se desplegó a mano antes de que el workflow existiera en GitHub. Queda ejecutarlo una vez para comprobar que la automatización reproduce lo que la mano ya hizo. El §9.ter explica por qué su redacción literal —despachar antes de empujar a `demo`— no es alcanzable en este repositorio.
+**Nada.** Las 86 tareas están cerradas. La 8.6 se resolvió empujando a `demo`, con el flujo
+ejecutándose tres veces en verde; el §9.ter explica por qué su redacción literal —despachar
+antes de empujar— no es alcanzable en este repositorio.
+
+---
+
+## 11. Límites de la verificación: tres escenarios que no se pudieron observar
+
+> De 52 escenarios entre las tres specs delta, **49 se verificaron**. Los tres restantes se
+> dejan anotados en lugar de darlos por buenos, porque la diferencia entre «comprobado» y «no
+> comprobable con lo que hay» es justamente lo que un registro de QA debe conservar.
+
+### 11.1 «The environment survives the AI container being terminated» — parcial
+
+**Verificado en vivo:** con `jbg-demo-ai` caído, el proxy, la API y la base de datos siguieron
+sirviendo, y la búsqueda devolvió 200 con diez resultados y `aiAvailable: false`. Es la
+degradación de D18 funcionando: el fallo del contenedor de IA no tumba la página, la degrada al
+camino léxico.
+
+**No observable:** la cláusula *«is restarted by its restart policy»*. Los dos modos de
+terminación disponibles quedan fuera por razones estructurales, no por un defecto:
+
+| Intento | Por qué no sirve |
+|---|---|
+| `docker kill` desde el anfitrión | Docker lo registra como parada **pedida por un operador**, y `unless-stopped` la respeta a propósito. El contenedor se quedó abajo, y estaba bien que se quedara |
+| `kill -9 1` dentro del contenedor | El núcleo **descarta las señales** dirigidas al PID 1 de un espacio de nombres cuando vienen de ese mismo espacio, salvo que tenga manejador |
+
+Reproducirlo de verdad exigiría provocar un agotamiento de memoria real —bajar el límite del
+contenedor hasta que el núcleo lo mate—, que es una tercera interrupción de una URL pública
+para observar un comportamiento que el motor de contenedores garantiza. Se decidió no hacerlo.
+
+### 11.2 «Hostname changes without rebuilding images» — no verificado
+
+Necesita un dominio propio, que todavía no existe. D6 lo declara no bloqueante, y el mecanismo
+está probado a medias: el entorno sirve hoy bajo `52-49-209-14.sslip.io`, un nombre derivado de
+la IP elástica, con certificado válido. Lo que falta por demostrar es el **cambio** de nombre
+sin reconstruir imágenes, no que el nombre sea configurable.
+
+### 11.3 «An empty index fails the deployment» — sólo por inspección
+
+`verify.sh` corta explícitamente con recuento cero, pero nunca llegó a ejecutarse contra un
+índice vacío: el primer despliegue murió antes, en las migraciones, y para cuando la
+verificación se ejecutó por primera vez el corpus ya estaba cargado. La lógica está leída, no
+ejercitada.
