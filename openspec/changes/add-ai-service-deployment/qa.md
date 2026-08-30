@@ -333,9 +333,16 @@ nada a la rama `demo`. No es alcanzable tal como está escrita, por dos razones
 independientes:
 
 1. `workflow_dispatch` sólo es invocable si el workflow existe en la **rama por
-   defecto**. `master` está **119 commits por detrás** de la rama de
-   integración, así que habilitarlo exigiría adelantar toda esa integración a
-   `master` — una distorsión mayor que el problema que resuelve.
+   defecto**. No es una deducción: se intentó, con el entorno `demo` ya creado y
+   la rama de C17 empujada, y GitHub respondió
+
+   ```
+   HTTP 404: workflow deploy-demo.yml not found on the default branch
+   ```
+
+   `master` está **119 commits por detrás** de la rama de integración, así que
+   habilitar el despacho exigiría adelantar toda esa integración a `master` —
+   una distorsión mayor que el problema que resuelve.
 2. El disparador `on: push: branches: [demo]` se activa igualmente. No hay forma
    de poner el código en esa rama sin lanzar una ejecución.
 

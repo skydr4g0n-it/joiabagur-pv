@@ -163,9 +163,15 @@ jobs:
           # the systems management document joins these lines into one script and runs
           # it with the host's `sh`, so `pipefail` would not be available and every
           # level of quoting is one more chance to send something that parses
-          # differently than it reads here. `--unlink-first` matters: extracting over
-          # a script that a shell is currently executing truncates the file it is
-          # still reading from.
+          # differently than it reads here.
+          #
+          # A plain extraction, with no `--unlink-first`. That flag looks like the
+          # careful choice and is the wrong one: it unlinks EVERY entry before
+          # extracting it, directories included, and unlink on a non-empty directory
+          # fails — which aborts the whole deployment on the forty template folders
+          # under frontend/src/components/layouts/. It is also unnecessary, because
+          # the reason the refresh lives HERE rather than inside deploy.sh is exactly
+          # that nothing from this tree is executing while it is being replaced.
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$IID" \
             --document-name "AWS-RunShellScript" \
@@ -174,7 +180,7 @@ jobs:
               'BUNDLE=\$(aws ssm get-parameter --name $SSM_PREFIX/DEPLOYMENT_BUNDLE_URL --query Parameter.Value --output text)',
               'curl -fsSL \$BUNDLE -o /tmp/jbg-demo-bundle.tar.gz',
               'mkdir -p /opt/jbg-demo',
-              'tar -xzf /tmp/jbg-demo-bundle.tar.gz -C /opt/jbg-demo --strip-components=1 --unlink-first',
+              'tar -xzf /tmp/jbg-demo-bundle.tar.gz -C /opt/jbg-demo --strip-components=1',
               'rm -f /tmp/jbg-demo-bundle.tar.gz',
               'chmod +x /opt/jbg-demo/deploy/demo/deploy.sh /opt/jbg-demo/deploy/demo/verify.sh',
               '/opt/jbg-demo/deploy/demo/deploy.sh $TAG'

@@ -26,6 +26,15 @@ resource "aws_iam_openid_connect_provider" "github" {
   # certificate chain, not in a pinned thumbprint that expires and has to be
   # chased. Same choice as the production module.
   thumbprint_list = []
+
+  lifecycle {
+    # AWS fills the thumbprint in by itself and keeps it there. Without this,
+    # every single apply reports "1 to change" trying to empty it again, forever
+    # — and a plan that always shows a change is a plan people stop reading.
+    # Measured: after an apply that "modified" this resource, the API still
+    # returned ab9d0263…, unchanged.
+    ignore_changes = [thumbprint_list]
+  }
 }
 
 # ─── Deploy role ────────────────────────────────────────────────────────────
