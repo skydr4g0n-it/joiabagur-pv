@@ -356,6 +356,31 @@ VITE_ENABLE_DEV_TOOLS=false
 
 ---
 
+## Entorno de Demostración (C17)
+
+Hay un **tercer entorno**, y no es una variante de los dos anteriores: vive en una **cuenta AWS distinta** de la de la tienda, con estado de Terraform propio (`terraform/demo/`) y sin una sola arista hacia producción — ni infraestructura, ni permisos, ni flujos de despliegue, ni datos. Existe para poder enseñar el sistema completo funcionando, con el corpus cargado, sin tocar el catálogo real del negocio.
+
+### Topología
+
+Cuatro contenedores sobre una única instancia, descritos en `compose.demo.yaml`:
+
+| Servicio | Papel | Puertos publicados |
+|---|---|---|
+| `jbg-demo-proxy` | Caddy: termina TLS y emite y renueva el certificado por sí mismo | **80 y 443 — los únicos** |
+| `jbg-demo-api` | API .NET con la SPA embebida, servida desde su propio `wwwroot` | ninguno |
+| `jbg-demo-ai` | Servicio `jbg-ai`, con límite de memoria explícito de 512 MiB | ninguno |
+| `jbg-demo-postgres` | PostgreSQL 15 con pgvector, en contenedor y con volumen persistente | ninguno |
+
+### Tres diferencias que importan frente a producción
+
+- **Caddy en lugar de nginx.** El certificado se emite y renueva solo, sin cliente de certificados en el anfitrión ni tarea programada, y el aprovisionamiento de la máquina no sabe nada de dominios.
+- **PostgreSQL en contenedor en lugar de RDS.** Vuelve irrelevante la pregunta de si el servicio gestionado admite la extensión vectorial, y da simetría exacta con el entorno local: el mismo `bootstrap.sql` y el mismo camino de migraciones funcionan sin una variación.
+- **El servicio de IA no publica puertos.** Custodia la clave del proveedor de embeddings, y la frontera se cumple en **tres capas independientes**: el grupo de seguridad sólo abre 80 y 443, el proxy es el único servicio con puertos publicados, y el propio servicio no declara ninguno. Como consecuencia, el navegador no puede consultarlo: la tarjeta de estado del panel de administración la sirve un endpoint .NET que hace de intermediario.
+
+El nombre de dominio es un **parámetro**, no una constante de construcción: el entorno arranca bajo un nombre derivado de su IP elástica y migra a un dominio propio sin reconstruir ninguna imagen. Procedimiento completo en [`deploy/demo/README.md`](../deploy/demo/README.md).
+
+---
+
 ## Diferencias Clave: Desarrollo vs Producción
 
 | Aspecto | Desarrollo | Producción |

@@ -12,6 +12,19 @@
 
 Este documento se escribió antes de implementar. Cuando una sesión de diseño de un change concreto altera lo que su ficha decía, el cambio se registra aquí con fecha y motivo, y la ficha afectada se corrige en el sitio.
 
+### 2026-08-30 — C17, al cerrar: el riesgo se materializó, y no donde se esperaba
+
+C17 quedó archivado con 86/86 tareas y el entorno vivo. La entrada de abajo advertía de que el change podía «terminar en verde y entregar una URL pública donde *Buscar con ayuda* no encuentra nada». **Ese riesgo se materializó, en una forma que la advertencia no anticipaba**: el índice llegó lleno —1.200 documentos, `drift_count = 0`— y aun así la búsqueda devolvía **200 con diez resultados plausibles** servidos por el camino **léxico**, porque C16 había dejado la búsqueda asistida tras una puerta de despliegue progresivo (`AiSearch:EnabledByDefault`, en `false`) que `compose.demo.yaml` no abría. Sin error, sin traza, y con resultados en pantalla.
+
+Lo encontró la verificación de extremo a extremo —una búsqueda real por la URL pública, leyendo `aiAvailable` en vez del número de resultados—, que es exactamente para lo que la tarea 9.6 existía. **La lección se confirma con un matiz nuevo:** la firma no es sólo «llega vacío», es «llega **degradado y con apariencia de lleno**», que es peor porque ni siquiera un recuento lo delata.
+
+Otros dos hallazgos del apply que afectan a changes anteriores:
+
+- **C13 tenía un defecto de conformidad.** `of_product_ids` ordenaba los identificadores como el `Guid.CompareTo` del .NET *Framework* (con signo) cuando .NET Core compara sin signo, que equivale al orden de bytes. Los dos lados nunca coincidían y `drift_count` **no podía dar cero** con un índice real. La spec viva ya nombraba a .NET como referencia normativa, así que era el código el que la incumplía. La prueba que lo guardaba usaba dos UUID de la misma mitad del rango, donde ambos órdenes coinciden.
+- **El presupuesto de recuperación, medido en la demo**: 170, 184 y 383 ms en llamadas calientes; **1707 ms** en una de cada cuatro. El de 2500 ms no se consume en el caso normal, pero volver a los 800 ms del §6.4 degradaría un cuarto de las búsquedas. Se mantiene, y la deuda del cliente de embeddings por petición sigue siendo de C21 o C22.
+
+Detalle completo en `openspec/changes/archive/2026-08-30-add-ai-service-deployment/qa.md`.
+
 ### 2026-08-29 — C17, tras la sesión de exploración previa al proposal
 
 La ficha de C17 se escribió dando por hecho que «producción» era un sitio al que este equipo puede desplegar. **No lo es: la cuenta AWS donde vive la tienda no es accesible**, su RDS contiene el catálogo real del negocio, y el script que despliega está horneado dentro de una instancia viva bajo `ignore_changes`. De las seis cosas que la ficha da por sentadas, **cinco no se sostienen**, y la sexta —el `/health` enriquecido— es justo lo que S15 y S16 desaconsejan por escrito. El detalle vive en [HU-AIENG-017](../Historias/AI-Eng/HU-AIENG-017.md) y en el ticket del change; aquí queda el resumen y la ficha corregida.

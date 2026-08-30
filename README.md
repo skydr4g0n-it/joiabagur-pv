@@ -30,6 +30,10 @@ Sistema de gestión integral para una joyería que opera en múltiples puntos de
 
 https://pv.joiabagur.com
 
+**Entorno de demostración del Proyecto Final de IA:** https://52-49-209-14.sslip.io
+
+Despliegue aislado en una cuenta AWS propia, con el catálogo real y sus 1.200 documentos vectorizados cargados, y dos cuentas de demostración —una de administración y una de operación— cuyas credenciales se entregan aparte. El nombre de dominio deriva de la IP elástica y es un parámetro del despliegue: migrar a un dominio propio no reconstruye ninguna imagen.
+
 ### 0.5. URL o archivo comprimido del repositorio
 
 https://github.com/marcello-clearcust/joiabagur-pv
@@ -51,7 +55,7 @@ El producto tiene como propósito ofrecer una solución integral de gestión par
 - **Gestión de métodos de pago:** Lista general (Efectivo, Bizum, Transferencia, Tarjeta TPV propio/punto de venta, PayPal), asignación por punto de venta y registro del método en cada venta.
 - **Gestión de usuarios:** Roles Administrador y Operador, autenticación con usuario y contraseña, operadores asociados a puntos de venta concretos.
 - **Otras funcionalidades:** Devoluciones, ajustes manuales de inventario, historial de ventas y movimientos de stock, dashboard con estadísticas y stock crítico.
-- **Búsqueda semántica y venta asistida (en desarrollo):** Proyecto Final del Máster de IA. Añade búsqueda semántica sobre el catálogo, sugerencia de sustitutos y argumentario de venta asistido, mediante el microservicio `jbg-ai`. A día de hoy están congelados el contrato HTTP y la autenticación entre servicios, el backend .NET ya dispone del cliente tipado que los consume —con timeouts, reintento único y cortacircuitos— y la capa de persistencia vectorial está lista: esquema `ai` con pgvector, migraciones propias e índices HNSW por similitud coseno. La recuperación vectorial de `POST /v1/retrieval/products` (C14) y el endpoint .NET de búsqueda asistida con hidratación autoritativa (C15) están entregados: el operador puede buscar en lenguaje natural y recibir resultados con el precio y el stock reales de su tienda. **El panel del operador (C16) también está entregado**: describe la pieza con sus palabras, distingue en pantalla los cuatro modos de no encontrar nada —la IA no encontró, la tienda no lo tiene, la asistencia no está sirviendo, o se han hecho demasiadas búsquedas seguidas— y arrastra la búsqueda hasta la caja, de modo que la venta queda atribuida a la consulta que la originó. La fusión híbrida se entrega en changes posteriores.
+- **Búsqueda semántica y venta asistida (en desarrollo):** Proyecto Final del Máster de IA. Añade búsqueda semántica sobre el catálogo, sugerencia de sustitutos y argumentario de venta asistido, mediante el microservicio `jbg-ai`. A día de hoy están congelados el contrato HTTP y la autenticación entre servicios, el backend .NET ya dispone del cliente tipado que los consume —con timeouts, reintento único y cortacircuitos— y la capa de persistencia vectorial está lista: esquema `ai` con pgvector, migraciones propias e índices HNSW por similitud coseno. La recuperación vectorial de `POST /v1/retrieval/products` (C14) y el endpoint .NET de búsqueda asistida con hidratación autoritativa (C15) están entregados: el operador puede buscar en lenguaje natural y recibir resultados con el precio y el stock reales de su tienda. **El panel del operador (C16) también está entregado**: describe la pieza con sus palabras, distingue en pantalla los cuatro modos de no encontrar nada —la IA no encontró, la tienda no lo tiene, la asistencia no está sirviendo, o se han hecho demasiadas búsquedas seguidas— y arrastra la búsqueda hasta la caja, de modo que la venta queda atribuida a la consulta que la originó. **Y desde C17 todo lo anterior es demostrable en público**: un entorno aislado en una cuenta AWS propia, con TLS válido, el catálogo real y sus 1.200 documentos vectorizados cargados, y una tarjeta en el panel de administración que informa del estado del servicio de IA — incluida la discrepancia entre el modelo de embeddings configurado y el del índice, que de otro modo devolvería resultados sin sentido sin dar ningún error. La fusión híbrida se entrega en changes posteriores.
 
 ### 1.3. Diseño y experiencia de usuario
 
@@ -158,6 +162,8 @@ flowchart TB
 ### 2.4. Infraestructura y despliegue
 
 En producción (AWS): EC2 con nginx (TLS) y un contenedor Docker con API .NET + SPA React; RDS PostgreSQL; S3 (`prod-jpv-files`) para ficheros; ECR; parámetros en SSM; despliegue con GitHub Actions y OIDC. Backups RDS según Terraform (p. ej. 7 días). Detalle en [Documentos/Guias/deploy-aws-production.md](Documentos/Guias/deploy-aws-production.md).
+
+**Entorno de demostración del Proyecto Final de IA (C17):** despliegue independiente en una **cuenta AWS distinta**, con su propio estado de Terraform ([terraform/demo/](terraform/demo/)) y su propio flujo de despliegue. Cuatro contenedores —proxy Caddy con TLS automático, API con la SPA, servicio de IA y PostgreSQL con pgvector— de los que **sólo el proxy publica puertos**: el servicio que custodia la clave del proveedor no es alcanzable desde Internet, y esa frontera se cumple en tres capas independientes (grupo de seguridad, puertos publicados y ausencia de ruta). Los secretos se leen del almacén de parámetros al entorno del proceso y **nunca a disco**. Runbook en [deploy/demo/README.md](deploy/demo/README.md).
 
 ### 2.5. Seguridad
 

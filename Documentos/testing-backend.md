@@ -198,6 +198,26 @@ Sobre los dos primeros conviene una precisión que ahorra tests engañosos. Al p
 > desaparece solo. Eso convierte la no determinación del conjunto de fallos de sospecha razonable en
 > hecho comprobado, y cierra la pregunta de si comparar recuentos podría servir «al menos para ver
 > la tendencia»: no sirve.
+
+> **Actualización del 2026-08-30, sobre `c17-add-ai-service-deployment`.** La suite tiene ahora
+> **890 tests** y **53 fallos** en la línea base, y **897 y 54** al cierre del change — los siete de
+> más son los siete tests nuevos de C17, todos verdes.
+>
+> Esta cuarta medición añade una tercera pasada al expediente de la no determinación, y con ella
+> el argumento queda cerrado del todo. La comparación por nombres entre la línea base y el cierre
+> **no dio un subconjunto limpio**: aparecieron 10 nombres y desaparecieron 9, casi todos de
+> `InventoryIntegrationTests`. Antes de concluir nada se ejecutaron **esas mismas clases en
+> aislamiento**, sobre el mismo árbol y sin recompilar, y salieron **14 fallos con nombres que no
+> estaban ni en la línea base ni en el cierre**.
+>
+> Es decir: **tres ejecuciones del mismo código dieron tres conjuntos distintos**. Ninguna de las
+> clases que se mueven es tocada por C17 —el change no entra en inventario, devoluciones, productos
+> ni ventas—, y lo que sí toca está cubierto por siete tests nuevos en verde. El detalle está en
+> `openspec/changes/archive/2026-08-30-add-ai-service-deployment/qa.md` §2.1.
+>
+> **Efecto colateral que conviene conocer:** añadir una clase de integración a la colección
+> compartida cambia el orden y los tiempos, y con ellos **cuáles** de los tests dependientes del
+> orden caen. No cambia que caigan.
 >
 > El procedimiento y el detalle de las dos pasadas están en
 > `openspec/changes/archive/2026-08-17-add-product-family-entity/qa.md` §1.1.

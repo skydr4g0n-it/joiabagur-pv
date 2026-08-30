@@ -350,10 +350,17 @@ magnitude or if a generative route lands.
 
 ---
 
-## Descubierto el 2026-08-30: **este repositorio no tiene CI**
+## **Este repositorio no tiene CI** — causa ya documentada, confirmada el 2026-08-30
 
 **Estado: hallazgo, no tarea de C17.** Merece un change propio; se anota aquí para que no
 se pierda.
+
+> **La causa no es nueva.** [`Documentos/testing-backend.md`](../Documentos/testing-backend.md)
+> ya la registraba en su sección *Estado de la suite*: `test-backend.yml` sólo dispara en
+> `main` y `develop`, «y **todo el Proyecto Final de IA se está construyendo en `ai-eng`** y
+> sus ramas de change». Lo que C17 aporta no es el descubrimiento sino la **confirmación
+> empírica** de su consecuencia extrema, que hasta ahora se intuía: no es que se ejecute poco,
+> es que **no se ha ejecutado nunca**.
 
 `test-backend.yml` y `test-frontend.yml` **no se han ejecutado nunca**, ni una vez:
 

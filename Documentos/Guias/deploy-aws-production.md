@@ -3,7 +3,13 @@
 Esta guía describe la **arquitectura actual**: una instancia **EC2** con **nginx** (TLS), contenedor **Docker** con API .NET + SPA React embebida, **RDS PostgreSQL**, **S3** solo para ficheros, **ECR**, **SSM Parameter Store** y despliegue con **GitHub Actions (OIDC)**.
 
 **Migración desde App Runner + CloudFront + S3 frontend:** [deploy-aws-ec2-migration.md](deploy-aws-ec2-migration.md).  
-**Referencia histórica App Runner / CloudFront:** [deploy-aws-app-runner-legacy.md](deploy-aws-app-runner-legacy.md).
+**Referencia histórica App Runner / CloudFront:** [deploy-aws-app-runner-legacy.md](deploy-aws-app-runner-legacy.md).  
+**Entorno de demostración del servicio de IA:** [../../deploy/demo/README.md](../../deploy/demo/README.md).
+
+> Esta guía describe **la cuenta de la tienda**. El entorno de demostración de C17 vive en una
+> **cuenta AWS distinta**, con su propio estado de Terraform, su propio flujo de despliegue y
+> una topología diferente —Caddy en lugar de nginx, PostgreSQL en contenedor en lugar de RDS—.
+> No comparten nada, y nada de lo que se haga allí puede afectar a lo que describe esta guía.
 
 ---
 
