@@ -242,16 +242,135 @@ La última fila es la que más importa: coincide con el literal versionado de `c
 
 ---
 
+## 9.bis El despliegue real: cinco defectos que ninguna suite podía encontrar
+
+> Sección añadida el 2026-08-30, tras desplegar el entorno de verdad. Los cinco
+> se descubrieron **después** de que todas las comprobaciones anteriores
+> estuvieran en verde, y cuatro de ellos sólo son observables con el sistema
+> vivo. Es la justificación empírica de por qué el §9 de este change lleva el
+> camino del dato dentro y no lo delega.
+
+### 9.bis.1 `drift_count` no podía dar cero. Nunca
+
+La sincronización de reconciliación (tarea 9.5) devolvía `drift_count = 1` con
+`upserted: 0, deleted: 0, failed: 0`. Los conjuntos eran idénticos —comprobado
+en SQL: 1.200 identificadores indexables, 1.200 indexados, cero diferencias en
+ambos sentidos—, así que el desacuerdo estaba en el **hash**, no en los datos.
+
+Midiendo ambos lados sobre los mismos 1.200 identificadores:
+
+| Orden | Hash |
+|---|---|
+| `Guid.CompareTo` con signo, el que usaba `set_hash.py` | `35e77e80…` |
+| Bytes / lexicográfico | `ba2d18de…` **= el que publica el feed** |
+
+`_dotnet_guid_sort_key` modelaba el `Guid.CompareTo` del **.NET Framework**, que
+lee `Data1/Data2/Data3` con signo. En .NET Core la comparación es **sin signo**,
+y entonces equivale al orden de bytes.
+
+**Por qué sobrevivió a C13:** `test_set_hash_matches_known_vector` usaba
+`aaaaaaaa-…` y `bbbbbbbb-…`, ambos en la mitad alta del rango, donde los dos
+órdenes coinciden. La prueba pasaba con la implementación correcta y con la
+incorrecta. La nueva, `test_set_hash_distinguishes_signed_from_unsigned_order`,
+usa un identificador a cada lado del bit alto y **falla contra la
+implementación antigua** (verificado explícitamente).
+
+**Alcance de la corrección:** `of_product_ids` se usa en un único punto de
+producción —la comparación en vivo de `report_index_status`— y lo que se
+persiste en `last_aggregate_hash` es el hash *del feed*. No invalida ningún dato
+guardado.
+
+Tras corregir: `drift_count = 0`, con `skipped: 1200` y **cero llamadas al
+proveedor de embeddings**, que es exactamente la reconciliación que pedía D19.
+
+### 9.bis.2 La búsqueda servía el camino degradado, con apariencia de funcionar
+
+La verificación de extremo a extremo (tarea 9.6) devolvía **HTTP 200 con diez
+resultados plausibles** y `aiAvailable: false`, `candidatesReturned: 0`. El
+servicio de IA no registraba ni una petición a `/v1/retrieval/products`: la API
+**nunca lo llamaba**.
+
+Causa: C16 dejó la búsqueda asistida detrás de una **puerta de despliegue
+progresivo** —`AiSearch:EnabledByDefault` en `false`, más una lista de puntos de
+venta habilitados uno a uno— y `compose.demo.yaml` no la abría. Correcto para la
+tienda, donde un ranking malo llega a un mostrador; equivocado en un entorno
+cuya razón de ser es enseñar ese camino.
+
+Es el fallo silencioso arquetípico de este change: sin error, sin traza, y con
+resultados en pantalla. Corregido con un literal de clase C. Tras el arreglo:
+`aiAvailable: true`, 60 candidatos, 8 supervivientes, 0,99 s.
+
+### 9.bis.3 La API resembraba `admin` / `Admin123!` en un host público
+
+Tras truncar y restaurar, ningún usuario se llamaba `admin`. El sembrador de la
+API —cuya única guarda es «¿existe alguno con ese nombre?»— creó al arrancar un
+administrador con una contraseña que es **una constante en un repositorio
+público**, sobre una máquina con los puertos 80 y 443 abiertos a Internet.
+
+Borrar la fila no sirve: vuelve en el siguiente reinicio. La defensa es dejar un
+`admin` **desactivado** con hash inservible: el sembrador lo encuentra y no crea
+nada, y el login lo rechaza por `IsActive` antes de mirar la contraseña.
+Verificado: `admin` / `Admin123!` → **401**.
+
+### 9.bis.4 y 9.bis.5 Dos trampas al fabricar hashes fuera de .NET
+
+- La biblioteca `bcrypt` de Python emite `$2b$`; BCrypt.Net sólo entiende `$2a$`
+  y lanza `SaltParseException`, que sube sin capturar y convierte un login en
+  **500 en lugar de 401**.
+- Leer un fichero `NOMBRE=$2a$12$…` con `source` **expande** `$2a` y `$12` como
+  parámetros posicionales vacíos. El hash llega destrozado y produce el mismo
+  `SaltParseException`, lo que envía a diagnosticar el problema equivocado —como
+  ocurrió aquí, donde el prefijo se acusó primero y era un síntoma.
+
+Ambas están documentadas en el runbook, §5.5b.
+
+---
+
+## 9.ter Desviación respecto a la tarea 8.6, y su motivo
+
+La tarea pide validar el workflow con `workflow_dispatch` **antes** de empujar
+nada a la rama `demo`. No es alcanzable tal como está escrita, por dos razones
+independientes:
+
+1. `workflow_dispatch` sólo es invocable si el workflow existe en la **rama por
+   defecto**. `master` está **119 commits por detrás** de la rama de
+   integración, así que habilitarlo exigiría adelantar toda esa integración a
+   `master` — una distorsión mayor que el problema que resuelve.
+2. El disparador `on: push: branches: [demo]` se activa igualmente. No hay forma
+   de poner el código en esa rama sin lanzar una ejecución.
+
+**Lo que la tarea protegía** no era el orden sino **gastar intentos de emisión
+de certificado**: la autoridad limita a cinco duplicados por semana. Ese riesgo
+es idéntico se dispare como se dispare, y la mitigación real —que el primer
+intento encuentre parámetros e infraestructura en su sitio— se cumplió.
+
+En la práctica el entorno se desplegó **a mano**, por `aws ssm send-command`,
+antes de que el workflow existiera en GitHub: imágenes construidas y publicadas
+en ECR, script invocado en el anfitrión, y las tareas 9.1–9.6 completas. El
+certificado se emitió en ese primer despliegue manual y persiste en su volumen,
+así que la primera ejecución del workflow no consume ninguno.
+
+---
+
 ## 10. Lo que NO se ha podido verificar, y por qué
 
-Todo lo siguiente depende del **alta de la cuenta AWS de demostración** (tarea 1.4), que es un prerrequisito externo. No hay código pendiente por ninguno de estos motivos.
+> **Esta sección quedó obsoleta el 2026-08-30.** Decía que todo dependía del alta de la cuenta AWS. La cuenta se creó ese día, y con ella se cerraron 5.10, 9.1–9.6, 10.1 y 10.3. Se conserva reescrita en lugar de borrarse, porque el que una lista de bloqueos envejezca es información.
 
-| Tarea | Qué falta |
+### Lo que sí se verificó contra el entorno real
+
+| Tarea | Evidencia |
 |---|---|
-| 5.10 | `terraform plan` real y la verificación de que no lista ningún recurso ajeno al módulo |
-| 8.6 · 8.7 | Ejecutar el workflow por `workflow_dispatch` y crear la rama `demo` y su GitHub Environment |
-| 9.1 – 9.6 | Aprovisionamiento, volcado, sustitución de cuentas, restauración, sincronización de reconciliación y verificación de extremo a extremo |
-| 10.1 | Medir el presupuesto de recuperación **en la demo** — anotado en `DEFERRED_TASKS.md` con qué medir y cómo leerlo |
-| 10.3 | `docker stats` sobre los cuatro contenedores y confirmación del dimensionado |
+| 5.10 | Plan de **18 recursos**, 18 esperados, ninguno ajeno al módulo, 0 cambios y 0 destrucciones |
+| 8.7 | Rama `demo` y GitHub Environment `demo` **sin reglas de protección**, con el secreto `DEMO_DEPLOY_ROLE_ARN` |
+| 9.1 | `bootstrap.sql` ejecutado: extensión `vector`, esquema `ai`, rol `jbg_ai`, y `alembic upgrade head` aplicando sus dos revisiones |
+| 9.2 – 9.4 | Volcado de sólo datos y restauración con los **siete recuentos coincidiendo** con la línea base de 1.5, y `DISTINCT embedding_model` igual al literal de `compose.demo.yaml` |
+| 9.3 | Cuatro cuentas anonimizadas, dos de demostración activas, **cero correos fuera del dominio de ejemplo**, y `admin`/`Admin123!` rechazado con 401 |
+| 9.5 | `drift_count = 0` con `skipped: 1200` y cero llamadas al proveedor |
+| 9.6 | Búsqueda en lenguaje natural por la URL pública: `aiAvailable: true`, 60 candidatos, 8 supervivientes, 0,99 s |
+| 10.1 · 10.3 | Cuatro latencias del gateway y `docker stats` de los cuatro contenedores, anotados en `DEFERRED_TASKS.md` |
 
-El punto de corte declarado en el ticket se respeta: lo entregado cubre las cuatro zonas de código y de configuración, y lo que queda es ejecución contra una cuenta que todavía no existe.
+Y de paso, contra la URL pública: TLS válido emitido por Let's Encrypt para el nombre derivado de la IP elástica, redirección 308 desde HTTP, operador **403** contra `api/ai/health` y administrador **200** con la carga enriquecida completa.
+
+### Lo que sigue abierto
+
+**Sólo la tarea 8.6**, y no por un bloqueo externo sino por el orden en que ocurrieron las cosas: el entorno se desplegó a mano antes de que el workflow existiera en GitHub. Queda ejecutarlo una vez para comprobar que la automatización reproduce lo que la mano ya hizo. El §9.ter explica por qué su redacción literal —despachar antes de empujar a `demo`— no es alcanzable en este repositorio.

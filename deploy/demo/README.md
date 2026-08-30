@@ -259,8 +259,22 @@ gh workflow run deploy-demo.yml
 gh run watch
 ```
 
-The first run will deploy successfully and then **fail verification**, because
-the database is empty. That is the correct behaviour, and §5 is the fix.
+**The first run will fail, and it fails earlier than you would guess.** Not at
+verification for an empty index — it never gets that far. It fails at
+`alembic upgrade head`, with:
+
+```
+FATAL: password authentication failed for user "jbg_ai"
+```
+
+The `jbg_ai` role and the `ai` schema do not exist until `bootstrap.sql` runs,
+and `bootstrap.sql` needs the Postgres container that this very deployment is
+what creates. The chicken and egg is inherent, not a mistake: **deploy first,
+provision second, redeploy third.**
+
+Everything before that step does succeed, and two of those things matter: the
+containers come up, and **Caddy obtains the TLS certificate** — so the failed
+run does not cost you a certificate issuance when you re-run it.
 
 ### One-off schema provisioning
 

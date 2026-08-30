@@ -93,7 +93,7 @@
 - [x] 8.4 Desplegar con `aws ssm send-command` invocando el script, con sondeo del resultado
 - [x] 8.5 Implementar la verificación posterior **desde dentro del anfitrión** por `docker exec`, exigiendo base accesible, **recuento de documentos mayor que cero**, ausencia de discrepancia de modelo y credencial configurada
 - [ ] 8.6 Validar el workflow con `workflow_dispatch` **antes** de empujar nada a la rama `demo`
-- [ ] 8.7 Crear la rama `demo` y el GitHub Environment homónimo
+- [x] 8.7 Crear la rama `demo` y el GitHub Environment homónimo
 
 ## 9. Camino del dato
 
