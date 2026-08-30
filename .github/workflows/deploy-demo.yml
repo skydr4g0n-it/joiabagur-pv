@@ -10,9 +10,52 @@ name: Deploy demo environment
 # that does not declare that environment. Production's role, by contrast, trusts
 # any branch and any workflow of the repository.
 
+#
+# El filtro de rutas es una LISTA NEGRA, y la elección es deliberada.
+#
+# Una lista blanca (`paths:`) parece más precisa y falla hacia el lado
+# equivocado: si olvidas una ruta, el entorno se queda corriendo código viejo
+# sin que nada lo diga. Una lista negra falla hacia desplegar de más, que cuesta
+# tres minutos y se ve.
+#
+# Y la lista blanca evidente —`backend/**`, `frontend/**`, `ai-service/**`— se
+# dejaría fuera TODO el paquete de despliegue: `compose.demo.yaml`, los guiones
+# de `deploy/demo/`, el `Caddyfile` y `bootstrap.sql`, que no van dentro de
+# ninguna imagen pero sí se despliegan.
+#
+# Nótese que NO se ignora `**/*.md`, que es lo primero que uno escribe: en este
+# repositorio `ai-service/prompts/catalog-synth/v3.md` no es documentación sino
+# un prompt que viaja dentro de la imagen.
+#
+# `workflow_dispatch` no se ve afectado por el filtro: si alguna vez hace falta
+# forzar un despliegue sin cambios de código, ésa es la salida.
+#
 on:
   push:
     branches: [demo]
+    paths-ignore:
+      # Especificaciones y documentación. Nada de esto entra en una imagen ni
+      # viaja en el paquete de despliegue.
+      - 'openspec/**'
+      - 'Documentos/**'
+      - '**/README.md'
+      - 'CLAUDE.md'
+      - 'AGENTS.md'
+      # La infraestructura se aplica con terraform, jamás desde este flujo.
+      - 'terraform/**'
+      # Otras canalizaciones, incluidas las deprecadas.
+      - '.github/workflows/test-*.yml'
+      - '.github/workflows/deploy-aws-ec2.yml'
+      - '.github/workflows/deploy-backend-aws.yml'
+      - '.github/workflows/deploy-frontend-aws.yml'
+      # Configuración de herramientas de asistencia.
+      - '.claude/**'
+      - '.codex/**'
+      - '.cursor/**'
+      - '.agent/**'
+      - '.opencode/**'
+      - '.docs-update/**'
+      - '.pr/**'
   workflow_dispatch:
     inputs:
       image_tag:
