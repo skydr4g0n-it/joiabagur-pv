@@ -161,6 +161,20 @@ services:
       # purpose so the demo behaves like the environment those figures describe.
       # Revising it belongs to the changes working in retrieval/.
       AiGateway__RetrievalTimeoutMs: "2500"
+      # Class C - versioned literal, and the one whose absence made the whole
+      # environment look finished while it was not.
+      #
+      # C16 put assisted search behind a ROLLOUT GATE, not a feature flag:
+      # `AiSearch:EnabledByDefault` is false and shops are switched on one at a
+      # time by identifier. That is right for the shop, where a bad ranking
+      # reaches a till. It is wrong here, where the entire point is to show the
+      # assisted path.
+      #
+      # Without this the demo answers 200 with plausible results — served by the
+      # LEXICAL fallback, with `aiAvailable: false` and zero candidates. Nothing
+      # errors, nothing is logged, and the AI service is never even called.
+      # C17 found it only by running a real search through the public URL.
+      AiSearch__EnabledByDefault: "true"
       # Class A - secret, the other half of the shared pair.
       IndexFeed__ApiKey: ${INDEX_FEED_SHARED_KEY}
       # Class B. Same origin in practice — the SPA is served by this very

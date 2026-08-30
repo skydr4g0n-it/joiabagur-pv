@@ -296,23 +296,57 @@ Agree the change with whoever owns the .NET client, then regenerate with the REA
 **References:** C17 `design.md` D12 · `openspec/specs/ai-service-runtime/spec.md` ·
 S16 *Observabilidad* ("no confundáis el latido con la vigilancia")
 
-### Measuring the real retrieval budget on the demo environment
+### The retrieval budget, measured on the demo environment
 
-**Status:** Pending the demo environment being deployed. **Not** a revision of the 2500 ms budget
-— that belongs to the changes working in `retrieval/`, as recorded above.
+**Status: measured on 2026-08-30. The conclusion is "do not revert yet", and the reason is
+sharper than before.**
 
-**What to measure and why it is a different measurement.** The 2500 ms figure was measured
-against a provider reached from a laptop. The demo environment sits in a different network, a
-different region and a different instance size, and the same cold round trip may cost more there.
-Once the environment is up, run several assisted searches and read the funnel log:
+Four `ai_gateway_call_completed` latencies over four distinct queries, from the demo host in
+`eu-west-1` against the real provider, with `aiAvailable: true` on all four:
 
-- `ai_gateway_call_completed` latency, cold and warm.
-- Whether the badge reports `Origin=Assisted` or `LexicalFallback`.
+| Query | Gateway latency | End to end |
+|---|---|---|
+| anillo de plata para regalar | 383 ms | 0,99 s |
+| pendientes de oro para una boda | **1707 ms** | 1,98 s |
+| collar con perlas elegante | 170 ms | 0,41 s |
+| pulsera de plata sencilla | 184 ms | 0,40 s |
 
-Record the numbers here. If the assisted path degrades on the demo at 2500 ms, that is evidence
-the singleton fix is more urgent, not a reason to raise the budget further.
+**What this changes.** The 2500 ms budget is not being consumed in the normal case: warm calls
+land at **170–383 ms**, four to fourteen times inside it. Measured from a laptop during C16 the
+same path degraded on *every* search at 800 ms; from an instance in the same region as nothing in
+particular but with a better route to the provider, the ordinary case is comfortable.
 
-**References:** C17 `tasks.md` §10.1 · C16 `qa.md` §6
+**What this does NOT change.** One call in four cost **1707 ms** — still more than double the
+800 ms of §6.4. So reverting the budget today would degrade roughly a quarter of searches to the
+lexical path. The debt is the same one recorded above: the AI service builds a
+`LiteLlmEmbeddingClient` per request, so the in-memory cache never hits and any request may pay a
+full cold round trip. Distance to the provider changed how *often* that hurts, not whether it
+happens.
+
+**Therefore:** leave `RetrievalTimeoutMs` at 2500 ms. Make the embedding client a singleton in
+the change that owns `retrieval/`, measure again, and only then consider 800 ms. These figures
+are the new baseline to beat.
+
+**References:** C17 `qa.md` · C16 `qa.md` §6 · measured with the demo corpus of 1200 documents
+
+### Instance sizing, measured (C17 §10.3) — no action needed
+
+`docker stats` on the four containers with the corpus loaded and searches served, 2026-08-30:
+
+| Container | Memory | Of its limit |
+|---|---|---|
+| `jbg-demo-ai` | 232,5 MiB | **45 % of its 512 MiB cap** |
+| `jbg-demo-api` | 108 MiB | — |
+| `jbg-demo-postgres` | 93 MiB | — |
+| `jbg-demo-proxy` | 11,7 MiB | — |
+
+Host: 689 MB used of 1909, **917 MB available**, and **no swap configured**.
+
+**`t3.small` is right-sized and the 512 MiB cap on the AI service is well chosen**: high enough
+that ordinary operation never approaches it, low enough that the container dies before the host
+does — which is the whole point of D18. No resizing, and the swap file the design offered as a
+mitigation is not needed at these numbers. Re-measure if the corpus grows by an order of
+magnitude or if a generative route lands.
 
 ---
 

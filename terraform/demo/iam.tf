@@ -122,9 +122,19 @@ resource "aws_iam_role_policy" "deploy" {
       {
         # So the workflow can confirm the host is registered before sending it a
         # command, instead of timing out on a command nobody will ever collect.
-        Sid      = "InstanceRegistrationStatus"
-        Effect   = "Allow"
-        Action   = "ssm:DescribeInstanceInformation"
+        #
+        # `ec2:DescribeInstances` lets it find the host by tag instead of being
+        # handed an instance id, which would otherwise have to live in a secret
+        # and would go stale the first time the instance is replaced. Neither
+        # action supports resource-level permissions, so both are `*` — in an
+        # account that holds this environment and nothing else, that is a list
+        # of one machine.
+        Sid    = "InstanceDiscoveryAndRegistrationStatus"
+        Effect = "Allow"
+        Action = [
+          "ssm:DescribeInstanceInformation",
+          "ec2:DescribeInstances"
+        ]
         Resource = "*"
       },
       {

@@ -29,12 +29,17 @@
 
 set -euo pipefail
 
-AI_SERVICE="jbg-demo-ai"
-COMPOSE_FILE="${DEPLOY_ROOT:-/opt/jbg-demo}/compose.demo.yaml"
+# Plain `docker exec` on the container name, NOT `docker compose exec`. Compose
+# would parse the composition file to resolve the service, and parsing it means
+# interpolating every `${VAR}` in it — none of which are exported when this runs
+# on its own. The result is a screen of "variable is not set" warnings on a
+# verification that is working perfectly, which is exactly the kind of noise that
+# teaches people to ignore output. The name is fixed by `container_name:`.
+AI_CONTAINER="jbg-demo-ai"
 
 echo "[verify] Probing the AI service health report from inside the host ..."
 
-docker compose -f "${COMPOSE_FILE}" exec -T "${AI_SERVICE}" python - <<'PYTHON'
+docker exec -i "${AI_CONTAINER}" python - <<'PYTHON'
 import json
 import sys
 import urllib.request

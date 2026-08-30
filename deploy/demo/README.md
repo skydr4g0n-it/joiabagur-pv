@@ -378,6 +378,29 @@ PY
 Expected: `drift_count = 0`. Anything else means the feed and the index disagree
 about the catalog, and the environment must not be shown until it does not.
 
+### 5.5b Three traps a wipe-and-restore sets, all found the hard way in C17
+
+**The API reseeds `admin` / `Admin123!` on every start.** Its seeder's only guard
+is "does any user named `admin` exist?", and after a truncate none does — so a
+restart creates an administrator whose password is a constant in a **public**
+repository, on a host open to the Internet. Deleting the row does not help: the
+next restart recreates it. Leave one **disabled** row named `admin` with an
+unusable hash: the seeder finds it and skips, and login rejects it on `IsActive`
+before it ever checks the password.
+
+**Password hashes minted outside .NET must use the `$2a$` prefix.** Python's
+`bcrypt` emits `$2b$` by default, and the BCrypt.Net version here answers
+`SaltParseException: Invalid salt version` — which escapes uncaught and turns a
+login into a **500, not a 401**. Use `bcrypt.gensalt(12, prefix=b"2a")`. Do this
+for the disabled accounts too: their hash never has to verify, but it does have
+to *parse*.
+
+**Do not read a hash file with `source`.** A line like `H=$2a$12$...` is an
+unquoted assignment, and the shell eats `$2a` and `$12` as positional
+parameters. The value arrives mangled and produces exactly the same
+`SaltParseException`, which sends you hunting for the wrong bug. Read it with
+command substitution instead: `H=$(grep '^H=' file | cut -d= -f2-)`.
+
 ### 5.6 End-to-end check
 
 Sign in as the **operator** account, run a natural-language search from

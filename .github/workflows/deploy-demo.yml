@@ -109,10 +109,30 @@ jobs:
             --value "${{ steps.tag.outputs.value }}" \
             --overwrite
 
+      # Discovered by tag rather than carried in a secret. It is not a secret —
+      # and a lookup survives the instance being replaced, which a pinned
+      # identifier does not: changing host provisioning replaces the instance by
+      # design in this module, and a stale secret would then point at a machine
+      # that no longer exists.
+      - name: Discover the demo host
+        id: host
+        run: |
+          set -euo pipefail
+          IID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=jbg-demo-host" \
+                      "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' --output text)
+          if [ -z "$IID" ] || [ "$IID" = "None" ]; then
+            echo "::error::No running instance tagged jbg-demo-host was found in ${AWS_REGION}."
+            exit 1
+          fi
+          echo "instance_id=$IID" >> $GITHUB_OUTPUT
+          echo "Host: $IID"
+
       - name: Verify the host is registered with SSM
         run: |
           set -euo pipefail
-          IID=$(echo -n "${{ secrets.DEMO_INSTANCE_ID }}" | tr -d '[:space:]')
+          IID="${{ steps.host.outputs.instance_id }}"
           PING=$(aws ssm describe-instance-information \
             --filters "Key=InstanceIds,Values=$IID" \
             --query 'InstanceInformationList[0].PingStatus' \
@@ -131,7 +151,7 @@ jobs:
         id: deploy
         run: |
           set -euo pipefail
-          IID=$(echo -n "${{ secrets.DEMO_INSTANCE_ID }}" | tr -d '[:space:]')
+          IID="${{ steps.host.outputs.instance_id }}"
           TAG="${{ steps.tag.outputs.value }}"
 
           # The bundle is refreshed before the script runs, so a change to

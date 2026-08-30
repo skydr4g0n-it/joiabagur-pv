@@ -431,6 +431,32 @@ def test_set_hash_matches_known_vector() -> None:
     assert expected.islower()
 
 
+def test_set_hash_distinguishes_signed_from_unsigned_order() -> None:
+    """El vector de arriba no distingue los dos ordenes posibles. Este si.
+
+    `aaaaaaaa-...` y `bbbbbbbb-...` caen ambos en la mitad alta del rango, donde
+    leer el primer campo como entero con signo o sin signo da el mismo orden. La
+    prueba pasaba, por tanto, con la implementacion correcta y con la
+    incorrecta.
+
+    Estos dos identificadores estan uno a cada lado del bit alto, que es
+    exactamente donde las dos lecturas se separan:
+
+      * sin signo (.NET Core, y lo que hace el feed): 0x00000000 < 0xffffffff
+      * con signo (.NET Framework):                   0xffffffff = -1 < 0
+
+    C17 descubrio que el feed publica el orden sin signo, midiendo ambos hashes
+    sobre los mismos 1200 identificadores del indice real.
+    """
+    bajo = UUID("00000000-0000-0000-0000-000000000001")
+    alto = UUID("ffffffff-ffff-ffff-ffff-ffffffffffff")
+
+    expected = hashlib.sha256((str(bajo) + str(alto)).encode("utf-8")).hexdigest()
+
+    assert of_product_ids([alto, bajo]) == expected
+    assert of_product_ids([bajo, alto]) == expected
+
+
 def test_status_reports_drift_when_counts_diverge() -> None:
     repo = FakeProductDocumentRepo()
     item = make_upsert(sku="SKU01", product_id=A)

@@ -51,7 +51,7 @@
 - [x] 5.7 Declarar la instancia `jbg-demo-host`, su perfil de instancia con lectura de `/jbg-demo/*` y descarga de imágenes, y la IP elástica
 - [x] 5.8 Resolver la AMI con `data "aws_ssm_parameter"` del alias público de AL2023, eliminando la variable manual, y anotar el supuesto sobre la VPC por defecto
 - [x] 5.9 Crear `terraform/demo/templates/user_data.sh` con **cuatro pasos y nada específico de la aplicación**, instalando el plugin de Compose desde una release con **versión fijada**
-- [ ] 5.10 Ejecutar el plan y **verificar que no aparece ningún recurso ajeno al módulo**
+- [x] 5.10 Ejecutar el plan y **verificar que no aparece ningún recurso ajeno al módulo**
 
 ## 6. Salud enriquecida del servicio de IA
 
@@ -97,18 +97,18 @@
 
 ## 9. Camino del dato
 
-- [ ] 9.1 Ejecutar el aprovisionamiento del esquema (`bootstrap.sql`) contra la base de la demo, con privilegios de administrador
-- [ ] 9.2 Volcar `public` y `ai` desde el entorno local
-- [ ] 9.3 **Sustituir el personal real de la joyería** por una cuenta de administración y una de operación de demostración, y verificar que ninguna cuenta del personal puede autenticarse
-- [ ] 9.4 Restaurar ambos esquemas y verificar recuentos frente a los medidos en 1.5
-- [ ] 9.5 Ejecutar **una** sincronización de reconciliación y verificar `drift_count = 0` en el estado del índice
-- [ ] 9.6 Verificar de extremo a extremo: iniciar sesión con la cuenta de operación, buscar en lenguaje natural y confirmar que la insignia declara **origen asistido** y no camino degradado
+- [x] 9.1 Ejecutar el aprovisionamiento del esquema (`bootstrap.sql`) contra la base de la demo, con privilegios de administrador
+- [x] 9.2 Volcar `public` y `ai` desde el entorno local
+- [x] 9.3 **Sustituir el personal real de la joyería** por una cuenta de administración y una de operación de demostración, y verificar que ninguna cuenta del personal puede autenticarse
+- [x] 9.4 Restaurar ambos esquemas y verificar recuentos frente a los medidos en 1.5
+- [x] 9.5 Ejecutar **una** sincronización de reconciliación y verificar `drift_count = 0` en el estado del índice
+- [x] 9.6 Verificar de extremo a extremo: iniciar sesión con la cuenta de operación, buscar en lenguaje natural y confirmar que la insignia declara **origen asistido** y no camino degradado
 
 ## 10. Cierre
 
-- [ ] 10.1 **Medir el presupuesto de recuperación real en la demo** y anotarlo en `DEFERRED_TASKS.md` — sin revertirlo: el arreglo pertenece a los changes que trabajan en `retrieval/`
+- [x] 10.1 **Medir el presupuesto de recuperación real en la demo** y anotarlo en `DEFERRED_TASKS.md` — sin revertirlo: el arreglo pertenece a los changes que trabajan en `retrieval/`
 - [x] 10.2 Anotar en `DEFERRED_TASKS.md` los tres disparadores de la bifurcación del `/health` en vida y disponibilidad
-- [ ] 10.3 Medir el consumo de memoria con `docker stats` y confirmar o corregir el dimensionado de la instancia y el límite del contenedor de IA
+- [x] 10.3 Medir el consumo de memoria con `docker stats` y confirmar o corregir el dimensionado de la instancia y el límite del contenedor de IA
 - [x] 10.4 Comparar ambas suites contra las líneas base de 1.1 y 1.2 **por nombres de test**, y registrar el resultado en `qa.md`
 - [x] 10.5 `dotnet build`, `npm run build` y `uv run pytest` sin errores
 - [x] 10.6 Enlazar HU-AIENG-017 en `Documentos/epicas.md` (EP11)
