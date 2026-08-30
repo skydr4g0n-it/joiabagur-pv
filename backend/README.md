@@ -595,7 +595,22 @@ Production does **not** use Docker Compose. The active path is `.github/workflow
 gh workflow run deploy-aws-ec2.yml
 ```
 
-> `docker-compose.prod.yml` is **not** the production deployment: no workflow, terraform template or script invokes it, it builds the wrong Dockerfile, and it declares its own Postgres container where production uses RDS. It survived the move to the bundled-image path and is pending removal.
+> `docker-compose.prod.yml` is **not** the production deployment: no workflow, terraform template or script invokes it, it builds the wrong Dockerfile, and it declares its own Postgres container where production uses RDS. It survived the move to the bundled-image path and now carries a deprecation header, together with the two image definitions only it and the deprecated App Runner workflow ever built — `src/JoiabagurPV.API/Dockerfile` and `Dockerfile.prod` (C17).
+
+### Demo environment
+
+C17 adds a **second, fully isolated** deployment path, in a different AWS account, for the public demonstration of the AI service. It does not share infrastructure, permissions, workflows or data with the shop's production account, and nothing in it can affect production.
+
+| Piece | File |
+|---|---|
+| Infrastructure, with its own state | `terraform/demo/` |
+| Four-service composition (proxy, API, AI service, database) | `compose.demo.yaml`, at the repository root |
+| Reverse proxy configuration and deployment script | `deploy/demo/` |
+| Runbook: account set-up, schema provisioning, data path, demo accounts | `deploy/demo/README.md` |
+| Image, built with a **relative** API base so it serves under any hostname | `src/JoiabagurPV.API/Dockerfile.demo` |
+| Workflow, on the `demo` branch | `.github/workflows/deploy-demo.yml` |
+
+`Dockerfile.bundled` — the production image — is **not** touched by that path, and neither is anything under `terraform/` outside `terraform/demo/`.
 
 ### Security Checklist
 

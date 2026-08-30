@@ -1,3 +1,11 @@
+# DEPRECATED — imagen sólo-API, sin la SPA. No la construye ningún flujo.
+#
+# Su único consumidor era `backend/docker-compose.prod.yml`, también deprecado.
+#
+#   Producción:   `Dockerfile.bundled` (API + SPA), construida por
+#                 `.github/workflows/deploy-aws-ec2.yml`
+#   Demostración: `Dockerfile.demo` + `compose.demo.yaml` (C17)
+
 # Build stage
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src

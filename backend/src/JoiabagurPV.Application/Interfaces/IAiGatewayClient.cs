@@ -60,4 +60,28 @@ public interface IAiGatewayClient
         AiEnrichRequest request,
         AiCallScope scope,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads the jbg-ai health report: database reachability, index state, and whether the
+    /// embedding provider credential is configured.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The report as the service produced it.</returns>
+    /// <remarks>
+    /// <para>
+    /// Unauthenticated on the wire, because <c>GET /health</c> is public on the jbg-ai side. The
+    /// authorisation that matters is on this side: the endpoint that calls this is restricted to
+    /// administrators, since the report describes infrastructure.
+    /// </para>
+    /// <para>
+    /// <strong>This call does not share the circuit breaker</strong> of the retrieval and
+    /// enrichment clients. Its whole purpose is to diagnose the system precisely when the main
+    /// path is failing, and a probe that fails whenever the circuit is open answers "broken" by
+    /// refusing to look — which is the one answer it must never give.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="Exceptions.AiUnavailableException">
+    /// Timeout, transport failure, or a non-success status. There is no retry and no breaker.
+    /// </exception>
+    Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default);
 }

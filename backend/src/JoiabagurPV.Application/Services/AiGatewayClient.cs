@@ -37,11 +37,25 @@ public class AiGatewayClient : IAiGatewayClient
     /// </remarks>
     public const string EnrichClientName = "ai-enrich";
 
+    /// <summary>
+    /// Named client for the health probe. Carries a short timeout and <b>no resilience
+    /// pipeline at all</b>.
+    /// </summary>
+    /// <remarks>
+    /// No breaker, and that is the reason it exists as a separate client rather than reusing
+    /// <see cref="RetrievalClientName"/>. The probe's job is to say what is wrong when the main
+    /// path is already failing; sharing the retrieval breaker would make it refuse to look at
+    /// exactly the moment somebody opens the dashboard to find out why. No retry either: an
+    /// administrator refreshing a card is the retry.
+    /// </remarks>
+    public const string HealthClientName = "ai-health";
+
     /// <summary>Correlation header, the only thing that ties a rejected request to its origin.</summary>
     public const string TraceHeaderName = "X-Trace-Id";
 
     private const string RetrievalPath = "/v1/retrieval/products";
     private const string EnrichPath = "/v1/enrich/products";
+    private const string HealthPath = "/health";
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IAiServiceTokenFactory _tokenFactory;
@@ -298,6 +312,83 @@ public class AiGatewayClient : IAiGatewayClient
         finally
         {
             AiGatewayAttemptTracker.End();
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default)
+    {
+        var traceId = _traceContextAccessor.CurrentTraceId;
+
+        using var logScope = _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["trace_id"] = traceId,
+            ["endpoint"] = HealthPath
+        });
+
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            // The health client, never the retrieval one. Its pipeline is empty on purpose:
+            // see HealthClientName.
+            var client = _httpClientFactory.CreateClient(HealthClientName);
+
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Get, HealthPath);
+
+            // No Authorization header: GET /health is public on the jbg-ai side. The
+            // restriction that matters is on this side, where the calling endpoint is limited
+            // to administrators.
+            httpRequest.Headers.TryAddWithoutValidation(TraceHeaderName, traceId);
+
+            using var response = await client.SendAsync(httpRequest, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw Fail(AiGatewayOutcome.ServerError, stopwatch,
+                    new AiUnavailableException($"The AI service answered {(int)response.StatusCode} on its health probe."));
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<AiHealthResponse>(
+                AiGatewaySerialization.Options,
+                cancellationToken);
+
+            if (payload is null)
+            {
+                throw Fail(AiGatewayOutcome.ServerError, stopwatch,
+                    new AiUnavailableException("The AI service returned an empty health body."));
+            }
+
+            stopwatch.Stop();
+
+            _logger.LogInformation(
+                "ai_gateway_health_completed {LatencyMs} {ServiceStatus} {Database} {IndexStatus} {IndexedDocuments}",
+                stopwatch.ElapsedMilliseconds,
+                payload.Status,
+                payload.Database,
+                payload.Index.Status,
+                payload.Index.Documents);
+
+            return payload;
+        }
+        catch (AiGatewayException)
+        {
+            throw;
+        }
+        catch (TimeoutRejectedException ex)
+        {
+            throw Fail(AiGatewayOutcome.Timeout, stopwatch,
+                new AiUnavailableException("The AI service did not answer its health probe in time.", ex));
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw Fail(AiGatewayOutcome.Timeout, stopwatch,
+                new AiUnavailableException("The AI service did not answer its health probe in time.", ex));
+        }
+        catch (HttpRequestException ex)
+        {
+            throw Fail(AiGatewayOutcome.Transport, stopwatch,
+                new AiUnavailableException("The AI service could not be reached.", ex));
         }
     }
 

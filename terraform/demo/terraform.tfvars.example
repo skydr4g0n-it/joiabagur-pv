@@ -1,0 +1,32 @@
+# Copy to terraform.tfvars and fill in. Nothing here is a secret: the six
+# secrets of this environment are created directly in the parameter store, out
+# of Terraform state. See deploy/demo/README.md.
+
+# GitHub repository, used only to scope the OIDC trust and to derive the
+# deployment bundle URL.
+github_repo = "skydr4g0n-it/joiabagur-pv"
+
+# Region. The demo account has no reason to share one with production, but
+# there is no reason not to either.
+aws_region = "eu-west-1"
+
+# Leave empty on the first apply: the hostname is derived from the elastic IP as
+# <dashed-ip>.sslip.io, which is a real DNS name and gets a valid certificate.
+# When a domain is purchased, point it at the elastic IP, set it here, apply,
+# and redeploy — no image is rebuilt.
+# demo_hostname = "demo.example.com"
+
+# Starting point for four containers with a 512 MiB cap on the AI service. The
+# definitive size is decided with the measurement of the first deployment.
+instance_type = "t3.small"
+
+# Pinned deliberately. Bump in a commit, like a dependency.
+docker_compose_version = "v2.32.4"
+
+# Only needed if the repository is private: stage a tarball of the deployment
+# bundle somewhere the host can read and put its URL here.
+# deployment_bundle_url = "https://<bucket>.s3.<region>.amazonaws.com/jbg-demo-bundle.tar.gz"
+
+# Emergency SSH. Empty means no SSH at all; deployments and debugging both go
+# through the systems management service, which needs no inbound rule.
+key_pair_name = ""

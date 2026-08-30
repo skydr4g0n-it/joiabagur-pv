@@ -261,6 +261,61 @@ C15 `design.md`, *Risks / Trade-offs*
 
 ---
 
+## Active Change: `add-ai-service-deployment` (C17)
+
+### Splitting `/health` into liveness and readiness probes
+
+**Status:** Deliberately NOT done in C17. The enriched report lives on the existing `GET /health`
+with its return annotation unchanged (an open mapping), so `ai-service/openapi.json` — the
+contract frozen with the .NET side — does not move and `test_openapi_snapshot_is_stable` stays
+green.
+
+**Why it is deferred rather than forgotten.** The current endpoint answers three different
+questions for three different consumers: the container health check ("is this process alive?"),
+post-deployment verification ("is this environment fit to show?"), and the administrator card
+("what is wrong right now?"). That is one endpoint doing the job of two, and it is affordable
+only while nothing acts on the answer automatically.
+
+**The three triggers. Split when ANY ONE of them becomes true, and not before:**
+
+1. **Something can restart the container based on the answer.** Today nothing does: Compose's
+   `restart: unless-stopped` reacts to the process exiting, not to a health status. The moment an
+   orchestrator is allowed to recycle the container on an unhealthy report, a degraded database
+   turns into a restart loop — the probe causing the outage it reports.
+2. **The expensive part stops being cheaply cacheable.** The report is reused for ten seconds,
+   which is what keeps repeated probing off a connection pool capped at five for the whole
+   system. If a future field cannot be cached that way, liveness must stop paying for readiness.
+3. **The service is deployed to the shop's real account.** A different blast radius and a
+   different operator justify a different contract.
+
+**What splitting costs, and why that cost is correct.** A new route regenerates `openapi.json`
+and breaks its drift test. That is the right outcome, not an obstacle: the boundary with the .NET
+side will genuinely have moved, and the test exists to make that visible rather than silent.
+Agree the change with whoever owns the .NET client, then regenerate with the README one-liner.
+
+**References:** C17 `design.md` D12 · `openspec/specs/ai-service-runtime/spec.md` ·
+S16 *Observabilidad* ("no confundáis el latido con la vigilancia")
+
+### Measuring the real retrieval budget on the demo environment
+
+**Status:** Pending the demo environment being deployed. **Not** a revision of the 2500 ms budget
+— that belongs to the changes working in `retrieval/`, as recorded above.
+
+**What to measure and why it is a different measurement.** The 2500 ms figure was measured
+against a provider reached from a laptop. The demo environment sits in a different network, a
+different region and a different instance size, and the same cold round trip may cost more there.
+Once the environment is up, run several assisted searches and read the funnel log:
+
+- `ai_gateway_call_completed` latency, cold and warm.
+- Whether the badge reports `Origin=Assisted` or `LexicalFallback`.
+
+Record the numbers here. If the assisted path degrades on the demo at 2500 ms, that is evidence
+the singleton fix is more urgent, not a reason to raise the budget further.
+
+**References:** C17 `tasks.md` §10.1 · C16 `qa.md` §6
+
+---
+
 ## Implementation Guidance
 
 When implementing deferred tasks:

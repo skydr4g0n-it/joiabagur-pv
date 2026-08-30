@@ -172,7 +172,14 @@ dist-ssr/
 *.local
 
 # Docker
-.dockerignore
+#
+# `.dockerignore` used to be listed here and no longer is (C17). A build
+# context exclusion file is CONFIGURATION, on the same footing as the Dockerfile
+# beside it: ignoring it means every build runs with whatever exclusions the
+# machine happens to have, which is how the bundled image ended up shipping a
+# 1.18 GB context nobody noticed. Two are tracked now — one at the repository
+# root and one in `ai-service/`, because a `.dockerignore` only governs the
+# context it sits at the root of.
 docker-compose.override.yml
 *.dockerfile.local
 

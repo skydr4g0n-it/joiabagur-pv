@@ -371,6 +371,7 @@ Cimientos del microservicio `jbg-ai`: esqueleto ejecutable, contratos HTTP conge
 - [HU-AIENG-002: Contratos congelados y autenticación de servicio](Historias/AI-Eng/HU-AIENG-002.md) *(C02 — hecho)*
 - [HU-AIENG-003: Cliente tipado .NET hacia `jbg-ai` con resiliencia y token de servicio](Historias/AI-Eng/HU-AIENG-003.md) *(C03 — hecho)*
 - [HU-AIENG-005: Cimiento de persistencia vectorial — extensión `vector`, esquema `ai` y migraciones Alembic](Historias/AI-Eng/HU-AIENG-005.md) *(C05 — hecho)*
+- [HU-AIENG-017: Entorno de demostración aislado — despliegue del servicio de IA, salud enriquecida y tarjeta de estado](Historias/AI-Eng/HU-AIENG-017.md) *(C17)*
 
 ---
 

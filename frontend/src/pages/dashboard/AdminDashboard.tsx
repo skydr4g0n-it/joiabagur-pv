@@ -33,9 +33,15 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import { Alert, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import { dashboardService } from '@/services/dashboard.service';
 import { salesService } from '@/services/sales.service';
+import { aiHealthService } from '@/services/ai-health.service';
 import type { DashboardStats, PaginatedLowStockResult } from '@/types/dashboard.types';
+import type { AiHealthOutcome } from '@/types/ai-health.types';
 import type { Sale } from '@/types/sales.types';
 import { ROUTES } from '@/routing/routes';
 
@@ -69,6 +75,8 @@ interface PosRevenueItem {
 
 const STOCK_PAGE_SIZE = 10;
 
+const formatCount = (value: number) => new Intl.NumberFormat('es-ES').format(value);
+
 export function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [trendData, setTrendData] = useState<TrendDataPoint[]>([]);
@@ -79,6 +87,7 @@ export function AdminDashboard() {
   const [stockLoading, setStockLoading] = useState(false);
   const [recentSales, setRecentSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
+  const [aiHealth, setAiHealth] = useState<AiHealthOutcome | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -163,6 +172,21 @@ export function AdminDashboard() {
     };
 
     load();
+  }, []);
+
+  // Loaded on its own, deliberately outside the Promise.all above. The AI service is a separate
+  // deployment behind a gateway with its own time budget: folding it into the batch that gates
+  // `loading` would let a slow or unreachable AI service delay — or, if it threw, blank — a
+  // dashboard whose sales, revenue and stock have nothing to do with it. The service itself
+  // never rejects; `unreachable` is a state the card renders.
+  useEffect(() => {
+    const abortController = new AbortController();
+
+    aiHealthService.getHealth(abortController.signal).then((outcome) => {
+      if (!abortController.signal.aborted) setAiHealth(outcome);
+    });
+
+    return () => abortController.abort();
   }, []);
 
   const stockPageInitialRef = useRef(true);
@@ -512,6 +536,110 @@ export function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/*
+        Estado del servicio de IA — sólo en el panel de administración.
+
+        El navegador no puede preguntar directamente al servicio de IA: es privado por diseño y
+        no publica ningún puerto, así que esto lo sirve `GET /api/ai/health`, restringido a
+        administradores porque describe infraestructura.
+
+        Dos condiciones se presentan como error y EN TEXTO, nunca sólo por color:
+          - el modelo de embeddings configurado no coincide con el del índice, que devuelve ruido
+            con un 200 y sin traza;
+          - el servicio no responde, que degrada la búsqueda asistida al camino léxico.
+      */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Servicio de IA</CardTitle>
+          <CardDescription>
+            Búsqueda asistida: base de datos, índice vectorial y proveedor de embeddings
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {aiHealth === null ? (
+            <div className="space-y-3" data-testid="ai-service-status-loading">
+              <Skeleton className="h-4 w-56" />
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-4 w-48" />
+            </div>
+          ) : aiHealth.kind === 'unreachable' ? (
+            <Alert variant="destructive" appearance="light">
+              <AlertIcon>
+                <AlertTriangle />
+              </AlertIcon>
+              <AlertTitle>El servicio de IA no responde</AlertTitle>
+              <AlertDescription>
+                La búsqueda asistida sigue disponible en modo degradado, con búsqueda léxica. El
+                resto del panel no se ve afectado.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <div className="space-y-4">
+              {aiHealth.report.index.status === 'model_mismatch' && (
+                <Alert variant="destructive" appearance="light">
+                  <AlertIcon>
+                    <AlertTriangle />
+                  </AlertIcon>
+                  <AlertTitle>Modelo de embeddings incompatible con el índice</AlertTitle>
+                  <AlertDescription>
+                    El servicio consulta con <strong>{aiHealth.report.index.configuredModel}</strong> y
+                    el índice se generó con <strong>{aiHealth.report.index.model}</strong>. Las
+                    búsquedas comparan dos espacios vectoriales distintos y devuelven resultados sin
+                    sentido, sin dar ningún error. Hay que reindexar o corregir la configuración.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <dl className="grid gap-3 sm:grid-cols-3">
+                <div className="space-y-1">
+                  <dt className="text-xs text-muted-foreground">Base de datos</dt>
+                  <dd>
+                    {aiHealth.report.database === 'ok' ? (
+                      <Badge variant="success" appearance="light">
+                        Accesible
+                      </Badge>
+                    ) : (
+                      <Badge variant="destructive" appearance="light">
+                        No accesible
+                      </Badge>
+                    )}
+                  </dd>
+                </div>
+
+                <div className="space-y-1">
+                  <dt className="text-xs text-muted-foreground">Documentos indexados</dt>
+                  <dd className="text-lg font-semibold">
+                    {formatCount(aiHealth.report.index.documents)}
+                  </dd>
+                </div>
+
+                <div className="space-y-1">
+                  <dt className="text-xs text-muted-foreground">Proveedor de embeddings</dt>
+                  <dd>
+                    {aiHealth.report.provider === 'configured' ? (
+                      <Badge variant="success" appearance="light">
+                        Credencial configurada
+                      </Badge>
+                    ) : (
+                      <Badge variant="destructive" appearance="light">
+                        Credencial ausente
+                      </Badge>
+                    )}
+                  </dd>
+                </div>
+              </dl>
+
+              <Separator />
+
+              <p className="text-xs text-muted-foreground">
+                Versión {aiHealth.report.version}
+                {aiHealth.report.index.model ? ` · Modelo del índice: ${aiHealth.report.index.model}` : ''}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
