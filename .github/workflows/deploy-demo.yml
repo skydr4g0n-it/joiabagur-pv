@@ -1,0 +1,312 @@
+name: Deploy demo environment
+
+# Isolated demonstration environment (C17), in a DIFFERENT AWS ACCOUNT from the
+# shop's production one. It shares no role, no instance, no image repository and
+# no parameter prefix with `deploy-aws-ec2.yml`, which deploys production and is
+# not touched by this workflow.
+#
+# Its own branch and its own GitHub Environment, because the AWS role trusts a
+# single subject — `repo:<org>/<repo>:environment:demo` — and will refuse a job
+# that does not declare that environment. Production's role, by contrast, trusts
+# any branch and any workflow of the repository.
+
+#
+# El filtro de rutas es una LISTA NEGRA, y la elección es deliberada.
+#
+# Una lista blanca (`paths:`) parece más precisa y falla hacia el lado
+# equivocado: si olvidas una ruta, el entorno se queda corriendo código viejo
+# sin que nada lo diga. Una lista negra falla hacia desplegar de más, que cuesta
+# tres minutos y se ve.
+#
+# Y la lista blanca evidente —`backend/**`, `frontend/**`, `ai-service/**`— se
+# dejaría fuera TODO el paquete de despliegue: `compose.demo.yaml`, los guiones
+# de `deploy/demo/`, el `Caddyfile` y `bootstrap.sql`, que no van dentro de
+# ninguna imagen pero sí se despliegan.
+#
+# Nótese que NO se ignora `**/*.md`, que es lo primero que uno escribe: en este
+# repositorio `ai-service/prompts/catalog-synth/v3.md` no es documentación sino
+# un prompt que viaja dentro de la imagen.
+#
+# `workflow_dispatch` no se ve afectado por el filtro: si alguna vez hace falta
+# forzar un despliegue sin cambios de código, ésa es la salida.
+#
+on:
+  push:
+    branches: [demo]
+    paths-ignore:
+      # Especificaciones y documentación. Nada de esto entra en una imagen ni
+      # viaja en el paquete de despliegue.
+      - 'openspec/**'
+      - 'Documentos/**'
+      - '**/README.md'
+      - 'CLAUDE.md'
+      - 'AGENTS.md'
+      # La infraestructura se aplica con terraform, jamás desde este flujo.
+      - 'terraform/**'
+      # Otras canalizaciones, incluidas las deprecadas.
+      - '.github/workflows/test-*.yml'
+      - '.github/workflows/deploy-aws-ec2.yml'
+      - '.github/workflows/deploy-backend-aws.yml'
+      - '.github/workflows/deploy-frontend-aws.yml'
+      # Configuración de herramientas de asistencia.
+      - '.claude/**'
+      - '.codex/**'
+      - '.cursor/**'
+      - '.agent/**'
+      - '.opencode/**'
+      - '.docs-update/**'
+      - '.pr/**'
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (default: sha-<commit>)"
+        required: false
+        default: ""
+
+env:
+  AWS_REGION: eu-west-1
+  API_REPOSITORY: jbg-demo-api
+  AI_REPOSITORY: jbg-demo-ai
+  SSM_PREFIX: /jbg-demo
+
+permissions:
+  id-token: write # OIDC token exchange; no AWS credential is stored anywhere
+  contents: read
+
+jobs:
+  deploy:
+    name: Build, push and deploy
+    runs-on: ubuntu-latest
+
+    # Load-bearing, not decorative: the role's trust condition names this
+    # environment literally. Remove it and every deployment fails to assume the
+    # role, with an error that says nothing about the cause.
+    environment: demo
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.DEMO_DEPLOY_ROLE_ARN }}
+          role-session-name: GitHubActions-demo-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Resolve image tag
+        id: tag
+        run: |
+          TAG="${{ github.event.inputs.image_tag }}"
+          if [ -z "$TAG" ]; then
+            TAG="sha-${{ github.sha }}"
+          fi
+          echo "value=$TAG" >> $GITHUB_OUTPUT
+
+      # Build context is the repository root so Dockerfile.demo reaches both
+      # frontend/ and backend/src/. `.dockerignore` at the root keeps that
+      # context at tens of megabytes instead of the 1.18 GB it was before C17.
+      #
+      # VITE_API_BASE_URL is RELATIVE. The interface is served by this same
+      # container, so every call is same-origin, and the image stays agnostic of
+      # the hostname it answers under — which is what lets the environment start
+      # on a name derived from its IP address and move to a purchased domain
+      # without a rebuild. The production image bakes an absolute domain and is
+      # not reused here for exactly that reason.
+      - name: Build and push the API image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.tag.outputs.value }}
+        run: |
+          set -euo pipefail
+          docker build \
+            -f backend/src/JoiabagurPV.API/Dockerfile.demo \
+            --build-arg VITE_API_BASE_URL=/api \
+            -t "$ECR_REGISTRY/$API_REPOSITORY:$IMAGE_TAG" \
+            .
+          docker push "$ECR_REGISTRY/$API_REPOSITORY:$IMAGE_TAG"
+
+      - name: Build and push the AI service image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.tag.outputs.value }}
+        run: |
+          set -euo pipefail
+          docker build \
+            -f ai-service/Dockerfile \
+            -t "$ECR_REGISTRY/$AI_REPOSITORY:$IMAGE_TAG" \
+            ai-service
+          docker push "$ECR_REGISTRY/$AI_REPOSITORY:$IMAGE_TAG"
+
+      # So an unattended restart of the host brings back the tag that was last
+      # deployed, rather than whatever the placeholder says.
+      - name: Record the deployed tag
+        run: |
+          aws ssm put-parameter \
+            --name "$SSM_PREFIX/IMAGE_TAG" \
+            --type String \
+            --value "${{ steps.tag.outputs.value }}" \
+            --overwrite
+
+      # Discovered by tag rather than carried in a secret. It is not a secret —
+      # and a lookup survives the instance being replaced, which a pinned
+      # identifier does not: changing host provisioning replaces the instance by
+      # design in this module, and a stale secret would then point at a machine
+      # that no longer exists.
+      - name: Discover the demo host
+        id: host
+        run: |
+          set -euo pipefail
+          IID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=jbg-demo-host" \
+                      "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' --output text)
+          if [ -z "$IID" ] || [ "$IID" = "None" ]; then
+            echo "::error::No running instance tagged jbg-demo-host was found in ${AWS_REGION}."
+            exit 1
+          fi
+          echo "instance_id=$IID" >> $GITHUB_OUTPUT
+          echo "Host: $IID"
+
+      - name: Verify the host is registered with SSM
+        run: |
+          set -euo pipefail
+          IID="${{ steps.host.outputs.instance_id }}"
+          PING=$(aws ssm describe-instance-information \
+            --filters "Key=InstanceIds,Values=$IID" \
+            --query 'InstanceInformationList[0].PingStatus' \
+            --output text)
+          echo "PingStatus: $PING"
+          if [ "$PING" != "Online" ]; then
+            echo "::error::SSM PingStatus is '$PING', expected Online. Wait a few minutes after first boot, or check the instance profile and outbound HTTPS."
+            exit 1
+          fi
+
+      # Deployment and verification both run INSIDE the host: the AI service
+      # publishes no port and the security group opens only 80 and 443, so a
+      # runner cannot reach it — and making it reachable in order to check it
+      # would destroy what the check is protecting.
+      - name: Deploy
+        id: deploy
+        run: |
+          set -euo pipefail
+          IID="${{ steps.host.outputs.instance_id }}"
+          TAG="${{ steps.tag.outputs.value }}"
+
+          # The bundle is refreshed before the script runs, so a change to
+          # compose.demo.yaml or to the Caddyfile reaches the host with the
+          # deployment that introduced it. Refreshed HERE rather than inside
+          # deploy.sh, because extracting over a script while that script is
+          # executing truncates the file bash is still reading from.
+          # No nested double quotes and no bash-only options in the remote command:
+          # the systems management document joins these lines into one script and runs
+          # it with the host's `sh`, so `pipefail` would not be available and every
+          # level of quoting is one more chance to send something that parses
+          # differently than it reads here.
+          #
+          # A plain extraction, with no `--unlink-first`. That flag looks like the
+          # careful choice and is the wrong one: it unlinks EVERY entry before
+          # extracting it, directories included, and unlink on a non-empty directory
+          # fails — which aborts the whole deployment on the forty template folders
+          # under frontend/src/components/layouts/. It is also unnecessary, because
+          # the reason the refresh lives HERE rather than inside deploy.sh is exactly
+          # that nothing from this tree is executing while it is being replaced.
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$IID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters "commands=[
+              'set -eu',
+              'BUNDLE=\$(aws ssm get-parameter --name $SSM_PREFIX/DEPLOYMENT_BUNDLE_URL --query Parameter.Value --output text)',
+              'curl -fsSL \$BUNDLE -o /tmp/jbg-demo-bundle.tar.gz',
+              'mkdir -p /opt/jbg-demo',
+              'tar -xzf /tmp/jbg-demo-bundle.tar.gz -C /opt/jbg-demo --strip-components=1',
+              'rm -f /tmp/jbg-demo-bundle.tar.gz',
+              'chmod +x /opt/jbg-demo/deploy/demo/deploy.sh /opt/jbg-demo/deploy/demo/verify.sh',
+              '/opt/jbg-demo/deploy/demo/deploy.sh $TAG'
+            ]" \
+            --timeout-seconds 600 \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "command_id=$COMMAND_ID" >> $GITHUB_OUTPUT
+          echo "instance_id=$IID" >> $GITHUB_OUTPUT
+          echo "SSM command: $COMMAND_ID"
+
+      - name: Wait for the deployment
+        run: |
+          set -euo pipefail
+          IID="${{ steps.deploy.outputs.instance_id }}"
+          COMMAND_ID="${{ steps.deploy.outputs.command_id }}"
+
+          for i in $(seq 1 60); do
+            ERRFILE=$(mktemp)
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" --instance-id "$IID" \
+              --query "Status" --output text 2>"$ERRFILE") && RC=0 || RC=$?
+            if [ "$RC" != "0" ]; then
+              # Not an error: the invocation record takes a moment to appear.
+              echo "Attempt $i: invocation not available yet ($(cat "$ERRFILE"))"
+              STATUS="Pending"
+            fi
+            rm -f "$ERRFILE"
+            echo "Attempt $i: $STATUS"
+
+            case "$STATUS" in
+              Success) echo "Deployment succeeded."; exit 0 ;;
+              Failed|Cancelled|TimedOut)
+                aws ssm get-command-invocation --command-id "$COMMAND_ID" \
+                  --instance-id "$IID" --query "StandardOutputContent" --output text
+                aws ssm get-command-invocation --command-id "$COMMAND_ID" \
+                  --instance-id "$IID" --query "StandardErrorContent" --output text
+                echo "::error::Deployment finished with status $STATUS"
+                exit 1 ;;
+            esac
+            sleep 10
+          done
+
+          echo "::error::Timed out waiting for the deployment."
+          exit 1
+
+      # NOT `continue-on-error`. A demo whose index is empty answers every
+      # request successfully and finds nothing; if this check is advisory, that
+      # environment gets handed over as if it worked.
+      - name: Verify the deployment from inside the host
+        run: |
+          set -euo pipefail
+          IID="${{ steps.deploy.outputs.instance_id }}"
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$IID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters "commands=['/opt/jbg-demo/deploy/demo/verify.sh']" \
+            --timeout-seconds 300 \
+            --query "Command.CommandId" --output text)
+
+          for i in $(seq 1 30); do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" --instance-id "$IID" \
+              --query "Status" --output text 2>/dev/null || echo Pending)
+            echo "Attempt $i: $STATUS"
+            if [ "$STATUS" = "Success" ]; then
+              aws ssm get-command-invocation --command-id "$COMMAND_ID" \
+                --instance-id "$IID" --query "StandardOutputContent" --output text
+              exit 0
+            fi
+            case "$STATUS" in
+              Failed|Cancelled|TimedOut)
+                aws ssm get-command-invocation --command-id "$COMMAND_ID" \
+                  --instance-id "$IID" --query "StandardOutputContent" --output text
+                aws ssm get-command-invocation --command-id "$COMMAND_ID" \
+                  --instance-id "$IID" --query "StandardErrorContent" --output text
+                echo "::error::Post-deployment verification failed. The environment is NOT ready to show."
+                exit 1 ;;
+            esac
+            sleep 10
+          done
+
+          echo "::error::Timed out waiting for post-deployment verification."
+          exit 1

@@ -362,7 +362,7 @@ Cimientos del microservicio `jbg-ai`: esqueleto ejecutable, contratos HTTP conge
 - JWT interno HS256 entre .NET y Python, con scope por usuario, rol y punto de venta
 - Cliente tipado `IAiGatewayClient` en .NET con timeouts, reintento y circuit breaker
 - Esquema `ai` con pgvector, migraciones y rol de base de datos dedicado
-- Despliegue del contenedor en EC2, secretos en SSM y health enriquecido
+- Despliegue del contenedor en un **entorno de demostración aislado, en una cuenta AWS propia** —no en la de la tienda, a la que no hay acceso—, secretos en el almacén de parámetros y health enriquecido con contraste del modelo de embeddings contra el índice
 
 **Changes asociados:** C01, C02, C03, C05, C17
 
@@ -371,6 +371,7 @@ Cimientos del microservicio `jbg-ai`: esqueleto ejecutable, contratos HTTP conge
 - [HU-AIENG-002: Contratos congelados y autenticación de servicio](Historias/AI-Eng/HU-AIENG-002.md) *(C02 — hecho)*
 - [HU-AIENG-003: Cliente tipado .NET hacia `jbg-ai` con resiliencia y token de servicio](Historias/AI-Eng/HU-AIENG-003.md) *(C03 — hecho)*
 - [HU-AIENG-005: Cimiento de persistencia vectorial — extensión `vector`, esquema `ai` y migraciones Alembic](Historias/AI-Eng/HU-AIENG-005.md) *(C05 — hecho)*
+- [HU-AIENG-017: Entorno de demostración aislado — despliegue del servicio de IA, salud enriquecida y tarjeta de estado](Historias/AI-Eng/HU-AIENG-017.md) *(C17 — hecho)*
 
 ---
 

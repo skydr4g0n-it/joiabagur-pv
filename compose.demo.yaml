@@ -1,0 +1,233 @@
+# ============================================================================
+# compose.demo.yaml — the ISOLATED DEMO environment (C17)
+#
+# READ THIS BEFORE ASSUMING WHAT THIS FILE IS:
+#
+#   * **Production does not use Compose.** The shop's instance runs a bare
+#     `docker run` written into `terraform/templates/user_data.sh` at first
+#     boot, under `lifecycle { ignore_changes = [user_data] }`. Nothing in this
+#     file describes, reaches or affects that environment. It lives in a
+#     different AWS account.
+#   * **The local development file is a different file**:
+#     `backend/docker-compose.yml`, on network `jpv-network`. Its path and its
+#     network are fixed literally by the live `ai-service-dev-compose`
+#     specification, so this one is self-contained rather than an extension of
+#     it — describing the topology twice is the deliberate cost (C17 D4).
+#
+# The boundary this file is responsible for: **only `jbg-demo-proxy` declares
+# published ports.** The AI service holds the embedding provider credential and
+# publishes nothing; the API and the database publish nothing either. That is
+# one of three independent layers, the other two being the security group and
+# the absence of any public route to them (C17 D7).
+#
+# Deployed by `deploy/demo/deploy.sh`, which exports every `${VAR}` below into
+# its own process environment straight from the parameter store. There is no
+# environment file on the host, and there must never be one.
+# ============================================================================
+
+name: jbg-demo
+
+services:
+  # ─── Database ────────────────────────────────────────────────────────────
+  # The same engine and the same image as the local development file, which is
+  # what makes `ai-service/migrations/bootstrap.sql` and the Alembic path work
+  # here without a single variation (C17 D2).
+  #
+  # Do NOT create schema `ai` or run CREATE EXTENSION here: that is the one-off
+  # bootstrap, run once with admin privileges. See deploy/demo/README.md.
+  jbg-demo-postgres:
+    image: pgvector/pgvector:pg15
+    container_name: jbg-demo-postgres
+    environment:
+      POSTGRES_DB: joiabagur_pv
+      POSTGRES_USER: postgres
+      # Class A - secret. Source: /jbg-demo/POSTGRES_PASSWORD
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - jbg-demo-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Order of arrival matters: the API applies its migrations at start-up and
+      # `alembic upgrade head` runs right after the stack is up. Both need a
+      # database that accepts connections, not merely a container that exists.
+      test: ["CMD-SHELL", "pg_isready -U postgres -d joiabagur_pv"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - jbg-demo-net
+    restart: unless-stopped
+
+  # ─── AI service ──────────────────────────────────────────────────────────
+  jbg-demo-ai:
+    image: ${ECR_REGISTRY}/jbg-demo-ai:${IMAGE_TAG}
+    container_name: jbg-demo-ai
+    # No `ports:`. This is the service that holds the provider credential; it is
+    # reachable only from `jbg-demo-net`, by name.
+    #
+    # `mem_limit`, and NOT `deploy.resources.limits`: the declarative resources
+    # block is silently IGNORED outside swarm mode, so it would look like a
+    # limit and enforce nothing. Bounding this container turns a host-wide
+    # memory exhaustion into the death of the AI container alone: the restart
+    # policy brings it back, and meanwhile the .NET circuit breaker degrades
+    # assisted search to the lexical path, which is the degradation already
+    # designed (C17 D18).
+    mem_limit: 512m
+    environment:
+      # -- Class B - environment settings ---------------------------------
+      APP_ENV: demo
+      SERVICE_VERSION: 0.1.0
+      LOG_LEVEL: INFO
+      # `enable_dev_endpoints` derives from APP_ENV, and only the literal names
+      # `prod`/`production` turn it off. `demo` is neither, so without this the
+      # evaluation route would be mounted in a demonstrated environment.
+      ENABLE_DEV_ENDPOINTS: "false"
+      # Resolves the database by its network name on the INTERNAL port. The
+      # `jbg_ai` role and its password are created by bootstrap.sql.
+      DATABASE_URL: postgresql+psycopg://jbg_ai:${AI_DB_PASSWORD}@jbg-demo-postgres:5432/joiabagur_pv
+      # The catalog feed is the .NET API, on this network, by name.
+      JPV_INDEX_FEED_BASE_URL: http://jbg-demo-api:8080
+      JPV_INDEX_SYNC_TIME_BUDGET_SECONDS: "180"
+
+      # -- Class C - behaviour settings, versioned literals ----------------
+      # These three do not belong in the parameter store, and that is the most
+      # consequential configuration decision in this file. None of them is a
+      # secret, and none of them should differ between environments — but the
+      # parameter store is a place where a value can be changed without code
+      # review, and each of these fails SILENTLY when it is wrong:
+      #
+      #   * STUB_MODE=true serves fabricated fixtures that look like a working
+      #     system, with a 200 and no trace.
+      #   * An embedding model other than the one that produced the indexed
+      #     vectors compares two different vector spaces. Results are noise,
+      #     the response is a 200, and nothing is logged. `/health` contrasts
+      #     this literal against the model recorded on the index rows for
+      #     exactly that reason (C17 D9).
+      #   * The distance threshold is the value the published evaluation
+      #     figures were computed with. Changing it makes those figures
+      #     describe a different system.
+      #
+      # Changing any of them is a change of system: code review, and a reindex
+      # where it applies.
+      STUB_MODE: "false"
+      JPV_EMBEDDING_MODEL: openai/text-embedding-3-small
+      JPV_RETRIEVAL_DISTANCE_THRESHOLD: "0.65"
+
+      # -- Class A - secrets ----------------------------------------------
+      # Source: /jbg-demo/AI_SERVICE_SHARED_SECRET — ONE parameter, read once
+      # and injected into both sides. The .NET API signs the internal token with
+      # the same value as AiGateway__JwtSecret. Two separate parameters could
+      # drift, and drift produces a 401 whose cause this service is required not
+      # to disclose (C17 D11).
+      JWT_SECRET: ${AI_SERVICE_SHARED_SECRET}
+      # Source: /jbg-demo/INDEX_FEED_SHARED_KEY — the other half of the same
+      # pattern; the API accepts it as IndexFeed__ApiKey.
+      JPV_INDEX_FEED_API_KEY: ${INDEX_FEED_SHARED_KEY}
+      # Source: /jbg-demo/EMBEDDING_API_KEY
+      JPV_EMBEDDING_API_KEY: ${EMBEDDING_API_KEY}
+    # Never `env_file:`. The deploy script exports these into its own process
+    # and Compose interpolates them here; writing an environment file next to
+    # this one would put every secret on the host's disk (C17 D10).
+    depends_on:
+      jbg-demo-postgres:
+        condition: service_healthy
+    networks:
+      - jbg-demo-net
+    restart: unless-stopped
+
+  # ─── Business API, serving the SPA from its own wwwroot ──────────────────
+  jbg-demo-api:
+    image: ${ECR_REGISTRY}/jbg-demo-api:${IMAGE_TAG}
+    container_name: jbg-demo-api
+    # No `ports:` either. The proxy reaches it by name on this network.
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      # Class A - secret. Source: /jbg-demo/POSTGRES_PASSWORD, the same
+      # parameter the database is created with.
+      ConnectionStrings__DefaultConnection: Host=jbg-demo-postgres;Port=5432;Database=joiabagur_pv;Username=postgres;Password=${POSTGRES_PASSWORD}
+      # Class A - secret. Source: /jbg-demo/JWT_SIGNING_KEY. Signs the USER
+      # tokens; distinct from AiGateway__JwtSecret, which signs the internal
+      # service token.
+      Jwt__SecretKey: ${JWT_SIGNING_KEY}
+      Jwt__Issuer: JoiabagurPV
+      Jwt__Audience: JoiabagurPV
+      # Class B. The AI service by container name, which resolves because this
+      # is a user-defined network — on the default bridge it would not.
+      AiGateway__BaseUrl: http://jbg-demo-ai:8000
+      # Class A - secret, and the same single parameter the AI service reads.
+      AiGateway__JwtSecret: ${AI_SERVICE_SHARED_SECRET}
+      # Class C - versioned literal. The C16 measurement, carried here on
+      # purpose so the demo behaves like the environment those figures describe.
+      # Revising it belongs to the changes working in retrieval/.
+      AiGateway__RetrievalTimeoutMs: "2500"
+      # Class C - versioned literal, and the one whose absence made the whole
+      # environment look finished while it was not.
+      #
+      # C16 put assisted search behind a ROLLOUT GATE, not a feature flag:
+      # `AiSearch:EnabledByDefault` is false and shops are switched on one at a
+      # time by identifier. That is right for the shop, where a bad ranking
+      # reaches a till. It is wrong here, where the entire point is to show the
+      # assisted path.
+      #
+      # Without this the demo answers 200 with plausible results — served by the
+      # LEXICAL fallback, with `aiAvailable: false` and zero candidates. Nothing
+      # errors, nothing is logged, and the AI service is never even called.
+      # C17 found it only by running a real search through the public URL.
+      AiSearch__EnabledByDefault: "true"
+      # Class A - secret, the other half of the shared pair.
+      IndexFeed__ApiKey: ${INDEX_FEED_SHARED_KEY}
+      # Class B. Same origin in practice — the SPA is served by this very
+      # container — but declared so the value is not the localhost list of the
+      # base settings file.
+      Cors__AllowedOrigins__0: https://${DEMO_HOSTNAME}
+    depends_on:
+      jbg-demo-postgres:
+        condition: service_healthy
+    networks:
+      - jbg-demo-net
+    restart: unless-stopped
+
+  # ─── Reverse proxy: the ONLY service reachable from the Internet ─────────
+  jbg-demo-proxy:
+    # Pinned to a patch version, like every other external artefact here.
+    image: caddy:2.10.0-alpine
+    container_name: jbg-demo-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Class B. The hostname is configuration, so the environment can start on
+      # a name derived from its IP address and migrate to a purchased domain by
+      # changing one parameter — without rebuilding a single image (C17 D6).
+      DEMO_HOSTNAME: ${DEMO_HOSTNAME}
+    volumes:
+      - ./deploy/demo/Caddyfile:/etc/caddy/Caddyfile:ro
+      # jbg-demo-caddy-data holds the ISSUED CERTIFICATES. Losing it means
+      # asking the certificate authority for the same certificate again, and the
+      # authority allows five duplicates per week. Two careless redeployments
+      # leave the demo without TLS until the following week.
+      - jbg-demo-caddy-data:/data
+      - jbg-demo-caddy-config:/config
+    depends_on:
+      - jbg-demo-api
+    networks:
+      - jbg-demo-net
+    restart: unless-stopped
+
+volumes:
+  # Explicit `name` on all three, so they are not the `<project>_<key>` names
+  # Compose derives — and so a listing sorts them together next to the
+  # containers they belong to. Renaming one does NOT migrate anything: Compose
+  # creates a new empty volume and orphans the previous one.
+  jbg-demo-pgdata:
+    name: jbg-demo-pgdata
+  jbg-demo-caddy-data:
+    name: jbg-demo-caddy-data
+  jbg-demo-caddy-config:
+    name: jbg-demo-caddy-config
+
+networks:
+  jbg-demo-net:
+    name: jbg-demo-net
+    driver: bridge

@@ -13,6 +13,14 @@ and day-to-day operation procedure lives in
 > `deploy-frontend-aws.yml`) are **deprecated and manual-only**. This stack is
 > the current architecture.
 
+**This is not the only Terraform module.** `terraform/demo/` is a sibling stack for the
+isolated demonstration environment of the AI service (C17): **its own state file, in its own
+AWS account and region**, sharing no resource, permission, deployment path or data with this
+one. That separation is the point — a plan of one module cannot propose a change to the
+other, because it has never read its state. Its topology is four containers behind Caddy,
+with PostgreSQL in a container rather than RDS, and its operating procedure lives in
+[`deploy/demo/README.md`](../deploy/demo/README.md).
+
 ## Layout
 
 | File | Contents |

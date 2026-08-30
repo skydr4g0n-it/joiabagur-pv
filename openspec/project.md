@@ -70,6 +70,7 @@
 - **CI/CD**: GitHub Actions
 - **Repository**: GitHub
 - **Cloud**: AWS (EC2 + Docker bundlado + nginx, RDS PostgreSQL, S3, ECR, SSM Parameter Store; GitHub OIDC para deploy)
+- **Entorno de demostración (C17)**: cuenta AWS **separada** de la de la tienda, con estado de Terraform propio (`terraform/demo/`), cuatro contenedores tras Caddy con TLS automático, PostgreSQL con pgvector en contenedor en lugar de RDS, y el servicio de IA **sin puertos publicados**. Ni infraestructura, ni permisos, ni datos en común con producción. Runbook en `deploy/demo/README.md`
 - **Target**: Free-tier optimized deployment
 - **Locale**: es-ES, currency EUR (€)
 

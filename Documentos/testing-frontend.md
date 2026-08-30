@@ -296,6 +296,10 @@ describe('ProductCard', () => {
 
 > **`vitest` sale con código 0 si canalizas su salida.** `npm run test | tail` devuelve el código de `tail`, no el de la suite. Un prompt verde no significa nada: hay que leer la línea de resumen.
 
+> **Actualización del 2026-08-30, sobre `c17-add-ai-service-deployment`.** La suite tiene ahora **529 tests, 116 fallos, en 15 de los 44 ficheros** en la línea base, y **533, 113 y 14 de 45** al cierre del change. Los cuatro tests de más son los de `pages/dashboard/ai-service-status.test.tsx`, los cuatro verdes.
+>
+> La comparación por nombres salió **subconjunto estricto**: ni un fallo nuevo, y **tres que dejaron de fallar** sin que nadie tocara sus ficheros — los tres de `pages/sales/__tests__/assisted.test.tsx`, conocidos por ser dependientes del orden. Es la segunda vez que se observa el mismo fenómeno tras el de C16, y refuerza la regla de esta misma sección: el número no sirve, el conjunto de nombres sí.
+
 ### La comparación válida es por nombres, igual que en el backend
 
 ```powershell

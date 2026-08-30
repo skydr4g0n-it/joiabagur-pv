@@ -253,7 +253,7 @@ These four tests exist to catch failures that produce **no error at all**: an HN
 - `ai.product_document` is written by C13 from the catalog feed; `ai.pos_projection` stays empty until C22; `ai.knowledge_*` until C23
 - No `ai.eval_*` tables (C24) and no `ai.query_log` (unassigned; C14 logs `stage=embed|search` with `trace_id` instead)
 - No SQL access to schema `public`, ever
-- No production deploy, SSM, enriched health or `CREATE EXTENSION` on RDS (C17)
+- No production deploy, SSM or `CREATE EXTENSION` on RDS. C17 delivered the **enriched health** — `GET /health` reports database reachability, indexed document count, whether the embedding provider credential is configured, and a contrast between the configured embedding model and the one recorded on the index rows, all without ever calling the provider — and deployed it to an **isolated demo account**, not to the shop's production account. The return annotation stays an open mapping, so `openapi.json` is unchanged
 - No production tuning: `halfvec`, `hnsw.iterative_scan`, `CREATE INDEX CONCURRENTLY` and the `VACUUM`/`REINDEX` cycle are deliberate omissions at ~1,500 vectors, not oversights
 - No drain of the POS feed and no edits to `indexing/embeddings.py`
 

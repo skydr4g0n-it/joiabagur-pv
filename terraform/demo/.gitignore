@@ -1,0 +1,13 @@
+# Exclusiones propias del módulo de la demo (C17).
+#
+# Los `.gitignore` se ANIDAN: las reglas de `terraform/.gitignore` — estado,
+# `.terraform/`, `*.tfvars` — siguen aplicando aquí. Este fichero sólo añade lo
+# que aquel no cubre, y existe para no tocar el de producción: la especificación
+# de C17 limita las ediciones del lado de producción a cabeceras de deprecado y
+# a la corrección de la documentación del backend, y una regla de exclusión no
+# es ninguna de las dos cosas.
+
+# Planes guardados (`terraform plan -out=tfplan`). Artefacto binario de una
+# ejecución concreta, con los valores de las variables dentro.
+tfplan
+*.tfplan

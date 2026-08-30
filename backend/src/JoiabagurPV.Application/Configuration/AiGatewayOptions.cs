@@ -70,6 +70,18 @@ public class AiGatewayOptions
     /// </remarks>
     public int EnrichTimeoutMs { get; set; } = 120_000;
 
+    /// <summary>
+    /// Time budget for the health probe, in milliseconds.
+    /// </summary>
+    /// <remarks>
+    /// Short on purpose, and short for a different reason than retrieval's budget. A human is
+    /// waiting on this one: it backs a status card an administrator opens when something looks
+    /// wrong. "The AI service did not answer in two seconds" is a useful diagnosis; thirty
+    /// seconds of a spinner is not. It is enforced by the client's own timeout because the
+    /// health client carries no resilience pipeline to race with.
+    /// </remarks>
+    public int HealthTimeoutMs { get; set; } = 2000;
+
     /// <summary>Whether the gateway client is registered at all.</summary>
     public bool Enabled { get; set; } = true;
 

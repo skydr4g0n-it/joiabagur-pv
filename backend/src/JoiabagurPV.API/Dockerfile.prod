@@ -1,3 +1,12 @@
+# DEPRECATED — construcción sólo-API para App Runner (cuenta AWS legada).
+#
+# Su único consumidor es `.github/workflows/deploy-backend-aws.yml`, deprecado y
+# ejecutable sólo a mano.
+#
+#   Producción:   `Dockerfile.bundled` (API + SPA), construida por
+#                 `.github/workflows/deploy-aws-ec2.yml`
+#   Demostración: `Dockerfile.demo` + `compose.demo.yaml` (C17)
+
 # ============================================
 # Stage 1: Build .NET application
 # ============================================

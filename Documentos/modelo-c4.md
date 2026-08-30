@@ -749,6 +749,21 @@ El modelo está preparado para escalar:
 - **Microservicios**: Separación de servicios si es necesario en el futuro
 - **CDN Ampliado**: Más puntos de presencia para mejor rendimiento global
 
+### Entorno de Demostración (C17): un tercer despliegue
+
+Las notas anteriores contrastan dos entornos. Desde C17 hay **tres**, y el nuevo cambia dos de los contenedores del Nivel 2 sin cambiar ninguno de los componentes del Nivel 3 — la misma aplicación, otra topología.
+
+| Contenedor del Nivel 2 | Producción | Demostración |
+|---|---|---|
+| Proxy inverso | nginx en el anfitrión, con cliente de certificados y tarea programada | **Caddy como contenedor**, con emisión y renovación de certificado integradas |
+| Base de datos | **RDS** PostgreSQL gestionada, fuera de la instancia | **PostgreSQL con pgvector en contenedor**, con volumen persistente |
+| Servicio de IA | alcanzable solo desde el backend en la red de contenedores | igual, y además **sin puertos publicados** en tres capas independientes |
+| Cuenta AWS | la de la tienda | **una cuenta distinta**, con estado de Terraform propio |
+
+La consecuencia para este modelo es una sola, y afecta al Nivel 3: como el navegador no puede alcanzar el servicio de IA, la tarjeta de estado del panel de administración **no es un componente de frontend que hable con Python**, sino uno que consume un endpoint .NET (`AiHealthController`) que hace de intermediario, con su propio cliente HTTP y sin el cortacircuitos del camino principal.
+
+Detalle en [Arquitectura del Sistema](arquitectura.md#entorno-de-demostración-c17) y procedimiento en [`deploy/demo/README.md`](../deploy/demo/README.md).
+
 ---
 
 ## Referencias

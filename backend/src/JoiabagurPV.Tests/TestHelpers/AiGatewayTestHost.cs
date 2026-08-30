@@ -37,7 +37,9 @@ public static class AiGatewayTestHost
         string? traceId = null,
         RecordingLoggerProvider? logs = null,
         int enrichTimeoutMs = 120_000,
-        FakeHttpMessageHandler? enrichHandler = null)
+        FakeHttpMessageHandler? enrichHandler = null,
+        FakeHttpMessageHandler? healthHandler = null,
+        int healthTimeoutMs = 2000)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -50,7 +52,8 @@ public static class AiGatewayTestHost
                 ["AiGateway:BreakerFailureRatio"] = breakerFailureRatio.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 ["AiGateway:BreakerSamplingDurationSeconds"] = breakerSamplingDurationSeconds.ToString(),
                 ["AiGateway:BreakerBreakDurationSeconds"] = breakerBreakDurationSeconds.ToString(),
-                ["AiGateway:EnrichTimeoutMs"] = enrichTimeoutMs.ToString()
+                ["AiGateway:EnrichTimeoutMs"] = enrichTimeoutMs.ToString(),
+                ["AiGateway:HealthTimeoutMs"] = healthTimeoutMs.ToString()
             })
             .Build();
 
@@ -79,6 +82,14 @@ public static class AiGatewayTestHost
             AiGatewayClient.EnrichClientName,
             options => options.HttpMessageHandlerBuilderActions.Add(
                 b => b.PrimaryHandler = enrichHandler ?? handler));
+
+        // The health client gets its own handler too, for the same reason as enrichment and one
+        // more: the property worth asserting about it is that an OPEN RETRIEVAL CIRCUIT does not
+        // stop it answering. Sharing a handler would make that assertion meaningless.
+        services.Configure<HttpClientFactoryOptions>(
+            AiGatewayClient.HealthClientName,
+            options => options.HttpMessageHandlerBuilderActions.Add(
+                b => b.PrimaryHandler = healthHandler ?? handler));
 
         return services.BuildServiceProvider();
     }

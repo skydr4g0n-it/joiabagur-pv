@@ -1,3 +1,15 @@
+# DEPRECATED — camino de despliegue obsoleto. No lo invoca nada.
+#
+# Construye la API desde fuente y declara un PostgreSQL propio, cuando producción
+# usa una imagen publicada en ECR y una instancia RDS gestionada: describe un
+# sistema que no existe. `backend/README.md` lo presentaba como «Production
+# Deployment › Docker»; corregido por C17.
+#
+#   Producción:   `.github/workflows/deploy-aws-ec2.yml` →
+#                 `src/JoiabagurPV.API/Dockerfile.bundled` → ECR → SSM sobre EC2
+#   Desarrollo:   `backend/docker-compose.yml`
+#   Demostración: `compose.demo.yaml`, en la raíz del repositorio (C17)
+
 version: '3.8'
 
 services:

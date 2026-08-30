@@ -1,0 +1,86 @@
+# Build context exclusions for the images built from the REPOSITORY ROOT:
+# `backend/src/JoiabagurPV.API/Dockerfile.bundled` (production) and
+# `Dockerfile.demo` (C17). Both restore and build from source, so nothing
+# excluded here is needed inside any stage.
+#
+# This file did not exist before C17 and the context was ~1 GB, virtually all
+# of it thrown away by the daemon after the transfer: `node_modules` is
+# reinstalled by `npm ci` in the frontend stage, `.venv` belongs to a service
+# whose image is built from `ai-service/` (a different context), and `bin/`,
+# `obj/` and `dist/` are outputs of the very stages that rebuild them.
+#
+# Note on scope: a `.dockerignore` applies to the context it sits at the root
+# of. `ai-service/Dockerfile` is built with `ai-service/` as its context, so it
+# is governed by `ai-service/.dockerignore`, not by this file.
+
+# ─── Dependency trees, reinstalled inside the image ──────────────────────────
+node_modules/
+**/node_modules/
+.venv/
+**/.venv/
+venv/
+**/venv/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+**/.pytest_cache/
+.ruff_cache/
+**/.ruff_cache/
+.mypy_cache/
+**/.mypy_cache/
+
+# ─── Version control and tooling metadata ────────────────────────────────────
+.git/
+.gitignore
+.github/
+.vs/
+.vscode/
+.idea/
+.claude/
+.codex/
+.cursor/
+.agent/
+.opencode/
+.docs-update/
+.pr/
+
+# ─── Build outputs, produced by the stages that need them ────────────────────
+**/bin/
+**/obj/
+**/dist/
+**/build/
+**/TestResults/
+**/coverage/
+*.user
+
+# ─── Local data and generated corpora, never part of an image ────────────────
+data/
+uploads/
+**/uploads/
+*.sql
+*.dump
+*.bak
+
+# ─── Environment files. A secret inside an image is a secret with a passport ──
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+**/appsettings.Development.json
+
+# ─── Documentation and specifications, not shipped in a runtime image ────────
+Documentos/
+openspec/
+*.md
+!frontend/README.md
+!ai-service/README.md
+
+# ─── Infrastructure and deployment definitions ───────────────────────────────
+terraform/
+deploy/
+compose.demo.yaml
+docker-compose*.yml
+**/docker-compose*.yml
+Dockerfile*
+!backend/src/JoiabagurPV.API/Dockerfile*

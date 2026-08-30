@@ -261,6 +261,149 @@ C15 `design.md`, *Risks / Trade-offs*
 
 ---
 
+## Active Change: `add-ai-service-deployment` (C17)
+
+### Splitting `/health` into liveness and readiness probes
+
+**Status:** Deliberately NOT done in C17. The enriched report lives on the existing `GET /health`
+with its return annotation unchanged (an open mapping), so `ai-service/openapi.json` — the
+contract frozen with the .NET side — does not move and `test_openapi_snapshot_is_stable` stays
+green.
+
+**Why it is deferred rather than forgotten.** The current endpoint answers three different
+questions for three different consumers: the container health check ("is this process alive?"),
+post-deployment verification ("is this environment fit to show?"), and the administrator card
+("what is wrong right now?"). That is one endpoint doing the job of two, and it is affordable
+only while nothing acts on the answer automatically.
+
+**The three triggers. Split when ANY ONE of them becomes true, and not before:**
+
+1. **Something can restart the container based on the answer.** Today nothing does: Compose's
+   `restart: unless-stopped` reacts to the process exiting, not to a health status. The moment an
+   orchestrator is allowed to recycle the container on an unhealthy report, a degraded database
+   turns into a restart loop — the probe causing the outage it reports.
+2. **The expensive part stops being cheaply cacheable.** The report is reused for ten seconds,
+   which is what keeps repeated probing off a connection pool capped at five for the whole
+   system. If a future field cannot be cached that way, liveness must stop paying for readiness.
+3. **The service is deployed to the shop's real account.** A different blast radius and a
+   different operator justify a different contract.
+
+**What splitting costs, and why that cost is correct.** A new route regenerates `openapi.json`
+and breaks its drift test. That is the right outcome, not an obstacle: the boundary with the .NET
+side will genuinely have moved, and the test exists to make that visible rather than silent.
+Agree the change with whoever owns the .NET client, then regenerate with the README one-liner.
+
+**References:** C17 `design.md` D12 · `openspec/specs/ai-service-runtime/spec.md` ·
+S16 *Observabilidad* ("no confundáis el latido con la vigilancia")
+
+### The retrieval budget, measured on the demo environment
+
+**Status: measured on 2026-08-30. The conclusion is "do not revert yet", and the reason is
+sharper than before.**
+
+Four `ai_gateway_call_completed` latencies over four distinct queries, from the demo host in
+`eu-west-1` against the real provider, with `aiAvailable: true` on all four:
+
+| Query | Gateway latency | End to end |
+|---|---|---|
+| anillo de plata para regalar | 383 ms | 0,99 s |
+| pendientes de oro para una boda | **1707 ms** | 1,98 s |
+| collar con perlas elegante | 170 ms | 0,41 s |
+| pulsera de plata sencilla | 184 ms | 0,40 s |
+
+**What this changes.** The 2500 ms budget is not being consumed in the normal case: warm calls
+land at **170–383 ms**, four to fourteen times inside it. Measured from a laptop during C16 the
+same path degraded on *every* search at 800 ms; from an instance in the same region as nothing in
+particular but with a better route to the provider, the ordinary case is comfortable.
+
+**What this does NOT change.** One call in four cost **1707 ms** — still more than double the
+800 ms of §6.4. So reverting the budget today would degrade roughly a quarter of searches to the
+lexical path. The debt is the same one recorded above: the AI service builds a
+`LiteLlmEmbeddingClient` per request, so the in-memory cache never hits and any request may pay a
+full cold round trip. Distance to the provider changed how *often* that hurts, not whether it
+happens.
+
+**Therefore:** leave `RetrievalTimeoutMs` at 2500 ms. Make the embedding client a singleton in
+the change that owns `retrieval/`, measure again, and only then consider 800 ms. These figures
+are the new baseline to beat.
+
+**References:** C17 `qa.md` · C16 `qa.md` §6 · measured with the demo corpus of 1200 documents
+
+### Instance sizing, measured (C17 §10.3) — no action needed
+
+`docker stats` on the four containers with the corpus loaded and searches served, 2026-08-30:
+
+| Container | Memory | Of its limit |
+|---|---|---|
+| `jbg-demo-ai` | 232,5 MiB | **45 % of its 512 MiB cap** |
+| `jbg-demo-api` | 108 MiB | — |
+| `jbg-demo-postgres` | 93 MiB | — |
+| `jbg-demo-proxy` | 11,7 MiB | — |
+
+Host: 689 MB used of 1909, **917 MB available**, and **no swap configured**.
+
+**`t3.small` is right-sized and the 512 MiB cap on the AI service is well chosen**: high enough
+that ordinary operation never approaches it, low enough that the container dies before the host
+does — which is the whole point of D18. No resizing, and the swap file the design offered as a
+mitigation is not needed at these numbers. Re-measure if the corpus grows by an order of
+magnitude or if a generative route lands.
+
+---
+
+## **Este repositorio no tiene CI** — causa ya documentada, confirmada el 2026-08-30
+
+**Estado: hallazgo, no tarea de C17.** Merece un change propio; se anota aquí para que no
+se pierda.
+
+> **La causa no es nueva.** [`Documentos/testing-backend.md`](../Documentos/testing-backend.md)
+> ya la registraba en su sección *Estado de la suite*: `test-backend.yml` sólo dispara en
+> `main` y `develop`, «y **todo el Proyecto Final de IA se está construyendo en `ai-eng`** y
+> sus ramas de change». Lo que C17 aporta no es el descubrimiento sino la **confirmación
+> empírica** de su consecuencia extrema, que hasta ahora se intuía: no es que se ejecute poco,
+> es que **no se ha ejecutado nunca**.
+
+`test-backend.yml` y `test-frontend.yml` **no se han ejecutado nunca**, ni una vez:
+
+```
+gh run list --workflow=test-backend.yml   -> NUNCA SE HA EJECUTADO
+gh run list --workflow=test-frontend.yml  -> NUNCA SE HA EJECUTADO
+```
+
+Ambos disparan sobre `branches: [main, develop]`, y **ninguna de esas dos ramas existe**. Las
+del repositorio son `master`, `ai-eng` —donde se integra de verdad: el PR #21 mergeó ahí— y
+`demo`. Los workflows están bien escritos, sus filtros de ruta son razonables, y son inertes.
+
+Es la misma firma que C17 encontró siete veces en un día: algo que aparenta funcionar y no se
+ejecuta. Aquí el coste acumulado es mayor que el de cualquiera de aquéllos, porque significa
+que **ningún cambio de este proyecto ha pasado por una comprobación automática antes de
+integrarse**.
+
+### Lo que hay que hacer, y en qué orden
+
+1. **Corregir las ramas**: `pull_request: branches: [ai-eng, master]` más `push` sobre las
+   mismas. Es el arreglo de una línea que enciende la CI.
+2. **Sólo entonces**, decidir si la CI puede ser una puerta. Hoy **no puede**, y el motivo
+   está en `CLAUDE.md`: la suite de backend arrastra **53 fallos preexistentes** y la de
+   frontend **116**. Una puerta sobre una suite roja no es una puerta; es un bloqueo
+   permanente que alguien terminará saltándose. Poner la CI en verde es el trabajo de verdad,
+   y es un change en sí mismo.
+3. Mantener la **lista blanca** (`paths:`) en los tests, al contrario que en los despliegues.
+   Un test que sobra cuesta minutos; un despliegue que falta deja el entorno corriendo código
+   viejo en silencio. Los dos filtros fallan hacia lados distintos a propósito.
+4. Al hacer la CI obligatoria, cuidado con la trampa conocida: un workflow **omitido** por
+   filtro de rutas nunca reporta su estado, y una comprobación requerida que no reporta deja
+   el PR bloqueado para siempre. Se resuelve con un trabajo acompañante que siempre se ejecuta
+   y publica el mismo nombre de comprobación.
+
+### Y el despliegue de producción, que sigue sin filtro
+
+`deploy-aws-ec2.yml` redespliega la tienda ante **cualquier** cambio, incluido uno que sólo
+toque documentación. Se le aplica el mismo razonamiento que a `deploy-demo.yml`, pero **C17 no
+lo toca**: su propia especificación exige que el flujo de despliegue de producción quede
+inalterado, y hay un escenario que lo verifica. Corresponde a otro change.
+
+---
+
 ## Implementation Guidance
 
 When implementing deferred tasks:

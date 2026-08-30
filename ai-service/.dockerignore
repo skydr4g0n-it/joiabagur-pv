@@ -1,0 +1,23 @@
+# Build context exclusions for `ai-service/Dockerfile`, whose context is this
+# directory. The repository root has its own `.dockerignore`; a `.dockerignore`
+# only governs the context it sits at the root of, so both are needed.
+
+# Resolved inside the build stage from pyproject.toml + uv.lock
+.venv/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Never part of a runtime image
+tests/
+openapi.json
+README.md.bak
+*.md
+!README.md
+
+# Environment files. A secret inside an image is a secret with a passport.
+.env
+.env.*
+!.env.example

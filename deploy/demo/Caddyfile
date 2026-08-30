@@ -1,0 +1,34 @@
+# Reverse proxy for the isolated demo environment (C17).
+#
+# Everything this environment exposes to the Internet passes through here. The
+# API, the AI service and the database publish no ports at all; they are
+# reachable only by name on `jbg-demo-net`.
+#
+# Two things this file deliberately does NOT do, both of which the shop's
+# production host does on its own:
+#
+#   * It does not obtain or renew certificates by hand. Caddy issues and renews
+#     them itself on first request for the configured name, which removes the
+#     certificate client from the host, its scheduled task, and the manual step
+#     after a DNS change (C17 D5).
+#   * It does not hard-code a domain. `{$DEMO_HOSTNAME}` is supplied by
+#     `compose.demo.yaml` from the parameter store, so the environment can run
+#     under a hostname derived from its IP address today and under a purchased
+#     domain tomorrow, by changing one parameter (C17 D6).
+#
+# HTTP to HTTPS redirection is automatic: a site block with a real hostname
+# makes Caddy serve port 80 as a redirect to 443. Nothing needs declaring.
+
+{$DEMO_HOSTNAME} {
+	encode zstd gzip
+
+	# The SPA and the API are the same origin, served by the same container,
+	# which is what lets the demo image be built with a relative API base and
+	# stay agnostic of the hostname it answers under (C17 D15).
+	reverse_proxy jbg-demo-api:8080
+
+	log {
+		output stdout
+		format json
+	}
+}

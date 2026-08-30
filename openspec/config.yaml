@@ -23,6 +23,22 @@ context: |
   Separate container; Python does vector search and LLM only, .NET owns all business
   logic and is the final authority on price, stock and permissions. Browser never
   calls Python: .NET → jbg-ai over an internal HS256 service JWT on the Docker network.
+
+  C17 enriched GET /health without moving the frozen contract: it also reports database
+  reachability, indexed document count, whether the embedding provider credential is
+  configured, and a contrast of the configured embedding model against the one recorded on
+  the index rows — never calling the provider, and cached for a short window because the
+  connection pool is capped at 5. Its return annotation stays an open mapping, so
+  openapi.json is unchanged. The browser cannot query jbg-ai directly, so the administrator
+  dashboard card is served by GET /api/ai/health on the .NET side: administrators only, and
+  on an HTTP client with no circuit breaker, because its job is to diagnose the system
+  precisely when the main path is failing.
+
+  C17 also deploys an isolated demonstration environment in a SEPARATE AWS account:
+  terraform/demo/ with its own state, compose.demo.yaml with four services where only the
+  Caddy proxy publishes ports, secrets read from the parameter store into the deploying
+  process environment and never to disk, and post-deployment verification executed inside
+  the host because the AI service is private by design. Runbook: deploy/demo/README.md.
   Vector index lives in schema `ai` (pgvector) of the same PostgreSQL database.
 
   Infra: Docker Compose (dev), AWS EC2 + Docker + nginx (TLS via Let's Encrypt),

@@ -1,0 +1,83 @@
+# ============================================================
+# Dockerfile.demo — image for the ISOLATED DEMO environment (C17)
+#
+# `Dockerfile.bundled`, next to this file, is the PRODUCTION image and is NOT
+# TOUCHED by C17. Do not "unify" the two: the production one bakes the shop's
+# absolute domain into the SPA at build time, so reusing it here would give the
+# demo interface an API base pointing at the shop's API.
+#
+# The one difference that matters is `VITE_API_BASE_URL`, which defaults to the
+# relative `/api` instead of an absolute URL. The SPA is served by this very
+# container, so every call is same-origin, and the image stays agnostic of the
+# hostname it is served under — which is what lets the demo start on a
+# hostname derived from its IP address and migrate to a real domain later
+# without rebuilding anything (C17 D6, D15).
+#
+# Build context: REPO ROOT (not backend/)
+# Usage: docker build -f backend/src/JoiabagurPV.API/Dockerfile.demo \
+#          --build-arg VITE_API_BASE_URL=/api \
+#          -t jbg-demo-api:<tag> .
+# ============================================================
+
+# ─── Stage 1: Build React frontend ───────────────────────────────────────────
+FROM node:20-alpine AS frontend-build
+WORKDIR /frontend
+
+COPY frontend/package*.json ./
+RUN npm ci --legacy-peer-deps
+
+COPY frontend/ .
+
+# Relative by default. `api.service.ts` falls back to an absolute localhost URL
+# when the variable is empty, so the default must be the working value rather
+# than an empty string: an unset build argument would produce an SPA that calls
+# a developer laptop.
+ARG VITE_API_BASE_URL=/api
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+RUN npm run build
+# Output: /frontend/dist/
+
+# ─── Stage 2: Build .NET application ─────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+COPY backend/src/JoiabagurPV.Domain/*.csproj         JoiabagurPV.Domain/
+COPY backend/src/JoiabagurPV.Infrastructure/*.csproj  JoiabagurPV.Infrastructure/
+COPY backend/src/JoiabagurPV.Application/*.csproj     JoiabagurPV.Application/
+COPY backend/src/JoiabagurPV.API/*.csproj             JoiabagurPV.API/
+
+RUN dotnet restore JoiabagurPV.API/JoiabagurPV.API.csproj
+
+COPY backend/src/ .
+
+RUN dotnet publish JoiabagurPV.API/JoiabagurPV.API.csproj \
+    -c Release -o /app/publish --no-restore
+
+# ─── Stage 3: Runtime ─────────────────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /app/publish .
+
+# Copy React SPA into wwwroot/ — served by UseStaticFiles() + MapFallbackToFile()
+COPY --from=frontend-build /frontend/dist ./wwwroot/
+
+RUN groupadd -r appuser && useradd -r -g appuser appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+# No EXPOSE-as-publication here: in `compose.demo.yaml` this service declares no
+# `ports:` at all. Only the reverse proxy is reachable from the Internet.
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8080/api/health || exit 1
+
+ENTRYPOINT ["dotnet", "JoiabagurPV.API.dll"]

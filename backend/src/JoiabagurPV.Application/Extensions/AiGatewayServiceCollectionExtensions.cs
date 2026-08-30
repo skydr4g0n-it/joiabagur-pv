@@ -53,7 +53,7 @@ public static class AiGatewayServiceCollectionExtensions
                 $"{AiGatewayOptions.SectionName}:JwtSecret is too short for HS256; at least {AiGatewayOptions.MinimumSecretLength} characters are required.")
             .Validate(
                 o => o.TokenTtlSeconds > 0 && o.RetrievalTimeoutMs > 0 && o.AssistTimeoutMs > 0
-                     && o.EnrichTimeoutMs > 0,
+                     && o.EnrichTimeoutMs > 0 && o.HealthTimeoutMs > 0,
                 $"{AiGatewayOptions.SectionName} time-to-live and time budgets must be positive.")
             // ValidateOnStart is the whole point. Without it the check is lazy and would surface
             // inside a request instead of at boot, which is the failure mode being removed here.
@@ -126,6 +126,23 @@ public static class AiGatewayServiceCollectionExtensions
                 });
 
                 builder.AddTimeout(TimeSpan.FromMilliseconds(options.EnrichTimeoutMs));
+            });
+
+        // The health client (C17). NO resilience handler, and that is the entire point of it
+        // being a separate registration rather than a third call on the retrieval client:
+        //
+        //   * No circuit breaker. The probe exists to diagnose the system when the main path is
+        //     already failing. Sharing retrieval's breaker would make it decline to answer at
+        //     exactly the moment an administrator opens the dashboard to find out why.
+        //   * No retry. A human refreshing a card is the retry, and each attempt costs them a
+        //     wait.
+        //
+        // The budget is therefore the client's own timeout, with no pipeline to race against it.
+        services
+            .AddHttpClient(AiGatewayClient.HealthClientName, client =>
+            {
+                client.BaseAddress = new Uri(options.BaseUrl);
+                client.Timeout = TimeSpan.FromMilliseconds(options.HealthTimeoutMs);
             });
 
         // C34 registers its own named client here for the generative route, with a 5 s budget

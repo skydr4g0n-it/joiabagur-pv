@@ -37,7 +37,7 @@ parallel taxonomy later.
 
 | Folder | Changes that will land here |
 |---|---|
-| `api/` | C01 (health), C02 (contracts, service auth, stubs, snapshot), C08 (enrichment provenance, catalog-scoped auth), C13 (landed: `/v1/index/*` real), C14 (landed: `/v1/retrieval/products` real) |
+| `api/` | C01 (health), C02 (contracts, service auth, stubs, snapshot), C08 (enrichment provenance, catalog-scoped auth), C13 (landed: `/v1/index/*` real), C14 (landed: `/v1/retrieval/products` real), C17 (landed: enriched `/health` — database, index, provider credential, model contrast) |
 | `config/` | C01, C02 (settings, canonical OpenAPI profile), C13 (feed settings) |
 | `db/` | C05 (engine, bounded pool, boot without a database) |
 | `migrations/` | C05, C13 (landed: `text_provenance`, `sync_checkpoint`) |
@@ -49,8 +49,10 @@ parallel taxonomy later.
 | `evals/` | C24, C38 |
 
 Changes with no Python zone (C03, C04, C07, C08, C12, C15, C16, C19, C28, C29, C34,
-C36, C37) are tested on the .NET or frontend side. C17 adds a post-deploy smoke
-check, which belongs to the deployment pipeline, not to this suite.
+C36, C37) are tested on the .NET or frontend side. C17 also ships a post-deploy smoke
+check that belongs to the deployment pipeline rather than here — but it does have a
+Python zone after all: the enriched `/health` is tested in `api/test_health_report.py`,
+with its probe double in `support/fake_health_probe.py`.
 
 Source: [`proyecto-final-plan-changes-openspec.md`](../../Documentos/Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md).
 

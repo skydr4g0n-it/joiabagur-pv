@@ -309,6 +309,9 @@ public class AiCatalogControllerTests : IAsyncLifetime
                 PromptVersion = "enrichment/v1",
                 Usage = new AiUsage()
             });
+
+        public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     /// <summary>A gateway that only knows how to fail, in the way the test chooses.</summary>
@@ -320,6 +323,9 @@ public class AiCatalogControllerTests : IAsyncLifetime
 
         public Task<AiEnrichResponse> EnrichAsync(
             AiEnrichRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
+            throw failure();
+
+        public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
             throw failure();
     }
 
@@ -376,6 +382,9 @@ public class AiCatalogControllerTests : IAsyncLifetime
                 Usage = new AiUsage()
             };
         }
+
+        public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private async Task AssertProfileCountAsync(int expected, string because)
