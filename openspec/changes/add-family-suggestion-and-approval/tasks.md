@@ -62,14 +62,14 @@
 
 ## 7. Tests .NET
 
-- [ ] 7.1 `SuggestFamilies_ReturnsProposals_WithoutWritingAnything` — ni familia, ni miembro, ni `Product.UpdatedAt`.
-- [ ] 7.2 `ApplyFamilySuggestions_RecordsAiApprovedOriginWithApprover` y `CreateFamily_StillRecordsManualOrigin`.
-- [ ] 7.3 `ApplyFamilySuggestions_StampsUpdatedAtOfEnteringProducts` y el complementario de feed: `IndexFeed_EmitsExactlyTheStampedProducts_AfterApply`.
-- [ ] 7.4 `ApplyFamilySuggestions_ReportsConflict_WithoutPartialFamily`.
-- [ ] 7.5 `ApplyFamilySuggestions_IsIdempotent_ForIdenticalMemberList` — no reescribe filas ni toca `UpdatedAt`.
-- [ ] 7.6 `SuggestFamilies_ReturnsForbidden_ForOperator` y `SuggestFamilies_ReturnsUnauthorized_ForAnonymous`. **Pedir un cliente nuevo a la factoría**: el `HttpClient` compartido conserva las cookies de cada login y no es anónimo.
-- [ ] 7.7 `SuggestFamilies_ReturnsServiceUnavailable_WhenGatewayNotImplemented` y el equivalente para indisponibilidad.
-- [ ] 7.8 Al fijar datos con los *object mothers*, anclar `PointOfSale.Phone` explícitamente: Bogus genera teléfonos que no caben en `varchar(20)`.
+- [x] 7.1 `SuggestFamilies_ReturnsProposals_WithoutWritingAnything` — ni familia, ni miembro, ni `Product.UpdatedAt`.
+- [x] 7.2 `ApplyFamilySuggestions_RecordsAiApprovedOriginWithApprover` y `CreateFamily_StillRecordsManualOrigin`.
+- [x] 7.3 `ApplyFamilySuggestions_MakesMembersVisibleToAnIncrementalPull` — se afirma **sobre el feed**, no sobre `Product.UpdatedAt`. Crear una familia mueve el watermark por `Family.UpdatedAt`, así que el timestamp del producto era el detalle de implementación y el feed es el requisito. El primer intento afirmaba el timestamp y falló, con razón.
+- [x] 7.4 `ApplyFamilySuggestions_ReportsConflict_WithoutPartialFamily`.
+- [x] 7.5 `ApplyFamilySuggestions_IsIdempotent_ForIdenticalMemberList` — no reescribe filas ni toca `UpdatedAt`.
+- [x] 7.6 `SuggestFamilies_ReturnsForbidden_ForOperator` y `SuggestFamilies_ReturnsUnauthorized_ForAnonymous`. **Pedir un cliente nuevo a la factoría**: el `HttpClient` compartido conserva las cookies de cada login y no es anónimo.
+- [x] 7.7 `SuggestFamilies_ReturnsServiceUnavailable_WhenGatewayNotImplemented` y el equivalente para indisponibilidad.
+- [x] 7.8 Al fijar datos con los *object mothers*, anclar `PointOfSale.Phone` explícitamente: Bogus genera teléfonos que no caben en `varchar(20)`.
 
 ## 8. Ejecución del lote y reconciliación
 
