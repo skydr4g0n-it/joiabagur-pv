@@ -1,6 +1,6 @@
 """Domain routers for the frozen `/v1` surface."""
 
-from jbg_ai.api.routers import assist, enrich, evals, index, inventory, retrieval
+from jbg_ai.api.routers import assist, enrich, evals, families, index, inventory, retrieval
 
 #: Mounted on every profile. `evals` is added separately, development only.
 DOMAIN_ROUTERS = (
@@ -8,7 +8,17 @@ DOMAIN_ROUTERS = (
     assist.router,
     inventory.router,
     enrich.router,
+    families.router,
     index.router,
 )
 
-__all__ = ["DOMAIN_ROUTERS", "assist", "enrich", "evals", "index", "inventory", "retrieval"]
+__all__ = [
+    "DOMAIN_ROUTERS",
+    "assist",
+    "enrich",
+    "evals",
+    "families",
+    "index",
+    "inventory",
+    "retrieval",
+]

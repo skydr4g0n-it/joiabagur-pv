@@ -39,16 +39,16 @@
 
 ## 4. Ruta HTTP en `jbg-ai`
 
-- [ ] 4.1 Esquemas Pydantic en `api/schemas/families.py`: cuerpo de acotación opcional, propuestas con miembros ordenados y etiquetas anulables, marcas de revisión con su distancia, y grupos rechazados con su motivo.
-- [ ] 4.2 Router `api/routers/families.py` con `POST /v1/families/suggest`, exigiendo el token de servicio como el resto de `/v1`.
-- [ ] 4.3 Fixture determinista en `stubs/` para `STUB_MODE`, que valide contra el modelo declarado y **no** abra conexión a base de datos.
-- [ ] 4.4 `503` nombrado cuando falten los ajustes necesarios con `STUB_MODE=false`, siguiendo el patrón de `retrieval.py`.
-- [ ] 4.5 Tests de la ruta en `tests/api/`: modelo declarado, token exigido, stub sin base de datos, y `503` por configuración ausente.
+- [x] 4.1 Esquemas Pydantic en `api/schemas/families.py`: cuerpo de acotación opcional, propuestas con miembros ordenados y etiquetas anulables, marcas de revisión con su distancia, y grupos rechazados con su motivo.
+- [x] 4.2 Router `api/routers/families.py` con `POST /v1/families/suggest`, exigiendo el token de servicio como el resto de `/v1`.
+- [x] 4.3 Fixture determinista en `stubs/` para `STUB_MODE`, que valide contra el modelo declarado y **no** abra conexión a base de datos.
+- [x] 4.4 `503` nombrado cuando falten los ajustes necesarios con `STUB_MODE=false`, siguiendo el patrón de `retrieval.py`.
+- [x] 4.5 Tests de la ruta en `tests/api/`: modelo declarado, token exigido, stub sin base de datos, y `503` por configuración ausente.
 
 ## 5. Contrato congelado
 
-- [ ] 5.1 **Regenerar `ai-service/openapi.json`** con la orden del README del `ai-service`. Verificación: el fichero contiene **nueve** rutas `/v1`.
-- [ ] 5.2 Actualizar `test_openapi_snapshot_is_stable` y dejarlo en verde contra el árbol de trabajo. Registrar en el `proposal` que el movimiento de frontera es deliberado.
+- [x] 5.1 **Regenerar `ai-service/openapi.json`** con la orden del README del `ai-service`. Verificación: el fichero contiene **nueve** rutas `/v1`.
+- [x] 5.2 Actualizar `test_openapi_snapshot_is_stable` y dejarlo en verde contra el árbol de trabajo. Registrar en el `proposal` que el movimiento de frontera es deliberado.
 
 ## 6. Camino .NET
 

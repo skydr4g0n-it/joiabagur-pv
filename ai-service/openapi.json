@@ -515,6 +515,138 @@
         "title": "EvalRunsResponse",
         "type": "object"
       },
+      "ExcludedProductModel": {
+        "description": "A product the piece-type gate removed before grouping.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "product_id": {
+            "title": "Product Id",
+            "type": "string"
+          },
+          "reason": {
+            "description": "no_piece_type",
+            "title": "Reason",
+            "type": "string"
+          },
+          "sku": {
+            "title": "Sku",
+            "type": "string"
+          }
+        },
+        "required": [
+          "product_id",
+          "sku",
+          "name",
+          "reason"
+        ],
+        "title": "ExcludedProductModel",
+        "type": "object"
+      },
+      "FamilyProposalModel": {
+        "description": "A candidate family: one piece type, one root, two or more members.",
+        "properties": {
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedFamilyMember"
+            },
+            "minItems": 2,
+            "title": "Members",
+            "type": "array"
+          },
+          "piece_type": {
+            "title": "Piece Type",
+            "type": "string"
+          },
+          "root": {
+            "title": "Root",
+            "type": "string"
+          },
+          "suggested_name": {
+            "title": "Suggested Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "root",
+          "suggested_name",
+          "piece_type",
+          "members"
+        ],
+        "title": "FamilyProposalModel",
+        "type": "object"
+      },
+      "FamilySuggestRequest": {
+        "description": "Optional narrowing. An empty body proposes over the whole active index.",
+        "properties": {
+          "max_proposals": {
+            "default": 500,
+            "description": "Upper bound on returned proposals; refusals are never truncated",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Max Proposals",
+            "type": "integer"
+          },
+          "piece_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Restrict to one closed-vocabulary piece type; null means all",
+            "title": "Piece Type"
+          }
+        },
+        "title": "FamilySuggestRequest",
+        "type": "object"
+      },
+      "FamilySuggestResponse": {
+        "properties": {
+          "already_in_family_count": {
+            "default": 0,
+            "description": "Products skipped for already belonging to a family. Counted rather than listed: after the first approved batch they are hundreds, and their exclusion is the convergence rule working, not a finding",
+            "minimum": 0.0,
+            "title": "Already In Family Count",
+            "type": "integer"
+          },
+          "excluded_products": {
+            "items": {
+              "$ref": "#/components/schemas/ExcludedProductModel"
+            },
+            "title": "Excluded Products",
+            "type": "array"
+          },
+          "proposals": {
+            "items": {
+              "$ref": "#/components/schemas/FamilyProposalModel"
+            },
+            "title": "Proposals",
+            "type": "array"
+          },
+          "rejected_groups": {
+            "items": {
+              "$ref": "#/components/schemas/RejectedGroupModel"
+            },
+            "title": "Rejected Groups",
+            "type": "array"
+          },
+          "trace_id": {
+            "description": "Correlation id, from the token claim when present",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trace_id"
+        ],
+        "title": "FamilySuggestResponse",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -888,6 +1020,78 @@
         "title": "InventoryProposeResponse",
         "type": "object"
       },
+      "ProposedFamilyMember": {
+        "description": "One product inside a proposal, with what tells it from its siblings.",
+        "properties": {
+          "flagged_for_review": {
+            "default": false,
+            "description": "A product of another proposed family sits closer than this member's worst sibling",
+            "title": "Flagged For Review",
+            "type": "boolean"
+          },
+          "margin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How far the nearest stranger beat the worst sibling; null when not flagged",
+            "title": "Margin"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "position": {
+            "description": "Order by canonical size rank, gap-free",
+            "minimum": 0.0,
+            "title": "Position",
+            "type": "integer"
+          },
+          "product_id": {
+            "title": "Product Id",
+            "type": "string"
+          },
+          "review_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Reason"
+          },
+          "sku": {
+            "title": "Sku",
+            "type": "string"
+          },
+          "variant_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for the base piece, which is a variant value and not a gap",
+            "title": "Variant Label"
+          }
+        },
+        "required": [
+          "product_id",
+          "sku",
+          "name",
+          "position"
+        ],
+        "title": "ProposedFamilyMember",
+        "type": "object"
+      },
       "ProposedList": {
         "properties": {
           "confidence": {
@@ -1060,6 +1264,44 @@
           "value"
         ],
         "title": "ProposedText",
+        "type": "object"
+      },
+      "RejectedGroupModel": {
+        "description": "A group a guard refused, reported so a person can look at it.",
+        "properties": {
+          "piece_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Piece Type"
+          },
+          "product_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Product Names",
+            "type": "array"
+          },
+          "reason": {
+            "description": "root_too_short | root_is_bare_piece_type | empty_root | duplicate_variant_labels",
+            "title": "Reason",
+            "type": "string"
+          },
+          "root": {
+            "title": "Root",
+            "type": "string"
+          }
+        },
+        "required": [
+          "root",
+          "reason"
+        ],
+        "title": "RejectedGroupModel",
         "type": "object"
       },
       "RetrievalFilters": {
@@ -1724,6 +1966,59 @@
         "summary": "List evaluation runs (development profile only)",
         "tags": [
           "evals"
+        ]
+      }
+    },
+    "/v1/families/suggest": {
+      "post": {
+        "description": "Group the active index into candidate families without writing anything.\n\nAnswers 503 rather than a degraded result when the index is unreachable. Unlike\nsearch, which drops to the lexical branch, there is no honest partial answer\nhere: proposing groupings without the index would mean inventing catalogue\nstructure.",
+        "operationId": "suggest_v1_families_suggest_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamilySuggestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamilySuggestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Invalid or missing internal service token"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "description": "Not implemented yet; delivered in a later change"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Propose product families, and report what was refused",
+        "tags": [
+          "families"
         ]
       }
     },
