@@ -1,0 +1,2 @@
+tests/retrieval/test_orchestrator.py::test_malformed_exclusions_are_ignored
+tests/retrieval/test_orchestrator.py::test_trace_id_appears_in_stage_logs

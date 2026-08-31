@@ -183,9 +183,52 @@ De ahí una conclusión que refuerza el change entero: **el sinónimo sólo recu
 
 ---
 
-## 5. Auditoría de miembros marcados
+## 5. Primera ejecución de la auditoría, contra el corpus real
 
-_Pendiente — grupo 7._
+Ejecutada con `audit_families` sobre el Postgres local, con `JPV_FAMILY_VETO_MARGIN = 0,05` y `JPV_FAMILY_ORPHAN_MARGIN = 0`:
+
+| | |
+|---|---|
+| Familias examinadas / miembros | **156 / 486** |
+| **Miembros marcados** | **18** |
+| **Huérfanos candidatos** | **40** (39 reales, 1 sintético) |
+| Grupos rechazados | 2 |
+| Excluidos por la puerta | 11 |
+
+### La decisión 5 del diseño queda validada con datos, no con el argumento
+
+**Once de los dieciocho marcados son `Colgante estrella de mar`** —siete de la familia, tres de su gemela `… dorado`, y el intruso—, encabezados por márgenes de 0,147:
+
+```
+0,147  SKU82   Colgante estrella de mar M oro     en Colgante estrella de mar
+0,140  SKU80   Colgante estrella de mar XS oro    en Colgante estrella de mar
+0,127  SKU81   Colgante estrella de mar S oro     en Colgante estrella de mar
+ ...
+0,084  SKU610  Colgante Estrella de Mar           en Colgante estrella de mar   <- el sintetico colado
+```
+
+Es exactamente lo que el `design.md` anticipó: una familia contaminada tiene el peor hermano por los suelos (0,778 frente a una media de 0,85–0,95) y **marca a casi todos sus miembros**, porque cualquier extraño les gana ese listón. El hallazgo (d) de C18a —un sintético que se coló en una familia real— **no marca sólo al intruso: contamina a los siete que le acompañan.**
+
+De ahí que el orden del change no sea negociable: **sacar a `SKU610` sube el listón de esa familia y debería llevarse la mayor parte de los dieciocho de golpe.** Es la limpieza que el grupo 7 hace antes de que el grupo 8 fije θ.
+
+### Y la pureza se comporta como se diseñó: ordena, no nomina
+
+Con las dos señales una al lado de la otra sobre datos reales se ve que **no van juntas**, que es justo el motivo de no usar la pureza como criterio:
+
+| margen | pureza | huérfano | familia candidata |
+|---|---|---|---|
+| 0,109 | **4** | `Pendientes botón erizo de mar S dorado` | `Pendientes boton erizo de mar` |
+| 0,094 | **1** | `Colgante Estrella de Mar v2` *(sintético)* | `Colgante estrella de mar` |
+| 0,050 | **0** | `Colgante mejillón plata L` | `Colgante estrella de mar` |
+| 0,047 | **4** | `Anillo pie Erizo XL` | `Anillo erizo de mar` |
+
+Los de pureza 0 con margen positivo son los falsos positivos del imán —`Colgante mejillón` no es una estrella de mar—, y los de pureza 4 son los aciertos claros. La pureza **discrimina dentro de la lista que el margen ya eligió**, que es el papel que el diseño le da.
+
+---
+
+## 6. Auditoría de miembros marcados: resolución
+
+_Pendiente — grupo 7. Requiere juicio humano._
 
 ---
 

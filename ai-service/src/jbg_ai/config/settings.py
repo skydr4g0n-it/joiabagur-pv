@@ -175,6 +175,27 @@ class Settings(BaseSettings):
         ),
     )
 
+    jpv_family_orphan_margin: float = Field(
+        default=0.0,
+        ge=0,
+        le=1,
+        description=(
+            "C18b orphan-nomination margin for POST /v1/families/audit "
+            "(JPV_FAMILY_ORPHAN_MARGIN). A product belonging to no family is "
+            "nominated as a candidate for family F when its similarity to F's "
+            "members beats F's own worst-sibling similarity by more than this much. "
+            "Deliberately NOT neighbourhood purity, which was measured and rejected: "
+            "over 650 orphans, purity nominates 55 synthetic against 19 real, "
+            "because the synthetic corpus was built with deliberate vN near-duplicate "
+            "families it cannot tell from a missing member, whereas this margin "
+            "nominates 21 real against 1 synthetic. Purity travels as a ranking "
+            "signal only. Measured curve: 0 -> 40 candidates, 0.02 -> 22, "
+            "0.05 -> 5, 0.08 -> 3. Starts at 0 on purpose: with verdicts persisted a "
+            "dismissal is paid once, while a candidate the margin excluded is never "
+            "seen at all. Not required to boot /health."
+        ),
+    )
+
     @model_validator(mode="before")
     @classmethod
     def derive_dev_endpoints(cls, data: Any) -> Any:

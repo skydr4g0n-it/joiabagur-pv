@@ -22,19 +22,19 @@
 
 ## 3. Auditoría en `ai-service`
 
-- [ ] 3.1 Extender `jbg_ai/families/repository.py` con la lectura de pertenencias persistidas (`family_id IS NOT NULL`) agrupadas por familia, y con el peor hermano por familia calculado con `<=>` **en PostgreSQL**, en una sola sentencia. Sin cargar vectores en Python.
-- [ ] 3.2 Reutilizar `apply_relative_veto` sobre familias persistidas cambiando el universo, sin duplicar la lógica del veto.
-- [ ] 3.3 Implementar la nominación de huérfanos por **margen relativo**, con la puerta de `piece_type` aplicada y `data_origin` en cada candidato. Calcular la pureza de vecindad (5 vecinos, mismo tipo de pieza) y devolverla **sólo como señal de ordenación**.
-- [ ] 3.4 Excluir de la salida los pares `(product_id, family_id)` que llegan juzgados en la petición, sin persistirlos y sin leer `public`.
-- [ ] 3.5 Añadir `JPV_FAMILY_ORPHAN_MARGIN` a `pydantic-settings`, con el mismo patrón que `JPV_FAMILY_VETO_MARGIN`. Valor inicial `0` — se ajusta en la tarea 6.1.
-- [ ] 3.6 Recalcular grupos rechazados y productos excluidos sobre el estado actual, y devolverlos sin truncar aunque el cap de candidatos actúe.
+- [x] 3.1 Extender `jbg_ai/families/repository.py` con la lectura de pertenencias persistidas (`family_id IS NOT NULL`) agrupadas por familia, y con el peor hermano por familia calculado con `<=>` **en PostgreSQL**, en una sola sentencia. Sin cargar vectores en Python.
+- [x] 3.2 Reutilizar `apply_relative_veto` sobre familias persistidas cambiando el universo, sin duplicar la lógica del veto.
+- [x] 3.3 Implementar la nominación de huérfanos por **margen relativo**, con la puerta de `piece_type` aplicada y `data_origin` en cada candidato. Calcular la pureza de vecindad (5 vecinos, mismo tipo de pieza) y devolverla **sólo como señal de ordenación**.
+- [x] 3.4 Excluir de la salida los pares `(product_id, family_id)` que llegan juzgados en la petición, sin persistirlos y sin leer `public`.
+- [x] 3.5 Añadir `JPV_FAMILY_ORPHAN_MARGIN` a `pydantic-settings`, con el mismo patrón que `JPV_FAMILY_VETO_MARGIN`. Valor inicial `0` — se ajusta en la tarea 6.1.
+- [x] 3.6 Recalcular grupos rechazados y productos excluidos sobre el estado actual, y devolverlos sin truncar aunque el cap de candidatos actúe.
 
 ## 4. Ruta HTTP y contrato congelado
 
-- [ ] 4.1 `POST /v1/families/audit` en `api/routers/families.py`, con sus modelos Pydantic en `api/schemas/families.py` y respuesta determinista bajo `STUB_MODE`.
-- [ ] 4.2 Tests de la librería: `test_audit_flags_member_when_stranger_beats_worst_sibling`, `test_orphan_detection_lists_unassigned_similar_products`, `test_orphan_nomination_never_crosses_piece_type`, `test_orphan_without_piece_type_is_never_nominated`, `test_purity_does_not_nominate`, `test_judged_pairs_are_omitted`, `test_orphan_margin_comes_from_configuration`, `test_audit_writes_nothing`, `test_audit_is_deterministic`, `test_audit_calls_no_provider`.
-- [ ] 4.3 Regenerar `ai-service/openapi.json` con la orden del README y actualizar `test_openapi_snapshot_is_stable` a **diez rutas**. Verificar que el test falla con el snapshot viejo y pasa con el nuevo.
-- [ ] 4.4 `uv run pytest` en verde, sin llamadas reales a LLM, embeddings ni RDS.
+- [x] 4.1 `POST /v1/families/audit` en `api/routers/families.py`, con sus modelos Pydantic en `api/schemas/families.py` y respuesta determinista bajo `STUB_MODE`.
+- [x] 4.2 Tests de la librería: `test_audit_flags_member_when_stranger_beats_worst_sibling`, `test_orphan_detection_lists_unassigned_similar_products`, `test_orphan_nomination_never_crosses_piece_type`, `test_orphan_without_piece_type_is_never_nominated`, `test_purity_does_not_nominate`, `test_judged_pairs_are_omitted`, `test_orphan_margin_comes_from_configuration`, `test_audit_writes_nothing`, `test_audit_is_deterministic`, `test_audit_calls_no_provider`.
+- [x] 4.3 Regenerar `ai-service/openapi.json` con la orden del README y actualizar `test_openapi_snapshot_is_stable` a **diez rutas**. Verificar que el test falla con el snapshot viejo y pasa con el nuevo.
+- [x] 4.4 `uv run pytest` en verde, sin llamadas reales a LLM, embeddings ni RDS.
 
 ## 5. Entidad, migración y endpoints .NET
 
