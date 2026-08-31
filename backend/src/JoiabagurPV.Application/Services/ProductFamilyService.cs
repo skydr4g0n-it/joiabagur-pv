@@ -58,6 +58,38 @@ public class ProductFamilyService : IProductFamilyService
     }
 
     /// <inheritdoc/>
+    public async Task<ProductFamilyDto> CreateFromSuggestionAsync(
+        CreateProductFamilyRequest request,
+        Guid approvedByUserId)
+    {
+        var declared = Normalise(request.Members);
+        await GuardAgainstOtherFamiliesAsync(declared, Guid.Empty);
+
+        var family = new ProductFamily
+        {
+            Name = request.Name.Trim(),
+            Description = request.Description?.Trim(),
+            // The other value, and the first time it is ever written. C07 reserved these three
+            // columns for exactly this moment and its own qa noted they had no write path yet.
+            Origin = FamilyOrigin.AiApproved,
+            ApprovedByUserId = approvedByUserId,
+            ApprovedAt = DateTime.UtcNow,
+            Members = BuildMembers(declared)
+        };
+
+        await _familyRepository.AddAsync(family);
+        await SaveTranslatingMembershipRaceAsync(declared);
+
+        _logger.LogInformation(
+            "product_family_approved_from_suggestion {FamilyId} {MemberCount} {ApprovedBy}",
+            family.Id,
+            family.Members.Count,
+            approvedByUserId);
+
+        return await ReadBackAsync(family.Id);
+    }
+
+    /// <inheritdoc/>
     public async Task<ProductFamilyDto?> GetByIdAsync(Guid id)
     {
         var family = await _familyRepository.GetWithMembersAsync(id);

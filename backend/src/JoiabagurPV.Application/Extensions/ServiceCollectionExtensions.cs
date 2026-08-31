@@ -89,6 +89,7 @@ public static class ServiceCollectionExtensions
 
         // Register product families (EP13)
         services.AddScoped<IProductFamilyService, ProductFamilyService>();
+        services.AddScoped<IFamilySuggestionService, FamilySuggestionService>();
 
         // Indexing feeds (catalog + POS). Options are bound separately in AddIndexFeed so
         // start-up validation runs even if this registration is reused from a test host.

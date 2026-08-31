@@ -52,13 +52,13 @@
 
 ## 6. Camino .NET
 
-- [ ] 6.1 DTOs de petición y respuesta en `JoiabagurPV.Application/DTOs/Ai/`, con nombres `snake_case` en el cable y `variant_label` anulable.
-- [ ] 6.2 `IAiGatewayClient.SuggestFamiliesAsync` y su implementación en `AiGatewayClient`, **sin truncar ni reordenar** ninguna de las dos listas.
-- [ ] 6.3 Traducción de fallos a los errores tipados ya existentes: `501` → no implementado, timeout/circuito/5xx → indisponible, credenciales → configuración. **Sin fallback degradado.**
-- [ ] 6.4 Validadores FluentValidation del cuerpo de `apply`, invocados **explícitamente** en la acción: este proyecto registra validadores sin pipeline automático.
-- [ ] 6.5 `POST /api/ai/catalog/family-suggestions` en `AiCatalogController` — sólo administradores, **sin escribir nada**.
-- [ ] 6.6 `POST /api/ai/catalog/family-suggestions/apply` — persiste el subconjunto recibido **a través de `ProductFamilyService`**, con `Origin = AiApproved`, aprobador e instante.
-- [ ] 6.7 Propagación del conflicto por producto (409 con el detalle de qué familia retiene cada uno) sin dejar familias a medias.
+- [x] 6.1 DTOs de petición y respuesta en `JoiabagurPV.Application/DTOs/Ai/`, con nombres `snake_case` en el cable y `variant_label` anulable.
+- [x] 6.2 `IAiGatewayClient.SuggestFamiliesAsync` y su implementación en `AiGatewayClient`, **sin truncar ni reordenar** ninguna de las dos listas.
+- [x] 6.3 Traducción de fallos a los errores tipados ya existentes: `501` → no implementado, timeout/circuito/5xx → indisponible, credenciales → configuración. **Sin fallback degradado.**
+- [x] 6.4 Validadores FluentValidation del cuerpo de `apply`, invocados **explícitamente** en la acción: este proyecto registra validadores sin pipeline automático.
+- [x] 6.5 `POST /api/ai/catalog/family-suggestions` en `AiCatalogController` — sólo administradores, **sin escribir nada**.
+- [x] 6.6 `POST /api/ai/catalog/family-suggestions/apply` — persiste el subconjunto recibido **a través de `ProductFamilyService`**, con `Origin = AiApproved`, aprobador e instante.
+- [x] 6.7 Propagación del conflicto por producto (409 con el detalle de qué familia retiene cada uno) sin dejar familias a medias.
 
 ## 7. Tests .NET
 

@@ -137,6 +137,10 @@ public class AiHealthControllerTests : IAsyncLifetime
             AiEnrichRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
+            AiFamilySuggestRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(new AiHealthResponse
             {

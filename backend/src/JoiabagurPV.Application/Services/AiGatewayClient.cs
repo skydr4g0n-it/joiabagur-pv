@@ -56,6 +56,7 @@ public class AiGatewayClient : IAiGatewayClient
     private const string RetrievalPath = "/v1/retrieval/products";
     private const string EnrichPath = "/v1/enrich/products";
     private const string HealthPath = "/health";
+    private const string FamilySuggestPath = "/v1/families/suggest";
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IAiServiceTokenFactory _tokenFactory;
@@ -389,6 +390,122 @@ public class AiGatewayClient : IAiGatewayClient
         {
             throw Fail(AiGatewayOutcome.Transport, stopwatch,
                 new AiUnavailableException("The AI service could not be reached.", ex));
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
+        AiFamilySuggestRequest request,
+        AiCallScope scope,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(scope);
+
+        // Same guard as EnrichAsync, for the same reason: grouping covers the whole catalog, so
+        // a point-of-sale scope would narrow nothing and merely emit a claim the route ignores.
+        if (scope.Kind != AiCallScopeKind.Catalog)
+        {
+            throw new ArgumentException(
+                "Family suggestion requires a catalog scope. Grouping the catalog belongs to no "
+                + "point of sale.",
+                nameof(scope));
+        }
+
+        if (request.MaxProposals is < 1 or > AiFamilySuggestRequest.MaxProposalsLimit)
+        {
+            throw new ArgumentException(
+                $"max_proposals must be between 1 and {AiFamilySuggestRequest.MaxProposalsLimit}, "
+                + "which is the range the frozen contract accepts.",
+                nameof(request));
+        }
+
+        var traceId = _traceContextAccessor.CurrentTraceId;
+
+        using var logScope = _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["trace_id"] = traceId,
+            ["endpoint"] = FamilySuggestPath
+        });
+
+        _logger.LogInformation("ai_gateway_family_suggest_started {Role}", scope.Role);
+
+        var stopwatch = Stopwatch.StartNew();
+        AiGatewayAttemptTracker.Begin();
+
+        try
+        {
+            // The enrichment client, not the retrieval one: this is a catalog-wide batch that
+            // shares enrichment.s budget and breaker, and it must not spend retrieval.s.
+            var client = _httpClientFactory.CreateClient(EnrichClientName);
+
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, FamilySuggestPath)
+            {
+                Content = JsonContent.Create(request, options: AiGatewaySerialization.Options)
+            };
+
+            httpRequest.Headers.Authorization =
+                new AuthenticationHeaderValue("Bearer", _tokenFactory.Create(scope, traceId));
+            httpRequest.Headers.TryAddWithoutValidation(TraceHeaderName, traceId);
+
+            using var response = await client.SendAsync(httpRequest, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw TranslateStatus(response.StatusCode, stopwatch, FamilySuggestPath);
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<AiFamilySuggestResponse>(
+                AiGatewaySerialization.Options,
+                cancellationToken);
+
+            if (payload is null)
+            {
+                throw Fail(AiGatewayOutcome.ServerError, stopwatch,
+                    new AiUnavailableException("The AI service returned an empty suggestion body."));
+            }
+
+            stopwatch.Stop();
+
+            // The two refusal counts are logged beside the proposal count on purpose: a run that
+            // proposes little because it refused much is a catalog finding, not a quiet failure.
+            _logger.LogInformation(
+                "ai_gateway_family_suggest_completed {StatusCode} {LatencyMs} {Proposals} {Rejected} {Excluded}",
+                (int)response.StatusCode,
+                stopwatch.ElapsedMilliseconds,
+                payload.Proposals.Count,
+                payload.RejectedGroups.Count,
+                payload.ExcludedProducts.Count);
+
+            return payload;
+        }
+        catch (AiGatewayException)
+        {
+            throw;
+        }
+        catch (BrokenCircuitException ex)
+        {
+            throw Fail(AiGatewayOutcome.CircuitOpen, stopwatch,
+                new AiUnavailableException("The AI enrichment circuit is open; no request was issued.", ex));
+        }
+        catch (TimeoutRejectedException ex)
+        {
+            throw Fail(AiGatewayOutcome.Timeout, stopwatch,
+                new AiUnavailableException("The AI service did not answer within the batch time budget.", ex));
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw Fail(AiGatewayOutcome.Timeout, stopwatch,
+                new AiUnavailableException("The AI service did not answer within the batch time budget.", ex));
+        }
+        catch (HttpRequestException ex)
+        {
+            throw Fail(AiGatewayOutcome.Transport, stopwatch,
+                new AiUnavailableException("The AI service could not be reached.", ex));
+        }
+        finally
+        {
+            AiGatewayAttemptTracker.End();
         }
     }
 

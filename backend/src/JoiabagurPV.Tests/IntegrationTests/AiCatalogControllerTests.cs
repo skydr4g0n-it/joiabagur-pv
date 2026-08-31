@@ -312,6 +312,10 @@ public class AiCatalogControllerTests : IAsyncLifetime
 
         public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
+            AiFamilySuggestRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     /// <summary>A gateway that only knows how to fail, in the way the test chooses.</summary>
@@ -326,6 +330,10 @@ public class AiCatalogControllerTests : IAsyncLifetime
             throw failure();
 
         public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
+            throw failure();
+
+        public Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
+            AiFamilySuggestRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
             throw failure();
     }
 
@@ -384,6 +392,10 @@ public class AiCatalogControllerTests : IAsyncLifetime
         }
 
         public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
+            AiFamilySuggestRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }
 
