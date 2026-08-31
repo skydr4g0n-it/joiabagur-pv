@@ -57,6 +57,7 @@ public class AiGatewayClient : IAiGatewayClient
     private const string EnrichPath = "/v1/enrich/products";
     private const string HealthPath = "/health";
     private const string FamilySuggestPath = "/v1/families/suggest";
+    private const string FamilyAuditPath = "/v1/families/audit";
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IAiServiceTokenFactory _tokenFactory;
@@ -394,6 +395,128 @@ public class AiGatewayClient : IAiGatewayClient
     }
 
     /// <inheritdoc/>
+    public async Task<AiFamilyAuditResponse> AuditFamiliesAsync(
+        AiFamilyAuditRequest request,
+        AiCallScope scope,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(scope);
+
+        // Same guard as suggestion, for the same reason: the audit covers every family in the
+        // catalog, so a point-of-sale scope would narrow nothing and merely emit a claim the
+        // route ignores.
+        if (scope.Kind != AiCallScopeKind.Catalog)
+        {
+            throw new ArgumentException(
+                "Family audit requires a catalog scope. Auditing the catalog's families belongs "
+                + "to no point of sale.",
+                nameof(scope));
+        }
+
+        if (request.MaxOrphans is < 1 or > AiFamilyAuditRequest.MaxOrphansLimit)
+        {
+            throw new ArgumentException(
+                $"max_orphans must be between 1 and {AiFamilyAuditRequest.MaxOrphansLimit}, "
+                + "which is the range the frozen contract accepts.",
+                nameof(request));
+        }
+
+        var traceId = _traceContextAccessor.CurrentTraceId;
+
+        using var logScope = _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["trace_id"] = traceId,
+            ["endpoint"] = FamilyAuditPath
+        });
+
+        _logger.LogInformation(
+            "ai_gateway_family_audit_started {Role} {JudgedPairs}",
+            scope.Role,
+            request.JudgedPairs.Count);
+
+        var stopwatch = Stopwatch.StartNew();
+        AiGatewayAttemptTracker.Begin();
+
+        try
+        {
+            // The enrichment client, like suggestion: a catalog-wide read that shares enrichment's
+            // budget and breaker rather than spending retrieval's.
+            var client = _httpClientFactory.CreateClient(EnrichClientName);
+
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, FamilyAuditPath)
+            {
+                Content = JsonContent.Create(request, options: AiGatewaySerialization.Options)
+            };
+
+            httpRequest.Headers.Authorization =
+                new AuthenticationHeaderValue("Bearer", _tokenFactory.Create(scope, traceId));
+            httpRequest.Headers.TryAddWithoutValidation(TraceHeaderName, traceId);
+
+            using var response = await client.SendAsync(httpRequest, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw TranslateStatus(response.StatusCode, stopwatch, FamilyAuditPath);
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<AiFamilyAuditResponse>(
+                AiGatewaySerialization.Options,
+                cancellationToken);
+
+            if (payload is null)
+            {
+                // Never a silent empty result. On this route an empty body and a clean catalog
+                // look identical to the screen, and only one of them is true.
+                throw Fail(AiGatewayOutcome.ServerError, stopwatch,
+                    new AiUnavailableException("The AI service returned an empty audit body."));
+            }
+
+            stopwatch.Stop();
+
+            // The two examined counts are logged beside the findings, so that "nothing flagged"
+            // can be told from "nothing looked at" in the log as well as on the screen.
+            _logger.LogInformation(
+                "ai_gateway_family_audit_completed {StatusCode} {LatencyMs} {Flagged} {Candidates} {Families} {Members}",
+                (int)response.StatusCode,
+                stopwatch.ElapsedMilliseconds,
+                payload.FlaggedMembers.Count,
+                payload.OrphanCandidates.Count,
+                payload.FamiliesReviewedCount,
+                payload.MembersExaminedCount);
+
+            return payload;
+        }
+        catch (AiGatewayException)
+        {
+            throw;
+        }
+        catch (BrokenCircuitException ex)
+        {
+            throw Fail(AiGatewayOutcome.CircuitOpen, stopwatch,
+                new AiUnavailableException("The AI enrichment circuit is open; no request was issued.", ex));
+        }
+        catch (TimeoutRejectedException ex)
+        {
+            throw Fail(AiGatewayOutcome.Timeout, stopwatch,
+                new AiUnavailableException("The AI service did not answer within the batch time budget.", ex));
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw Fail(AiGatewayOutcome.Timeout, stopwatch,
+                new AiUnavailableException("The AI service did not answer within the batch time budget.", ex));
+        }
+        catch (HttpRequestException ex)
+        {
+            throw Fail(AiGatewayOutcome.Transport, stopwatch,
+                new AiUnavailableException("The AI service could not be reached.", ex));
+        }
+        finally
+        {
+            AiGatewayAttemptTracker.End();
+        }
+    }
+
     public async Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
         AiFamilySuggestRequest request,
         AiCallScope scope,

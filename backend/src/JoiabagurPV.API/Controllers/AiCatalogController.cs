@@ -30,24 +30,30 @@ public class AiCatalogController : ControllerBase
 {
     private readonly IProductAiProfileService _profileService;
     private readonly IFamilySuggestionService _familySuggestionService;
+    private readonly IFamilyAuditService _familyAuditService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IValidator<EnrichBatchRequest> _validator;
     private readonly IValidator<ApplyFamilySuggestionsRequest> _applyValidator;
+    private readonly IValidator<RecordFamilyVerdictsRequest> _verdictsValidator;
     private readonly ILogger<AiCatalogController> _logger;
 
     public AiCatalogController(
         IProductAiProfileService profileService,
         IFamilySuggestionService familySuggestionService,
+        IFamilyAuditService familyAuditService,
         ICurrentUserService currentUserService,
         IValidator<EnrichBatchRequest> validator,
         IValidator<ApplyFamilySuggestionsRequest> applyValidator,
+        IValidator<RecordFamilyVerdictsRequest> verdictsValidator,
         ILogger<AiCatalogController> logger)
     {
         _profileService = profileService;
         _familySuggestionService = familySuggestionService;
+        _familyAuditService = familyAuditService;
         _currentUserService = currentUserService;
         _validator = validator;
         _applyValidator = applyValidator;
+        _verdictsValidator = verdictsValidator;
         _logger = logger;
     }
 
@@ -219,5 +225,119 @@ public class AiCatalogController : ControllerBase
             request, _currentUserService.UserId.Value);
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Audits the families that exist, and nominates the products that look like their members.
+    /// </summary>
+    /// <param name="request">Optional narrowing, thresholds and candidate cap.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Flagged memberships, orphan candidates, and what the run still refuses.</returns>
+    /// <remarks>
+    /// <para>
+    /// Reads and writes nothing. Recording a judgement is <c>family-verdicts</c>, and keeping the
+    /// two apart is what lets a test assert that auditing changed nothing at all.
+    /// </para>
+    /// <para>
+    /// The pairs a person already ruled on are read from this side and sent along, because the AI
+    /// service holds no verdict: a store of judgements beside the index would be state nothing
+    /// invalidates.
+    /// </para>
+    /// </remarks>
+    [HttpPost("family-audit")]
+    [ProducesResponseType(typeof(AiFamilyAuditResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> AuditFamilies(
+        [FromBody] FamilyAuditQueryRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (!_currentUserService.UserId.HasValue)
+        {
+            return Unauthorized(new { message = "User not authenticated." });
+        }
+
+        try
+        {
+            var response = await _familyAuditService.AuditAsync(
+                request ?? new FamilyAuditQueryRequest(),
+                _currentUserService.UserId.Value,
+                _currentUserService.Role ?? "Administrator",
+                cancellationToken);
+
+            return Ok(response);
+        }
+        catch (AiNotImplementedException exception)
+        {
+            _logger.LogWarning(exception, "family_audit_not_implemented");
+
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new
+                {
+                    message = "Family audit is not available yet: the AI service has no "
+                        + "implementation for it."
+                });
+        }
+        catch (AiUnavailableException exception)
+        {
+            // 503 and never an empty result. This feeds a catalog-quality screen, where an empty
+            // answer reads as 'the catalog is clean' — asserting by accident the very conclusion
+            // the review exists to establish with evidence.
+            _logger.LogWarning(exception, "family_audit_ai_unavailable");
+
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new { message = "The AI service is unavailable. No audit was produced." });
+        }
+    }
+
+    /// <summary>
+    /// Records what an administrator decided about a batch of product and family pairs.
+    /// </summary>
+    /// <param name="request">The judgements.</param>
+    /// <returns>How many were recorded for the first time, and how many corrected an earlier one.</returns>
+    /// <remarks>
+    /// Idempotent per pair. Judging the same pair again replaces the standing record rather than
+    /// adding a second contradictory one, which is the invariant the unique index also enforces.
+    /// </remarks>
+    [HttpPost("family-verdicts")]
+    [ProducesResponseType(typeof(RecordFamilyVerdictsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> RecordFamilyVerdicts(
+        [FromBody] RecordFamilyVerdictsRequest? request)
+    {
+        if (!_currentUserService.UserId.HasValue)
+        {
+            return Unauthorized(new { message = "User not authenticated." });
+        }
+
+        if (request is null)
+        {
+            return BadRequest(new { errors = new[] { "A verdict body is required." } });
+        }
+
+        // Validated explicitly: this project registers validators but wires no automatic
+        // pipeline, so an uninvoked validator is worse than none — it looks like validation.
+        var validationResult = await _verdictsValidator.ValidateAsync(request);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(new { errors = validationResult.Errors.Select(e => e.ErrorMessage) });
+        }
+
+        try
+        {
+            var response = await _familyAuditService.RecordVerdictsAsync(
+                request, _currentUserService.UserId.Value);
+
+            return Ok(response);
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { errors = new[] { exception.Message } });
+        }
     }
 }

@@ -70,4 +70,27 @@ public interface IProductFamilyService
     /// </remarks>
     /// <exception cref="KeyNotFoundException">No product has that identifier.</exception>
     Task<ProductFamilyDto?> GetByProductIdAsync(Guid productId);
+
+    /// <summary>
+    /// Lists families matching the query, with the counts a review screen needs to triage them.
+    /// </summary>
+    Task<PaginatedResultDto<ProductFamilyListItemDto>> ListAsync(ProductFamilyQueryParameters query);
+
+    /// <summary>
+    /// Dissolves a family: it ceases to exist and its members belong to nothing.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Not the same as declaring an empty membership. An empty family is a legitimate state for one
+    /// being built and meaningless for one that was wrong, and leaving the shell behind puts a row
+    /// in every listing that a reviewer has to decide about again.
+    /// </para>
+    /// <para>
+    /// Stamps the departing products, without which an incremental index pull never emits them and
+    /// their documents keep a family identifier pointing at a family that is gone — silently. The
+    /// membership rows themselves go by cascade, and so do any verdicts recorded against the family.
+    /// </para>
+    /// </remarks>
+    /// <returns><c>false</c> when no family carries that identifier.</returns>
+    Task<bool> DeleteAsync(Guid id);
 }

@@ -109,3 +109,75 @@ public record ProductFamilyConflictDto(
     Guid ProductId,
     Guid FamilyId,
     string FamilyName);
+
+// ──────────────────────────────────────────────────────────────────────────────────────────────
+// C18b — enumerating and dissolving families, which the review screen cannot work without
+// ──────────────────────────────────────────────────────────────────────────────────────────────
+
+/// <summary>
+/// Narrowing and paging for the family listing.
+/// </summary>
+/// <remarks>
+/// Retrieval by identifier was the only read this controller offered, which is enough for a
+/// product's sibling list and useless for review: a person working through the catalogue's
+/// families has no identifier to start from, and no other operation produces the set.
+/// </remarks>
+public class ProductFamilyQueryParameters
+{
+    /// <summary>Largest page this endpoint will serve, matching the rest of the catalogue.</summary>
+    public const int MaxPageSize = 50;
+
+    /// <summary>Page number, 1-based.</summary>
+    public int Page { get; set; } = 1;
+
+    /// <summary>Items per page. Capped at <see cref="MaxPageSize"/>.</summary>
+    public int PageSize { get; set; } = MaxPageSize;
+
+    /// <summary>Restrict to families of one origin: <c>Manual</c> or <c>AiApproved</c>.</summary>
+    public string? Origin { get; set; }
+
+    /// <summary>Restrict to families whose members share one closed-vocabulary piece type.</summary>
+    /// <remarks>
+    /// Resolved through the AI profiles of the members, because the piece type is an enriched
+    /// attribute of the product and not a column on the family. A family whose members carry no
+    /// piece type simply never matches.
+    /// </remarks>
+    public string? PieceType { get; set; }
+
+    /// <summary>Restrict to families holding at least one product judged and rejected.</summary>
+    /// <remarks>
+    /// Named after what the reviewer is looking for rather than after the audit: the audit's
+    /// flags are recomputed on demand and live in no table, so the durable trace of "somebody
+    /// looked at this family and found something wrong" is a rejected verdict against one of its
+    /// members.
+    /// </remarks>
+    public bool? HasRejectedMembers { get; set; }
+}
+
+/// <summary>
+/// A family as it appears in a listing: enough to decide, without loading every member.
+/// </summary>
+/// <param name="Id">The family.</param>
+/// <param name="Name">What it is called.</param>
+/// <param name="Description">Free-form note, when there is one.</param>
+/// <param name="Origin">Whether it was created by hand or approved from a suggestion.</param>
+/// <param name="MemberCount">How many products it holds.</param>
+/// <param name="ApprovedByUserId">Who approved it, when it came from a suggestion.</param>
+/// <param name="ApprovedAt">When that approval happened.</param>
+/// <param name="ReviewedMemberCount">How many of its members carry a human verdict.</param>
+/// <param name="RejectedMemberCount">How many of those verdicts rejected the membership.</param>
+/// <remarks>
+/// The two review counts are what make the listing a work queue rather than a catalogue dump:
+/// without them a reviewer cannot tell a family nobody has opened from one already worked through,
+/// and the 156 families this catalogue holds all look identical on every other column.
+/// </remarks>
+public record ProductFamilyListItemDto(
+    Guid Id,
+    string Name,
+    string? Description,
+    string Origin,
+    int MemberCount,
+    Guid? ApprovedByUserId,
+    DateTime? ApprovedAt,
+    int ReviewedMemberCount,
+    int RejectedMemberCount);

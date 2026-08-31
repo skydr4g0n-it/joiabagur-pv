@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using JoiabagurPV.Application.DTOs.Auth;
 using JoiabagurPV.Application.DTOs.Products;
+using JoiabagurPV.Domain.Common;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Interfaces.Repositories;
 using JoiabagurPV.Infrastructure.Data;
@@ -689,6 +690,10 @@ public class ProductFamiliesControllerTests : IAsyncLifetime
         public Task RemoveMembersAsync(IEnumerable<ProductFamilyMember> members) => _inner.RemoveMembersAsync(members);
         public Task AddMembersAsync(IEnumerable<ProductFamilyMember> members) => _inner.AddMembersAsync(members);
         public Task StampUpdatedAtAsync(Guid familyId) => _inner.StampUpdatedAtAsync(familyId);
+        public Task<(List<ProductFamilySummary> Items, int TotalCount)> ListAsync(
+            ProductFamilyQuery query) => _inner.ListAsync(query);
+        public Task<List<Guid>> GetMemberProductIdsAsync(Guid familyId) =>
+            _inner.GetMemberProductIdsAsync(familyId);
         public IQueryable<ProductFamily> GetAll() => _inner.GetAll();
         public Task<ProductFamily?> GetByIdAsync(Guid id) => _inner.GetByIdAsync(id);
         public Task<ProductFamily> AddAsync(ProductFamily entity) => _inner.AddAsync(entity);

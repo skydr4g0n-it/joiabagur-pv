@@ -149,3 +149,174 @@ public class AiFamilySuggestResponse
     /// <summary>Correlation id echoed by the service.</summary>
     public string? TraceId { get; set; }
 }
+
+// ──────────────────────────────────────────────────────────────────────────────────────────────
+// C18b — the audit contract: the same comparison, read from both sides of membership
+// ──────────────────────────────────────────────────────────────────────────────────────────────
+
+/// <summary>
+/// A <c>(product, family)</c> pair a person has already ruled on.
+/// </summary>
+/// <remarks>
+/// Travels in the request because the AI service holds no verdict of its own and must not: the
+/// catalog's truth lives here, and a store of judgements beside the index would be state nothing
+/// invalidates. Assembling this set from <c>FamilyReviewVerdicts</c> is this side's work.
+/// </remarks>
+public class AiJudgedPair
+{
+    /// <summary>Identifier of the product.</summary>
+    public required string ProductId { get; set; }
+
+    /// <summary>Identifier of the family.</summary>
+    public required string FamilyId { get; set; }
+}
+
+/// <summary>
+/// Narrowing, thresholds and prior judgements for one audit run.
+/// </summary>
+public class AiFamilyAuditRequest
+{
+    /// <summary>Largest number of orphan candidates the frozen contract returns in one call.</summary>
+    /// <remarks>
+    /// Mirrored from <c>MAX_ORPHAN_CANDIDATES</c> on the Python side rather than picked here, for
+    /// the same reason as the suggestion cap: rejecting an out-of-range value before the round trip
+    /// turns a validation error into an immediate, explainable answer.
+    /// </remarks>
+    public const int MaxOrphansLimit = 500;
+
+    /// <summary>Restrict to one closed-vocabulary piece type; null audits all of them.</summary>
+    public string? PieceType { get; set; }
+
+    /// <summary>Overrides the service's configured veto margin for this run. Null uses it.</summary>
+    public double? VetoMargin { get; set; }
+
+    /// <summary>Overrides the service's configured orphan margin for this run. Null uses it.</summary>
+    public double? OrphanMargin { get; set; }
+
+    /// <summary>Upper bound on returned candidates. Refusals are never truncated.</summary>
+    public int MaxOrphans { get; set; } = MaxOrphansLimit;
+
+    /// <summary>Pairs already ruled on, omitted from both lists of the response.</summary>
+    public List<AiJudgedPair> JudgedPairs { get; set; } = [];
+}
+
+/// <summary>
+/// A member of an existing family that the vectors do not support.
+/// </summary>
+/// <remarks>
+/// This queue exists only because it is recomputed. Suggestion converges by excluding products
+/// that already belong somewhere, and C18a persisted no proposals, so the members it flagged at
+/// approval time are unreachable by every later suggestion: the flags lived in one response and
+/// the products are now inside families.
+/// </remarks>
+public class AiFlaggedFamilyMember
+{
+    /// <summary>Identifier of the product in the business database.</summary>
+    public required string ProductId { get; set; }
+
+    /// <summary>Product SKU.</summary>
+    public required string Sku { get; set; }
+
+    /// <summary>Product name as the catalog holds it.</summary>
+    public required string Name { get; set; }
+
+    /// <summary>Label that tells this member from its siblings. Null is the base piece.</summary>
+    public string? VariantLabel { get; set; }
+
+    /// <summary>Identifier of the family the product currently belongs to.</summary>
+    public required string FamilyId { get; set; }
+
+    /// <summary>Name of that family.</summary>
+    public string? FamilyName { get; set; }
+
+    /// <summary>How far the nearest stranger beat this member's own worst sibling.</summary>
+    public double Margin { get; set; }
+
+    /// <summary>Family of the product that beat the worst sibling.</summary>
+    public string? StrangerFamilyId { get; set; }
+
+    /// <summary>Why the member was flagged. Today only <c>closer_to_another_family</c>.</summary>
+    public string Reason { get; set; } = "closer_to_another_family";
+}
+
+/// <summary>
+/// A product belonging to no family that looks like it belongs to one.
+/// </summary>
+public class AiOrphanCandidate
+{
+    /// <summary>Identifier of the product in the business database.</summary>
+    public required string ProductId { get; set; }
+
+    /// <summary>Product SKU.</summary>
+    public required string Sku { get; set; }
+
+    /// <summary>Product name as the catalog holds it.</summary>
+    public required string Name { get; set; }
+
+    /// <summary>Closed-vocabulary piece type shared with the target family.</summary>
+    public required string PieceType { get; set; }
+
+    /// <summary>
+    /// <c>real</c> or <c>synthetic</c>.
+    /// </summary>
+    /// <remarks>
+    /// Carried because the two populations behave very differently here and every figure derived
+    /// from this list has to be able to separate them, the same discipline C24 applies.
+    /// </remarks>
+    public required string DataOrigin { get; set; }
+
+    /// <summary>Identifier of the family it is nominated for.</summary>
+    public required string FamilyId { get; set; }
+
+    /// <summary>Name of that family.</summary>
+    public string? FamilyName { get; set; }
+
+    /// <summary>Similarity to that family's members.</summary>
+    public double Similarity { get; set; }
+
+    /// <summary>Lowest similarity observed inside that family.</summary>
+    public double WorstSibling { get; set; }
+
+    /// <summary>
+    /// <c>Similarity - WorstSibling</c>. This is the nomination criterion.
+    /// </summary>
+    public double Margin { get; set; }
+
+    /// <summary>
+    /// Of the five nearest neighbours of the same piece type, how many belong to this family.
+    /// </summary>
+    /// <remarks>
+    /// <strong>A ranking signal only, never the criterion.</strong> Measured over this corpus,
+    /// purity nominates 55 synthetic products against 19 real ones, because the deliberate
+    /// <c>vN</c> families it cannot separate from a missing member are synthetic by construction.
+    /// Filtering on it here would silently adopt the mistake the margin exists to avoid.
+    /// </remarks>
+    public int Purity { get; set; }
+}
+
+/// <summary>
+/// Everything one audit run produced: both sides of the membership line, and both refusals.
+/// </summary>
+public class AiFamilyAuditResponse
+{
+    /// <summary>Members of existing families the vectors do not support.</summary>
+    public List<AiFlaggedFamilyMember> FlaggedMembers { get; set; } = [];
+
+    /// <summary>Unassigned products nominated as candidates, ordered by margin.</summary>
+    public List<AiOrphanCandidate> OrphanCandidates { get; set; } = [];
+
+    /// <summary>Groups a guard refused, recomputed over the current catalog state.</summary>
+    public List<AiRejectedFamilyGroup> RejectedGroups { get; set; } = [];
+
+    /// <summary>Products the piece-type gate removed, recomputed likewise.</summary>
+    public List<AiExcludedProduct> ExcludedProducts { get; set; } = [];
+
+    /// <summary>Families the audit examined, so an empty flag list is readable.</summary>
+    public int FamiliesReviewedCount { get; set; }
+
+    /// <summary>Memberships the audit examined, for the same reason.</summary>
+    public int MembersExaminedCount { get; set; }
+
+    /// <summary>Correlation id echoed by the service.</summary>
+    public string? TraceId { get; set; }
+}
