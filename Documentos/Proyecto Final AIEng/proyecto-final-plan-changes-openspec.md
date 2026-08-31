@@ -14,6 +14,44 @@
 
 Este documento se escribió antes de implementar. Cuando una sesión de diseño de un change concreto altera lo que su ficha decía, el cambio se registra aquí con fecha y motivo, y la ficha afectada se corrige en el sitio.
 
+### 2026-08-31 — C18b, al explorar: su ficha describe un mundo que C18a ya no dejó en pie
+
+**Los tres números que la ficha manda pintar están caducados, y el mecanismo que los produciría ya no los produce.** La ficha dice *«pintar la cola de revisión que C18a ya calcula: 15 miembros marcados, 4 grupos rechazados y 37 productos excluidos»*. Medido contra el Postgres local el mismo día que C18a se archivó:
+
+| La ficha | Medido | Por qué |
+|---|---|---|
+| 15 miembros marcados | **0 recalculables** | Los 486 ya pertenecen a una familia y `build_candidate_groups` los excluye en su paso 1 por convergencia. Las marcas vivían **sólo en la respuesta de `suggest`**, y la decisión 3 de C18a fue no persistir propuestas |
+| 4 grupos rechazados | **2** — `Alianzas Plata/oro` y `Cadena oro/plata` | `Encargos` y `Presión` salieron del índice con `ReviewStatus = Rejected` en el mismo lote: ya no son candidatos y su grupo no llega a formarse |
+| 37 productos excluidos | **11** | 26 de los 37 estaban entre los 32 retirados |
+| «una propuesta descartada reaparece» | **0 propuestas** | Se aplicaron las 156. `POST /v1/families/suggest` devuelve hoy lista vacía |
+
+Construir C18b literalmente entregaría **una pantalla vacía** — cuarta aparición de la firma que este proyecto persigue desde C17, tras A1 en C04, B5 en C16 y el índice en C17. **La ficha se reencuadra:** el objeto de la pantalla son las **156 familias que nadie ha mirado** (las 156 llevan `Origin = AiApproved` con aprobador e instante de un lote que se disparó de una vez, y hay **cero** familias `Manual`) y los **682 productos activos sin familia**, de los que **671 tienen `piece_type`**.
+
+**El hallazgo que hace pequeño el change: marcados y huérfanos son el mismo predicado.** Un miembro marcado es un producto **dentro** de una familia al que un extraño le gana a su peor hermano; un huérfano candidato es uno **fuera** al que le pasa lo mismo. Mismo cálculo, mismo objeto de revisión —el par `(producto, familia)`—, mismo veredicto humano: un endpoint, una consulta y una tabla, reutilizando `apply_relative_veto` con el universo de familias **persistidas** en vez de propuestas.
+
+**Y la medición volvió a desmentir la hipótesis de partida, como en C18a.** Se entró suponiendo que el umbral relativo se dispararía en cientos sobre 671 huérfanos y que la **pureza de vecindad** sería más segura por estar acotada por construcción. Es al revés:
+
+| `data_origin` | huérfanos | **A** · margen relativo > 0,02 | **B** · pureza ≥ 3 de 5 | A ∧ B |
+|---|---|---|---|---|
+| `real` | 216 | **21** | 19 | 6 |
+| `synthetic` | 434 | **1** | **55** | 0 |
+
+**A dispara 95 % sobre catálogo real; B, 74 % sobre sintético** — camina directo a la trampa que el `design.md` de C18a ya tenía escrita (*«fracasa en el sintético, donde `v2`/`v3`/`v4`/`v5` son casi-duplicados deliberados»*), nominando `Anillo Llama Eterna v3` → `Anillo llama eterna v2` y compañía. **A nomina y B ordena.** Curva del margen: `0 → 40` · `0,02 → 22` · `0,05 → 5` · `0,08 → 3`.
+
+**La alerta no es sólo calidad de catálogo: diagnostica el agrupador.** Los primeros por margen tienen causa nombrable — `Pendientes botón erizo de mar S dorado` (0,109), `Colgante Lapa Mini Dorado` (0,096) y `Pendientes botón estrella de mar dorado` (0,056) quedaron fuera porque **`dorado` no figura en `materials`** de `vocabularies.yaml`, que sí tiene `baño de oro` con `chapado en oro` y `gold plated` como sinónimos. Y como el agrupador lee `name` y no `materials[]`, **el sinónimo recupera familias sin reenriquecer y sin salto de prompt**: va en C18b, no en `fix-enrichment-vocabulary-gaps`, cuya mitad de `piece_type.terms` sí exige `enrichment/v2`.
+
+**Una familia contaminada es un imán.** `Colgante estrella de mar`, la que se comió un sintético, tiene peor hermano **0,778** frente a una media de 0,85–0,95, y atrae 4 de los 25 primeros por margen. Se corrige con orden y no con lógica: **auditar miembros antes que huérfanos** sube el listón y esos falsos positivos desaparecen solos.
+
+| Lo que decía la ficha | Lo que la exploración obligó | Motivo |
+|---|---|---|
+| **Zona:** frontend + `Application/` | **Python + .NET + frontend, y con migración** | El endpoint de auditoría necesita los vectores, y **.NET no mapea el esquema `ai`** (cero referencias en `Infrastructure/`). El propio test que la ficha pide, `test_orphan_detection_...`, es de pytest. **Séptima vez** que la zona de una ficha se queda corta, tras C08, C07, C15, C16 y C17 |
+| «lista de **descartes** persistente» de propuestas | **Veredictos sobre pares `(producto, familia)`** | Los tres objetos descartables no son equivalentes: una propuesta **no tiene clave estable** y hoy hay cero; un miembro marcado y un huérfano candidato **comparten clave**. Y esa misma fila **es el sello por ítem** que la decisión 7 de C18a aplazó aquí: una tabla responde a tres promesas |
+| Sin migración *(C18 nunca fue 🗄️)* | **🗄️ — séptima migración del plan**, `FamilyReviewVerdict` | La contención **caducó**: anulados C19 y C29, el §12 ya sólo cuenta la de C27. Una tabla en `ai` reintroduciría *«un estado paralelo a .NET que nada invalida»*, porque `ai.product_document` es una proyección que se lapida y reconstruye |
+| «el frontend es lo único nuevo» | Faltan además **`GET /api/product-families`** y **`DELETE /api/product-families/{id}`** | No hay listado: una pantalla que revisa 156 familias no puede enumerarlas. Y sin borrado, disolver una familia mala deja **una familia fantasma sin miembros** |
+| Revisión sólo de lo marcado | **Se reaprueban las 156 ítem a ítem** | Es lo que produce la evidencia del renglón *«métricas de revisión humana»* del §16, que **hoy no tiene ninguna**: cero productos y cero familias han pasado por revisión real. Y revisar no mueve el corpus — sólo lo mueve **cambiar** |
+
+**Y una consecuencia de reparto que conviene fijar aquí:** C18b y **C28** son la misma pantalla dos veces —ambas *frontend + `Application/`*, sólo administrador, revisión por lotes de salida de IA, y EP13 ya las agrupa—. C18b construye la **carcasa** y es su primer inquilino; C28 es el segundo. Lo que se extrae es **sólo lo que la ficha de C28 pide por escrito** (tabla editable, atajos de teclado, aprobación masiva, registro de quién revisó y qué cambió), nada conjeturado. Las dos alimentan la misma tabla del README: corrección del **agrupador** y corrección del **extractor**.
+
 ### 2026-08-31 — Prórroga abierta y equipo de uno: se deja de planificar por calendario
 
 El proyecto pasa a tener **prórroga abierta**: no hay fecha de entrega, y el objetivo es entregar cuanto antes. Y lo desarrolla **una sola persona**, no dos.
@@ -493,7 +531,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 | **C16** | `add-frontend-assisted-search-panel` | Frontend + .NET | C15 | 🔴 | **rev. 29 ago · archivado** |
 | **C17** | `add-ai-service-deployment` | Infra + Python + .NET + FE | C15 | 🔴 | **rev. 29 ago** |
 | **C18a** | `add-family-suggestion-and-approval` | Python + .NET | C07, C13 | 🟢 | **rev. dec. 2**, **31 ago · archivado** |
-| **C18b** | `add-family-review-ui-and-orphan-alert` | Frontend | C18a | 🟢 | **rev. dec. 2**, **partido el 31 ago** |
+| **C18b** | `add-family-review-ui-and-orphan-alert` | Python + .NET 🗄️ + FE | C18a | 🟢 | **rev. dec. 2**, **partido el 31 ago**, **ficha reescrita el 31 ago** |
 | ~~**C19**~~ | ~~`add-demand-signal-service`~~ | .NET 🗄️ | C10 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
 | **C20** | `add-synonym-dictionary` | Python | C14 | 🟢 | **rev. dec. 4** · *tapona a C21: se coge primero* |
 | **C21** | `add-hybrid-search-rrf` | Python | C14, C20 | 🔴 | — |
@@ -783,12 +821,22 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 **Tres correcciones que el apply obligó a hacer.** *(1)* El **umbral absoluto del §7.5 no existe**: peor hermano y mejor extraño se solapan (real 0,847–0,936). La raíz agrupa y el embedding veta, **en relativo**. *(2)* El **stripping global de material degenera** `Anillo plata S/M/L/XL` a la raíz `anillo`; la fusión no. *(3)* El 1,7 % que la exploración midió describía familias de sufijo de talla solamente; sobre el algoritmo entregado la cifra honesta es **3,1 %**.
 
-#### C18b · `add-family-review-ui-and-orphan-alert` 🟢
+#### C18b · `add-family-review-ui-and-orphan-alert` 🟢 🗄️
 
-**Objetivo.** El segundo caso de intervención humana del PF: revisión por **ítem**, no por lote.
-**Prereq.** C18a · **Zona.** frontend + `Application/`
-**Alcance.** Pantalla de revisión por lotes sobre los dos endpoints que C18a ya expone —el frontend es lo único nuevo—; lista de **descartes** persistente, que es lo que C18a no tiene y hace que una propuesta rechazada reaparezca; **alerta de huérfanos** (producto muy similar a una familia sin pertenecer a ella), que necesita familias existentes y por eso es de aquí; y pintar la cola de revisión que C18a ya calcula: 15 miembros marcados, 4 grupos rechazados y 37 productos excluidos por la puerta.
-**Tests.** `should create family when suggestion is approved`; `should keep a dismissed suggestion out of the next run`; `test_orphan_detection_lists_unassigned_similar_products`; `should show why a group was rejected`.
+> **Ficha reescrita el 2026-08-31** tras la sesión de exploración. Sus tres números —15 marcados, 4 rechazados, 37 excluidos— quedaron caducados al aplicarse C18a, y su zona se quedaba corta por séptima vez. Motivo, medición y decisiones en el **§0 · *C18b, al explorar***.
+
+**Objetivo.** El segundo caso de intervención humana del PF: **auditar lo que existe**, no pintar propuestas que ya no hay. Y producir la evidencia del renglón *«métricas de revisión humana»* del §16, que hoy no tiene ninguna.
+**Prereq.** C18a · **Zona.** `ai-service/src/jbg_ai/families/`, `backend/` *(incluidos `Infrastructure/` y `Tests/`: es 🗄️)*, `frontend/` · **Lleva `design.md`**
+
+**Punto de partida medido (2026-08-31).** 156 familias · 486 miembros · **0 familias `Manual`** · 1.168 documentos · **682 activos sin familia**, 671 de ellos con `piece_type` · 2 grupos rechazados · 11 excluidos por la puerta.
+
+**Alcance.** **`POST /v1/families/audit`**, **décima ruta** del contrato congelado, devolviendo en una llamada los **miembros marcados** sobre familias *persistidas* —`apply_relative_veto` de C18a con el universo cambiado— y los **huérfanos candidatos**, nominados por **margen relativo** y ordenados por pureza de vecindad, con la puerta de `piece_type` y reportando `data_origin`; **`FamilyReviewVerdict`** y la **séptima migración**, con el par `(ProductId, FamilyId)` como identidad del juicio, borrado en cascada desde la familia, y que **es a la vez la lista de descartes y el sello de aprobación por ítem**; **`GET /api/product-families`** paginado y **`DELETE /api/product-families/{id}`**, que hoy no existen; `POST /api/ai/catalog/family-audit` y `.../family-verdicts`; **`materials.synonyms` += `dorado: baño de oro`**, que recupera familias sin reenriquecer, con diff completo de propuestas antes de aceptarlo; y la **carcasa de revisión** en frontend —tabla, teclado, confirmación en bloque, cronómetro por ítem— de la que **C28 será el segundo inquilino**. Se **reaprueban las 156** ítem a ítem, y el informe del lote publica tasa de corrección del agrupador y tiempo medio.
+
+**Fuera de alcance.** Ampliar `piece_type.terms` y el salto a `enrichment/v2` — es `fix-enrichment-vocabulary-gaps`, propuesto en el §0 y **sin número** *(no es C20, que es el diccionario de sinónimos **de consulta**)*; reenriquecer producto alguno; tocar la fusión por material, la guarda de raíz degenerada o el rango canónico de tallas; persistir propuestas de `suggest`; `source-text/v1`, `embedding_version` e `indexing/embeddings.py`; la pantalla de perfiles y su endpoint de métricas (**C28**); y **el comportamiento de la pantalla cuando `jbg-ai` no responde** — se cubre con los estados de error convencionales del frontend, sin requisito propio.
+
+**Orden.** Cambia pertenencias y `preprocessing_id` sigue siendo `source-text/v1`, que no delataría el movimiento: **antes de la línea base de C24**. Barato de cumplir, porque **confirmar sin cambiar no mueve el corpus**.
+
+**Tests.** `test_audit_flags_member_when_stranger_beats_worst_sibling`; `test_orphan_detection_lists_unassigned_similar_products`; `test_orphan_nomination_never_crosses_piece_type`; `test_audit_writes_nothing`; `Verdict_DismissedPair_ExcludedFromNextAudit`; `DeleteFamily_CascadesVerdictsAndFreesProducts`; `ListFamilies_RequiresAdministrator`; test de desfase modelo↔migración; `should keep a dismissed suggestion out of the next run`; `should show why a group was rejected`.
 
 ---
 
@@ -1078,7 +1126,7 @@ flowchart LR
 | C23 | C30 | |
 | C22 | C25, C26 | |
 | C28 | nada — pero lo pide el checklist §16 del diseño | hoja obligatoria |
-| C18b | nada | hoja recortable |
+| C18b | nada — pero es la única evidencia posible del checklist §16 sobre familias | hoja, ya no gratis de recortar |
 
 **Cadena crítica que queda:** `C20 → C21 → C24 → C25 → C26 → C34 → C36`, con `C22` y `C23` entrando por los lados, y `C30 → C31 → C32 → C38 → C39` cerrando.
 
@@ -1105,7 +1153,7 @@ Con un solo desarrollador esto deja de ser coordinación y pasa a ser disciplina
 |---|---|
 | C15 ‖ C34 | ~~Mismo controlador `AiController.cs`~~ → **mismo servicio de búsqueda**. `AiController.cs` no existe: el patrón real es un controlador por capacidad *(corregido el 2026-08-28)* |
 | C16 ‖ C36 | Misma página y servicio del frontend |
-| Cualquier par de 🗄️ (C04, C07, C08, C27) | Dos migraciones EF Core simultáneas colisionan en el orden. **De seis migraciones planificadas quedan cuatro**: C19 y C29 se anularon, y las tres primeras ya están archivadas — la única viva es la de C27, y lleva corte pre-autorizado |
+| Cualquier par de 🗄️ (C04, C07, C08, **C18b**, C27) | Dos migraciones EF Core simultáneas colisionan en el orden. **De seis planificadas quedaban cuatro** —C19 y C29 anulados, las tres primeras archivadas— y **C18b abre una quinta el 31 de agosto**: la contención que la impedía desapareció con la rama de C19. **Vivas: la de C18b y la de C27**, que además lleva corte pre-autorizado. No se abren a la vez |
 | C13 ‖ C11 | C13 depende del cliente de embeddings congelado en C11 |
 | C21 ‖ C22 ‖ C25 | Los tres tocan el pipeline de ranking en `retrieval/` |
 | C13 ‖ C23 | Zona `indexing/` compartida: separados por fichero, pero no solapar si hay dudas |
@@ -1127,7 +1175,7 @@ Los cortes **1 y 2 están confirmados de antemano** y se aplican desde el princi
 
 Tres entradas nuevas en esa lista, y conviene el porqué: **C20** porque tapona a C21 y con él al grafo entero; **C31** porque sin guardrails el agente de C32 no es defendible como sistema en producción; y **C28** porque el checklist de entrega del documento hermano pide literalmente *«métricas de revisión humana del enriquecimiento»* y su §11.5 advierte de que esos números *«no existen sin la vía revisada»* — es una casilla marcada o vacía, no un grado.
 
-**C06b sí admite recorte** *(ya archivado, se conserva la nota)*: si no hubiera llegado, el corpus se quedaba en los 436 reales, con las métricas reportadas sobre ellos y el README declarando que no hubo ampliación sintética. **C18b** es hoja del grafo: nadie depende de ella y cae sin efectos.
+**C06b sí admite recorte** *(ya archivado, se conserva la nota)*: si no hubiera llegado, el corpus se quedaba en los 436 reales, con las métricas reportadas sobre ellos y el README declarando que no hubo ampliación sintética. **C18b** sigue siendo hoja del grafo —nadie depende de ella— pero **ya no cae sin efectos** *(revisado el 2026-08-31)*: es lo único que puede revisar las 156 familias que hoy nadie ha mirado y lo único que produce la tasa de corrección del agrupador para el §16. Recortarla deja esa casilla del checklist con la mitad de la evidencia, la de C28. Y se lleva por delante la alerta que destapó que el agrupador de C18a se dejó miembros fuera por una laguna del vocabulario.
 
 ---
 
@@ -1142,5 +1190,5 @@ Tres entradas nuevas en esa lista, y conviene el porqué: **C20** porque tapona 
 | **El golden set lo etiqueta una sola persona** | No se finge la conciliación: *pooling* sobre la unión de configuraciones, relectura diferida de las dudosas, y la ausencia de acuerdo entre anotadores **declarada** en el README como limitación |
 | C09, C10 y C38 son sesiones largas | Punto de partición predefinido en cada ficha; se entrega primero la mitad que desbloquea |
 | ~~C29 necesita saber cuál es el POS origen de suministro~~ | **Sin objeto:** C29 anulada. `IsSupplySource` no llega a existir en SQL, y sigue viviendo solo en el YAML de C10 |
-| ~~Seis~~ **Cuatro** migraciones EF Core (C04, C07, C08, C27) | Tres archivadas; **la única viva es la de C27**, que además es el corte nº 1. Regla de migración única activa |
-| Artefactos OpenSpec consumen tiempo de sesión | `design.md` solo cuando hay decisión con alternativas reales (C02, C11, C21, C22, C24, C32); en el resto, `proposal` + `tasks` + spec delta |
+| ~~Seis~~ ~~Cuatro~~ **Cinco** migraciones EF Core (C04, C07, C08, **C18b**, C27) | Tres archivadas. **C18b abre una el 31 de agosto** —`FamilyReviewVerdict`—, posible porque la contención por el turno murió con la rama de C19. **Vivas: C18b y C27**, ésta además el corte nº 1. Regla de migración única activa: no se abren a la vez |
+| Artefactos OpenSpec consumen tiempo de sesión | `design.md` solo cuando hay decisión con alternativas reales (C02, C11, C21, C22, C24, C32, y de hecho también **C17**, **C18a** y **C18b**); en el resto, `proposal` + `tasks` + spec delta |
