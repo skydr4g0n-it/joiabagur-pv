@@ -3,16 +3,20 @@
 **Versión:** 3 — consenso tras la revisión de la [PR #4](https://github.com/skydr4g0n-it/joiabagur-pv/pull/4) y las [especificaciones funcionales v2](joiabagur-ia-especificaciones-funcionales-v2.md)
 **Documento:** diseño conceptual + estrategia de datos + plan de ejecución
 **Dominio:** Joiabagur PV (gestión de puntos de venta de joyería)
-**Fecha de entrega del PF:** 3 de septiembre de 2026 — *sin margen asumido*
+**Fecha de entrega del PF:** **prórroga abierta desde el 2026-08-31** — sin fecha; el objetivo es entregar cuanto antes
 **Rama de entrega:** `finalproject-[INICIALES]` *(placeholder)*
-**Equipo:** **2 desarrolladores**, ambos trabajando indistintamente en Python y .NET/frontend
+**Equipo:** **1 desarrollador**, trabajando en Python, .NET y frontend
 **Descomposición ejecutable:** [proyecto-final-plan-changes-openspec.md](proyecto-final-plan-changes-openspec.md)
+
+> **Tres supuestos de la versión 3 dejaron de valer el 2026-08-31**, y el documento se lee con eso puesto: la entrega tenía fecha y ahora tiene **prórroga abierta**; el equipo eran **dos personas y ahora es una**; y el **agente de inventario se anula** junto con toda su rama de implementación (C19, C29, C33, C35, C37). El razonamiento completo está en el §0 del documento hermano. Aquí las secciones afectadas —§4, §9, §10, §11, §13, §14, §15 y §16— llevan la corrección en el sitio, y **el §10 se conserva íntegro a propósito**: es el diseño que el README adjunta como próximo paso.
 
 ---
 
 ## 0. Resumen ejecutivo
 
-Construimos un **buscador semántico de catálogo con venta asistida** para operadores de joyería, más un **agente de inventario que propone reposiciones y traslados con aprobación humana**, servidos por un microservicio RAG en Python sobre pgvector e integrados en el backend .NET existente.
+Construimos un **buscador semántico de catálogo con venta asistida** para operadores de joyería, servido por un microservicio RAG en Python sobre pgvector e integrado en el backend .NET existente, con un **agente asistente de venta** de tools de solo lectura y humano en el bucle.
+
+El **agente de inventario** —reposiciones y traslados con aprobación humana— estaba en el alcance acordado y **se anula el 2026-08-31**: no aportaba nada al sistema RAG (la señal de demanda que pondera el ranking ya llega por el feed de indexación) y costaba cinco changes de los que tres no tenían LLM. Su diseño se conserva completo en el §10 y se entrega como próximo paso documentado.
 
 ### Qué cambia respecto a la versión anterior
 
@@ -42,9 +46,9 @@ Las dos primeras están **⏳ pendientes de acuerdo** y se cierran en conversaci
 
 ### Restricciones que gobiernan el documento
 
-**Tiempo:** quedan **4,4 semanas** (3 de agosto → 3 de septiembre). **Equipo: dos personas.** El alcance acordado son **39 changes** de 2-3 h, es decir **~4,4 changes por persona y semana** sostenidos durante mes y medio de agosto. Es un ritmo alto y conviene decirlo ahora: §13.4 fija el orden de corte **antes** de empezar, no cuando falle.
+**Tiempo:** *(reescrito el 2026-08-31)* **prórroga abierta, sin fecha de entrega.** El objetivo es entregar cuanto antes, y en consecuencia lo que ordena el trabajo no es el calendario sino el **desbloqueo del grafo de dependencias** (§4 del documento hermano). **Equipo: una persona.** De las 41 fichas planificadas quedan **36 vivas**: 19 archivadas y 17 pendientes. El orden de corte del §13.4 sigue fijado de antemano, y ahora tiene cuatro posiciones en vez de ocho.
 
-> **Alcance de la entrega (respuesta a la decisión 1):** esto es **Fase 1 completa + Fase 3 parcial** de las especificaciones v2. Packing list (Fase 4), liquidación con descuentos, upsell/downsell y políticas de inventario configurables quedan **explícitamente fuera** y documentadas como fase posterior.
+> **Alcance de la entrega (respuesta a la decisión 1):** esto es **Fase 1 completa + Fase 3 parcial** de las especificaciones v2. Packing list (Fase 4), liquidación con descuentos, upsell/downsell, políticas de inventario configurables y —**desde el 2026-08-31**— el **agente de inventario completo** quedan **explícitamente fuera** y documentados como fase posterior.
 
 ---
 
@@ -123,11 +127,11 @@ La v2 corrige la mayoría de lo que criticaba la versión anterior de este docum
 | 4 | Venta asistida (agrupación por familia, avisos por reglas, citas) | **Núcleo** | Capa de generación con atribución verificable |
 | 5 | Agente asistente de venta (tools de solo lectura, guardrails, HITL) | **Núcleo** | Requisito del PF |
 | 6 | Sustitutos por falta de stock | **Núcleo** | Reutiliza el retriever |
-| 7 | Complementarios por reglas + co-ocurrencia | **Acordado** | Decisión 8 de la revisión |
-| 8 | Perfil comercial por POS, calculado periódicamente | **Acordado** | Decisión 7 |
-| 9 | Agente de inventario: reposición, traslados, rotación/stock parado, con aprobación | **Acordado** | Decisión 6. Segundo agente + HITL: sirve al producto y al PF |
-| 10 | Evaluación (golden set, ablations, validador anti-alucinación, escenarios de agente) | **Núcleo** | Requisito del PF |
-| 11 | Vista imprimible de recomendaciones aprobadas por POS | **Acordado (reducido)** | Sustituye a la packing list completa |
+| 7 | Complementarios por reglas + co-ocurrencia | **Acordado (con corte pre-autorizado)** | Decisión 8 de la revisión. Es el corte nº 1 del §13.4 |
+| 8 | Perfil comercial por POS, calculado periódicamente | **Fuera — fase posterior** *(31 ago)* | Decisión 7. Cae con la rama del agente de inventario, aunque **no dependía de ella**: es el único de los cinco rescatable por separado, y el §13.4 explica cómo |
+| 9 | Agente de inventario: reposición, traslados, rotación/stock parado, con aprobación | **Fuera — fase posterior** *(31 ago)* | Decisión 6. **Anulado:** cero aporte al sistema RAG a cambio de cinco changes, tres de ellos sin LLM. Diseño íntegro conservado en el §10 |
+| 10 | Evaluación (golden set, ablations, validador anti-alucinación, escenarios de agente) | **Núcleo** | Requisito del PF. Sin los 8-10 escenarios de inventario ni el test de fidelidad del perfil por POS |
+| 11 | Vista imprimible de recomendaciones aprobadas por POS | **Fuera — fase posterior** *(31 ago)* | Sin recomendaciones que aprobar, no hay nada que imprimir |
 | 12 | Packing list con máquina de 6 estados y auditoría | **Fuera — fase posterior** | Cero IA, aguas abajo, no bloquea nada |
 | 13 | Liquidación con descuentos, `InventoryPolicy` configurable | **Fuera** | Toca precios; requiere decisión de negocio y auditoría propia |
 | 14 | Upsell / downsell / prioridad comercial por margen | **Fuera** | Viable (el margen existe) pero sin datos para validarlo antes del 3/9 |
@@ -153,20 +157,19 @@ La v2 corrige la mayoría de lo que criticaba la versión anterior de este docum
 ```mermaid
 flowchart TB
     subgraph cliente["Cliente"]
-        SPA["React SPA · Buscar con ayuda · Revisión de recomendaciones"]
+        SPA["React SPA · Buscar con ayuda · Card de venta asistida · Revisión de perfiles"]
     end
 
     subgraph ec2["EC2 · nginx TLS"]
         subgraph net["Backend .NET 10 — toda la regla de negocio"]
             API["ASP.NET Core API"]
-            BIZ["Familias · Perfiles IA · Señales de demanda · Motor de recomendaciones · Perfil por POS"]
+            BIZ["Familias · Perfiles IA · Agregados de venta del feed"]
             HYD["Hidratador: stock, precio, permisos POS — AUTORIDAD FINAL"]
             CB["Circuit breaker + fallback léxico"]
         end
         subgraph py["jbg-ai (Python · FastAPI) — solo vectorial y LLM"]
             R1["/v1/retrieval · híbrido, sinónimos, sustitutos, complementarios"]
             R2["/v1/assist · generación con citas + agente de venta"]
-            R3["/v1/inventory/propose · agente de inventario"]
             R4["/v1/index · /v1/enrich"]
             EV["Harness de evals (offline)"]
         end
@@ -179,9 +182,8 @@ flowchart TB
     API --> CB
     CB -->|JWT interno| R1
     CB -->|JWT interno| R2
-    CB -->|JWT interno| R3
     R4 -->|feed paginado since-cursor| API
-    R3 -->|tools: señales de demanda| API
+    R2 -->|tool: consultar_disponibilidad| API
     API --> BIZ
     BIZ --> DB
     API --> HYD
@@ -189,9 +191,12 @@ flowchart TB
     R1 --> DB
     R2 --> R1
     R2 --> LLM
-    R3 --> LLM
     R4 --> LLM
 ```
+
+> **Corregido el 2026-08-31.** El diagrama de la v3 dibujaba un tercer servicio Python, `/v1/inventory/propose`, y una arista de vuelta `Python → .NET` etiquetada *«tools: señales de demanda»*. Ambos desaparecen con la anulación del agente de inventario.
+>
+> La llamada de vuelta **no desaparece**: `consultar_disponibilidad` es tool del agente de venta y también va de Python a .NET. Lo que cambia es su superficie, y para bien. **El §6.4 solo especifica el sentido .NET → Python** (JWT interno de servicio HS256 con `pos_id` y `trace_id`); el de vuelta seguía sin esquema definido, y ahora tiene que resolverse **una sola vez, para un dato que el hidratador ya es autoridad de expresar**, en lugar de dos veces y transportando además cifras de demanda por producto. Queda como decisión abierta del change del agente de venta.
 
 ### 6.2. Qué vive dónde (respuesta a la decisión 9)
 
@@ -199,10 +204,9 @@ flowchart TB
 |---|---|---|
 | Catálogo, precios, POS, permisos, inventario, ventas | **.NET** | Fuente de verdad transaccional |
 | `ProductAiProfile`, `ProductFamily`, `ProductFamilyMember`, `ProductRecommendation` (curación manual) | **.NET** | Datos de negocio revisables por humanos |
-| **Señales de demanda** (`sales_7/30/60d`, cobertura, días sin venta, stock en otros POS) | **.NET, en SQL** | Cálculos deterministas sobre datos transaccionales. Un LLM aquí solo introduce error |
-| **Motor de recomendaciones de inventario** (reglas de reposición, traslado, rotación) | **.NET** | Reglas de negocio auditables y testeables sin LLM |
-| `InventoryRecommendation` y su ciclo de aprobación | **.NET** | Escritura sensible con auditoría |
-| Perfil comercial por POS (métricas) | **.NET, en SQL** | Métricas calculadas; el LLM solo redacta el resumen |
+| **Agregados de venta por (producto, POS)** — `sales30d`, `sales90d`, `lastSaleAt`, `qtyBucket` | **.NET, en SQL** | Cálculos deterministas sobre datos transaccionales. Un LLM aquí solo introduce error. **Ya implementados** en el feed de indexación; son la señal de negocio que pondera el ranking |
+| ~~Señales de demanda de inventario~~ (`sales_7/60d`, días a rotura, stock en otros POS) | — | **Fuera desde el 31 ago.** Nunca alimentaron el ranking: eso lo hace la fila de arriba. Diseño en el §10.1 |
+| ~~Motor de recomendaciones · `InventoryRecommendation` · perfil por POS~~ | — | **Fuera desde el 31 ago.** Diseño en §10.2, §10.3 y §10.4 |
 | Embeddings, índice vectorial, recuperación híbrida, sustitutos, complementarios | **Python** | Es el espacio vectorial |
 | Generación con citas, guardrails, bucles agénticos | **Python** | Es la capa LLM |
 | Evaluación offline | **Python** | Instrumental del máster (RAGAS, harness) |
@@ -352,7 +356,9 @@ La respuesta es **estructurada**, no prosa libre:
 | `color_tags`, `style_tags`, `occasion_tags` | **Auto-aprobación** si la confianza supera el umbral; a revisión si no |
 | Cualquier campo con confianza bajo umbral | Revisión |
 
-**El problema operativo, dicho abiertamente:** con ~1.000 productos, "revisar todos los campos sensibles inferidos" son horas de trabajo humano que no tenemos antes del 3 de septiembre, y si solo se indexan perfiles aprobados el corpus queda vacío y no hay demo.
+**El problema operativo, dicho abiertamente:** con ~1.000 productos, "revisar todos los campos sensibles inferidos" son horas de trabajo humano que no hay, y si solo se indexan perfiles aprobados el corpus queda vacío y no hay demo.
+
+> **Matiz del 2026-08-31.** La restricción original era de calendario —*«que no tenemos antes del 3 de septiembre»*— y con **prórroga abierta** ya no lo es. Sigue siendo real, pero por otra razón: es **una sola persona** revisando, y el cuello de botella es de atención, no de fecha. La consecuencia práctica sí cambia y conviene aprovecharla: el lote revisado **puede crecer por encima de los 120-150** sin romper nada, y hacerlo mejora directamente los dos números que el checklist del §16 exige —tasa de corrección por campo y tiempo medio de revisión—, que son mejores cuanto mayor es la muestra. El porcentaje revisado que acabe declarando la limitación 2 del §15 se fija con lo que se revise de verdad, no con este párrafo.
 
 **Cómo se resuelve sin hacer trampa:** dos vías declaradas y distinguibles en los datos.
 
@@ -446,14 +452,18 @@ Familias confundibles (3-5 variantes con diferencia solo de talla **en el nombre
 
 ## 9. Capa agéntica
 
-### 9.1. Dos agentes, ninguno escribe
+### 9.1. Un agente, y no escribe
+
+Eran dos hasta el 2026-08-31; el de inventario se anuló con toda su rama de implementación.
 
 | Agente | Qué decide | Tools (todas de lectura) | Salida |
 |---|---|---|---|
-| **Asistente de venta** (síncrono) | Si buscar, si pedir aclaración, si pivotar a sustitutos o variantes, si consultar conocimiento | `buscar_catalogo`, `consultar_disponibilidad` (.NET), `listar_familia`, `buscar_sustitutos`, `buscar_complementarios`, `consultar_conocimiento`, `perfil_punto_venta`, `pedir_aclaracion` | Resultados estructurados + borrador de venta que confirma el operador |
-| **Agente de inventario** (batch) | Qué priorizar, qué sustituto proponer cuando no hay stock, cómo redactar el motivo | `senales_demanda` (.NET, SQL), `stock_por_pos` (.NET), `buscar_sustitutos`, `perfil_punto_venta` | `InventoryRecommendation` en estado **`Proposed`**; el admin aprueba |
+| **Asistente de venta** (síncrono) | Si buscar, si pedir aclaración, si pivotar a sustitutos o variantes, si consultar conocimiento | `buscar_catalogo`, `consultar_disponibilidad` (.NET), `listar_familia`, `buscar_sustitutos`, `buscar_complementarios`, `consultar_conocimiento`, `pedir_aclaracion` | Resultados estructurados + borrador de venta que confirma el operador |
+| ~~**Agente de inventario** (batch)~~ | ~~Qué priorizar, qué sustituto proponer, cómo redactar el motivo~~ | ~~`senales_demanda`, `stock_por_pos`, `buscar_sustitutos`, `perfil_punto_venta`~~ | **Fuera desde el 31 ago** |
 
-**Los números nunca los calcula el LLM.** Las señales de demanda y las reglas de reposición son SQL en .NET; el agente prioriza, elige sustituto y redacta el motivo. Es exactamente la matriz §7.3 de las especificaciones v2.
+**Siete tools, no ocho.** `perfil_punto_venta` sale del registro con el perfil por POS: registrar una tool cuyo servicio no existe le da al modelo una herramienta que falla siempre, y una tool que devuelve error es peor que una tool ausente — el bucle la reintenta y quema presupuesto. Si el perfil por POS se rescata, vuelve. Y `buscar_complementarios` sale también si se dispara el corte nº 1 del §13.4.
+
+**Los números nunca los calcula el LLM.** Sigue siendo el principio rector, y sigue siendo verificable con lo que queda: precio y stock viajan como **placeholders** que el modelo no puede rellenar (§7.7), el hidratador .NET los resuelve, y el validador determinista del §11.3 rechaza la respuesta si sobrevive alguna cifra sin contrastar. Es exactamente la matriz §7.3 de las especificaciones v2.
 
 ### 9.2. Control del bucle y HITL
 
@@ -463,11 +473,20 @@ Familias confundibles (3-5 variantes con diferencia solo de talla **en el nombre
 
 ---
 
-## 10. Inventario asistido (alcance acordado)
+## 10. Inventario asistido — FUERA DEL ALCANCE, diseño conservado
+
+> **⛔ Anulado el 2026-08-31, con toda su rama de implementación** (C19, C29, C33, C35, C37 del documento hermano). **Esta sección se conserva íntegra a propósito:** es lo que el README adjunta como próximo paso, y una limitación identificada con su solución ya diseñada puntúa en la evaluación del PF donde un hueco no puntúa nada.
+>
+> **Por qué se anula.** No aporta nada al sistema RAG. La afirmación del §10.1 de que las señales son *«reutilizadas por el ranking de búsqueda»* es cierta del concepto y **falsa del cableado**: el ranking usa `sales_30d` y `qty_bucket` desde `ai.pos_projection`, que se sincroniza del feed de indexación, y ni ese feed ni el ranking dependen de este bloque. Lo que compraba era el segundo agente, a cambio de cinco changes de los que tres no tienen ni una llamada a un LLM.
+>
+> **Dos cosas que hay que saber antes de retomarlo:**
+>
+> 1. **El perfil por POS (§10.3) no depende de las señales de demanda (§10.1)**, aunque el plan lo encadenaba así. Sus siete métricas son agregados a nivel POS sobre ventas y perfiles IA, y lo único per-producto que usan —`sales_30d` y `lastSaleAt`— ya lo calcula el feed. Es la pieza rescatable por separado, y la que devuelve al agente de venta su octava tool.
+> 2. **La ventana de 7 días hay que replantearla, y está medido.** El mundo sintético termina el 2026-08-23; contra el reloj de pared el 2026-08-31, `sales_7d` es distinto de cero en **3 de 6.050** pares (producto, POS) activos — 0,05 %. Anclada al final de los datos serían 443. Toda señal con ventana necesita un instante de referencia inyectado y **declarado en la respuesta**, igual que `projection_age_seconds` declara la frescura de la proyección en el §7.6.
 
 ### 10.1. Señales de demanda — .NET, en SQL
 
-Por producto y POS: `sales_7d`, `sales_30d`, `sales_60d`, `current_stock`, `stock_in_other_pos`, `days_since_last_sale`, `avg_daily_sales_30d`, `estimated_days_to_stockout`, `is_top_seller_in_pos`. Deterministas, testeables sin LLM y reutilizadas por el ranking de búsqueda.
+Por producto y POS: `sales_7d`, `sales_30d`, `sales_60d`, `current_stock`, `stock_in_other_pos`, `days_since_last_sale`, `avg_daily_sales_30d`, `estimated_days_to_stockout`, `is_top_seller_in_pos`. Deterministas y testeables sin LLM.
 
 ### 10.2. Reglas iniciales
 
@@ -495,7 +514,9 @@ Pantalla de revisión con aprobar/rechazar por recomendación, señales visibles
 
 ### 11.1. Golden set
 
-**60-70 consultas** etiquetadas a mano **por las dos personas por separado, con conciliación de discrepancias**, con relevancia graduada (0/1/2) sobre un *pool* generado por la unión de todas las configuraciones (*pooling*).
+**60-70 consultas** etiquetadas a mano, con relevancia graduada (0/1/2) sobre un *pool* generado por la unión de todas las configuraciones (*pooling*).
+
+> **Corregido el 2026-08-31.** La v3 decía *«por las dos personas por separado, con conciliación de discrepancias»*. Con un solo anotador eso no existe, y el sustituto no es fingirlo: **se etiqueta una vez**, se conserva el *pooling* —que es la mitad del rigor y no depende del número de personas—, se añade **relectura diferida** de las consultas etiquetadas con dudas, y el README **declara la ausencia de acuerdo entre anotadores** como limitación del golden set en lugar de reclamar una mitigación que no se aplicó.
 
 | Categoría | Nº | Qué mide |
 |---|---:|---|
@@ -532,11 +553,13 @@ Métricas: Recall@5, nDCG@5, MRR, P@3, abstención correcta, % sin resultado, p5
 - **Validador anti-alucinación determinista** (sin LLM juez): extrae toda cifra de precio/stock de la respuesta final y la contrasta con el hidratador. **Umbral: 0 fallos.** Es la pieza de evaluación con mejor retorno y convierte el principio 2 en garantía verificable.
 - **RAGAS** (faithfulness, answer relevancy, context precision, context recall) sobre el subconjunto con citas.
 - **Verificación de citas**: toda afirmación del corpus apunta a un `chunk_id` existente y realmente recuperado.
-- **Test de fidelidad del perfil por POS**: el resumen no menciona métricas ausentes del payload.
+- ~~**Test de fidelidad del perfil por POS**~~: fuera desde el 31 ago — evaluaba el perfil por POS, anulado. Vuelve si el perfil se rescata.
 
 ### 11.4. Agentes
 
-20-25 escenarios multi-turno de venta y 8-10 de inventario, con éxito definido. Métricas: *task success rate*, tools invocadas vs esperadas, pasos, coste medio, tasa de escalado. Más 20-25 casos adversarios con criterio de bloqueo por categoría.
+20-25 escenarios multi-turno de venta, con éxito definido. Métricas: *task success rate*, tools invocadas vs esperadas, pasos, coste medio, tasa de escalado. Más 20-25 casos adversarios con criterio de bloqueo por categoría.
+
+Los **8-10 escenarios de agente de inventario** salen el 2026-08-31 con el agente. Lo que la evaluación conserva es lo que el PF puntúa: validador anti-alucinación con umbral cero, escenarios de venta, adversarios y RAGAS.
 
 ### 11.5. Métricas del enriquecimiento
 
@@ -567,15 +590,17 @@ Se hace en la **ola 2**, no al final: con dos personas, descubrir un problema de
 
 ### 13.1. Modelo de trabajo
 
-**Sin roles fijos.** Las dos personas trabajan indistintamente en Python y .NET/frontend y **toman el siguiente change desbloqueado** de la ruta crítica. El detalle, con prerequisitos y ruta crítica marcada, está en [proyecto-final-plan-changes-openspec.md](proyecto-final-plan-changes-openspec.md).
+**Un desarrollador, sin roles** *(desde el 2026-08-31; eran dos)*, que trabaja indistintamente en Python, .NET y frontend y **toma el siguiente change desbloqueado**. El detalle, con prerequisitos y grafo de changes vivos, está en [proyecto-final-plan-changes-openspec.md](proyecto-final-plan-changes-openspec.md).
 
-Tres reglas que sustituyen a la coordinación por roles:
+Tres reglas de orden:
 
-1. **Prioridad a la ruta crítica.** Si hay un change de ruta crítica libre, se coge ese antes que cualquier otro.
-2. **Una sola migración EF Core activa a la vez.** Quien la abre lo anuncia y la mergea antes de que empiece otra.
-3. **Contratos congelados el día 2** con test de *snapshot* de OpenAPI: cambiar el contrato rompe el build y se negocia, en vez de filtrarse.
+1. **Prioridad al desbloqueo, no al calendario.** Entre los changes libres se coge el que más aristas abre en el grafo, no el marcado de ruta crítica: el caso vivo es el diccionario de sinónimos, fuera de ruta crítica y sin embargo único prerrequisito pendiente de la búsqueda híbrida, que a su vez bloquea el harness de evaluación **y** la capa de generación.
+2. **Una sola migración EF Core activa a la vez.** Con un solo desarrollador deja de ser coordinación y pasa a ser disciplina de rama: dos migraciones abiertas colisionan en el orden igual aunque las escriba la misma mano.
+3. **Contratos congelados el día 2** con test de *snapshot* de OpenAPI: cambiar el contrato rompe el build y obliga a decidirlo, en vez de filtrarse.
 
 ### 13.2. Olas
+
+> **Registro, no plan** *(desde el 2026-08-31)*. Con prórroga abierta no hay fechas que cumplir: las olas describen cómo se ejecutó O0–O2 y en qué orden estaba previsto lo demás. **Lo que decide qué se abre a continuación es el grafo de dependencias del documento hermano.** La O4 tal como está descrita ya no existe: pierde señales de demanda, motor de recomendaciones, agente de inventario y pantallas de revisión de inventario, y se queda en generación, guardrails, agente de venta y evals.
 
 | Ola | Fechas | Objetivo | Hito verificable |
 |---|---|---|---|
@@ -586,35 +611,33 @@ Tres reglas que sustituyen a la coordinación por roles:
 | **O4** | 27-31 ago | **Agentes e inventario.** Generación con citas y avisos por reglas, guardrails, agente de venta, señales de demanda, motor de recomendaciones, agente de inventario, pantallas de revisión, evals finales | Flujo completo en producción; validador anti-alucinación en verde; recomendaciones aprobables |
 | **O5** | 1-3 sep | **Congelación.** README, diagramas, limitaciones, vídeo, tag, entrega | Entrega el 3 de septiembre |
 
-### 13.3. Carga real
+### 13.3. Trabajo restante
 
-39 changes en 4,4 semanas entre 2 personas = **~4,4 changes por persona y semana**, unos 10-13 h semanales cada uno. Es sostenible solo si se empieza el 3 de agosto y no se acumula deuda. La ola 4 concentra agentes e inventario y es la más expuesta.
+*(Reescrito el 2026-08-31.)* De **41 fichas** planificadas quedan **36 vivas**: **19 archivadas** y **17 pendientes**. No se planifica por semanas ni por carga: se toma el siguiente change que más desbloquee.
 
 ### 13.4. Orden de corte, fijado de antemano
 
-Si el **26 de agosto** (fin de O3) no está la tabla de ablations y el sistema desplegado, se abandona en este orden:
+**Reescrito el 2026-08-31.** La lista tenía ocho posiciones y **cuatro vivían dentro del bloque de inventario** —rotación, traslados, vista imprimible y el agente entero—, que es lo que delató que el bloque sobraba: un plan que se compromete de antemano a destripar una funcionalidad está diciendo que no la necesita. Anulado el bloque, el disparador deja de ser una fecha y pasa a ser el juicio de que el núcleo peligra:
 
-1. **Complementarios** → se documenta como fase posterior; sustitutos ya cubren el caso de venta
-2. **Rotación / stock parado** → el motor queda, se cae el tipo de recomendación
-3. **RAGAS** → se conservan validador anti-alucinación y métricas de recuperación
-4. **Traslados** → se conserva solo reposición
-5. **Vista imprimible** → se aprueba desde la pantalla de revisión y se exporta a CSV
-6. **Corpus de conocimiento** 30-45 → 15 documentos, manteniendo las citas
-7. **Golden set** 70 → 45 consultas, **nunca renunciando al doble etiquetado**
-8. **Agente de inventario** → las recomendaciones se generan por reglas puras sin capa agéntica ni redacción LLM
+1. **Complementarios** → fase posterior; los sustitutos ya cubren el caso de venta. Ahorra además la última migración EF Core viva
+2. **Corpus de conocimiento** 30-45 → **15 documentos**, manteniendo las citas verificables
+3. **RAGAS** → se conservan validador anti-alucinación, escenarios de venta y adversarios
+4. **Golden set** 70 → 45 consultas
 
-**Nunca se recorta:** corpus e índice, familias, retriever híbrido con prefiltro blando, hidratación autoritativa en .NET, agente de venta, harness con ablations, validador anti-alucinación, despliegue y README.
+Los cortes **1 y 2 están confirmados de antemano** y se aplican desde el principio del change, no a mitad.
+
+**Nunca se recorta:** corpus e índice, familias, **diccionario de sinónimos** (tapona el grafo), retriever híbrido con prefiltro blando, hidratación autoritativa en .NET, **guardrails**, agente de venta, harness con ablations, validador anti-alucinación, **métricas de revisión humana del enriquecimiento** (las pide el checklist del §16 y el §11.5 advierte de que no existen sin la vía revisada), despliegue y README.
 
 ### 13.5. Riesgos
 
 | Riesgo | Prob. | Impacto | Mitigación |
 |---|---|---|---|
-| **Equipo de dos sin holgura**: una baja de una semana se lleva el 25 % de la capacidad | Media | **Muy alto** | Slice vertical desplegado en O2; orden de corte fijado; ningún change bloquea a más de dos |
-| **El alcance de inventario desborda la ola 4** | **Alta** | Alto | Las reglas y señales se entregan antes que el agente; si el agente no llega, las recomendaciones se generan por reglas y se documenta |
+| **Equipo de uno** *(desde el 31 ago)*: cualquier interrupción para el proyecto entero | Alta | Medio | **Mitigado por la prórroga abierta**: sin fecha, una pausa retrasa pero no recorta. Sigue valiendo el slice vertical ya desplegado y el orden de corte fijado |
+| ~~**El alcance de inventario desborda la ola 4**~~ | — | — | **Se materializó, y la respuesta fue anular el bloque entero** el 31 de agosto, no degradarlo. La degradación prevista —recomendaciones por reglas puras sin capa agéntica— habría dejado en pie una migración, un motor de reglas .NET y una pantalla, es decir todo el coste fuera de lo que el PF evalúa |
 | **El export real llega tarde o es muy pequeño** | Media | Medio | El generador se calibra con lo que haya; si el export llega después de C24, el golden set se re-ancla sobre productos reales en una sesión adicional. Nunca se bloquea el desarrollo esperándolo |
 | La revisión humana de 120-150 perfiles se alarga | Media | Medio | Pantalla de revisión por lotes con atajos; tope de 3 h por persona; el resto va a `auto_bulk` declarado |
-| Datos sintéticos demasiado fáciles → métricas infladas | Alta | Alto | Ruido dirigido (§8.4); etiqueta el golden set quien no generó el corpus |
-| Agosto: disponibilidad irregular | Alta | Alto | Contratos congelados en O0; trabajo desacoplado; pool de changes sin espera por rol |
+| Datos sintéticos demasiado fáciles → métricas infladas | Alta | Alto | Ruido dirigido (§8.4); métricas **reportadas por `data_origin`** y umbral aplicado a la porción real. **La mitigación de «etiqueta quien no generó el corpus» ya no es posible** con un solo desarrollador: se declara en el §15 |
+| Disponibilidad irregular | Alta | Bajo *(era Alto)* | **Degradado por la prórroga abierta**: sin fecha, la irregularidad retrasa y no recorta. Contratos congelados y trabajo desacoplado siguen valiendo |
 | Fricción con pgvector en RDS | Baja | Alto | **Verificar en O0**; alternativa: contenedor Postgres+pgvector en la misma EC2 |
 
 ---
@@ -623,12 +646,12 @@ Si el **26 de agosto** (fin de O3) no está la tabla de ablations y el sistema d
 
 | # | Pregunta | Estado | Resolución |
 |---|---|---|---|
-| 1 | **¿Existe una "tienda central" u origen de suministro?** | ✅ **Resuelto** | Sí. Se añade **`IsSupplySource bool` a `PointOfSale`** (una columna, migración en C19). Desbloquea las reglas de reposición y traslado de §10.2 |
+| 1 | **¿Existe una "tienda central" u origen de suministro?** | ⛔ **Sin objeto** *(31 ago)* | Se resolvió que sí, y la columna `IsSupplySource` iba a añadirse en C19. **Anulado con la rama.** La marca sigue existiendo solo en el YAML de perfiles de POS del mundo sintético (`MAO-TALLER`), nunca llega a SQL, y el `insert_pos` del ingest tampoco la escribía |
 | 2 | **¿Habrá export anonimizado de catálogo e histórico 2026?** | ✅ **Resuelto** | Sí, de tamaño desconocido y probablemente insuficiente. **Corpus híbrido** con `data_origin` y métricas desglosadas (§8.1.1). El golden set se ancla en lo real |
 | 3 | **¿Diccionario de sinónimos en lugar de `SearchAliases`?** | ⏳ **Pendiente de acuerdo** | Se implementa tras flag y se decide con la categoría de sinónimos del golden set. Coste de discrepancia: cero |
-| 4 | **¿Packing list fuera del PF?** | ⏳ **Pendiente de acuerdo** | Fuera, con vista imprimible en su lugar. Si entra: +1,5-2 changes en la ola 4 y salen complementarios y rotación |
-| 5 | **Umbrales iniciales de reposición** (días de cobertura, mínimo por POS) | 🔹 No bloqueante | Configurables con valores por defecto: cobertura < 14 días, `sales_30d ≥ 2`. Se recalibran con datos |
-| 6 | **¿Se captura feedback del admin sobre sustitutos?** | 🔹 No bloqueante | Se registra aceptado/rechazado en la recomendación; no se usa para reentrenar en esta fase |
+| 4 | **¿Packing list fuera del PF?** | ⛔ **Sin objeto** *(31 ago)* | Fuera, y ahora también lo está la vista imprimible que iba a sustituirla: sin recomendaciones que aprobar no hay nada que imprimir |
+| 5 | **Umbrales iniciales de reposición** (días de cobertura, mínimo por POS) | ⛔ **Sin objeto** *(31 ago)* | Los valores por defecto propuestos —cobertura < 14 días, `sales_30d ≥ 2`— quedan anotados en el §10.2 para quien retome el bloque |
+| 6 | **¿Se captura feedback del admin sobre sustitutos?** | ⛔ **Sin objeto** *(31 ago)* | Se registraba en la recomendación, que ya no existe. Los sustitutos (§6.3.2) siguen vivos, pero se consumen en venta asistida y ahí el feedback es la propia venta |
 | 7 | **¿Qué tamaño tiene el export real?** | 🔸 **A verificar antes del 10 de agosto** | Determina cuántas de las 60-70 consultas del golden set se pueden anclar en productos reales y cuánto sintético hay que generar. No cambia el diseño, sí la fuerza de la evidencia |
 
 ---
@@ -642,22 +665,23 @@ Si el **26 de agosto** (fin de O3) no está la tabla de ablations y el sistema d
    Tres consecuencias que el lector debe tener presentes: la afirmación defendible es **«funciona sobre un catálogo realista»**, no «sobre un catálogo real»; las métricas de **enriquecimiento** (§11.5) no se ven afectadas, porque miden al extractor y no la verdad del dato; las de **recuperación** dejan de describir el negocio tal como está hoy. El catálogo original queda archivado y **el delta entre ambos sigue siendo medible** con un segundo `eval_run` (§11.2).
 2. **Solo el 12-15 % de los perfiles está revisado por humanos**; el resto es `auto_bulk` y está marcado como tal en todas las métricas.
 3. **No hay validación con usuarios reales.** Los KPIs de negocio están instrumentados, no medidos.
-4. **El golden set es pequeño (60-70) y hecho por el equipo.** Mitigado con *pooling* y doble etiquetado, no eliminado.
+4. **El golden set es pequeño (60-70), lo etiquetó quien construyó el sistema, y no hay acuerdo entre anotadores** *(corregido el 2026-08-31)*. La v3 prometía doble etiquetado con conciliación entre dos personas; el proyecto lo desarrolla una sola, así que esa mitigación **no se aplicó** y el README lo dice en lugar de reclamarla. Lo que sí se conserva es el *pooling* sobre la unión de todas las configuraciones —que evita el sesgo de evaluar solo lo que la configuración favorita recupera— y la relectura diferida de las consultas etiquetadas con dudas. La consecuencia honesta: los valores absolutos de nDCG y Recall llevan el sesgo de un único juicio, y **lo comparable entre configuraciones sigue siendo válido**, porque el sesgo es el mismo en todas las filas de la tabla de ablations.
 5. **El reranking no se ha medido**, solo argumentado y protocolizado.
 6. **Packing list, liquidación con descuentos, upsell/downsell y políticas de inventario configurables no están implementados** y se declaran como fase posterior.
 7. **Dos espacios vectoriales conviven** (visual MobileNetV2 y textual): no se fusionan.
 8. **Ningún agente escribe.** Toda acción con efecto pasa por el operador o el admin.
-9. **La proyección de disponibilidad puede desfasarse minutos**; por eso solo pondera el ranking y nunca excluye.
-10. **La telemetría de búsqueda no tiene política de retención** *(añadido el 2026-08-10, al diseñar C04)*. `ProductSearchEvent.SearchText` es texto libre escrito por un operador y se conserva indefinidamente; en un punto de venta de hotel puede recoger incidentalmente una referencia a un huésped. Las medidas adoptadas son proporcionadas al riesgo real —tope de 500 caracteres, el texto confinado a nivel `Debug` en los logs, y **ninguna ruta de lectura por API**: solo se consulta con SQL—, y no se aplica anonimización porque este texto nunca entra en el espacio vectorial ni se recupera semánticamente. La supresión por usuario queda operable: el enlace `Sale.SearchEventId` es `ON DELETE SET NULL`, así que borrar eventos no destruye ni bloquea ventas.
+9. **El sistema entrega un solo agente, el asistente de venta** *(añadido el 2026-08-31)*. El agente de inventario —reposiciones, traslados y detección de stock parado con aprobación humana— estaba en el alcance acordado y **se anuló junto con toda su rama de implementación**, cinco changes de los que tres no contenían LLM. El motivo no fue de plazo: no aportaba nada al sistema RAG, porque la señal de demanda que pondera el ranking ya llega por el feed de indexación y no por él. **Su diseño está completo en el §10** de este documento —señales, reglas, perfil por POS y ciclo de aprobación— y se entrega como próximo paso, con dos avisos medidos: el perfil comercial por POS no depende de las señales de demanda y es rescatable por separado, y la ventana de 7 días necesita un instante de referencia inyectado antes de significar nada.
+10. **La proyección de disponibilidad puede desfasarse minutos**; por eso solo pondera el ranking y nunca excluye.
+11. **La telemetría de búsqueda no tiene política de retención** *(añadido el 2026-08-10, al diseñar C04)*. `ProductSearchEvent.SearchText` es texto libre escrito por un operador y se conserva indefinidamente; en un punto de venta de hotel puede recoger incidentalmente una referencia a un huésped. Las medidas adoptadas son proporcionadas al riesgo real —tope de 500 caracteres, el texto confinado a nivel `Debug` en los logs, y **ninguna ruta de lectura por API**: solo se consulta con SQL—, y no se aplica anonimización porque este texto nunca entra en el espacio vectorial ni se recupera semánticamente. La supresión por usuario queda operable: el enlace `Sale.SearchEventId` es `ON DELETE SET NULL`, así que borrar eventos no destruye ni bloquea ventas.
 
-**Próximos pasos:** packing list completa; liquidación y políticas de inventario; prioridad comercial por margen (los datos existen en `ProductComponentAssignment`); reranking medido; reranking aprendido con `ProductSearchEvent` reales; fusión de señal visual y textual; evaluación online con A/B por POS.
+**Próximos pasos**, en orden de madurez del diseño: **agente de inventario completo** —señales de demanda, motor de reglas, perfil comercial por POS, ciclo de aprobación y vista imprimible—, cuyo diseño está íntegro en el §10 y solo espera implementación; **perfil comercial por POS** por separado, que es la mitad barata de lo anterior y devuelve al agente de venta una octava tool; packing list completa; liquidación y políticas de inventario; prioridad comercial por margen (los datos existen en `ProductComponentAssignment`); reranking medido; reranking aprendido con `ProductSearchEvent` reales; fusión de señal visual y textual; evaluación online con A/B por POS.
 
 ---
 
 ## 16. Checklist de entrega
 
 - [ ] Rama `finalproject-[INICIALES]` con README y código funcional
-- [ ] README con dominio, arquitectura y decisiones justificadas, CAG/RAG/agentes/evaluación/despliegue, arranque local, **los dos integrantes**, limitaciones y próximos pasos
+- [ ] README con dominio, arquitectura y decisiones justificadas, CAG/RAG/agente/evaluación/despliegue, arranque local, autoría **individual**, limitaciones y próximos pasos
 - [ ] URL pública con usuario demo **y** vídeo de 2-3 min
 - [ ] Tabla de ablations v0→v3 reproducible con un comando
 - [ ] Métricas de revisión humana del enriquecimiento (tasa de corrección y tiempo medio)
@@ -665,4 +689,5 @@ Si el **26 de agosto** (fin de O3) no está la tabla de ablations y el sistema d
 - [ ] `docker compose up` reproducible con corpus sintético
 - [ ] Tag `v1.0-final-[INICIALES]`
 - [ ] Acceso al TA si el repositorio es privado
-- [ ] Entrega antes del **3 de septiembre de 2026**
+- [ ] **Tres declaraciones que el README debe llevar explícitas** *(añadido el 2026-08-31)*: **un solo agente**, con el §10 adjunto como diseño del que falta; **golden set sin acuerdo entre anotadores**, por etiquetador único; y **proyecto individual**, no en pareja
+- [ ] ~~Entrega antes del 3 de septiembre de 2026~~ → **prórroga abierta desde el 2026-08-31**; el objetivo es entregar cuanto antes, sin fecha comprometida

@@ -2,15 +2,74 @@
 
 **Versión:** 3 — consenso tras la revisión de la [PR #4](https://github.com/skydr4g0n-it/joiabagur-pv/pull/4) y las [especificaciones funcionales v2](joiabagur-ia-especificaciones-funcionales-v2.md)
 **Documento hermano de:** [proyecto-final-diseno-rag-joiabagur.md](proyecto-final-diseno-rag-joiabagur.md)
-**Ventana:** 3 de agosto → 3 de septiembre de 2026 — *sin margen asumido*
-**Equipo:** **2 desarrolladores sin roles fijos**, ambos trabajan en Python y en .NET/frontend
-**Total:** 39 changes (38 de construcción + 1 de entrega) · **~4,4 por persona y semana**
+**Ventana:** arranque el 3 de agosto de 2026 · **prórroga abierta desde el 31 de agosto** — no hay fecha de entrega, el objetivo es entregar cuanto antes
+**Equipo:** **1 desarrollador**, trabaja en Python, .NET y frontend
+**Total:** 41 fichas (39 de la v3, más los partos de C06 y C18) · **36 vivas** tras anular la rama de C19 — **19 archivadas · 17 pendientes**
+
+> **Dos supuestos de la versión 3 ya no valen, y conviene leer el resto del documento con eso puesto.** Se escribió para **dos personas** y con **entrega el 3 de septiembre de 2026**. Desde el 31 de agosto de 2026 hay **prórroga abierta** y el proyecto lo desarrolla **una sola persona**. En consecuencia: no se planifica por calendario ni por «carga por persona y semana», sino por **desbloqueo del grafo**; los marcadores 👥 son de una sola persona; y las olas del §5 se conservan como registro de lo ya ejecutado, no como plan.
 
 ---
 
 ## 0. Revisiones posteriores a la versión 3
 
 Este documento se escribió antes de implementar. Cuando una sesión de diseño de un change concreto altera lo que su ficha decía, el cambio se registra aquí con fecha y motivo, y la ficha afectada se corrige en el sitio.
+
+### 2026-08-31 — Prórroga abierta y equipo de uno: se deja de planificar por calendario
+
+El proyecto pasa a tener **prórroga abierta**: no hay fecha de entrega, y el objetivo es entregar cuanto antes. Y lo desarrolla **una sola persona**, no dos.
+
+Las dos cosas juntas invalidan tres mecanismos del documento, que se sustituyen en lugar de borrarse:
+
+| Mecanismo de la v3 | Sustituto |
+|---|---|
+| Calendario por olas del §5 y «~4,4 changes por persona y semana» | **Orden por desbloqueo del grafo** (§4). Las olas se conservan como registro de lo ejecutado, no como plan |
+| Reglas de asignación del §1 (anunciar antes de empezar, no coger el mismo change, repartir la mitad que desbloquea) | Sin objeto. Sobrevive la **regla de migración única activa**, que ahora es una regla de *rama*, no de persona |
+| «Pares que NO deben ejecutarse en paralelo» (§5) | Sigue vigente **como conflicto de zona entre changes consecutivos**: dos changes que tocan el mismo fichero no se abren a la vez aunque los abra la misma persona |
+
+Y una consecuencia que no es de proceso sino de contenido: **el doble etiquetado del golden set de C24 desaparece**. Su ficha lo daba por hecho «entre los dos, etiquetando por separado y conciliando», y el §6 lo declaraba irrenunciable — *«nunca renunciando al doble etiquetado»*. Con un solo etiquetador no existe, y el sustituto no es fingirlo: se etiqueta **una vez**, y el README declara la ausencia de acuerdo entre anotadores como limitación explícita del golden set en lugar de reclamar una mitigación que no se aplicó. La compensación asequible es de método, no de personas: *pooling* sobre la unión de configuraciones (que se mantiene) y **relectura diferida** de las consultas cuya relevancia se etiquetó con dudas.
+
+### 2026-08-31 — Se anula C19 y toda su rama: C19, C29, C33, C35 y C37
+
+**El motivo no es de plazo, es de contenido: C19 no aporta nada al sistema RAG, y el plan lo dice sin decirlo.**
+
+El diseño afirma en su §10.1 que las señales de demanda son *«reutilizadas por el ranking de búsqueda»*. Es cierto del concepto y **falso del cableado**. La señal que pondera el retriever es `sales_30d` y `qty_bucket`, y llega por otro sitio:
+
+```text
+C25 ranking ──usa──▶ ai.pos_projection ──sincroniza──▶ /api/ai/index-feed/pos-availability
+                        (C22: C10,C12,C14)              (C12 · archivado)
+                                                        IndexFeedRepository.GetSalesAggregatesAsync
+                                                        └── sales30d · sales90d · lastSaleAt
+```
+
+C22 depende de C10, C12 y C14. C25 depende de C21, C22 y C24. **Ninguno de los dos depende de C19.** La suma que necesita el RAG está implementada, archivada y es normativa desde `openspec/specs/index-feed/spec.md`. C19 habría construido una segunda copia de la misma agregación para otro consumidor — con el riesgo, además, de que las dos definiciones de `sales_30d` divergieran y el agente de inventario contradijera al ranking en la misma pantalla.
+
+**Lo que C19 compraba de verdad era el segundo agente**, y el precio son cinco changes de los cuales tres no tienen ni una llamada a un LLM:
+
+| Change | Zona | Contenido de IA |
+|---|---|---|
+| **C19** `add-demand-signal-service` | .NET 🗄️ | ninguno — agregación SQL |
+| **C29** `add-inventory-recommendation-entity` | .NET 🗄️ | ninguno — motor de reglas |
+| **C33** `add-pos-sales-profile` | .NET + Python | el LLM redacta el resumen |
+| **C35** `add-inventory-agent-proposals` | Python | **el segundo agente** |
+| **C37** `add-frontend-inventory-review-and-print` | Frontend | ninguno — pantalla y vista imprimible |
+
+**Y el propio plan ya lo había decidido, en su otra versión.** [`proyecto-final-plan-changes-openspec-3devs.md`](proyecto-final-plan-changes-openspec-3devs.md) agrupa exactamente esta rama bajo *«§6. Bloque opcional — Agente de reposición ⚠️ · Solo si el núcleo está cerrado. Es el primer bloque que se cae»*, y su orden de corte empieza literalmente por ella. En esta versión la misma señal estaba repartida y por eso no se veía: **cuatro de los ocho cortes pre-acordados del §6 viven dentro de la rama** — Rotate de C29 (nº 2), Transfer de C29 (nº 4), vista imprimible de C37 (nº 5) y C35 entero (nº 8). Si esos cuatro se hubieran disparado, lo que quedaba en pie era una migración, un motor de reglas .NET y una pantalla de aprobación: todo el esfuerzo fuera de lo que el Proyecto Final evalúa.
+
+**Lo que se pierde, exactamente y sin adornos:**
+
+1. **De dos agentes se pasa a uno.** El asistente de venta (C30→C31→C32), que el diseño marca «Núcleo · Requisito del PF», se conserva entero.
+2. **El agente de venta pierde una tool de ocho:** `perfil_punto_venta` era C33. **La ficha de C32 queda corregida en el sitio**; sin eso el agente arrancaría registrando una tool sin servicio detrás.
+3. **C38 pierde** los 8-10 escenarios de agente de inventario y el test de fidelidad del perfil por POS. Conserva validador anti-alucinación, escenarios de venta, adversarios y RAGAS.
+4. Los ítems **9** (agente de inventario) y **11** (vista imprimible) del alcance acordado del diseño pasan a fase posterior, junto a la packing list que ya estaba ahí.
+
+**Lo que sobrevive es todo el RAG:** corpus híbrido, enriquecimiento y revisión humana, familias, índice y `source_hash`, recuperación híbrida con sinónimos y prefiltro blando, sustitutos, corpus de conocimiento con citas, generación con avisos por reglas, guardrails, agente de venta, endpoints .NET, frontend, golden set, ablations, validador, RAGAS y despliegue.
+
+**Dos hallazgos de la sesión de exploración que conviene no perder**, porque son la puerta de entrada si algún día se resucita algo de esta rama:
+
+- **C33 no necesitaba C19.** Su dependencia estaba sobre-especificada. Sus métricas (`top_piece_types`, `top_materials`, `top_price_ranges`, `top_collections`, `average_ticket`, `best_selling`, `slow_moving`) son agregados a nivel POS sobre `Sales` × `ProductAiProfile`, y lo único per-producto que necesitan —`sales_30d` y `lastSaleAt`— **ya lo calcula `GetSalesAggregatesAsync`**. No usa `IsSupplySource`, ni `stock_in_other_pos`, ni `estimated_days_to_stockout`, ni `is_top_seller_in_pos`, ni `sales_7d`, ni `sales_60d`. Si el núcleo cierra y sobra sesión, **C33 con prereq C08+C12 es un change suelto y sin migración** que devuelve la octava tool al agente de venta y da a §11.3 su test de fidelidad.
+- **`sales_7d` estaba muerta al nacer, y se midió.** El mundo de C10 termina el 2026-08-23; medido el 2026-08-31 contra el reloj de pared, `sales_7d` es distinto de cero en **3 de 6.050** pares (producto, POS) activos — 0,05 %. Anclada al fin del mundo serían 443. Cualquier resucitación de las señales de demanda necesita **primero** decidir el reloj (`asOf` inyectado y `computedAsOf` declarado en la respuesta, como `projection_age_seconds` en C22), y no al revés.
+
+**Cortes confirmados de antemano**, elegidos en la misma sesión y ya reordenados en el §6: **C27** (complementarios) y **C23 reducido a 15 documentos**. No están anulados — están pre-autorizados, y se disparan en ese orden si hace falta.
 
 ### 2026-08-31 — C18, al aplicar: el umbral del §7.5 no existe, y el plan se contradecía
 
@@ -31,7 +90,7 @@ El grafo del §4 tampoco dibujaba las aristas **C18→C25, C26, C30 y C36**. Ya 
 
 **Decisiones que C18a deja planteadas y no resuelve:**
 
-1. **El doble etiquetado del golden set de C24.** Su ficha lo da por hecho entre dos personas y el §6 lo declara irrenunciable; trabajando en solitario no existe. **Debe resolverse antes de abrir C24**, no dentro de él.
+1. ~~**El doble etiquetado del golden set de C24.**~~ **Resuelto el 2026-08-31** *(ver la entrada de esa fecha sobre prórroga y equipo de uno)*: se etiqueta una vez, se conserva el *pooling*, se añade relectura diferida de las dudosas, y la ausencia de acuerdo entre anotadores se declara como limitación del golden set en el README en vez de reclamar una mitigación que no se aplicó.
 2. **`Product.CollectionId` es una FK única y anulable**, pero la spec viva `product-family` justifica la distinción con las colecciones diciendo que un producto puede pertenecer *«to one of many unrelated collections»*. Ambas cardinalidades son 0..1. Los discriminadores reales, medidos: una colección abarca 1–154 productos (mediana 15) y **13–16 tipos de pieza**; una familia, 2–4 de **un solo tipo**.
 3. **Las lagunas del vocabulario de enriquecimiento**, en **un solo change** y no tres. Ver la propuesta de abajo. ~~Escala métrica en el vocabulario de talla~~ → **descartado el 2026-08-31**: `Cadena Barbara oro 40/42/45 cm` no son tallas de una misma pieza sino **tres cadenas de longitud distinta**, y declararlas familia forzaría el modelo — la familia agrupa variantes de una pieza, no productos parecidos. Caerán juntas por proximidad de vector cuando alguien busque una cadena de esa colección, que es el comportamiento correcto sin pertenencia declarada.
 
@@ -378,14 +437,14 @@ Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin e
   → /opsx:archive (openspec/changes/archive/YYYY-MM-DD-<change-id>/)
 ```
 
-### Reglas de asignación (sustituyen a los roles)
+### Reglas de orden *(reescritas el 2026-08-31: equipo de uno, prórroga abierta)*
 
 1. **Se coge el siguiente change desbloqueado**, sea Python o .NET. No hay dueño por zona.
-2. **Prioridad absoluta a la ruta crítica.** Si hay un change marcado 🔴 libre, se coge ese antes que cualquier otro. Los 🟢 son relleno: sirven para no quedarse parado, no para adelantar trabajo.
-3. **Antes de empezar se anuncia** (issue, tablero o mensaje) para que el otro no coja el mismo.
-4. **Una sola migración EF Core activa a la vez** (marcados 🗄️). Quien la abre lo anuncia y la mergea antes de que empiece otra.
-5. **Si un change se desborda de la sesión, se parte** y se entrega primero la mitad que desbloquea al otro desarrollador.
-6. **C24 (golden set) se hace entre los dos**, etiquetando por separado y conciliando.
+2. **Prioridad al desbloqueo, no al calendario.** Entre los changes libres se coge el que **más aristas abre en el grafo del §4**, no el que antes vence. Un 🟢 que tapona a un 🔴 va primero: el caso vivo es C20, marcado 🟢, que es lo único que separa a C21 de arrancar y C21 bloquea a la vez a C24 y a C30.
+3. **Una sola migración EF Core activa a la vez** (marcados 🗄️). Se mergea antes de abrir otra. Ya no es coordinación entre personas sino disciplina de rama: dos migraciones abiertas colisionan igual aunque las escriba la misma mano.
+4. **No se abren a la vez dos changes de la misma zona.** La tabla de *pares que no deben ejecutarse en paralelo* del §5 sigue vigente, ahora leída como changes consecutivos y no como desarrolladores simultáneos.
+5. **Si un change se desborda de la sesión, se parte** y se entrega primero la mitad que desbloquea el grafo.
+6. **C24 (golden set) se etiqueta una vez.** El doble etiquetado y la conciliación no existen con un solo anotador; se conserva el *pooling* y se declara la ausencia de acuerdo entre anotadores como limitación del README.
 
 ### Definition of Done común
 
@@ -405,7 +464,9 @@ Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin e
 
 ### Leyenda
 
-🔴 ruta crítica · 🟢 paralelizable / relleno · 🗄️ incluye migración EF Core · 👥 se hace entre los dos · ⏳ pendiente de acuerdo con el compañero
+🔴 ruta crítica · 🟢 fuera de la ruta crítica · 🗄️ incluye migración EF Core · ⛔ **anulado** *(no se implementa; la ficha se conserva como registro)*
+
+Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** *(«se hace entre los dos»)* y **⏳** *(«pendiente de acuerdo con el compañero»)*. Donde aparecen en fichas antiguas, léanse como trabajo de una sola persona y como decisión propia.
 
 ---
 
@@ -433,29 +494,33 @@ Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin e
 | **C17** | `add-ai-service-deployment` | Infra + Python + .NET + FE | C15 | 🔴 | **rev. 29 ago** |
 | **C18a** | `add-family-suggestion-and-approval` | Python + .NET | C07, C13 | 🟢 | **rev. dec. 2**, **31 ago · archivado** |
 | **C18b** | `add-family-review-ui-and-orphan-alert` | Frontend | C18a | 🟢 | **rev. dec. 2**, **partido el 31 ago** |
-| **C19** | `add-demand-signal-service` | .NET 🗄️ | C10 | 🟢 | **rev. dec. 6** |
-| **C20** | `add-synonym-dictionary` ⏳ | Python | C14 | 🟢 | **rev. dec. 4** |
+| ~~**C19**~~ | ~~`add-demand-signal-service`~~ | .NET 🗄️ | C10 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
+| **C20** | `add-synonym-dictionary` | Python | C14 | 🟢 | **rev. dec. 4** · *tapona a C21: se coge primero* |
 | **C21** | `add-hybrid-search-rrf` | Python | C14, C20 | 🔴 | — |
 | **C22** | `add-pos-projection-soft-prefilter` | Python | C10, C12, C14 | 🔴 | **rev. dec. 11** |
 | **C23** | `add-knowledge-corpus-and-indexer` | Python | C11 | 🟢 | — |
-| **C24** | `add-eval-harness-golden-set-and-baselines` | Python 👥 | C14, C21 | 🔴 | rev. dec. 12 |
+| **C24** | `add-eval-harness-golden-set-and-baselines` | Python | C14, C21 | 🔴 | rev. dec. 12 · **etiquetado simple desde el 31 ago** |
 | **C25** | `add-business-signals-ranking` | Python | C21, C22, C24 | 🔴 | — |
 | **C26** | `add-substitutes-retrieval` | Python | C22, C25 | 🟢 | specs v2 §6.3.2 |
-| **C27** | `add-complementary-recommendations` | Python + .NET 🗄️ | C10, C25 | 🟢 | **rev. dec. 8** |
-| **C28** | `add-profile-review-ui-and-metrics` | Frontend + .NET | C08 | 🟢 | **rev. dec. 5** |
-| **C29** | `add-inventory-recommendation-entity` | .NET 🗄️ | C19 | 🟢 | **rev. dec. 6** |
+| **C27** | `add-complementary-recommendations` | Python + .NET 🗄️ | C10, C25 | 🟢 | **rev. dec. 8** · **corte nº 1 pre-autorizado** |
+| **C28** | `add-profile-review-ui-and-metrics` | Frontend + .NET | C08 | 🟢 | **rev. dec. 5** · *lo pide el checklist §16* |
+| ~~**C29**~~ | ~~`add-inventory-recommendation-entity`~~ | .NET 🗄️ | C19 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
 | **C30** | `add-assist-generation-with-rule-warnings` | Python | C07, C21, C23 | 🔴 | **rev. dec. 4** |
 | **C31** | `add-guardrails-and-intent-router` | Python | C30 | 🔴 | — |
 | **C32** | `add-sales-assistant-agent-loop` | Python | C30, C31 | 🔴 | — |
-| **C33** | `add-pos-sales-profile` | .NET + Python | C19 | 🟢 | **rev. dec. 7** |
-| **C34** | `add-dotnet-assist-and-recommendation-endpoints` | .NET | C15, C26, C27, C30 | 🔴 | — |
-| **C35** | `add-inventory-agent-proposals` | Python | C26, C29, C32, C33 | 🟢 | **rev. dec. 6** |
+| ~~**C33**~~ | ~~`add-pos-sales-profile`~~ | .NET + Python | ~~C19~~ → C08, C12 | ⛔ | **rev. dec. 7** · **anulado el 31 ago** · *rescatable suelto* |
+| **C34** | `add-dotnet-assist-and-recommendation-endpoints` | .NET | C15, C26, C30 *(+ C27 si sobrevive)* | 🔴 | — |
+| ~~**C35**~~ | ~~`add-inventory-agent-proposals`~~ | Python | C26, C29, C32, C33 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
 | **C36** | `add-frontend-assist-card-and-family-disambiguation` | Frontend | C16, C34 | 🔴 | — |
-| **C37** | `add-frontend-inventory-review-and-print` | Frontend | C29, C35 | 🟢 | **rev. dec. 6** |
-| **C38** | `add-generation-and-agent-evals` | Python + .NET | C24, C30, C32, C34, C35 | 🔴 | — |
-| **C39** | `finalize-pf-readme-and-evidence` | Docs 👥 | todos | 🔴 | — |
+| ~~**C37**~~ | ~~`add-frontend-inventory-review-and-print`~~ | Frontend | C29, C35 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
+| **C38** | `add-generation-and-agent-evals` | Python + .NET | C24, C30, C32, C34 | 🔴 | — · *sin escenarios de inventario* |
+| **C39** | `finalize-pf-readme-and-evidence` | Docs | todos los vivos | 🔴 | — |
 
 **Origen** indica de dónde sale el change: en **negrita**, los que existen por la revisión del compañero.
+
+**⛔ Anulados el 2026-08-31 (5):** C19, C29, C33, C35 y C37 — la rama del agente de inventario. Motivo y consecuencias en el §0. Las fichas se conservan como registro y llevan el sello en el sitio.
+
+**Vivos: 36.** Archivados **19** (C01–C18a). Pendientes **17**: C18b, C20, C21, C22, C23, C24, C25, C26, C27, C28, C30, C31, C32, C34, C36, C38 y C39 — de los cuales C27 y C23 llevan corte pre-autorizado, y C18b es hoja del grafo.
 
 ---
 
@@ -727,7 +792,11 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ---
 
-#### C19 · `add-demand-signal-service` 🟢 🗄️
+#### ~~C19 · `add-demand-signal-service`~~ ⛔ 🗄️
+
+> **⛔ Anulado el 2026-08-31**, con toda su rama (C29, C33, C35, C37). No aporta nada al sistema RAG: la señal que pondera el ranking (`sales_30d`, `qty_bucket`) llega por `ai.pos_projection` desde el feed de C12, y ni C22 ni C25 dependen de este change. Lo que compraba era el segundo agente, a cambio de cinco changes de los que tres no tienen LLM. Razonamiento completo, lo que se pierde y las dos vías de rescate en el **§0 · *Se anula C19 y toda su rama***. La ficha se conserva como registro; nada de lo que sigue se implementa.
+>
+> **Si alguna vez se resucita:** decidir **primero** el reloj. Medido el 2026-08-31, `sales_7d` contra el reloj de pared es distinto de cero en **3 de 6.050** pares (producto, POS) activos, porque el mundo de C10 termina el 2026-08-23. Anclada al fin del mundo serían 443. Y la definición de `sales_30d` debe salir del mismo sitio que la del feed (`GetSalesAggregatesAsync`), no de una segunda copia.
 
 **Objetivo.** Señales de demanda **en SQL, en .NET**, más el origen de suministro. Base de todo el inventario y señal de ranking para la búsqueda.
 **Prereq.** C10 · **Zona.** `Domain/`, `Application/`, `Infrastructure/`
@@ -741,9 +810,11 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ---
 
-#### C20 · `add-synonym-dictionary` 🟢 ⏳
+#### C20 · `add-synonym-dictionary` 🟢
 
-**Objetivo.** Sustituir `SearchAliases` sin persistir texto por producto (decisión 4, contrapropuesta **pendiente de acuerdo**). Se implementa **tras flag** precisamente para que la decisión se tome con la medición de C24 y no con argumentos.
+> **Es el siguiente change a abrir** *(fijado el 31 ago)*. Está pintado 🟢 pero **tapona el grafo entero**: es el único prerrequisito que le falta a C21, y C21 bloquea a la vez a C24 y a C30, o sea las dos mitades del proyecto. La marca ⏳ desaparece: sin compañero no hay acuerdo que esperar, y el flag ya era el mecanismo previsto para decidir con la medición en vez de con argumentos.
+
+**Objetivo.** Sustituir `SearchAliases` sin persistir texto por producto (decisión 4). Se implementa **tras flag** precisamente para que la decisión se tome con la medición de C24 y no con argumentos.
 **Prereq.** C14 · **Zona.** `ai-service/src/jbg_ai/retrieval/`
 **Alcance.** Fichero YAML curado a mano (~40-60 entradas: sortija→anillo, gargantilla→collar, aro→pendiente…), versionado en el repo; expansión **en consulta, nunca en indexación**; flag para activarlo o desactivarlo y poder medir su efecto.
 **Tests.** `test_query_with_synonym_matches_canonical_term`; `test_expansion_does_not_modify_indexed_documents`; `test_unknown_term_passes_through_unchanged`; `test_disabled_flag_returns_original_query`.
@@ -778,13 +849,15 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ---
 
-#### C24 · `add-eval-harness-golden-set-and-baselines` 🔴 👥
+#### C24 · `add-eval-harness-golden-set-and-baselines` 🔴
 
-**Objetivo.** Convertir "parece que va mejor" en números. **Se hace entre los dos.**
+> **El doble etiquetado no existe** *(corregido el 31 ago)*. La ficha lo daba por hecho entre dos personas y el §6 lo declaraba irrenunciable; con un solo anotador, el sustituto no es fingirlo. Se etiqueta **una vez**, se conserva el *pooling* sobre la unión de configuraciones, se añade **relectura diferida** de las consultas etiquetadas con dudas, y el README declara la **ausencia de acuerdo entre anotadores** como limitación del golden set en lugar de reclamar una mitigación que no se aplicó.
+
+**Objetivo.** Convertir "parece que va mejor" en números.
 **Prereq.** C14, C21 · **Zona.** `ai-service/src/jbg_ai/evals/`
-**Alcance.** Tablas `ai.eval_run/case/result`; golden set de **60-70 consultas** en 9 categorías (incluidas **materiales multi-valor** y **sinónimos**), relevancia graduada 0-2, construido por *pooling* y **etiquetado por separado por ambos con conciliación**; **se etiqueta primero sobre productos reales** y solo se completa con sintéticos si no hay material para cubrir las categorías; CLI `uv run evals run --config vX`; métricas Recall@5, nDCG@5, MRR, P@3, abstención, p50/p95, coste, **reportadas por `data_origin` (real / sintético / global)**; configs `v0-lexico` (replica el buscador .NET actual — **es la comparación que pide la decisión 12**) y `v0-cag`; informe versionado en `ai-service/evals/results/`.
+**Alcance.** Tablas `ai.eval_run/case/result`; golden set de **60-70 consultas** en 9 categorías (incluidas **materiales multi-valor** y **sinónimos**), relevancia graduada 0-2, construido por *pooling* y **etiquetado una sola vez, con relectura diferida de las dudosas**; **se etiqueta primero sobre productos reales** y solo se completa con sintéticos si no hay material para cubrir las categorías; CLI `uv run evals run --config vX`; métricas Recall@5, nDCG@5, MRR, P@3, abstención, p50/p95, coste, **reportadas por `data_origin` (real / sintético / global)**; configs `v0-lexico` (replica el buscador .NET actual — **es la comparación que pide la decisión 12**) y `v0-cag`; informe versionado en `ai-service/evals/results/`.
 **Tests.** `test_ndcg_matches_hand_computed_value_on_fixture`; `test_run_is_reproducible_for_same_config_and_seed`; `test_metrics_reported_per_data_origin`; `test_lexical_baseline_matches_dotnet_search_semantics`; `test_cag_baseline_respects_context_budget`; `test_cost_per_query_recorded_per_config`.
-**Planificación.** Dos sesiones: runner y configs (una persona), etiquetado a cuatro manos (2 h). **Tope de 2 h por persona en etiquetado**: antes se recorta a 45 consultas que renunciar al doble etiquetado.
+**Planificación.** Dos sesiones: runner y configs, y etiquetado. **Tope de 2 h en etiquetado**; superado, se recorta a 45 consultas antes que alargarlo, porque un etiquetador cansado y único es exactamente el fallo que el doble etiquetado ya no puede corregir.
 **Criterio de aceptación.** El umbral se aplica a **la porción real**. Si el global cumple y el real no, la conclusión es que el corpus sintético es demasiado fácil.
 
 ---
@@ -825,7 +898,9 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ---
 
-#### C29 · `add-inventory-recommendation-entity` 🟢 🗄️
+#### ~~C29 · `add-inventory-recommendation-entity`~~ ⛔ 🗄️
+
+> **⛔ Anulado el 2026-08-31** con la rama de C19 (§0). Motor de reglas y migración, sin una sola llamada a un LLM; y su tipo `Rotate` y su tipo `Transfer` ya eran los cortes nº 2 y nº 4 del §6. Ficha conservada como registro.
 
 **Objetivo.** Recomendaciones de inventario como entidad con ciclo de aprobación, **generadas por reglas en .NET**. Base de la decisión 6.
 **Prereq.** C19 · **Zona.** `Domain/`, `Application/`, `API/Controllers/`
@@ -861,15 +936,20 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 **Objetivo.** Capa de decisión: bucle con function calling, tools de solo lectura, presupuesto duro.
 **Prereq.** C30, C31 · **Zona.** `ai-service/src/jbg_ai/assist/`
-**Alcance.** Tools `buscar_catalogo`, `consultar_disponibilidad` (.NET), `listar_familia`, `buscar_sustitutos`, `buscar_complementarios`, `consultar_conocimiento`, `perfil_punto_venta`, `pedir_aclaracion`; máx. 5 iteraciones y 6 llamadas; errores como datos; `partial: true` al agotar presupuesto; **ninguna tool escribe**; decorador de trazado con tokens y coste por iteración.
+**Alcance.** Tools `buscar_catalogo`, `consultar_disponibilidad` (.NET), `listar_familia`, `buscar_sustitutos`, `buscar_complementarios`, `consultar_conocimiento`, `pedir_aclaracion` — **siete, no ocho**; máx. 5 iteraciones y 6 llamadas; errores como datos; `partial: true` al agotar presupuesto; **ninguna tool escribe**; decorador de trazado con tokens y coste por iteración.
+**Tools retiradas** *(31 ago)*. **`perfil_punto_venta`** sale del registro: la servía C33, anulada con la rama de C19 (§0). Registrarla sin servicio detrás daría al modelo una herramienta que falla siempre, y una tool que devuelve error es peor que una tool ausente — el bucle la reintenta y quema presupuesto. Si C33 se rescata (su ficha explica cómo), vuelve. **`buscar_complementarios`** se retira también si se dispara el corte nº 1 (C27).
 **Tests.** `test_loop_stops_at_iteration_budget_and_flags_partial`; `test_tool_error_is_returned_as_data_not_exception`; `test_out_of_stock_query_triggers_substitutes_tool`; `test_no_registered_tool_performs_writes` (introspección del registro); `test_token_usage_accumulated_across_iterations`.
 
 ---
 
-#### C33 · `add-pos-sales-profile` 🟢
+#### ~~C33 · `add-pos-sales-profile`~~ ⛔
+
+> **⛔ Anulado el 2026-08-31** con la rama de C19 (§0). **Es el único rescatable de los cinco**, y su prerrequisito estaba sobre-especificado: **no necesita C19**. Sus siete métricas son agregados a nivel POS sobre `Sales` × `ProductAiProfile`, y lo único per-producto que usan —`sales_30d` y `lastSaleAt`— ya lo calcula `IndexFeedRepository.GetSalesAggregatesAsync` (C12). No toca `IsSupplySource`, `stock_in_other_pos`, `estimated_days_to_stockout`, `is_top_seller_in_pos`, `sales_7d` ni `sales_60d`.
+>
+> **Si el núcleo cierra y sobra sesión**, se reabre **con prereq C08 + C12, sin migración**: devuelve al agente de venta su octava tool (`perfil_punto_venta`, hoy retirada de C32) y da al §11.3 del diseño su test de fidelidad del perfil. Mientras tanto, C32 arranca con siete tools.
 
 **Objetivo.** Argumentario por POS como **perfil periódico calculado**, no como texto libre. Decisión 7.
-**Prereq.** C19 · **Zona.** `Application/` + `ai-service/src/jbg_ai/assist/`
+**Prereq.** ~~C19~~ → **C08, C12** *(corregido el 31 ago)* · **Zona.** `Application/` + `ai-service/src/jbg_ai/assist/`
 **Alcance.** Cálculo SQL en .NET de `top_piece_types`, `top_materials`, `top_price_ranges`, `top_collections`, `average_ticket`, `best_selling`, `slow_moving`; persistencia estructurada; el LLM **solo redacta el resumen a partir de ese payload**; `GET /api/ai/pos/{id}/sales-profile`; consumo como prior de ranking y por la tool `perfil_punto_venta`.
 **Tests.** `Profile_MetricsComputedFromSalesNotLlm`; `test_narrative_mentions_only_metrics_present_in_payload`; `Profile_PosWithoutSales_ProducesEmptyProfileNotHallucination`; `Profile_RegeneratedWhenPeriodChanges`.
 
@@ -878,14 +958,16 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 #### C34 · `add-dotnet-assist-and-recommendation-endpoints` 🔴
 
 **Objetivo.** Exponer venta asistida, sustitutos y complementarios con hidratación y resolución de placeholders.
-**Prereq.** C15, C26, C27, C30 · **Zona.** `API/Controllers/`, `Application/`
+**Prereq.** C15, C26, C30 · **C27 solo si sobrevive a su corte** *(§6, nº 1)*: si cae, se retira la ruta `.../recommendations` y su test `Recommendations_ManualPairsRankedFirst`, y el resto del change no se toca · **Zona.** `API/Controllers/`, `Application/`
 **Alcance.** `GET /api/ai/products/{id}/sales-assist`, `.../substitutes?pointOfSaleId=`, `.../recommendations?pointOfSaleId=`; **sustitución de `{{price}}`/`{{stock}}`** por valores reales; **rechazo de la respuesta si queda algún placeholder sin resolver**.
 **Tests.** `SalesAssist_ReplacesPlaceholdersWithRealValues`; `SalesAssist_WhenPlaceholderUnresolved_ReturnsErrorInsteadOfRawTemplate`; `Substitutes_ExcludeProductsWithoutStockAtTargetPos`; `Recommendations_ManualPairsRankedFirst`; `SalesAssist_AsOperatorOfAnotherPos_Returns403`.
 **Conflicto de zona.** Mismo controlador que C15 → nunca simultáneos.
 
 ---
 
-#### C35 · `add-inventory-agent-proposals` 🟢
+#### ~~C35 · `add-inventory-agent-proposals`~~ ⛔
+
+> **⛔ Anulado el 2026-08-31** con la rama de C19 (§0). Era el segundo agente, y ya era el corte nº 8 del §6. Con él cae la única pieza con contenido agéntico de la rama; el asistente de venta (C30→C31→C32) se conserva entero y es el que el diseño marca «Núcleo · Requisito del PF». Ficha conservada como registro.
 
 **Objetivo.** Segundo agente: prioriza, elige sustituto y redacta el motivo. **Los números los calcula .NET.**
 **Prereq.** C26, C29, C32, C33 · **Zona.** `ai-service/src/jbg_ai/assist/`
@@ -904,7 +986,9 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ---
 
-#### C37 · `add-frontend-inventory-review-and-print` 🟢
+#### ~~C37 · `add-frontend-inventory-review-and-print`~~ ⛔
+
+> **⛔ Anulado el 2026-08-31** con la rama de C19 (§0). Pantalla de React sin IA, y su vista imprimible ya era el corte nº 5 del §6. Ficha conservada como registro.
 
 **Objetivo.** Aprobación humana de recomendaciones y salida física. Sustituye a la packing list completa.
 **Prereq.** C29, C35 · **Zona.** `frontend/src/`
@@ -915,28 +999,32 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 #### C38 · `add-generation-and-agent-evals` 🔴
 
-**Objetivo.** Cerrar la evaluación: validador anti-alucinación, RAGAS, escenarios de ambos agentes y casos adversarios.
-**Prereq.** C24, C30, C32, C34, C35 · **Zona.** `ai-service/src/jbg_ai/evals/` + `Application/`
-**Alcance.** (1) **Validador determinista** que extrae toda cifra de precio/stock de la respuesta final y la contrasta con el hidratador, umbral **cero fallos**, más su equivalente en .NET antes de responder; (2) **RAGAS** sobre el subconjunto con citas; (3) **20-25 escenarios de agente de venta + 8-10 de inventario**; (4) **20-25 casos adversarios**; (5) **test de fidelidad del perfil por POS**. Todo integrado en el runner e informe de C24.
-**Tests.** `test_detects_injected_fake_price_in_response`; `test_ignores_numbers_that_are_sizes_or_skus`; `test_scenario_runner_replays_multi_turn_conversation`; `test_inventory_scenario_checks_proposal_state_and_reason`; `test_injection_cases_all_blocked`; .NET: `Response_WithUnverifiedNumber_IsRejected`.
-**Orden obligatorio si hay que partirlo:** validador → escenarios de venta → adversarios → escenarios de inventario → RAGAS. **RAGAS es lo primero que se cae.**
+**Objetivo.** Cerrar la evaluación: validador anti-alucinación, RAGAS, escenarios del agente de venta y casos adversarios.
+**Prereq.** C24, C30, C32, C34 *(~~C35~~, anulado)* · **Zona.** `ai-service/src/jbg_ai/evals/` + `Application/`
+**Alcance.** (1) **Validador determinista** que extrae toda cifra de precio/stock de la respuesta final y la contrasta con el hidratador, umbral **cero fallos**, más su equivalente en .NET antes de responder; (2) **RAGAS** sobre el subconjunto con citas; (3) **20-25 escenarios de agente de venta**; (4) **20-25 casos adversarios**. Todo integrado en el runner e informe de C24.
+**Recortado el 31 ago** con la rama de C19 (§0): salen los **8-10 escenarios de agente de inventario** —no hay segundo agente— y el **test de fidelidad del perfil por POS**, que evaluaba C33. Sobrevive lo que el PF puntúa: validador, escenarios de venta, adversarios y RAGAS.
+**Tests.** `test_detects_injected_fake_price_in_response`; `test_ignores_numbers_that_are_sizes_or_skus`; `test_scenario_runner_replays_multi_turn_conversation`; `test_injection_cases_all_blocked`; .NET: `Response_WithUnverifiedNumber_IsRejected`.
+**Orden obligatorio si hay que partirlo:** validador → escenarios de venta → adversarios → RAGAS. **RAGAS es lo primero que se cae.**
 
 ---
 
-### Ola 5 — Entrega (1-3 sep)
+### Ola 5 — Entrega
 
 ---
 
-#### C39 · `finalize-pf-readme-and-evidence` 🔴 👥
+#### C39 · `finalize-pf-readme-and-evidence` 🔴
 
 **Objetivo.** Empaquetar la entrega para que un evaluador externo entienda, reproduzca y pruebe el sistema.
-**Prereq.** todos · **Zona.** docs
-**Alcance.** README del PF (dominio, arquitectura con la frontera .NET/Python justificada, CAG/RAG/agentes/evaluación/despliegue, arranque local, **los dos integrantes**, limitaciones, próximos pasos); **tabla de ablations v0→v3**; **métricas de revisión humana** (tasa de corrección y tiempo medio); sección del reranking descartado con su protocolo; progresión de prompts v1→v2 con impacto medido; **declaración explícita de lo que queda para fase posterior** (packing list, liquidación, upsell, políticas de inventario); vídeo de 2-3 min; usuario demo; `docker compose up` verificado desde cero; rama `finalproject-[INICIALES]` y tag `v1.0-final-[INICIALES]`.
+**Prereq.** todos los vivos · **Zona.** docs
+**Alcance.** README del PF (dominio, arquitectura con la frontera .NET/Python justificada, CAG/RAG/agentes/evaluación/despliegue, arranque local, autoría, limitaciones, próximos pasos); **tabla de ablations v0→v3**; **métricas de revisión humana** (tasa de corrección y tiempo medio); sección del reranking descartado con su protocolo; progresión de prompts v1→v2 con impacto medido; **declaración explícita de lo que queda para fase posterior** (packing list, liquidación, upsell, políticas de inventario); vídeo de 2-3 min; usuario demo; `docker compose up` verificado desde cero; rama `finalproject-[INICIALES]` y tag `v1.0-final-[INICIALES]`.
+**Tres declaraciones nuevas** *(31 ago)*, que son puntos a favor si están escritas y huecos si faltan: **un solo agente**, con el diseño del de inventario (§10 del documento hermano) adjunto como próximo paso; **golden set sin acuerdo entre anotadores**, por etiquetador único; y **proyecto individual**, no en pareja.
 **Tests.** Ensayo de reproducibilidad en máquina limpia y `openspec validate --all`.
 
 ---
 
 ## 4. Grafo de dependencias
+
+**Solo changes vivos** *(reescrito el 2026-08-31)*. Los cinco anulados —C19, C29, C33, C35, C37— y sus aristas ya no aparecen: el grafo es lo que más se consulta para decidir qué se abre a continuación, y dibujar nodos muertos ahí es la forma más rápida de volver a planificarlos por error. Quedan en la tabla maestra del §2 y en sus fichas del §3.
 
 ```mermaid
 flowchart LR
@@ -949,31 +1037,50 @@ flowchart LR
     C07 --> C12 & C18a & C30
     C08 --> C12 & C28
     C09 --> C11
-    C10 --> C19 & C22 & C27
+    C10 --> C22 & C27
     C11 --> C13 & C23
     C12 --> C13 & C22
     C13 --> C14 & C18a
     C14 --> C15 & C20 & C21 & C22 & C24
-    C18a --> C18b & C25 & C26 & C30 & C36
     C15 --> C16 & C17 & C34
     C16 --> C36
-    C19 --> C29 & C33
+    C18a --> C18b & C25 & C26 & C30 & C36
     C20 --> C21
     C21 --> C24 & C25 & C30
     C22 --> C25 & C26
     C23 --> C30
     C24 --> C25 & C38
     C25 --> C26 & C27
-    C26 --> C34 & C35
+    C26 --> C34
     C27 --> C34
-    C29 --> C35 & C37
     C30 --> C31 & C34 & C38
     C31 --> C32
-    C32 --> C35 & C38
-    C33 --> C35
+    C32 --> C38
     C34 --> C36 & C38
-    C35 --> C37 & C38
+
+    classDef hecho fill:#d9ead3,stroke:#38761d,color:#274e13
+    classDef ahora fill:#fce5cd,stroke:#b45f06,color:#7f3f00,stroke-width:3px
+    classDef corte fill:#f4cccc,stroke:#a61c00,color:#660000,stroke-dasharray:4 3
+    class C01,C02,C03,C05,C06a,C06b,C07,C08,C09,C10,C11,C12,C13,C14,C15,C16,C17,C18a hecho
+    class C20 ahora
+    class C23,C27 corte
 ```
+
+🟩 archivado · 🟧 **siguiente a abrir** · 🟥 con corte pre-autorizado (§6) · sin color: pendiente
+
+**Fuera del dibujo, a propósito:** **C04** no tiene prerrequisitos ni dependientes *(está archivado)*, y **C39** depende de todos los vivos, así que ninguna de las dos arista añade información.
+
+**Cómo se lee para decidir qué se abre.** No por el color de ruta, sino por cuántas aristas abre cada nodo libre:
+
+| Libre ahora | Desbloquea | |
+|---|---|---|
+| **C20** | **C21** → y con él C24, C25, C30 → y con ellos casi todo lo demás | **es el tapón del grafo** |
+| C23 | C30 | |
+| C22 | C25, C26 | |
+| C28 | nada — pero lo pide el checklist §16 del diseño | hoja obligatoria |
+| C18b | nada | hoja recortable |
+
+**Cadena crítica que queda:** `C20 → C21 → C24 → C25 → C26 → C34 → C36`, con `C22` y `C23` entrando por los lados, y `C30 → C31 → C32 → C38 → C39` cerrando.
 
 ---
 
@@ -988,15 +1095,17 @@ flowchart LR
 | **O4** | 27-31 ago | C30-C38 (9) | C30 → C31 → C32, C34 → C36, C38 |
 | **O5** | 1-3 sep | C39 (1) | C39 |
 
-**Carga:** 39 changes / 4,4 semanas / 2 personas = **~4,4 por persona y semana**. La ola 3 (10 changes) y la ola 4 (9, con los dos agentes) son las más cargadas; si algo se retrasa, será ahí.
+> **Este calendario es registro, no plan** *(desde el 2026-08-31)*. Con prórroga abierta y un solo desarrollador ya no hay fechas que cumplir ni carga por persona y semana que repartir: las olas describen cómo se ejecutó C01–C18a y en qué orden estaba previsto lo demás. **Lo que decide qué se abre a continuación es el grafo del §4**, no esta tabla. Las olas 3 y 4 tal como están dibujadas ya no existen: la 3 pierde C29 y la 4 pierde C33, C35 y C37.
 
-### Pares que NO deben ejecutarse en paralelo
+### Pares que NO deben ejecutarse a la vez
+
+Con un solo desarrollador esto deja de ser coordinación y pasa a ser disciplina de rama: son changes que no se abren simultáneamente aunque los escriba la misma mano.
 
 | Par | Motivo |
 |---|---|
 | C15 ‖ C34 | ~~Mismo controlador `AiController.cs`~~ → **mismo servicio de búsqueda**. `AiController.cs` no existe: el patrón real es un controlador por capacidad *(corregido el 2026-08-28)* |
 | C16 ‖ C36 | Misma página y servicio del frontend |
-| Cualquier par de 🗄️ (C04, C07, C08, C19, C27, C29) | Dos migraciones EF Core simultáneas colisionan en el orden |
+| Cualquier par de 🗄️ (C04, C07, C08, C27) | Dos migraciones EF Core simultáneas colisionan en el orden. **De seis migraciones planificadas quedan cuatro**: C19 y C29 se anularon, y las tres primeras ya están archivadas — la única viva es la de C27, y lleva corte pre-autorizado |
 | C13 ‖ C11 | C13 depende del cliente de embeddings congelado en C11 |
 | C21 ‖ C22 ‖ C25 | Los tres tocan el pipeline de ranking en `retrieval/` |
 | C13 ‖ C23 | Zona `indexing/` compartida: separados por fichero, pero no solapar si hay dudas |
@@ -1005,18 +1114,20 @@ flowchart LR
 
 ## 6. Orden de corte, fijado de antemano
 
-Si el **26 de agosto** (fin de O3) no están la tabla de ablations y el sistema desplegado:
+**Reescrito el 2026-08-31.** La lista de la v3 tenía ocho posiciones y **cuatro de ellas vivían dentro de la rama de C19** —Rotate y Transfer de C29, vista imprimible de C37, y C35 entero—, que es precisamente lo que delató que la rama sobraba: un plan que se compromete de antemano a destripar una funcionalidad está diciendo que no la necesita. Anulada la rama, quedan cuatro cortes, y el disparador ya no es una fecha sino el juicio de que el núcleo peligra:
 
-1. **C27** complementarios → fase posterior; los sustitutos ya cubren el caso de venta
-2. **Tipo `Rotate` de C29** → el motor queda, se cae la regla de stock parado
-3. **RAGAS dentro de C38** → se conservan validador y métricas de recuperación
-4. **Tipo `Transfer` de C29** → solo reposición
-5. **Vista imprimible de C37** → se aprueba en pantalla y se exporta a CSV
-6. **C23** corpus 30-45 → 15 documentos, manteniendo las citas
-7. **Golden set de C24** 70 → 45 consultas, **nunca renunciando al doble etiquetado**
-8. **C35** agente de inventario → las recomendaciones se generan por reglas puras (C29), sin capa agéntica ni redacción LLM
+1. **C27** complementarios → fase posterior; los sustitutos (C26) ya cubren el caso de venta. **Ahorra además la última migración EF Core viva**, y arrastra la retirada de la tool `buscar_complementarios` de C32 y de la ruta `.../recommendations` de C34
+2. **C23** corpus 30-45 → **15 documentos**, manteniendo las citas verificables, que es lo que el PF evalúa
+3. **RAGAS dentro de C38** → se conservan validador anti-alucinación, escenarios de venta y adversarios
+4. **Golden set de C24** 70 → 45 consultas
 
-**Nunca se recortan:** C01, C02, C03, C05, **C06a**, C07, C09, C11, C12, C13, C14, C15, C16, C17, **C18a**, C21, C22, C24, C30, C32, C34, C36, el validador de C38 y C39. **C06b sí admite recorte**: si no llega, el corpus se queda en los 436 reales, todas las métricas se reportan sobre ellos y el README declara que no hubo ampliación sintética. Se pierde volumen y las categorías del golden set que necesiten productos inexistentes, no el sistema.
+Los cortes **1 y 2 están confirmados de antemano** y se aplican desde el principio del change, no a mitad: C23 se escribe ya con 15 documentos en lugar de redactar 45 y tirar 30.
+
+**Nunca se recortan:** C01, C02, C03, C05, **C06a**, C07, C09, C11, C12, C13, C14, C15, C16, C17, **C18a**, C20, C21, C22, C24, C28, C30, C31, C32, C34, C36, el validador de C38 y C39.
+
+Tres entradas nuevas en esa lista, y conviene el porqué: **C20** porque tapona a C21 y con él al grafo entero; **C31** porque sin guardrails el agente de C32 no es defendible como sistema en producción; y **C28** porque el checklist de entrega del documento hermano pide literalmente *«métricas de revisión humana del enriquecimiento»* y su §11.5 advierte de que esos números *«no existen sin la vía revisada»* — es una casilla marcada o vacía, no un grado.
+
+**C06b sí admite recorte** *(ya archivado, se conserva la nota)*: si no hubiera llegado, el corpus se quedaba en los 436 reales, con las métricas reportadas sobre ellos y el README declarando que no hubo ampliación sintética. **C18b** es hoja del grafo: nadie depende de ella y cae sin efectos.
 
 ---
 
@@ -1024,10 +1135,12 @@ Si el **26 de agosto** (fin de O3) no están la tabla de ablations y el sistema 
 
 | Riesgo | Mitigación |
 |---|---|
-| **Las olas 3 y 4 concentran 19 de los 39 changes** | C19, C29 y C33 (base de inventario, .NET y sin LLM) están adelantados a O3 precisamente para descargar O4 |
-| C02 se queda corto y el contrato cambia en O4, invalidando C03/C15/C16 | `test_openapi_snapshot_is_stable`: cualquier cambio rompe el build y se negocia entre los dos |
-| C24 (golden set) bloquea C25 y C38 | El runner y las configs van por delante; el etiquetado tiene tope de 2 h por persona y recorte definido a 45 consultas |
+| ~~Las olas 3 y 4 concentran 19 de los 39 changes~~ | **Sin objeto desde el 31 ago.** No hay olas que equilibrar: quedan 17 changes pendientes y se ordenan por desbloqueo del grafo. La concentración se resolvió anulando cinco de ellos, no repartiéndolos |
+| **C20 tapona el grafo entero y está pintado 🟢** | Es lo único que separa a C21 de arrancar, y C21 bloquea a C24 y a C30. Marcado como siguiente a abrir en su ficha y en el §4; el color de ruta ya no decide el orden |
+| C02 se queda corto y el contrato cambia, invalidando C03/C15/C16 | `test_openapi_snapshot_is_stable`: cualquier cambio de contrato rompe el build y obliga a decidirlo, en vez de filtrarse |
+| C24 (golden set) bloquea C25 y C38 | El runner y las configs van por delante; el etiquetado tiene tope de 2 h y recorte definido a 45 consultas |
+| **El golden set lo etiqueta una sola persona** | No se finge la conciliación: *pooling* sobre la unión de configuraciones, relectura diferida de las dudosas, y la ausencia de acuerdo entre anotadores **declarada** en el README como limitación |
 | C09, C10 y C38 son sesiones largas | Punto de partición predefinido en cada ficha; se entrega primero la mitad que desbloquea |
-| C29 necesita saber cuál es el POS origen de suministro | **Resuelto:** existe tienda central y `IsSupplySource` se añade en C19, dos olas antes |
-| Seis migraciones EF Core (C04, C07, C08, C19, C27, C29) | Regla de migración única activa; están repartidas en cuatro olas distintas |
-| Artefactos OpenSpec consumen tiempo de sesión | `design.md` solo cuando hay decisión con alternativas reales (C02, C11, C21, C22, C24, C29, C32); en el resto, `proposal` + `tasks` + spec delta |
+| ~~C29 necesita saber cuál es el POS origen de suministro~~ | **Sin objeto:** C29 anulada. `IsSupplySource` no llega a existir en SQL, y sigue viviendo solo en el YAML de C10 |
+| ~~Seis~~ **Cuatro** migraciones EF Core (C04, C07, C08, C27) | Tres archivadas; **la única viva es la de C27**, que además es el corte nº 1. Regla de migración única activa |
+| Artefactos OpenSpec consumen tiempo de sesión | `design.md` solo cuando hay decisión con alternativas reales (C02, C11, C21, C22, C24, C32); en el resto, `proposal` + `tasks` + spec delta |
