@@ -226,7 +226,41 @@ Los de pureza 0 con margen positivo son los falsos positivos del imán —`Colga
 
 ---
 
-## 6. Auditoría de miembros marcados: resolución
+## 6. Lo que la implementación obligó a decidir, y no estaba escrito
+
+Tres decisiones que el diseño no había fijado y que salieron al escribir el código.
+
+**El repositorio devuelve una forma de dominio, no el DTO de aplicación.** `IProductFamilyRepository` vive en `Domain`, y ese proyecto **no referencia ningún otro**: un DTO de `Application` en su firma invertiría la estratificación sobre la que se apoya la solución entera. Se añade `ProductFamilySummary` en `Domain` y el servicio mapea, que es una proyección corta y ninguna duplicación de significado.
+
+**Un origen de familia no reconocido responde 400, no la lista sin filtrar.** Servir el conjunto completo contestaría a una pregunta que nadie hizo, y sobre una pantalla de revisión se lee como *«estas son las familias manuales»* cuando son todas.
+
+**Dentro de un lote de veredictos gana el último.** Un revisor que marca la misma fila dos veces antes de enviar se está corrigiendo; insertar ambas rompería el índice único del par y convertiría una pregunta ya respondida en un error de base de datos.
+
+Y un cuarto punto que sí estaba en el diseño pero que el código hace visible: **un cuerpo vacío del servicio de IA se traduce a fallo y nunca a resultado vacío**. En esta ruta «vacío» y «catálogo limpio» son indistinguibles para la pantalla, y sólo uno de los dos es cierto.
+
+### Cómo quedó D20 en el código, que era el punto delicado
+
+Los tres estados no son un condicional en el render: **están en el tipo**.
+
+```ts
+export type AuditOutcome =
+  | { state: 'loaded'; audit: FamilyAudit }
+  | { state: 'unavailable'; reason: string };
+```
+
+Un llamante **no puede alcanzar las listas sin pasar por el estado**, que es lo que hace incómodo repetir el fallo en vez de sólo desaconsejarlo. La pantalla distingue tres cosas donde lo fácil habría sido distinguir dos:
+
+| Estado | Lo que dice | Por qué no puede confundirse con el anterior |
+|---|---|---|
+| `loaded`, con filas | La cola | — |
+| `loaded`, vacía | *«Sin hallazgos»*, citando cuántas pertenencias se examinaron | Un recuento es la prueba de que se miró |
+| `unavailable` | *«No se ha podido calcular»* — y literalmente *«esto **no** significa que no haya nada que revisar: significa que no se sabe»* | Es la frase que C17 no dijo |
+
+Y el estado es **por lista y no por página**: la pestaña de familias no usa vectores, así que sigue operativa mientras la auditoría no lo esté. Tres de los ocho tests de frontend pinchan exactamente eso.
+
+---
+
+## 7. Auditoría de miembros marcados: resolución
 
 _Pendiente — grupo 7. Requiere juicio humano._
 

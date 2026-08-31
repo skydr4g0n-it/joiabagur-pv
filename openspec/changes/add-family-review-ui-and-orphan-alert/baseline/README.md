@@ -37,3 +37,29 @@ decía que el código estaba bien y la conclusión obvia era «dependencia de or
 la suite .NET». Durante este apply llegué a escribir justamente eso aquí. Era falso: la
 suite de Python **no tiene fallos de línea base**, y la comprobación válida siempre fue la
 suite completa contra la suite completa.
+
+---
+
+## Medido el 2026-08-31: en el backend, ni los nombres son estables
+
+`CLAUDE.md` dice —con razón— que en la suite .NET se comparan **nombres** y nunca recuentos, porque
+«un puñado de estos fallos son genuinamente dependientes del orden». Al cerrar C18b se midió cuánto
+es ese puñado, ejecutando **la suite completa dos veces sobre el mismo commit**:
+
+| | pasada 1 | pasada 2 |
+|---|---|---|
+| Fallos | **48** | **54** |
+| Nombres sólo en esa pasada | 6 | 12 |
+| **Clases con fallos** | **17** | **17 — las mismas** |
+
+**Dieciocho nombres se mueven entre dos ejecuciones de código idéntico**, casi todos dentro de
+`InventoryIntegrationTests`. Así que comparar por nombre tampoco decide: sobre esta suite, la unidad
+estable es la **clase**.
+
+**La regla útil, entonces:** comparar el **conjunto de clases** con fallos, y sólo mirar nombres
+dentro de una clase que no estuviera en la línea base. Para C18b el resultado fue inequívoco —
+**ninguna clase de familia falla en ninguna de las dos pasadas**: ni `FamilyReviewControllerTests`,
+ni `FamilyReviewVerdictSchemaTests`, ni `ProductFamiliesControllerTests`, ni
+`FamilySuggestionControllerTests`, ni `ProductFamilySchemaTests`, ni `AiCatalogControllerTests`.
+
+Ejecutadas en aislamiento, esas seis clases dan **77/77** y **48/48** en verde.

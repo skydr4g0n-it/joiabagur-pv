@@ -42,6 +42,7 @@ export const ROUTES = {
     DETAIL: (id: string) => `/sales/${id}`,
   },
   AI_MODEL: '/admin/ai-model',
+  FAMILY_REVIEW: '/admin/family-review',
   RETURNS: {
     ROOT: '/returns',
     NEW: '/returns/new',
