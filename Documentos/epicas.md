@@ -417,14 +417,21 @@ Resuelve el caso de negocio crítico: variantes visualmente casi idénticas que 
 
 **Alcance:**
 - ✅ Entidades `ProductFamily` y `ProductFamilyMember` en .NET, con pertenencia excluyente garantizada por índice único, etiqueta de variante y orden declarados de forma idempotente, y cinco endpoints de administración (C07)
-- Propuesta asistida de familias por similitud de embedding, tipo de pieza y raíz común de nombre
-- Pantalla de revisión y aprobación por lotes (segundo caso de intervención humana del PF)
-- Alerta de huérfanos: productos con similitud alta a una familia a la que no pertenecen
-- Pantalla de revisión de perfiles de IA con métricas de calidad
+- ✅ Propuesta asistida de familias y aprobación por lotes: **156 familias y 486 miembros creados** el 2026-08-31 (C18a)
+- Pantalla de revisión y aprobación por ítem (segundo caso de intervención humana del PF) — C18b
+- Alerta de huérfanos: productos con similitud alta a una familia a la que no pertenecen — C18b
+- Pantalla de revisión de perfiles de IA con métricas de calidad — C28
 
-**Changes asociados:** C07 (hecho), C18, C28
+**Changes asociados:** C07 (hecho), **C18a (hecho)**, C18b, C28
 
-**Nota de secuencia.** C07 entrega la entidad y su edición manual, no la inteligencia: agrupar ~350 familias a mano es inviable y por eso existe C18. Lo que C07 hace posible es que haya un sitio donde esas familias vivan y se corrijan, y que `Product` no gane ninguna columna en el proceso. C07 reserva además `Origin`, `ApprovedByUserId` y `ApprovedAt` para que C18 —que no tiene turno de migración de EF Core— pueda registrar la aprobación humana sin abrir uno.
+**Nota de secuencia.** C07 entrega la entidad y su edición manual, no la inteligencia: agrupar ~350 familias a mano es inviable y por eso existe C18. Lo que C07 hace posible es que haya un sitio donde esas familias vivan y se corrijan, y que `Product` no gane ninguna columna en el proceso. C07 reserva además `Origin`, `ApprovedByUserId` y `ApprovedAt` para que C18 —que no tiene turno de migración de EF Core— pueda registrar la aprobación humana sin abrir uno. **C18a ejerció esa reserva el 2026-08-31**, que hasta entonces no tenía ningún camino de escritura.
+
+**C18 se partió en dos el 2026-08-31**, según la regla 5 del plan: se entrega primero la mitad que desbloquea. **C18a** es el motor y el camino de escritura —lo que hace que `family_id` deje de ser nulo, y con ello que dejen de ser vacuos los tests de familia de C25, C26, C30 y C36—; **C18b** es la pantalla de revisión y la alerta de huérfanos, que necesitan familias ya existentes para tener algo que revisar.
+
+**Entregable C18a.** Motor determinista en [`ai-service/src/jbg_ai/families/`](../ai-service/src/jbg_ai/families/) —raíz normalizada, fusión por material con guarda de raíz degenerada, puerta de `piece_type`, veto **relativo** por embedding que marca y no elimina—, novena ruta del contrato `POST /v1/families/suggest`, y en .NET `POST /api/ai/catalog/family-suggestions` más `/apply`, que persiste vía `ProductFamilyService` para que el feed incremental vea las altas. Reconciliación en **una sola** sincronización: `upserted 486, deleted 32, failed 0`. Informe: [`informes/c18a-family-suggestion-report.md`](Proyecto%20Final%20AIEng/informes/c18a-family-suggestion-report.md).
+
+- [HU-AIENG-007: Entidad de familia de producto y edición manual](Historias/AI-Eng/HU-AIENG-007.md) *(C07 — hecho)*
+- [HU-AIENG-018a: Propuesta asistida de familias y aprobación por lotes](Historias/AI-Eng/HU-AIENG-018a.md) *(C18a — hecho; 156 familias / 486 miembros; `Origin = AiApproved`; 32 entradas que no son joyería retiradas del índice con `ReviewStatus = Rejected`, nunca con `IsActive`; cola de revisión de 15 miembros en 5 familias)*
 
 ---
 
@@ -538,7 +545,7 @@ Se miden por *changes* de OpenSpec, no por número de historias: la serie `HU-AI
 |-------|-------------------|---------|--------------|
 | **EP11** | Plataforma del Servicio de IA | C01, C02, C03, C05, C17 | 🔴 completa |
 | **EP12** | Corpus y Enriquecimiento del Catálogo | C06a (hecho), C06b (hecho), C08, C09 (hecho), C10 (hecho), C11 (hecho), C23 | 🔴 parcial |
-| **EP13** | Familias de Producto y Desambiguación | C07, C18, C28 | 🟢 |
+| **EP13** | Familias de Producto y Desambiguación | C07 (hecho), C18a (hecho), C18b, C28 | 🟢 parcial |
 | **EP14** | Búsqueda Semántica Híbrida | C12, C13, C14, C15, C16, C20, C21, C22, C25 | 🔴 mayoritaria |
 | **EP15** | Venta Asistida, Sustitutos y Agentes | C26, C27, C30, C31, C32, C34, C36 | 🔴 parcial |
 | **EP16** | Inventario Asistido y Señales de Demanda | C19, C29, C33, C35, C37 | 🟢 |

@@ -147,6 +147,27 @@ curl -X POST http://127.0.0.1:8000/v1/retrieval/products \
 
 Health returns HTTP 200 with `{"status":"OK","version":"0.1.0"}`. The `/v1` call returns **401** without a token — that is the expected answer. To exercise it, sign a token with the same secret and the four claims, then send `Authorization: Bearer <token>`.
 
+### Running against a real database on Windows: two traps
+
+Both are development-machine problems. In production the service runs in a Linux container and neither exists — which is exactly why they are worth writing down: nothing in CI will ever reproduce them for you.
+
+**Uvicorn installs the `ProactorEventLoop`, and psycopg cannot use it.** Every query fails with `Psycopg cannot use the 'ProactorEventLoop' to run in async mode`, and `GET /health` reports `"database": "unavailable"` with no other hint. Setting the policy before calling `uvicorn.run` does not help — uvicorn installs its own. The service has to be started with uvicorn not managing the loop:
+
+```python
+import asyncio, sys, uvicorn
+from jbg_ai.api.main import create_app
+
+async def main() -> None:
+    config = uvicorn.Config(create_app(), host="127.0.0.1", port=8001, loop="none")
+    await uvicorn.Server(config).serve()
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+asyncio.run(main())
+```
+
+**LiteLLM verifies TLS against `certifi`, not the operating system store.** Behind a corporate proxy with its own root CA the embedding calls fail, and the symptom misleads: `curl` with the same key returns **200** while Python returns `CERTIFICATE_VERIFY_FAILED`. The indexer records it as `OpenAIException - Connection error` in `ai.sync_failure`, which names neither TLS nor certificates. This is the runtime sibling of the `--system-certs` flag above, and it needs its own fix — export the Windows root store, concatenate it with `certifi.where()`, and point `SSL_CERT_FILE` at the result.
+
 ## Run with Docker Compose
 
 From `backend/`:

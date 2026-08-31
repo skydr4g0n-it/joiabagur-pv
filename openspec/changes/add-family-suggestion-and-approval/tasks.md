@@ -83,12 +83,12 @@
 
 ## 9. Documentación y cierre
 
-- [ ] 9.1 Enlazar HU-AIENG-018a en `Documentos/epicas.md` (EP13) y marcar C18a como hecho en su lista de changes.
-- [ ] 9.2 **Reestructurar el plan de changes** al orden **C18a → C19 → C18b**: tabla maestra (§2), grafo de dependencias (§4) —hoy no dibuja C18→C25, C18→C26, C18→C30 ni C18→C36—, calendario (§5) y lista de *nunca se recorta* (§6), donde C30 y C36 son irrecortables mientras C18 no lo es. Renombrar la ficha y anunciar C18b como `add-family-review-ui-and-orphan-alert`.
-- [ ] 9.3 Añadir al §0 del plan la **revisión fechada con la medición del coseno** que corrige el enunciado del §7.5 del diseño.
-- [ ] 9.4 Dejar planteada en el §0 la decisión sobre el **doble etiquetado del golden set de C24** trabajando en solitario, para resolver antes de abrir C24 (D13).
-- [ ] 9.4b Anotar como **candidatos a change propio** los tres arreglos de raíz que C18a destapa y no resuelve: ampliar `piece_type.terms` con `diadema`, `gemelos` y `cinturon` —lo que obliga a reenriquecer esos 9 productos y **volverá a mover el corpus**, así que necesita su propia decisión de cuándo—; dar a C09 una salida explícita «no es una pieza» en vez de forzar un tipo; y llevar los cierres `Presión` a `ProductComponents` (EP10), que es donde conceptualmente viven.
-- [ ] 9.5 Anotar la **divergencia spec/código de `Product.CollectionId`**: la spec viva `product-family` apela a una cardinalidad 1..N que el código no tiene (`Guid? CollectionId`, FK única y anulable). Los discriminadores reales son el tipo de pieza y el tamaño.
-- [ ] 9.6 Actualizar la documentación afectada según la tabla *Post-Implementation Documentation Update* de `openspec/project.md`.
-- [ ] 9.7 Comparar la suite contra la línea base de 1.3 **por nombres de test**, no por recuento, y dejar constancia en `qa.md`.
-- [ ] 9.8 `openspec validate --all --strict` en verde (`0 failed`) antes de archivar — el gate completo, no sólo la forma de un change.
+- [x] 9.1 Enlazar HU-AIENG-018a en `Documentos/epicas.md` (EP13) y marcar C18a como hecho en su lista de changes.
+- [x] 9.2 **Reestructurar el plan de changes** al orden **C18a → C19 → C18b**: tabla maestra (§2), grafo de dependencias (§4) —hoy no dibuja C18→C25, C18→C26, C18→C30 ni C18→C36—, calendario (§5) y lista de *nunca se recorta* (§6), donde C30 y C36 son irrecortables mientras C18 no lo es. Renombrar la ficha y anunciar C18b como `add-family-review-ui-and-orphan-alert`.
+- [x] 9.3 Añadir al §0 del plan la **revisión fechada con la medición del coseno** que corrige el enunciado del §7.5 del diseño.
+- [x] 9.4 Dejar planteada en el §0 la decisión sobre el **doble etiquetado del golden set de C24** trabajando en solitario, para resolver antes de abrir C24 (D13).
+- [x] 9.4b Anotar como **candidatos a change propio** los tres arreglos de raíz que C18a destapa y no resuelve: ampliar `piece_type.terms` con `diadema`, `gemelos` y `cinturon` —lo que obliga a reenriquecer esos 9 productos y **volverá a mover el corpus**, así que necesita su propia decisión de cuándo—; dar a C09 una salida explícita «no es una pieza» en vez de forzar un tipo; y llevar los cierres `Presión` a `ProductComponents` (EP10), que es donde conceptualmente viven.
+- [x] 9.5 Anotar la **divergencia spec/código de `Product.CollectionId`**: la spec viva `product-family` apela a una cardinalidad 1..N que el código no tiene (`Guid? CollectionId`, FK única y anulable). Los discriminadores reales son el tipo de pieza y el tamaño.
+- [x] 9.6 Actualizar la documentación afectada según la tabla *Post-Implementation Documentation Update* de `openspec/project.md`.
+- [x] 9.7 Comparar la suite contra la línea base de 1.3 **por nombres de test**, no por recuento, y dejar constancia en `qa.md`.
+- [x] 9.8 `openspec validate --all --strict` en verde (`0 failed`) antes de archivar — el gate completo, no sólo la forma de un change.
