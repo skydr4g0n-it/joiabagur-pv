@@ -1,0 +1,91 @@
+> **Guardarraíl.** Este change **no abre migración** de EF Core ni de Alembic, y **no toca `frontend/`**. Si alguna tarea parece pedir una columna, es señal de que se está adelantando trabajo de C18b — pararse y releer el `design.md`, decisión 3.
+>
+> **Orden que no es negociable:** el grupo 7 (lote + reconciliación) mueve el 30 % del corpus. Nada de C20, C21 ni C24 debe medirse antes de que ese grupo esté cerrado.
+
+## 1. Línea base y medición previa
+
+- [ ] 1.1 Levantar el Postgres local y registrar la línea base: recuento de `ProductFamilies`, de `ProductFamilyMembers` y de `ai.product_document` con `family_id` no nulo. Verificación: los tres son 0.
+- [ ] 1.2 **Medir la tasa de nulos de `piece_type`** en `ai.product_document` y anotarla. Confirma D9 y dimensiona su efecto; **no** cambia la regla, que ya está fijada.
+- [ ] 1.3 Medir el baseline de la suite antes de tocar nada (`git stash push -u` → `dotnet test` y `uv run pytest` → `git stash pop`) y guardar los **nombres** de los tests en rojo, no el recuento. La suite de backend arrastra ~53 fallos preexistentes y la de frontend ~118.
+
+## 2. Librería de agrupación en `ai-service`
+
+- [ ] 2.1 Crear el paquete `ai-service/src/jbg_ai/families/` y su espejo `ai-service/tests/families/`, siguiendo la convención de `ai-service/tests/README.md`.
+- [ ] 2.2 Declarar el **vocabulario cerrado de materiales** con test de fijación (D12), y anotar en `design.md` la deuda de duplicación con `frontend/src/lib/materials-vocabulary.ts`.
+- [ ] 2.3 Declarar el **vocabulario de talla** en sus dos escalas (latina insensible a caja, y palabra) y el **rango canónico interno** que ordena ambas.
+- [ ] 2.4 Implementar la **normalización de raíz**: casefold, `NFD` sin diacríticos, puntuación y paréntesis a espacio, espacios colapsados, sufijo de talla retirado.
+- [ ] 2.5 Implementar la **agrupación por raíz** con la puerta de `piece_type`, tratando el nulo como valor propio que no agrupa con nadie.
+- [ ] 2.6 Implementar la **fusión por material** entre grupos cuyas raíces difieran en exactamente un token, **sin** retirar material de la raíz.
+- [ ] 2.7 Implementar la **guarda de raíz degenerada** (raíz igual al tipo de pieza pelado, o de menos de dos tokens) y devolver los grupos rechazados **con su motivo**, no descartarlos en silencio.
+- [ ] 2.8 Implementar el **veto relativo por embedding** (`mediana − k·MAD` contra el centroide del propio grupo) que **marca y no elimina**, con `k` y el número de vecinos leídos de `pydantic-settings` (D10).
+- [ ] 2.9 Implementar la **detección de `variant_label`** como el fragmento retirado verbatim normalizado, admitiendo la etiqueta nula para la pieza base y la etiqueta compuesta en las familias de dos ejes.
+- [ ] 2.10 Implementar el cálculo de `position` por rango canónico, **sin** persistir el rango como etiqueta.
+- [ ] 2.11 Implementar la **exclusión de productos ya asignados** a una familia, que es lo que hace converger la repetición.
+- [ ] 2.12 Puerto de lectura sobre `ai.product_document`. **No** se lee ni se escribe `public` por SQL, **no** se llama al proveedor de embeddings y **no** se modifica `indexing/embeddings.py`.
+
+## 3. Tests de la librería
+
+- [ ] 3.1 `test_groups_products_differing_only_in_size_suffix` y `test_inconsistent_capitalisation_does_not_split_family` (el caso real `Anillo erizo de mar` / `Anillo Erizo de mar XL`).
+- [ ] 3.2 `test_does_not_group_across_piece_types` y `test_null_piece_type_groups_with_nobody`.
+- [ ] 3.3 `test_merges_groups_differing_in_one_material_token` y `test_material_in_root_is_not_stripped` (el caso `Anillo plata S/M/L/XL`, que debe seguir siendo familia).
+- [ ] 3.4 `test_degenerate_root_is_rejected_and_reported` (los casos `Encargos` y `Arreglos`).
+- [ ] 3.5 `test_veto_flags_member_without_removing_it` y `test_no_global_threshold_decides_membership`.
+- [ ] 3.6 `test_veto_parameters_come_from_configuration` — falla si `k` o el número de vecinos están incrustados en el código.
+- [ ] 3.7 `test_variant_label_is_verbatim_not_translated` (`mini` no se convierte en `XS`) y `test_base_member_has_null_variant_label`.
+- [ ] 3.8 `test_members_ordered_by_canonical_rank_not_alphabetically` y `test_two_axis_family_labels_stay_unique`.
+- [ ] 3.9 `test_suggestion_is_deterministic_for_same_catalog_and_config` y `test_suggestion_calls_no_provider`.
+- [ ] 3.10 Tests de **propiedades** sobre los invariantes del agrupador —pertenencia única, orden sin huecos, etiquetas únicas por familia— y no sobre valores concretos.
+
+## 4. Ruta HTTP en `jbg-ai`
+
+- [ ] 4.1 Esquemas Pydantic en `api/schemas/families.py`: cuerpo de acotación opcional, propuestas con miembros ordenados y etiquetas anulables, marcas de revisión con su distancia, y grupos rechazados con su motivo.
+- [ ] 4.2 Router `api/routers/families.py` con `POST /v1/families/suggest`, exigiendo el token de servicio como el resto de `/v1`.
+- [ ] 4.3 Fixture determinista en `stubs/` para `STUB_MODE`, que valide contra el modelo declarado y **no** abra conexión a base de datos.
+- [ ] 4.4 `503` nombrado cuando falten los ajustes necesarios con `STUB_MODE=false`, siguiendo el patrón de `retrieval.py`.
+- [ ] 4.5 Tests de la ruta en `tests/api/`: modelo declarado, token exigido, stub sin base de datos, y `503` por configuración ausente.
+
+## 5. Contrato congelado
+
+- [ ] 5.1 **Regenerar `ai-service/openapi.json`** con la orden del README del `ai-service`. Verificación: el fichero contiene **nueve** rutas `/v1`.
+- [ ] 5.2 Actualizar `test_openapi_snapshot_is_stable` y dejarlo en verde contra el árbol de trabajo. Registrar en el `proposal` que el movimiento de frontera es deliberado.
+
+## 6. Camino .NET
+
+- [ ] 6.1 DTOs de petición y respuesta en `JoiabagurPV.Application/DTOs/Ai/`, con nombres `snake_case` en el cable y `variant_label` anulable.
+- [ ] 6.2 `IAiGatewayClient.SuggestFamiliesAsync` y su implementación en `AiGatewayClient`, **sin truncar ni reordenar** ninguna de las dos listas.
+- [ ] 6.3 Traducción de fallos a los errores tipados ya existentes: `501` → no implementado, timeout/circuito/5xx → indisponible, credenciales → configuración. **Sin fallback degradado.**
+- [ ] 6.4 Validadores FluentValidation del cuerpo de `apply`, invocados **explícitamente** en la acción: este proyecto registra validadores sin pipeline automático.
+- [ ] 6.5 `POST /api/ai/catalog/family-suggestions` en `AiCatalogController` — sólo administradores, **sin escribir nada**.
+- [ ] 6.6 `POST /api/ai/catalog/family-suggestions/apply` — persiste el subconjunto recibido **a través de `ProductFamilyService`**, con `Origin = AiApproved`, aprobador e instante.
+- [ ] 6.7 Propagación del conflicto por producto (409 con el detalle de qué familia retiene cada uno) sin dejar familias a medias.
+
+## 7. Tests .NET
+
+- [ ] 7.1 `SuggestFamilies_ReturnsProposals_WithoutWritingAnything` — ni familia, ni miembro, ni `Product.UpdatedAt`.
+- [ ] 7.2 `ApplyFamilySuggestions_RecordsAiApprovedOriginWithApprover` y `CreateFamily_StillRecordsManualOrigin`.
+- [ ] 7.3 `ApplyFamilySuggestions_StampsUpdatedAtOfEnteringProducts` y el complementario de feed: `IndexFeed_EmitsExactlyTheStampedProducts_AfterApply`.
+- [ ] 7.4 `ApplyFamilySuggestions_ReportsConflict_WithoutPartialFamily`.
+- [ ] 7.5 `ApplyFamilySuggestions_IsIdempotent_ForIdenticalMemberList` — no reescribe filas ni toca `UpdatedAt`.
+- [ ] 7.6 `SuggestFamilies_ReturnsForbidden_ForOperator` y `SuggestFamilies_ReturnsUnauthorized_ForAnonymous`. **Pedir un cliente nuevo a la factoría**: el `HttpClient` compartido conserva las cookies de cada login y no es anónimo.
+- [ ] 7.7 `SuggestFamilies_ReturnsServiceUnavailable_WhenGatewayNotImplemented` y el equivalente para indisponibilidad.
+- [ ] 7.8 Al fijar datos con los *object mothers*, anclar `PointOfSale.Phone` explícitamente: Bogus genera teléfonos que no caben en `varchar(20)`.
+
+## 8. Ejecución del lote y reconciliación
+
+- [ ] 8.1 Ejecutar `family-suggestions` sobre el corpus y revisar las propuestas y los grupos rechazados antes de aplicar.
+- [ ] 8.2 Ejecutar `apply` con el lote completo. Verificación: ~155 familias y ~450 miembros creados, todos con `Origin = AiApproved`.
+- [ ] 8.3 Ejecutar `POST /v1/index/sync` **sin `full`**. Verificación: los emitidos son **exactamente** los productos estampados, y `family_id` deja de ser nulo sólo en ésos.
+- [ ] 8.4 Comprobar que `doc_text` de esos documentos incluye `Familia:` y `Variante:`, que su `source_hash` cambió y que el embedding se recalculó.
+- [ ] 8.5 Comprobar que `source-text/v1` y `embedding_version` **no** han cambiado — es lo que obliga al orden, y conviene verificarlo en vez de suponerlo.
+- [ ] 8.6 Escribir [`Documentos/Proyecto Final AIEng/informes/c18a-family-suggestion-report.md`](../../../Documentos/Proyecto%20Final%20AIEng/informes/) con recuentos, cola de revisión, tasa de nulos de `piece_type` y los parámetros del veto usados (D14).
+
+## 9. Documentación y cierre
+
+- [ ] 9.1 Enlazar HU-AIENG-018a en `Documentos/epicas.md` (EP13) y marcar C18a como hecho en su lista de changes.
+- [ ] 9.2 **Reestructurar el plan de changes** al orden **C18a → C19 → C18b**: tabla maestra (§2), grafo de dependencias (§4) —hoy no dibuja C18→C25, C18→C26, C18→C30 ni C18→C36—, calendario (§5) y lista de *nunca se recorta* (§6), donde C30 y C36 son irrecortables mientras C18 no lo es. Renombrar la ficha y anunciar C18b como `add-family-review-ui-and-orphan-alert`.
+- [ ] 9.3 Añadir al §0 del plan la **revisión fechada con la medición del coseno** que corrige el enunciado del §7.5 del diseño.
+- [ ] 9.4 Dejar planteada en el §0 la decisión sobre el **doble etiquetado del golden set de C24** trabajando en solitario, para resolver antes de abrir C24 (D13).
+- [ ] 9.5 Anotar la **divergencia spec/código de `Product.CollectionId`**: la spec viva `product-family` apela a una cardinalidad 1..N que el código no tiene (`Guid? CollectionId`, FK única y anulable). Los discriminadores reales son el tipo de pieza y el tamaño.
+- [ ] 9.6 Actualizar la documentación afectada según la tabla *Post-Implementation Documentation Update* de `openspec/project.md`.
+- [ ] 9.7 Comparar la suite contra la línea base de 1.3 **por nombres de test**, no por recuento, y dejar constancia en `qa.md`.
+- [ ] 9.8 `openspec validate --all --strict` en verde (`0 failed`) antes de archivar — el gate completo, no sólo la forma de un change.

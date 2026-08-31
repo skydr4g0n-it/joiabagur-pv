@@ -1,0 +1,158 @@
+## Context
+
+La tubería de familias está construida entera y vacía. C07 entregó `ProductFamily` / `ProductFamilyMember` con pertenencia excluyente por índice único, orden y etiqueta de variante idempotentes, y cinco endpoints de administración; además **reservó** `Origin`, `ApprovedByUserId` y `ApprovedAt` precisamente para este change, porque C18 no tiene turno de migración. C12 emite `familyId` / `familyName` / `variantLabel` en el feed. C13 los mapea a `ai.product_document`. C02 congeló los campos de familia en el contrato de recuperación. C16 pinta la talla **sólo cuando `variantLabel` existe**.
+
+Y el estado real, verificado el 2026-08-30 contra el Postgres local: **1.200 productos, 1.200 documentos con embedding, 0 familias, 0 documentos con `family_id`**. El `qa.md` de C07 lo dejó anotado: *«La reserva para C18 no está ejercida»*.
+
+Este change no construye tubería. Construye las filas, y decide **cómo** se deciden.
+
+**Restricciones que gobiernan el diseño:**
+
+- **Python es dueño del esquema `ai` y no escribe `public` por SQL** desde el runtime. Los embeddings viven en `ai.product_document`; la verdad del catálogo vive en .NET.
+- **La dirección de confianza es asimétrica**: .NET→Python va con JWT interno HS256 (`AiServiceTokenFactory` + `AiGatewayClient`, desde C03); Python→.NET sólo tiene `X-Index-Feed-Key`, de **solo lectura**.
+- **`ai-service/openapi.json` está congelado** en ocho rutas, con un test que falla ante cualquier diferencia.
+- **El turno de migración de EF Core es único** y lo esperan C19, C27 y C29.
+- **Corpus**: 436 reales + 764 sintéticos, con vocabularios de variante muy distintos entre ambos.
+
+## Goals / Non-Goals
+
+**Goals:**
+
+- Que existan ~155 familias con sus ~450 miembros, escritas de forma que el índice las vea.
+- Que el algoritmo sea **determinista, reproducible y sin LLM**, y que sus parámetros se puedan barrer sin tocar código.
+- Que el corpus se mueva **una sola vez**, antes de cualquier change que mida.
+- Que la parte que el algoritmo no resuelve quede **contada y listada**, no escondida.
+- Ejercer por primera vez la reserva de aprobación humana de C07.
+
+**Non-Goals:**
+
+- La pantalla de revisión por lotes y el sello de aprobación por ítem — **C18b**.
+- La alerta de huérfanos — **C18b**: necesita familias existentes, es una segunda pasada por construcción.
+- Persistir propuestas o rechazos.
+- Cualquier migración de EF Core o de Alembic.
+- Cambiar `source-text/v1`, `embedding_version` o `indexing/embeddings.py`.
+- Corregir las entradas de catálogo que no son productos (`Encargos`, `Arreglos`, `Presión`): se listan, no se tocan.
+
+## Decisions
+
+### 1 · .NET conduce y Python calcula
+
+El administrador llama a .NET; .NET llama a `jbg-ai` con su JWT; .NET persiste con su propio servicio.
+
+Lo decide una restricción dura, no el estilo. [`ProductFamilyService.cs:201`](../../../backend/src/JoiabagurPV.Application/Services/ProductFamilyService.cs#L201) estampa `Product.UpdatedAt` de los productos que entran y salen, con este comentario en el código: *«The feed's catalog cursor is `Product.UpdatedAt` (plus profile and family). Deleting a [membership row] would be skipped on an incremental pull.»* Un `INSERT` directo desde Python no estampa nada, **el feed incremental nunca emite esos productos, y `family_id` sigue nulo para siempre** salvo que alguien ejecute un `sync --full`. Sin un solo error.
+
+**Alternativas consideradas.** *(a) CLI de Python que escribe `public` por SQL*, siguiendo el precedente de `world/ingest.py` (C10), que sí escribe `PointOfSales`, `Users` y `Sales`. Se descarta: aquel precedente escribe tablas **sin watermark de indexación**; `ProductFamilyMembers` sí lo tiene, y además se saltaría el 409 con detalle por producto y la validación de etiqueta duplicada que C07 construyó. *(b) CLI de Python que llama a la API .NET*: conserva el estampado, pero exige un admin JWT en `Settings` —un secreto con poder total sobre el catálogo para una tarea de lote— y C18b pagaría igualmente el movimiento del contrato.
+
+El patrón existe y está probado: `AiCatalogController.EnrichBatch` (C09) es exactamente «Python propone, .NET persiste», con el manejo de `AiNotImplementedException` → 503 y `AiUnavailableException` ya escrito.
+
+### 2 · Se mueve el contrato congelado, en este change
+
+`POST /v1/families/suggest` es la novena ruta. `openapi.json` se regenera y `test_openapi_snapshot_is_stable` se actualiza aquí mismo.
+
+Lo autoriza la doctrina que `IAiGatewayClient` lleva escrita: *«every other contracted endpoint is added by **the change that first calls it**: adding a method here is a small diff, whereas the wire contract it consumes is frozen and expensive to renegotiate.»* Y C17 fijó el criterio al aplazar la bifurcación de `/health`: romper el test de deriva **es el resultado correcto**, porque la frontera se ha movido de verdad; el test existe para hacerlo visible en lugar de silencioso.
+
+**Alternativa considerada.** *CLI sin ruta HTTP*, dejando el contrato quieto. Se descarta porque C18b necesita la ruta para pintar la pantalla, de modo que el movimiento sólo se aplaza; y porque sin ruta hay que resolver el problema de credencial de (1).
+
+### 3 · Sin persistencia de propuestas: `apply` recibe de vuelta lo aceptado
+
+`suggest` devuelve propuestas; el llamante envía a `apply` el subconjunto que acepta. No hay tabla de propuestas ni estado intermedio.
+
+Evita una tabla en `ai` y, sobre todo, **la séptima migración de EF Core** que el `design.md` de C07 se gastó tres columnas nulables en evitar, y que su tabla de riesgos nombra literalmente (*«C18 descubre que necesita una columna y abre una séptima migración en la Ola 3»*). `suggest` es determinista y **converge**, porque excluye del pool los productos que ya pertenecen a una familia.
+
+**Coste aceptado.** Un rechazo no se recuerda: al repetir `suggest`, una propuesta descartada reaparece. Es tolerable mientras la aprobación sea por lotes; la lista de descartes es de C18b, que es donde existe la pantalla que la necesita.
+
+**Alternativas consideradas.** *(a) Tabla `ai.family_suggestion`*: da rechazos persistentes y Python sería su dueño, pero crea un estado paralelo a .NET que nada invalida y que envejece en silencio. *(b) Entidad .NET*: auditoría completa, al precio de la migración que este change existe para no abrir.
+
+### 4 · La raíz del nombre agrupa; el embedding veta, y en relativo
+
+El §7.5 del diseño dice *«agrupa candidatos por similitud de embedding (**umbral alto**) + mismo `piece_type` + raíz común de nombre»*. **Medido sobre los 1.200 vectores reales, ese enunciado no funciona:**
+
+| | peor hermano *(hay que incluirlo)* | mejor extraño *(hay que excluirlo)* |
+|---|---|---|
+| real | 0,847 – 0,920 | 0,867 – **0,936** |
+| sintético | 0,896 – 0,948 | 0,845 – **0,945** |
+
+Las dos poblaciones se solapan, así que **no existe corte absoluto**. Dos casos:
+
+- `Anillo Bruma grapas {amatista, citrino, granate, peridoto, topacio}` tiene coseno interno 0,895–0,946, y el vecino **no perteneciente** `Anillo Bruma bata plata y oro + piedra` puntúa **0,926** — por encima del peor hermano.
+- `Anillo Aurora Boreal S/M/L/XL` frente a `Anillo Aurora Boreal v2 S/M/L/XL`, familias distintas por construcción, llegan a **0,9445** contra un mínimo intra-familia de 0,9497: **cinco milésimas**.
+
+Pero **en relativo el embedding es excelente**: el vecino más próximo es hermano en **96,2 %** (50/52) de los miembros reales y **99,7 %** (305/306) de los sintéticos, y sólo **6 de 358 productos (1,7 %)** tienen un extraño más cerca que su peor hermano.
+
+De ahí la inversión: **la raíz agrupa y el embedding veta**, comparando cada miembro contra el centroide de **su propio grupo** (`mediana − k·MAD`), nunca contra una constante global. Y el veto **marca para revisión, no elimina**: un miembro que comparte raíz y tipo de pieza pero que el vector no respalda es justamente lo que una persona debe mirar.
+
+Ese **1,7 % irreducible** es lo que justifica la revisión humana con un número en lugar de con una afirmación, y es la cifra que el README del Proyecto Final debe citar.
+
+**Alternativas consideradas.** *(a) Umbral absoluto del §7.5*: medido y descartado arriba. *(b) Clustering puro por embedding sin raíz*: fracasa en el sintético, donde `v2`/`v3`/`v4`/`v5` son casi-duplicados deliberados. *(c) Embedding sólo del nombre en vez del documento*: separaría mejor, pero exige 1.200 llamadas nuevas al proveedor y una columna más — coste desproporcionado para un veto.
+
+### 5 · L2 más fusión por material, nunca stripping global
+
+Retirar talla **y** material de todos los nombres a la vez convierte `Anillo plata S/M/L/XL` en la raíz `anillo`, que absorbería cualquier otro «Anillo ‹material›». Retirar sólo la talla la deja en `anillo plata`, correcta.
+
+Por eso el material **no se elimina de la raíz**: se usa para **fusionar** grupos ya formados que difieren en exactamente un token de material. Misma cobertura (~68 familias reales frente a 24 con sólo talla), sin degenerar.
+
+La guarda que lo hace posible —no fusionar si la raíz resultante queda en el tipo de pieza pelado o baja de dos tokens— resulta además tener valor de negocio: de las seis raíces que bloquea, **tres no son productos**. `Encargos plata/Oro` y `Arreglos plata/oro` son servicios del taller, y `Presión Oro/plata` es un componente. Se listan como incidencia de catálogo.
+
+### 6 · `variant_label` verbatim y `Position` por rango canónico; los ejes no se separan
+
+Descomponiendo las familias por **qué eje las separa**:
+
+| | REAL (~68) | SINTÉTICO (87) |
+|---|---|---|
+| solo eje talla | 33 (49 %) | 87 (100 %) |
+| solo eje material | 28 (41 %) | 0 |
+| **rejilla talla × material** | **3 (4 %)** | 0 |
+| sin eje detectado *(pieza base sin token)* | 4 (6 %) | 0 |
+
+**El 90 % tiene un solo eje**, y por tanto etiqueta limpia. Sólo tres familias necesitan etiqueta compuesta (`mini oro`), que sigue cumpliendo el índice `UNIQUE(family_id, variant_label)` de C07 y que su spec admite explícitamente: *«the size, colour **or finish** that tells one variant from another»*, texto libre y opcional.
+
+Las 4 «sin eje» no son un defecto sino un artefacto del detector: `Anillo mini conchiglie` / `Anillo conchiglie` sí varían en talla — **la ausencia de token es un valor de variante**, la pieza base, y C07 ya contempla `variant_label` nulo como estado legítimo.
+
+Sobre las **dos escalas de talla** (`XS/S/M/L/XL` y `mini/pequeño/mediano/grande`) se separan dos necesidades que se confundían: **la etiqueta se guarda literal** —`mini` no es `XS`; es la palabra del taller y la que el dependiente dice al cliente— y **el orden se calcula con un rango canónico interno** (`mini < XS < pequeño < S < M < mediano < L < grande < XL`) que alimenta el `Position` que C07 ya persiste e indexa. Sólo 2 familias mezclan escalas, y van a la cola de revisión en lugar de a una regla.
+
+**Alternativa considerada.** *Separar `variant_label` en `SizeLabel` + `MaterialLabel`*: representación limpia, al precio de una migración de EF Core **más** un cambio en la plantilla `source-text/v1` que elevaría `preprocessing_id` a `v2` y forzaría reindexar **los 1.200** en vez de 358. Ganancia: **3 familias de 155**. Relación coste/beneficio mala; descartada.
+
+### 7 · Todas las familias en un lote, con `Origin = AiApproved`
+
+`apply` escribe con `Origin = AiApproved`, `ApprovedByUserId` = el administrador que invoca, `ApprovedAt` = el instante. Es honesto a nivel de lote: un administrador dispara conscientemente la aprobación; **C18b lo refina a nivel de ítem**. Una familia creada por los endpoints de C07 sigue registrando `Manual`.
+
+Se escriben **todas** de una vez porque el corpus debe moverse una sola vez. Escribir un subconjunto ahora y el resto en C18b lo movería dos veces, y la segunda caería después de la línea base de C24 — que es el riesgo que el §2 de este documento existe para evitar.
+
+### 8 · Reconciliación incremental, nunca `--full`
+
+`POST /v1/index/sync` sin `full`. Un `--full` reindexaría todo y **taparía** un fallo de estampado en lugar de exponerlo. El incremental es la única prueba real de que la decisión 1 se implementó bien, y por eso el criterio de aceptación exige contar que los emitidos sean exactamente los estampados.
+
+### 9 · Los parámetros del veto viven en configuración
+
+`k = 2` sobre los 5 vecinos más próximos, leídos de `pydantic-settings`. El valor sale de una muestra pequeña —los 6 solapamientos medidos— y C24 lo revisará con datos. Un umbral incrustado en el código no se puede barrer.
+
+## Risks / Trade-offs
+
+- **Escribir por SQL directo rompería el índice en silencio** → Decisión 1: se escribe siempre por `ProductFamilyService`, y el escenario de aceptación lo verifica con sincronización **incremental**, que es la que falla si el estampado falta.
+- **El corpus se mueve y `embedding_version` no lo distingue** → Se mueve **una sola vez** (decisión 7) y este change precede a C20, C21 y C24. Queda anotado en el informe del lote y en la reestructuración del plan.
+- **Sobre-agrupamiento por la fusión de material** → Guarda de raíz degenerada, puerta de `piece_type` y veto relativo. Las excepciones van a la cola de revisión, no a una regla; ninguna se resuelve con una excepción codificada por nombre.
+- **El veto puede quedar mal calibrado** (`k = 2` sale de 6 casos) → Decisión 9: vive en configuración y se barre con C24 sin tocar código.
+- **La cola de revisión no tiene pantalla hasta C18b** → Aceptado. En C18a la aprobación es por lotes y las ~11 excepciones se listan en el informe versionado.
+- **`piece_type` sin medir** (el contenedor de Postgres se detuvo durante la exploración) → El nulo se trata como valor propio de la puerta: no agrupa con nadie, que es el lado seguro. La medición del apply confirma y dimensiona, no decide.
+- **Mover el contrato congelado** rompe `test_openapi_snapshot_is_stable` → Deliberado y regenerado en el mismo change. Trabajando en solitario, el acuerdo con «quien posee el cliente .NET» que pide `CLAUDE.md` es una nota, no un bloqueo.
+- **Un rechazo no se recuerda** → Coste aceptado de la decisión 3; la lista de descartes es de C18b.
+
+## Migration Plan
+
+**No hay migración de esquema** — ni EF Core ni Alembic. Sí hay **migración de datos**, en cuatro pasos y con vuelta atrás en cada uno:
+
+1. **Medir la línea base**: recuento de familias (0), de documentos con `family_id` (0) y tasa de nulos de `piece_type`. Se anota en el informe.
+2. **Proponer** con `POST /api/ai/catalog/family-suggestions`. No escribe nada: repetible sin consecuencias.
+3. **Aplicar** con `/apply`. Reversible: borrar las familias creadas cascadea sus miembros por la regla de C07, y los productos vuelven a no pertenecer a ninguna. El `Origin = AiApproved` identifica exactamente qué borrar frente a lo creado a mano.
+4. **Reconciliar** con `POST /v1/index/sync` incremental y verificar que `family_id` deja de ser nulo en los productos estampados y sólo en ésos.
+
+**Vuelta atrás completa:** borrar las familias con `Origin = AiApproved` y volver a sincronizar. Los documentos pierden `Familia:` y `Variante:`, su hash vuelve al anterior y se reembeben. El corpus queda como estaba.
+
+## Open Questions
+
+**Ninguna bloqueante.** Las seis que el ticket abrió el 2026-08-31 se cerraron el mismo día aplicando su opción por defecto, y quedan registradas con su motivo en [`ticket.md`](./ticket.md) § *Decisiones cerradas* y en la HU como D9–D14: `piece_type` nulo como valor propio de la puerta, `k = 2` sobre 5 vecinos en configuración, `Alianzas Plata/oro` a la cola de revisión, vocabulario de materiales propio en Python con test de fijación, doble etiquetado del golden set de C24 remitido a la reestructuración del plan, e informe del lote versionado.
+
+Dos cuestiones siguen vivas, ambas fuera del alcance de este change y anotadas para que no se pierdan:
+
+- **El doble etiquetado del golden set de C24**, que su ficha da por hecho entre dos personas y el §6 del plan declara irrenunciable, no existe trabajando en solitario. Debe resolverse **antes** de abrir C24.
+- **La divergencia entre la spec viva `product-family` y el código**: aquélla justifica la distinción con las colecciones diciendo que un producto puede pertenecer *«to one of many unrelated collections»*, pero [`Product.cs:31`](../../../backend/src/JoiabagurPV.Domain/Entities/Product.cs#L31) declara `Guid? CollectionId`, una FK única y anulable. Ambas cardinalidades son 0..1. Los discriminadores reales, medidos: una colección abarca 1–154 productos (mediana 15) y **13–16 tipos de pieza**; una familia, 2–4 productos de **un solo tipo**.
