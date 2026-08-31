@@ -1,0 +1,91 @@
+> **Guardarraíl.** Este change **sí abre migración** de EF Core —`FamilyReviewVerdict`, la séptima del plan— pero **ninguna de Alembic**: Python no persiste nada nuevo. Si alguna tarea parece pedir una tabla en el esquema `ai`, es señal de que se está reintroduciendo el estado paralelo que el `design.md` rechaza en su decisión 6 — pararse y releerla.
+
+> **Orden que no es negociable.** El grupo 5 (auditoría de miembros) va **antes** del grupo 6 (huérfanos): `Colgante estrella de mar` tiene peor hermano 0,778 por estar contaminada y atrae 4 de los 25 primeros por margen. Limpiarla primero elimina esos falsos positivos sin lógica adicional, y **θ no se fija hasta después**. Y el grupo 9 mueve el corpus: nada de C24 debe medirse antes de que esté cerrado.
+
+> **Las dos suites vienen rojas de base.** Backend y frontend fallan antes de tocar nada. Medir la línea base con `git stash push -u`, y comparar **nombres** de test, nunca recuentos. Detalle en `Documentos/testing-backend.md` y `testing-frontend.md`.
+
+## 1. Línea base, respaldo y medición previa
+
+- [ ] 1.1 Volcar `public` y `ai` a `pre-c18b.dump` dentro del contenedor `jpv-pv-postgres`, como hizo C18a con `pre-c18a.dump`. Verificar el tamaño del fichero y que contiene ambos esquemas.
+- [ ] 1.2 Anotar la línea base en el borrador del informe: familias (156), miembros (486), familias `Manual` (0), documentos (1.168), con `family_id` (486), activos sin familia (682) y de ellos con `piece_type` (671). Consulta reproducible incluida en el informe.
+- [ ] 1.3 Medir la línea base de las dos suites de test con `git stash push -u`, guardando la **lista de nombres** de los tests que fallan, no el recuento. `git stash pop` al terminar.
+- [ ] 1.4 Reproducir la curva del margen de huérfanos sobre el estado actual (`θ = 0 / 0,02 / 0,05 / 0,08`) y la tabla A-vs-B por `data_origin`, y dejarlas en el informe como punto de partida verificable.
+
+## 2. El sinónimo `dorado`, y su diff antes de aceptarlo
+
+- [ ] 2.1 Capturar la salida completa de `POST /v1/families/suggest` **antes** del cambio, como fichero de referencia para el diff.
+- [ ] 2.2 Añadir `dorado: baño de oro` a `materials.synonyms` en `ai-service/src/jbg_ai/enrichment/vocabularies.yaml`.
+- [ ] 2.3 Re-ejecutar `suggest` y **diffear las propuestas completas**, no sólo los tres casos buscados. Verificar que ninguna raíz que antes formaba familia queda degradada al tipo de pieza pelado, y que no aparecen fusiones nuevas indeseadas.
+- [ ] 2.4 Verificar que los tres huérfanos previstos —`Pendientes botón erizo de mar S dorado`, `Colgante Lapa Mini Dorado`, `Pendientes botón estrella de mar dorado`— pasan a proponerse en su familia. Si en su lugar aparecen rechazados por `duplicate_variant_labels`, el mapeo correcto era `oro`: revertir y documentar.
+- [ ] 2.5 Espejar el término en `frontend/src/lib/materials-vocabulary.ts` y actualizar su test de fijación.
+- [ ] 2.6 Registrar el diff en el informe. Si el paso 2.3 encuentra degradación, revertir el sinónimo y dejar el caso escrito: el resto del change no depende de él.
+
+## 3. Auditoría en `ai-service`
+
+- [ ] 3.1 Extender `jbg_ai/families/repository.py` con la lectura de pertenencias persistidas (`family_id IS NOT NULL`) agrupadas por familia, y con el peor hermano por familia calculado con `<=>` **en PostgreSQL**, en una sola sentencia. Sin cargar vectores en Python.
+- [ ] 3.2 Reutilizar `apply_relative_veto` sobre familias persistidas cambiando el universo, sin duplicar la lógica del veto.
+- [ ] 3.3 Implementar la nominación de huérfanos por **margen relativo**, con la puerta de `piece_type` aplicada y `data_origin` en cada candidato. Calcular la pureza de vecindad (5 vecinos, mismo tipo de pieza) y devolverla **sólo como señal de ordenación**.
+- [ ] 3.4 Excluir de la salida los pares `(product_id, family_id)` que llegan juzgados en la petición, sin persistirlos y sin leer `public`.
+- [ ] 3.5 Añadir `JPV_FAMILY_ORPHAN_MARGIN` a `pydantic-settings`, con el mismo patrón que `JPV_FAMILY_VETO_MARGIN`. Valor inicial `0` — se ajusta en la tarea 6.1.
+- [ ] 3.6 Recalcular grupos rechazados y productos excluidos sobre el estado actual, y devolverlos sin truncar aunque el cap de candidatos actúe.
+
+## 4. Ruta HTTP y contrato congelado
+
+- [ ] 4.1 `POST /v1/families/audit` en `api/routers/families.py`, con sus modelos Pydantic en `api/schemas/families.py` y respuesta determinista bajo `STUB_MODE`.
+- [ ] 4.2 Tests de la librería: `test_audit_flags_member_when_stranger_beats_worst_sibling`, `test_orphan_detection_lists_unassigned_similar_products`, `test_orphan_nomination_never_crosses_piece_type`, `test_orphan_without_piece_type_is_never_nominated`, `test_purity_does_not_nominate`, `test_judged_pairs_are_omitted`, `test_orphan_margin_comes_from_configuration`, `test_audit_writes_nothing`, `test_audit_is_deterministic`, `test_audit_calls_no_provider`.
+- [ ] 4.3 Regenerar `ai-service/openapi.json` con la orden del README y actualizar `test_openapi_snapshot_is_stable` a **diez rutas**. Verificar que el test falla con el snapshot viejo y pasa con el nuevo.
+- [ ] 4.4 `uv run pytest` en verde, sin llamadas reales a LLM, embeddings ni RDS.
+
+## 5. Entidad, migración y endpoints .NET
+
+- [ ] 5.1 `FamilyReviewVerdict` en `JoiabagurPV.Domain/Entities`: par `(ProductId, FamilyId)`, veredicto, `ReviewedByUserId`, `ReviewedAt`, `MarginAtReview` nullable y `Note` (máx. 500).
+- [ ] 5.2 Configuración EF en `Infrastructure/Data`: índice **único** sobre `(ProductId, FamilyId)`, índice de apoyo sobre `FamilyId`, y borrado **en cascada** desde `ProductFamily`.
+- [ ] 5.3 Crear y aplicar la migración. Verificar `Down` sobre base limpia.
+- [ ] 5.4 Test de desfase modelo↔migración con el arnés de C04, más aserciones sobre `information_schema` y `pg_indexes` para el índice único y la cascada.
+- [ ] 5.5 `IAiGatewayClient.AuditFamiliesAsync` y sus DTOs, con `snake_case` en el cable y sin filtrar, reordenar ni truncar las dos listas.
+- [ ] 5.6 `POST /api/ai/catalog/family-audit` en `AiCatalogController`: adjunta los pares ya juzgados leídos de `FamilyReviewVerdict`, y maneja `AiNotImplementedException` → 503 y `AiUnavailableException` como estableció C09.
+- [ ] 5.7 `POST /api/ai/catalog/family-verdicts`: registro en bloque, idempotente por par, con cota de lote espejada como constante y validación FluentValidation.
+- [ ] 5.8 `GET /api/product-families` paginado (máx. 50) con filtros por `origin`, `pieceType` y `hasFlaggedMembers`, y total de coincidencias.
+- [ ] 5.9 `DELETE /api/product-families/{id}`: disuelve la familia por `ProductFamilyService`, libera los miembros, **estampa `Product.UpdatedAt`** de los que salen, y devuelve 404 si no existe.
+- [ ] 5.10 Tests .NET: `Audit_ReturnsFlaggedMembersAndCandidates_ForAdministrator`, `Audit_WritesNothing_WhenRequested`, `Audit_ReturnsForbidden_ForOperator`, `Audit_Unauthenticated_ReturnsUnauthorized`, `Verdict_SamePairTwice_CorrectsInsteadOfDuplicating`, `Verdict_DismissedPair_ExcludedFromNextAudit`, `Verdict_FailedAudit_ChangesNothing`, `ListFamilies_ReturnsAtMostFiftyPerPage`, `ListFamilies_FiltersByOrigin`, `ListFamilies_RequiresAdministrator`, `DeleteFamily_CascadesVerdictsAndFreesProducts`, `DeleteFamily_StampsDepartingProducts`, `DeleteFamily_Absent_ReturnsNotFound`, `MoveProductBetweenFamilies_ReordersAndSwapsLabels_WithoutPhantomUpdate`.
+- [ ] 5.11 Pedir un cliente **nuevo** a la factoría para las aserciones de 401: el `HttpClient` compartido conserva las cookies de cada login y no es anónimo.
+
+## 6. Carcasa de revisión en frontend
+
+- [ ] 6.1 Revisar [`analisis-metronic-frontend.md`](../../../Documentos/Propuestas/analisis-metronic-frontend.md) y anotar qué componentes se reutilizan **antes** de crear ninguno.
+- [ ] 6.2 `types/family-review.types.ts` y `services/family-review.service.ts`, con rutas relativas siguiendo el patrón de `ai-health.service.ts`.
+- [ ] 6.3 Constante de ruta en `routing/routes.tsx` y entrada bajo `AdminRoute` + `Layout8` en `app-routing-setup.tsx`, con carga diferida.
+- [ ] 6.4 Pantalla con TanStack Table: paneles de familias, miembros marcados, huérfanos e incidencias; navegación por teclado; confirmación en bloque; y **cronómetro por ítem**.
+- [ ] 6.5 Acciones que declaran su camino de escritura: producto sin familia → `family-suggestions/apply`; producto con familia → `PUT /api/product-families/{id}/members`.
+- [ ] 6.6 Estados de carga y error convencionales. **No** se implementa distinguir «el servicio no contestó» de «no hay nada que revisar» — recortado, decisión 9 del `design.md`.
+- [ ] 6.7 Tests: `should list families a page at a time`, `should keep a dismissed suggestion out of the next run`, `should show why a group was rejected`, `should record the reviewer when a family is confirmed`, `should require the administrator role to open the review screen`. Envolver en el provider o mockear el hook — copiar `pages/sales/__tests__/cart.test.tsx`.
+- [ ] 6.8 `npm run build` en verde. Leer la **línea de resumen** de `npm run test`, no el código de salida: `vitest` sale 0 cuando se le pipea.
+
+## 7. Auditoría de miembros y limpieza
+
+- [ ] 7.1 Ejecutar la auditoría de miembros sobre las 156 familias por el camino real (.NET → `jbg-ai`), y anotar cuántos se marcan.
+- [ ] 7.2 Revisar cada miembro marcado y resolverlo: confirmar, sacar de la familia, o mover. Registrar el veredicto en todos los casos.
+- [ ] 7.3 Resolver el hallazgo (d) de C18a: el sintético colado en `Colgante estrella de mar`. Verificar que el peor hermano de esa familia sube de 0,778.
+
+## 8. Huérfanos, con θ fijado sobre números recalculados
+
+- [ ] 8.1 Recalcular la curva del margen **después** de la limpieza del grupo 7 y fijar `JPV_FAMILY_ORPHAN_MARGIN` sobre esos números, arrancando generoso. Anotar el valor y su motivo.
+- [ ] 8.2 Ejecutar la auditoría de huérfanos y revisar cada candidato: añadir como variante o descartar. Registrar el veredicto en todos los casos.
+- [ ] 8.3 Resolver las 2 incidencias de raíz degenerada —`Alianzas Plata/oro` y `Cadena oro/plata`— que C18a dejó para que las decidiera una persona (D11 de aquella HU).
+- [ ] 8.4 Contar y anotar los huérfanos que quedan fuera por construcción: los que tienen un `piece_type` del que ninguna familia es miembro.
+
+## 9. Revisión de las 156 y reconciliación
+
+- [ ] 9.1 Revisar las 156 familias ítem a ítem con el cronómetro activo, registrando veredicto por cada par `(producto, familia)`.
+- [ ] 9.2 Verificar que confirmar sin cambiar **no** movió el corpus: contrastar que los `Product.UpdatedAt` de las familias sólo confirmadas siguen intactos.
+- [ ] 9.3 Reconciliar con `POST /v1/index/sync` **incremental**, nunca `--full`, y verificar que se emiten exactamente los productos estampados y ninguno más.
+- [ ] 9.4 Comprobar el estado final del índice: documentos, `family_id` no nulos, `variant_label`, y cero filas en `ai.sync_failure`.
+
+## 10. Documentación y cierre
+
+- [ ] 10.1 Informe del lote en `Documentos/Proyecto Final AIEng/informes/c18b-family-review-report.md`: tasa de corrección del agrupador, tiempo medio de revisión, reparto por `data_origin`, θ elegido con su motivo, diff del sinónimo `dorado`, y los huérfanos que quedan fuera por construcción.
+- [ ] 10.2 Enlazar HU-AIENG-018b en `Documentos/epicas.md` (EP13).
+- [ ] 10.3 Añadir `FamilyReviewVerdict` a `Documentos/modelo-de-datos.md` con sus relaciones e índices.
+- [ ] 10.4 Actualizar `openspec/project.md` y los README afectados si la décima ruta o la entidad nueva dejan algo desactualizado.
+- [ ] 10.5 Comparar las dos suites contra la línea base de 1.3 por **nombres** de test, y dejar constancia de que el conjunto de fallos es el mismo.
+- [ ] 10.6 `openspec validate --all --strict` en **`0 failed`** antes de archivar.
