@@ -36,6 +36,7 @@ Manual creation MUST continue to record manual origin with empty approval fields
 
 #### Scenario: Approving the same suggestion twice writes nothing the second time
 
-- **WHEN** an administrator approves a suggestion whose family already exists with identical members, labels and order
-- **THEN** no membership row is rewritten
+- **WHEN** an administrator approves a suggestion whose products already belong to the family a previous approval created
+- **THEN** the second approval creates no family and no membership
+- **AND** it is reported as a conflict rather than absorbed in silence, because approving the same batch twice is a mistake worth seeing
 - **AND** no member product's `UpdatedAt` changes

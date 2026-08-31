@@ -191,6 +191,35 @@ public class FamilySuggestionControllerTests : IAsyncLifetime
         (await context.ProductFamilyMembers.CountAsync()).Should().Be(2);
     }
 
+    /// <summary>
+    /// Re-approving an already applied suggestion writes nothing — and says so.
+    /// </summary>
+    /// <remarks>
+    /// It does not short-circuit the way an identical membership replace does in C07: it takes the
+    /// conflict path, because from the catalogue's point of view those products already belong
+    /// somewhere. Nothing is written either way, and reporting it beats absorbing it in silence —
+    /// approving the same batch twice is a mistake worth seeing.
+    /// </remarks>
+    [Fact]
+    public async Task ApplyFamilySuggestions_AppliedTwice_WritesNothingTheSecondTime()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var batch = BatchOf(("S", _small), ("M", _medium));
+
+        await admin.PostAsJsonAsync(ApplyEndpoint, batch);
+        var second = await admin.PostAsJsonAsync(ApplyEndpoint, batch);
+
+        var body = await second.Content.ReadFromJsonAsync<ApplyFamilySuggestionsResponse>();
+        body!.FamiliesCreated.Should().Be(0);
+        body.MembersCreated.Should().Be(0);
+        body.Conflicts.Should().ContainSingle();
+
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await context.ProductFamilies.CountAsync()).Should().Be(1, "no second family is created");
+        (await context.ProductFamilyMembers.CountAsync()).Should().Be(2);
+    }
+
     // ── Validation ────────────────────────────────────────────────────────────────────────────
 
     [Fact]
