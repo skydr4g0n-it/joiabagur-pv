@@ -81,7 +81,15 @@ Pero **en relativo el embedding es excelente**: el vecino más próximo es herma
 
 De ahí la inversión: **la raíz agrupa y el embedding veta**, comparando cada miembro contra el centroide de **su propio grupo** (`mediana − k·MAD`), nunca contra una constante global. Y el veto **marca para revisión, no elimina**: un miembro que comparte raíz y tipo de pieza pero que el vector no respalda es justamente lo que una persona debe mirar.
 
-Ese **1,7 % irreducible** es lo que justifica la revisión humana con un número en lugar de con una afirmación, y es la cifra que el README del Proyecto Final debe citar.
+> **Corrección del 2026-08-31, al implementar.** Ese 1,7 % se midió sobre **familias formadas sólo por sufijo de talla** —373 productos, 24 familias reales— y **no es comparable** con el algoritmo que este change entrega. Se citó aquí como si fuera universal y no lo era.
+>
+> Dos consecuencias. La primera: la cifra sube porque **el algoritmo mejoró**. Con L2 más fusión hay 68 familias reales en vez de 24, y una familia que agrupa `pequeño` con `pequeño oro` tiene vectores genuinamente más dispersos. Más riqueza, más dispersión interna, más marcas. El 1,7 % era el precio de dejar fuera 44 familias reales.
+>
+> La segunda: el veto se implementó primero como `mediana − k·MAD` contra el centroide, que es una prueba **dentro** del grupo, mientras que la medición que lo justificaba era **entre** grupos. Son cosas distintas y se confundieron. El MAD marcaba al miembro menos típico de cada clúster —que todo clúster tiene— y disparaba al **16,9 %**.
+>
+> **La prueba correcta es la que se midió**: se marca al miembro que tiene un producto de **otra familia propuesta** más cerca que su propio peor hermano. Con margen 0,05, la cifra honesta es **15 de 486 miembros (3,1 %) en 5 familias**, y la mayor de las cinco es aquélla donde un producto sintético se coló en una real. Ésa es la cifra que el README debe citar.
+
+Ese residuo irreducible es lo que justifica la revisión humana con un número en lugar de con una afirmación.
 
 **Alternativas consideradas.** *(a) Umbral absoluto del §7.5*: medido y descartado arriba. *(b) Clustering puro por embedding sin raíz*: fracasa en el sintético, donde `v2`/`v3`/`v4`/`v5` son casi-duplicados deliberados. *(c) Embedding sólo del nombre en vez del documento*: separaría mejor, pero exige 1.200 llamadas nuevas al proveedor y una columna más — coste desproporcionado para un veto.
 

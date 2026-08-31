@@ -76,16 +76,20 @@ A merge MUST be rejected when the resulting root equals the bare piece type or f
 - **THEN** no family is proposed for them
 - **AND** they appear in the review list with the reason for the rejection
 
-### Requirement: The embedding veto is relative to its own group and marks rather than removes
+### Requirement: The embedding veto is relative to the other proposals and marks rather than removes
 
-The system SHALL use embedding similarity as a **veto relative to the candidate group**, comparing each member against its own group's centroid and flagging the member whose cosine falls below `median − k·MAD` **of that group**. The system MUST NOT apply a single global similarity threshold, because the population of worst siblings and the population of nearest strangers overlap: measured over the indexed corpus, worst siblings span 0.847–0.948 and nearest strangers reach 0.936–0.945.
+The system SHALL use embedding similarity as a **veto relative to the other proposed memberships**, flagging a member when a product of a **different proposed family** is closer to it than its own worst sibling, by more than a configured margin. The system MUST NOT apply a single global similarity threshold, because the population of worst siblings and the population of nearest strangers overlap: measured over the indexed corpus, worst siblings span 0.847–0.948 and nearest strangers reach 0.936–0.945.
 
-A flagged member MUST remain in the proposal, marked for review together with its distance. The system MUST NOT remove it silently. The veto's parameters — the multiplier and the neighbour count — MUST be read from configuration and MUST NOT be hard-coded.
+The comparison universe MUST be the members of proposed families and nothing else. A product competing for no membership is not an alternative membership and MUST NOT be able to veto one; widening the universe to the whole catalogue flags members against products that were never candidates for anything.
 
-#### Scenario: A member the vector does not support is flagged, not dropped
+The system MUST NOT decide membership from a member's distance to its own group's centre. That is a test *within* a group, and every group has a least-typical member by construction, so it flags on ordinary spread rather than on evidence.
 
-- **WHEN** a candidate shares root and piece type with its group but its cosine to the group centroid falls below the group's relative threshold
-- **THEN** the member appears in the proposal flagged for review, with its distance reported
+A flagged member MUST remain in the proposal, marked for review together with the margin by which the stranger won. The system MUST NOT remove it silently. The margin MUST be read from configuration and MUST NOT be hard-coded.
+
+#### Scenario: A member another family sits closer to is flagged, not dropped
+
+- **WHEN** a candidate shares root and piece type with its group, and a member of another proposed family is closer to it than its own worst sibling by more than the margin
+- **THEN** the member appears in the proposal flagged for review, with the margin reported
 - **AND** the member is not removed from the proposal
 - **AND** the proposal remains applicable as returned
 
@@ -95,9 +99,9 @@ A flagged member MUST remain in the proposal, marked for review together with it
 - **THEN** they are still not proposed as members of the same family
 - **AND** membership follows the root and piece-type gate, not the absolute similarity
 
-#### Scenario: Veto parameters come from configuration
+#### Scenario: The veto margin comes from configuration
 
-- **WHEN** the veto multiplier or the neighbour count is changed in configuration
+- **WHEN** the veto margin is changed in configuration
 - **THEN** the suggestion result changes accordingly without any code modification
 
 ### Requirement: Variant labels are stored verbatim and member order follows a canonical size rank

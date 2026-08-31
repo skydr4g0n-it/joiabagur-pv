@@ -17,11 +17,11 @@
 - [x] 2.5 Implementar la **agrupación por raíz** con la puerta de `piece_type`, tratando el nulo como valor propio que no agrupa con nadie.
 - [x] 2.6 Implementar la **fusión por material** entre grupos cuyas raíces difieran en exactamente un token, **sin** retirar material de la raíz.
 - [x] 2.7 Implementar la **guarda de raíz degenerada** (raíz igual al tipo de pieza pelado, o de menos de dos tokens) y devolver los grupos rechazados **con su motivo**, no descartarlos en silencio.
-- [ ] 2.8 Implementar el **veto relativo por embedding** (`mediana − k·MAD` contra el centroide del propio grupo) que **marca y no elimina**, con `k` y el número de vecinos leídos de `pydantic-settings` (D10).
+- [x] 2.8 Implementar el **veto relativo por embedding** que **marca y no elimina**, con su margen leído de `pydantic-settings` (D10 revisada el 2026-08-31). La prueba es **entre grupos**: se marca al miembro que tiene un producto de **otra familia propuesta** más cerca que su propio peor hermano, por más del margen. La versión inicial usaba `mediana − k·MAD` contra el centroide, que es una prueba *dentro* del grupo y disparaba al 16,9 % marcando al miembro menos típico de cada clúster — algo que todo clúster tiene por definición.
 - [x] 2.9 Implementar la **detección de `variant_label`** como el fragmento retirado verbatim normalizado, admitiendo la etiqueta nula para la pieza base y la etiqueta compuesta en las familias de dos ejes.
 - [x] 2.10 Implementar el cálculo de `position` por rango canónico, **sin** persistir el rango como etiqueta.
 - [x] 2.11 Implementar la **exclusión de productos ya asignados** a una familia, que es lo que hace converger la repetición.
-- [ ] 2.12 Puerto de lectura sobre `ai.product_document`. **No** se lee ni se escribe `public` por SQL, **no** se llama al proveedor de embeddings y **no** se modifica `indexing/embeddings.py`.
+- [x] 2.12 Puerto de lectura sobre `ai.product_document`. **No** se lee ni se escribe `public` por SQL, **no** se llama al proveedor de embeddings y **no** se modifica `indexing/embeddings.py`.
 
 ## 3. Tests de la librería
 

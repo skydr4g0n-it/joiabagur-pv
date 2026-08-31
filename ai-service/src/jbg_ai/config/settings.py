@@ -157,6 +157,24 @@ class Settings(BaseSettings):
         ),
     )
 
+    jpv_family_veto_margin: float = Field(
+        default=0.05,
+        ge=0,
+        le=1,
+        description=(
+            "C18a relative-veto margin for POST /v1/families/suggest "
+            "(JPV_FAMILY_VETO_MARGIN). A member is flagged for review, never "
+            "removed, when a product of ANOTHER proposed family is closer to it "
+            "than its own worst sibling by more than this much. Never an absolute "
+            "similarity cutoff: on this corpus the worst-sibling and "
+            "nearest-stranger populations overlap, so no constant separates them. "
+            "Calibrated at 0.05 -> 15 of 486 members across 5 families; 0.02 -> 33 "
+            "across 18; 0.08 -> 9 across 2. Lives here because C24 will revisit it "
+            "with the golden set, and an inlined threshold cannot be swept. "
+            "Not required to boot /health."
+        ),
+    )
+
     @model_validator(mode="before")
     @classmethod
     def derive_dev_endpoints(cls, data: Any) -> Any:
