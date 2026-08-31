@@ -16,7 +16,7 @@ import userEvent from '@testing-library/user-event';
 
 import FamilyReviewPage from '../family-review';
 import { familyReviewService } from '@/services/family-review.service';
-import type { FamilyAudit, PaginatedFamilies } from '@/types/family-review.types';
+import type { FamilyAudit, PaginatedFamilies, RecordedVerdict } from '@/types/family-review.types';
 
 vi.mock('@/services/family-review.service');
 
@@ -98,12 +98,38 @@ const onePage: PaginatedFamilies = {
   pageSize: 50,
 };
 
+/** One judgement the catalogue has not acted on: a candidate confirmed but never added. */
+const pendingAddition: RecordedVerdict = {
+  productId: '55555555-5555-5555-5555-555555555555',
+  sku: 'SKU25',
+  productName: 'Pendientes botón erizo de mar S dorado',
+  familyId: FAMILY_ID,
+  familyName: 'Pendientes boton erizo de mar',
+  outcome: 'Confirmed',
+  isCurrentMember: false,
+  pendingAction: 'add',
+  marginAtReview: 0.109,
+  reviewedAt: '2026-08-31T21:25:31Z',
+};
+
+/** A judgement the catalogue already reflects, so it must not appear as pending. */
+const settled: RecordedVerdict = {
+  ...pendingAddition,
+  productId: '66666666-6666-6666-6666-666666666666',
+  sku: 'SKU82',
+  productName: 'Colgante estrella de mar M oro',
+  isCurrentMember: true,
+  pendingAction: 'none',
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocked.getAudit.mockResolvedValue({ state: 'loaded', audit: populatedAudit });
   mocked.listFamilies.mockResolvedValue(onePage);
   mocked.recordVerdicts.mockResolvedValue({ created: 1, updated: 0 });
   mocked.dissolveFamily.mockResolvedValue(undefined);
+  mocked.listVerdicts.mockResolvedValue([pendingAddition, settled]);
+  mocked.applyVerdict.mockResolvedValue(undefined);
 });
 
 describe('family review screen', () => {
@@ -210,6 +236,121 @@ describe('family review screen', () => {
     // Recomputed after saving: the judged pair travels with the next audit, so what the screen
     // shows has to come from the server rather than from local bookkeeping.
     await waitFor(() => expect(mocked.getAudit).toHaveBeenCalledTimes(2));
+  });
+
+  /**
+   * Confirming and dismissing have to look different.
+   *
+   * The first version highlighted on "has a verdict" rather than on the verdict, so dismissing a
+   * row lit the *Confirmar* button exactly as confirming did. On a queue of 156 that is how a
+   * mis-click becomes permanent without anybody noticing — the reviewer has no way to see what
+   * they just answered.
+   */
+  it('should mark only the answer that was given when a member is dismissed', async () => {
+    const user = userEvent.setup();
+    render(<FamilyReviewPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Marcados/ }));
+    await user.click(await screen.findByRole('button', { name: 'Rechazar pertenencia' }));
+
+    expect(screen.getByRole('button', { name: 'Rechazar pertenencia' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Confirmar pertenencia' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
+  it('should mark only the answer that was given when a member is confirmed', async () => {
+    const user = userEvent.setup();
+    render(<FamilyReviewPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Marcados/ }));
+    await user.click(await screen.findByRole('button', { name: 'Confirmar pertenencia' }));
+
+    expect(screen.getByRole('button', { name: 'Confirmar pertenencia' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Rechazar pertenencia' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
+  it('should move the mark when the reviewer changes their mind', async () => {
+    const user = userEvent.setup();
+    render(<FamilyReviewPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Marcados/ }));
+    await user.click(await screen.findByRole('button', { name: 'Confirmar pertenencia' }));
+    await user.click(screen.getByRole('button', { name: 'Rechazar pertenencia' }));
+
+    expect(screen.getByRole('button', { name: 'Rechazar pertenencia' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Confirmar pertenencia' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
+  /**
+   * A verdict is not a membership, and the screen has to say which decisions are still only that.
+   *
+   * The first version recorded judgements and stopped there, so a reviewer could finish 58 items
+   * and leave the catalogue untouched without any surface telling them. The audit cannot show it
+   * either — it omits judged pairs, which is what makes a dismissal stick — so an unapplied
+   * decision disappeared from every list and read as work already finished.
+   */
+  it('should list only the judgements the catalogue has not acted on', async () => {
+    const user = userEvent.setup();
+    render(<FamilyReviewPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Aplicar/ }));
+
+    expect(
+      await screen.findByText('Pendientes botón erizo de mar S dorado'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Colgante estrella de mar M oro')).not.toBeInTheDocument();
+  });
+
+  it('should count the pending changes on its tab', async () => {
+    render(<FamilyReviewPage />);
+
+    expect(await screen.findByRole('tab', { name: 'Aplicar (1)' })).toBeInTheDocument();
+  });
+
+  it('should enact a pending addition with the variant label the reviewer typed', async () => {
+    const user = userEvent.setup();
+    render(<FamilyReviewPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Aplicar/ }));
+    await user.type(
+      await screen.findByLabelText(/Etiqueta de variante para Pendientes botón erizo/),
+      'S baño de oro',
+    );
+    await user.click(screen.getByRole('button', { name: 'Aplicar' }));
+
+    await waitFor(() =>
+      expect(mocked.applyVerdict).toHaveBeenCalledWith(pendingAddition, 'S baño de oro'),
+    );
+    // Reloaded afterwards: the pending list is the server's answer, not local bookkeeping.
+    await waitFor(() => expect(mocked.listVerdicts).toHaveBeenCalledTimes(2));
+  });
+
+  it('should say nothing is pending only when every decision is reflected', async () => {
+    mocked.listVerdicts.mockResolvedValue([settled]);
+    const user = userEvent.setup();
+    render(<FamilyReviewPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Aplicar/ }));
+
+    expect(await screen.findByText('Sin hallazgos')).toBeInTheDocument();
+    expect(screen.getByText(/1 decisiones registradas ya están reflejadas/)).toBeInTheDocument();
   });
 
   it('should report purity without ever filtering on it', async () => {

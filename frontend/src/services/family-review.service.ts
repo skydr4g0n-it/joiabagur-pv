@@ -12,9 +12,11 @@ import apiClient from './api.service';
 import type {
   AuditOutcome,
   FamilyAudit,
+  FamilyDetail,
   FamilyListQuery,
   FamilyVerdict,
   PaginatedFamilies,
+  RecordedVerdict,
   RecordVerdictsResult,
 } from '@/types/family-review.types';
 import type { ApiError } from '@/types/api.types';
@@ -77,6 +79,60 @@ export const familyReviewService = {
   recordVerdicts: async (verdicts: FamilyVerdict[]): Promise<RecordVerdictsResult> => {
     const response = await apiClient.post<RecordVerdictsResult>(VERDICTS_ENDPOINT, { verdicts });
     return response.data;
+  },
+
+  /**
+   * Lists the judgements already recorded, each with the change it still implies.
+   *
+   * The audit cannot show these: it omits judged pairs on purpose, which is what makes a dismissal
+   * stick. Without this read a decision nobody acted on disappears from every list and looks like
+   * work already finished.
+   */
+  listVerdicts: async (signal?: AbortSignal): Promise<RecordedVerdict[]> => {
+    const response = await apiClient.get<RecordedVerdict[]>(VERDICTS_ENDPOINT, { signal });
+    return response.data;
+  },
+
+  /**
+   * Enacts one judgement: adds the product to the family, or removes it.
+   *
+   * **Read, modify, declare.** Membership is replaced as a whole list rather than patched, which
+   * is C07's contract and not a choice here: the position of every member comes from its place in
+   * the declared list, so gaps and duplicates cannot be expressed. That also means this has to
+   * fetch the family first — sending a partial list would silently remove everybody else.
+   *
+   * Going through the family endpoint rather than a new one is what keeps the index watermark
+   * coherent: that service stamps the products entering and leaving, and without the stamp an
+   * incremental pull never emits them.
+   */
+  applyVerdict: async (
+    verdict: RecordedVerdict,
+    variantLabel?: string | null,
+  ): Promise<void> => {
+    const family = (
+      await apiClient.get<FamilyDetail>(`${FAMILIES_ENDPOINT}/${verdict.familyId}`)
+    ).data;
+
+    const current = family.members.map((member) => ({
+      productId: member.productId,
+      variantLabel: member.variantLabel,
+    }));
+
+    const members =
+      verdict.pendingAction === 'remove'
+        ? current.filter((member) => member.productId !== verdict.productId)
+        : [
+            ...current,
+            {
+              productId: verdict.productId,
+              // Blank means the base piece, which is a legitimate variant value. It is only
+              // rejected downstream when the family already has one, and the uniqueness index is
+              // the right place for that answer rather than a guess here.
+              variantLabel: variantLabel?.trim() ? variantLabel.trim() : null,
+            },
+          ];
+
+    await apiClient.put(`${FAMILIES_ENDPOINT}/${verdict.familyId}/members`, { members });
   },
 
   /**

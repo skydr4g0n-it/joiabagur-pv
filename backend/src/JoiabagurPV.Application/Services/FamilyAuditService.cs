@@ -1,5 +1,6 @@
 using JoiabagurPV.Application.DTOs.Ai;
 using JoiabagurPV.Application.Interfaces;
+using JoiabagurPV.Domain.Common;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Enums;
 using JoiabagurPV.Domain.Interfaces.Repositories;
@@ -146,6 +147,44 @@ public class FamilyAuditService(
 
         return new RecordFamilyVerdictsResponse { Created = created, Updated = updated };
     }
+
+    /// <inheritdoc/>
+    public async Task<List<FamilyVerdictDto>> ListVerdictsAsync()
+    {
+        var summaries = await _verdicts.ListWithMembershipAsync();
+
+        return summaries
+            .Select(summary => new FamilyVerdictDto
+            {
+                ProductId = summary.ProductId,
+                Sku = summary.Sku,
+                ProductName = summary.ProductName,
+                FamilyId = summary.FamilyId,
+                FamilyName = summary.FamilyName,
+                Outcome = summary.Outcome.ToString(),
+                IsCurrentMember = summary.IsCurrentMember,
+                PendingAction = PendingActionFor(summary),
+                MarginAtReview = summary.MarginAtReview,
+                ReviewedAt = summary.ReviewedAt
+            })
+            .ToList();
+    }
+
+    /// <summary>
+    /// What the catalog would have to change for a judgement to be honoured.
+    /// </summary>
+    /// <remarks>
+    /// Only two of the four combinations imply anything. A member the reviewer rejected is still
+    /// in its family until somebody removes it, and a candidate they confirmed still belongs to
+    /// nothing until somebody adds it; a confirmed member and a rejected candidate are decisions
+    /// the catalog already reflects.
+    /// </remarks>
+    private static string PendingActionFor(FamilyVerdictSummary summary) => summary switch
+    {
+        { Outcome: FamilyReviewOutcome.Rejected, IsCurrentMember: true } => "remove",
+        { Outcome: FamilyReviewOutcome.Confirmed, IsCurrentMember: false } => "add",
+        _ => "none"
+    };
 
     private static FamilyReviewOutcome ParseOutcome(string raw)
     {

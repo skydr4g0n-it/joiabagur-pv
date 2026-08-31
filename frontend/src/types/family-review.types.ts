@@ -137,6 +137,52 @@ export interface FamilyVerdict {
   note?: string;
 }
 
+/**
+ * What the catalogue would have to change for a judgement to be honoured.
+ *
+ * Only two of the four combinations imply anything. `none` is a decision the catalogue already
+ * reflects — a member that was confirmed, or a candidate that was dismissed.
+ */
+export type PendingAction = 'add' | 'remove' | 'none';
+
+/**
+ * A recorded judgement, and the membership change it still implies.
+ *
+ * Exists because recording a verdict does not move a membership, and the gap is otherwise
+ * invisible: the audit omits judged pairs — that is what makes a dismissal stick — so a rejected
+ * member nobody removed stops appearing anywhere and reads as work already finished.
+ */
+export interface RecordedVerdict {
+  productId: string;
+  sku: string;
+  productName: string;
+  familyId: string;
+  familyName: string;
+  outcome: FamilyReviewOutcome;
+  isCurrentMember: boolean;
+  pendingAction: PendingAction;
+  marginAtReview: number | null;
+  reviewedAt: string;
+}
+
+/** One member of a family, as the family endpoint returns it. */
+export interface FamilyMember {
+  productId: string;
+  sku: string;
+  name: string;
+  variantLabel: string | null;
+  sortOrder: number;
+}
+
+/** A family with its members, in order. */
+export interface FamilyDetail {
+  id: string;
+  name: string;
+  description: string | null;
+  origin: FamilyOrigin;
+  members: FamilyMember[];
+}
+
 /** How a batch of judgements landed. */
 export interface RecordVerdictsResult {
   created: number;

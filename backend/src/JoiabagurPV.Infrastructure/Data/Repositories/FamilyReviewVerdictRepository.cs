@@ -1,3 +1,4 @@
+using JoiabagurPV.Domain.Common;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Interfaces.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -55,4 +56,38 @@ public class FamilyReviewVerdictRepository
             .Where(verdict => wanted.Contains((verdict.ProductId, verdict.ProductFamilyId)))
             .ToList();
     }
+
+    /// <inheritdoc/>
+    public async Task<List<FamilyVerdictSummary>> ListWithMembershipAsync() =>
+        await _context.FamilyReviewVerdicts
+            .AsNoTracking()
+            .Join(_context.Products,
+                verdict => verdict.ProductId,
+                product => product.Id,
+                (verdict, product) => new { verdict, product })
+            .Join(_context.ProductFamilies,
+                row => row.verdict.ProductFamilyId,
+                family => family.Id,
+                (row, family) => new { row.verdict, row.product, family })
+            // Ordered on the source columns, before the projection. Sorting by a property of a
+            // constructed record is not translatable, and EF answers that with a runtime failure
+            // rather than a compile error.
+            //
+            // Widest margin first: the judgements the evidence was most confident about are the
+            // ones whose consequences are least worth leaving unapplied.
+            .OrderByDescending(row => row.verdict.MarginAtReview)
+            .ThenBy(row => row.product.SKU)
+            .Select(row => new FamilyVerdictSummary(
+                row.verdict.ProductId,
+                row.product.SKU,
+                row.product.Name,
+                row.verdict.ProductFamilyId,
+                row.family.Name,
+                row.verdict.Outcome,
+                _context.ProductFamilyMembers.Any(member =>
+                    member.ProductId == row.verdict.ProductId
+                    && member.ProductFamilyId == row.verdict.ProductFamilyId),
+                row.verdict.MarginAtReview,
+                row.verdict.ReviewedAt))
+            .ToListAsync();
 }

@@ -167,3 +167,52 @@ public class RecordFamilyVerdictsResponse
     /// </remarks>
     public int Updated { get; set; }
 }
+
+/// <summary>
+/// A recorded judgement, and the membership change the catalog would need to honour it.
+/// </summary>
+/// <remarks>
+/// Recording a verdict says what a person concluded; it does not move a membership. This DTO is
+/// what lets a screen show the gap between the two, which is otherwise invisible: the audit omits
+/// judged pairs on purpose — that is what makes a dismissal stick — so a decision nobody acted on
+/// disappears from every list and looks like work already done.
+/// </remarks>
+public class FamilyVerdictDto
+{
+    /// <summary>Identifier of the product judged.</summary>
+    public Guid ProductId { get; set; }
+
+    /// <summary>Product SKU.</summary>
+    public required string Sku { get; set; }
+
+    /// <summary>Product name.</summary>
+    public required string ProductName { get; set; }
+
+    /// <summary>Identifier of the family judged against.</summary>
+    public Guid FamilyId { get; set; }
+
+    /// <summary>That family's name.</summary>
+    public required string FamilyName { get; set; }
+
+    /// <summary>What the reviewer decided: <c>Confirmed</c> or <c>Rejected</c>.</summary>
+    public required string Outcome { get; set; }
+
+    /// <summary>Whether the product belongs to that family right now.</summary>
+    public bool IsCurrentMember { get; set; }
+
+    /// <summary>
+    /// What the catalog would have to change: <c>add</c>, <c>remove</c>, or <c>none</c>.
+    /// </summary>
+    /// <remarks>
+    /// Computed here rather than left to the client, because only this side knows the membership.
+    /// A rejected current member is a removal waiting to happen and a confirmed non-member is an
+    /// addition; the other two combinations are judgements the catalog already agrees with.
+    /// </remarks>
+    public required string PendingAction { get; set; }
+
+    /// <summary>The margin the audit reported when the decision was made.</summary>
+    public double? MarginAtReview { get; set; }
+
+    /// <summary>When it was decided.</summary>
+    public DateTime ReviewedAt { get; set; }
+}

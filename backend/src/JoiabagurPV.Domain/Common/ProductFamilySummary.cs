@@ -52,3 +52,40 @@ public record ProductFamilyQuery(
     FamilyOrigin? Origin,
     string? PieceType,
     bool? HasRejectedMembers);
+
+/// <summary>
+/// A recorded judgement together with what the catalog would have to change to honour it.
+/// </summary>
+/// <param name="ProductId">The product judged.</param>
+/// <param name="Sku">Its SKU.</param>
+/// <param name="ProductName">Its name.</param>
+/// <param name="FamilyId">The family judged against.</param>
+/// <param name="FamilyName">That family's name.</param>
+/// <param name="Outcome">What the reviewer decided.</param>
+/// <param name="IsCurrentMember">Whether the product belongs to that family right now.</param>
+/// <param name="MarginAtReview">The margin the audit reported when the decision was made.</param>
+/// <param name="ReviewedAt">When it was decided.</param>
+/// <remarks>
+/// <para>
+/// <strong>The judgement and the change are different things, and this is where that shows.</strong>
+/// Recording a verdict says what a person concluded; it does not move a membership. A rejected
+/// member is still in its family and a confirmed candidate still belongs to nothing until somebody
+/// declares the new membership — through the family service, which is the only path that keeps the
+/// index watermark coherent.
+/// </para>
+/// <para>
+/// <see cref="IsCurrentMember"/> combined with <see cref="Outcome"/> is what tells the two apart: a
+/// rejected current member is a removal waiting to happen, a confirmed non-member is an addition,
+/// and the other two combinations are judgements the catalog already agrees with.
+/// </para>
+/// </remarks>
+public record FamilyVerdictSummary(
+    Guid ProductId,
+    string Sku,
+    string ProductName,
+    Guid FamilyId,
+    string FamilyName,
+    FamilyReviewOutcome Outcome,
+    bool IsCurrentMember,
+    double? MarginAtReview,
+    DateTime ReviewedAt);

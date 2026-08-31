@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  Check,
   CheckCircle2,
   CloudOff,
   Inbox,
@@ -22,6 +23,8 @@ import {
   Timer,
   Trash2,
   Users,
+  Wrench,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -29,6 +32,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -44,8 +48,10 @@ import { familyReviewService } from '@/services/family-review.service';
 import type {
   FamilyAudit,
   FamilyListItem,
+  FamilyReviewOutcome,
   FamilyVerdict,
   ListState,
+  RecordedVerdict,
 } from '@/types/family-review.types';
 
 /** Formats a similarity margin the way the reviewer reads it: three decimals, Spanish comma. */
@@ -95,6 +101,14 @@ export default function FamilyReviewPage() {
   const [pending, setPending] = useState<FamilyVerdict[]>([]);
   const [saving, setSaving] = useState(false);
 
+  // Judgements already recorded, and what the catalogue would need to change to honour them.
+  // A verdict is not a membership: rejecting a member does not remove it, and confirming a
+  // candidate does not add it. Without this list that gap is invisible, because the audit omits
+  // judged pairs — so a decision nobody acted on stops appearing anywhere and reads as done.
+  const [recorded, setRecorded] = useState<RecordedVerdict[]>([]);
+  const [labels, setLabels] = useState<Record<string, string>>({});
+  const [applying, setApplying] = useState<string | null>(null);
+
   // Per-item stopwatch. The average it produces is a delivery metric, and it is also the only
   // signal that a review has degraded into clicking through: a queue worked at two seconds an
   // item is not being read.
@@ -135,11 +149,58 @@ export default function FamilyReviewPage() {
     return () => controller.abort();
   }, [loadAudit]);
 
+  const loadRecorded = useCallback(async (signal?: AbortSignal) => {
+    try {
+      setRecorded(await familyReviewService.listVerdicts(signal));
+    } catch {
+      // Left as it was rather than cleared: an empty list here would say "nothing pending",
+      // which is the one thing a failed read must not claim on this screen.
+    }
+  }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     void loadFamilies(page, controller.signal);
     return () => controller.abort();
   }, [loadFamilies, page]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadRecorded(controller.signal);
+    return () => controller.abort();
+  }, [loadRecorded]);
+
+  const actionable = useMemo(
+    () => recorded.filter((verdict) => verdict.pendingAction !== 'none'),
+    [recorded],
+  );
+
+  const applyVerdict = useCallback(
+    async (verdict: RecordedVerdict) => {
+      const key = `${verdict.productId}:${verdict.familyId}`;
+      setApplying(key);
+      try {
+        await familyReviewService.applyVerdict(verdict, labels[key]);
+        toast.success(
+          verdict.pendingAction === 'remove'
+            ? `«${verdict.productName}» sale de «${verdict.familyName}».`
+            : `«${verdict.productName}» entra en «${verdict.familyName}».`,
+        );
+        await Promise.all([loadRecorded(), loadFamilies(page)]);
+      } catch {
+        // The most likely refusal is a duplicate variant label, which the family's uniqueness
+        // index rejects. Saying so beats a generic failure: it is a question the reviewer can
+        // answer by typing a different label.
+        toast.error(
+          'No se ha podido aplicar. Si es una alta, revisa que la etiqueta de variante no '
+            + 'coincida con la de otro miembro.',
+        );
+      } finally {
+        setApplying(null);
+      }
+    },
+    [labels, loadFamilies, loadRecorded, page],
+  );
 
   const recordVerdict = useCallback(
     (verdict: FamilyVerdict) => {
@@ -195,9 +256,16 @@ export default function FamilyReviewPage() {
     [elapsedMs, reviewed],
   );
 
-  const isJudged = useCallback(
+  /**
+   * What the reviewer decided about a pair, or undefined if they have not.
+   *
+   * Returns the **outcome** rather than a boolean. A boolean only says "judged", and a screen
+   * that highlights on it marks the same button whichever answer was given — which makes the two
+   * answers indistinguishable at exactly the moment a reviewer needs to see what they just did.
+   */
+  const verdictFor = useCallback(
     (productId: string, familyId: string) =>
-      pending.some((item) => item.productId === productId && item.familyId === familyId),
+      pending.find((item) => item.productId === productId && item.familyId === familyId)?.outcome,
     [pending],
   );
 
@@ -244,8 +312,94 @@ export default function FamilyReviewPage() {
           <TabsTrigger value="orphans">
             Huérfanos{auditState === 'loaded' ? ` (${audit?.orphanCandidates.length ?? 0})` : ''}
           </TabsTrigger>
+          <TabsTrigger value="apply">
+            Aplicar{actionable.length > 0 ? ` (${actionable.length})` : ''}
+          </TabsTrigger>
           <TabsTrigger value="incidents">Incidencias</TabsTrigger>
         </TabsList>
+
+        {/* ── Judgements the catalogue has not acted on ──────────────────────────────────────── */}
+        <TabsContent value="apply">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wrench className="size-4" />
+                Cambios pendientes de aplicar
+              </CardTitle>
+              <CardDescription>
+                Un veredicto registra lo que decidiste; no mueve la pertenencia. Aquí están las
+                decisiones que el catálogo todavía no refleja.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {actionable.length === 0 ? (
+                <EmptyButComputed>
+                  Las {recorded.length} decisiones registradas ya están reflejadas en el catálogo.
+                </EmptyButComputed>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Acción</TableHead>
+                      <TableHead>Producto</TableHead>
+                      <TableHead>Familia</TableHead>
+                      <TableHead>Etiqueta de variante</TableHead>
+                      <TableHead />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {actionable.map((verdict) => {
+                      const key = `${verdict.productId}:${verdict.familyId}`;
+                      const adding = verdict.pendingAction === 'add';
+                      return (
+                        <TableRow key={key}>
+                          <TableCell>
+                            <Badge variant={adding ? 'secondary' : 'destructive'}>
+                              {adding ? 'Añadir' : 'Sacar'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-medium">{verdict.productName}</div>
+                            <div className="text-muted-foreground text-xs">{verdict.sku}</div>
+                          </TableCell>
+                          <TableCell>{verdict.familyName}</TableCell>
+                          <TableCell>
+                            {adding ? (
+                              <Input
+                                value={labels[key] ?? ''}
+                                onChange={(event) =>
+                                  setLabels((current) => ({
+                                    ...current,
+                                    [key]: event.target.value,
+                                  }))
+                                }
+                                placeholder="p. ej. S baño de oro"
+                                aria-label={`Etiqueta de variante para ${verdict.productName}`}
+                                className="h-8 w-48"
+                              />
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              variant={adding ? 'primary' : 'destructive'}
+                              disabled={applying === key}
+                              onClick={() => void applyVerdict(verdict)}
+                            >
+                              {applying === key ? 'Aplicando…' : 'Aplicar'}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* ── Families: needs no vectors, so it stays usable while the audit does not ────────── */}
         <TabsContent value="families">
@@ -399,7 +553,7 @@ export default function FamilyReviewPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <VerdictButtons
-                            judged={isJudged(member.productId, member.familyId)}
+                            outcome={verdictFor(member.productId, member.familyId)}
                             onConfirm={() =>
                               recordVerdict({
                                 productId: member.productId,
@@ -487,7 +641,7 @@ export default function FamilyReviewPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <VerdictButtons
-                            judged={isJudged(candidate.productId, candidate.familyId)}
+                            outcome={verdictFor(candidate.productId, candidate.familyId)}
                             onConfirm={() =>
                               recordVerdict({
                                 productId: candidate.productId,
@@ -604,38 +758,49 @@ export default function FamilyReviewPage() {
 }
 
 /**
- * The two answers, with the keyboard shortcuts a queue of 156 needs.
+ * The two answers, each showing whether it is the one that was given.
  *
- * `C` and `R` rather than a mouse round trip per row: the review is measured, and a reviewer who
- * has to aim at two small buttons per item spends the session aiming.
+ * The state is the **outcome**, not a boolean. Highlighting on "has a verdict" marks the same
+ * button whichever answer was chosen, so a reviewer cannot tell a confirmation from a dismissal
+ * on the row they just answered — which on a queue of 156 is how a mis-click becomes permanent
+ * without anybody noticing.
+ *
+ * The two are styled differently on purpose rather than both filled: a dismissal is the
+ * destructive answer, and colour carries that faster than reading the label. `aria-pressed`
+ * states the same thing for a screen reader, and gives the tests something honest to assert.
  */
 function VerdictButtons({
-  judged,
+  outcome,
   onConfirm,
   onReject,
 }: {
-  judged: boolean;
+  outcome: FamilyReviewOutcome | undefined;
   onConfirm: () => void;
   onReject: () => void;
 }) {
+  const confirmed = outcome === 'Confirmed';
+  const rejected = outcome === 'Rejected';
+
   return (
     <div className="flex justify-end gap-1">
       <Button
-        variant={judged ? 'secondary' : 'outline'}
+        variant={confirmed ? 'primary' : 'outline'}
         size="sm"
         onClick={onConfirm}
-        onKeyDown={(event) => event.key === 'c' && onConfirm()}
+        aria-pressed={confirmed}
         aria-label="Confirmar pertenencia"
       >
+        {confirmed && <Check className="size-3" />}
         Confirmar
       </Button>
       <Button
-        variant="outline"
+        variant={rejected ? 'destructive' : 'outline'}
         size="sm"
         onClick={onReject}
-        onKeyDown={(event) => event.key === 'r' && onReject()}
+        aria-pressed={rejected}
         aria-label="Rechazar pertenencia"
       >
+        {rejected && <X className="size-3" />}
         Descartar
       </Button>
     </div>

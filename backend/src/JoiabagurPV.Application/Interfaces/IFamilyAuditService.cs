@@ -39,4 +39,14 @@ public interface IFamilyAuditService
     Task<RecordFamilyVerdictsResponse> RecordVerdictsAsync(
         RecordFamilyVerdictsRequest request,
         Guid reviewedByUserId);
+
+    /// <summary>
+    /// Lists the recorded judgements, each with the membership change it still implies.
+    /// </summary>
+    /// <remarks>
+    /// Without this a decision nobody acted on is invisible: the audit omits judged pairs — which
+    /// is what makes a dismissal stick — so a rejected member that was never removed simply stops
+    /// appearing anywhere and looks like work already finished.
+    /// </remarks>
+    Task<List<FamilyVerdictDto>> ListVerdictsAsync();
 }

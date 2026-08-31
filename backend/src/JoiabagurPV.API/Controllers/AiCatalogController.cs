@@ -294,6 +294,22 @@ public class AiCatalogController : ControllerBase
     }
 
     /// <summary>
+    /// Lists the recorded judgements, each with the membership change it still implies.
+    /// </summary>
+    /// <returns>Every verdict, ordered so the widest margins come first.</returns>
+    /// <remarks>
+    /// Exists because a decision nobody acted on is otherwise invisible. The audit omits judged
+    /// pairs on purpose -- that is what makes a dismissal stick -- so a rejected member that
+    /// was never removed stops appearing anywhere and reads as work already finished.
+    /// </remarks>
+    [HttpGet("family-verdicts")]
+    [ProducesResponseType(typeof(List<FamilyVerdictDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ListFamilyVerdicts() =>
+        Ok(await _familyAuditService.ListVerdictsAsync());
+
+    /// <summary>
     /// Records what an administrator decided about a batch of product and family pairs.
     /// </summary>
     /// <param name="request">The judgements.</param>

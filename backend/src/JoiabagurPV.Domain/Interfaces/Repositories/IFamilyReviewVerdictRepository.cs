@@ -1,3 +1,4 @@
+using JoiabagurPV.Domain.Common;
 using JoiabagurPV.Domain.Entities;
 
 namespace JoiabagurPV.Domain.Interfaces.Repositories;
@@ -26,4 +27,14 @@ public interface IFamilyReviewVerdictRepository : IRepository<FamilyReviewVerdic
     /// </remarks>
     Task<List<FamilyReviewVerdict>> GetByPairsAsync(
         IReadOnlyCollection<(Guid ProductId, Guid FamilyId)> pairs);
+
+    /// <summary>
+    /// Every recorded judgement, with the product, the family and whether the membership exists.
+    /// </summary>
+    /// <remarks>
+    /// The audit deliberately omits judged pairs — that is what makes a dismissal stick — so
+    /// without this read nothing can show a reviewer what they decided, and in particular nothing
+    /// can show the decisions the catalog has not acted on yet.
+    /// </remarks>
+    Task<List<FamilyVerdictSummary>> ListWithMembershipAsync();
 }
