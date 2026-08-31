@@ -1,0 +1,113 @@
+AuthService refresh should return true on successful refresh
+Image Recognition Inference Service generateSuggestions should limit suggestions to maximum 5
+Image Recognition Inference Service loadModel should cache loaded model and reuse it
+Image Recognition Inference Service recognizeProduct should dispose tensors even on error
+Image Recognition Inference Service recognizeProduct should enrich suggestions with product details from dataset
+Image Recognition Inference Service recognizeProduct should handle network errors gracefully
+Image Recognition Inference Service recognizeProduct should return empty array when all confidences below threshold
+Image Recognition Inference Service recognizeProduct should return suggestions when confidence is above threshold
+Image Recognition Inference Service recognizeProduct should throw error when no model is available
+Image Recognition Inference Service runInference should extract features and run classification
+Image Recognition Inference Service runInference should use tidy to prevent memory leaks during feature extraction
+Image Recognition Inference Service validateImageDimensions should accept 5:1 aspect ratio as maximum
+Image Recognition Inference Service validateImageDimensions should accept images with valid dimensions
+Image Recognition Inference Service validateImageDimensions should reject completely black images
+Image Recognition Inference Service validateImageDimensions should reject completely white images
+ImageRecognitionSalesPage Camera Operations should prefer back camera on mobile (environment)
+ImageRecognitionSalesPage Camera Operations should request camera permission when activating camera
+ImageRecognitionSalesPage Camera Operations should show error when camera access is denied
+ImageRecognitionSalesPage Camera Operations should stop camera when canceled
+ImageRecognitionSalesPage Device Compatibility should check device compatibility on mount
+ImageRecognitionSalesPage Device Compatibility should show error when device is incompatible
+ImageRecognitionSalesPage Device Compatibility should show manual entry button when incompatible
+ImageRecognitionSalesPage File Upload Alternative should allow uploading photo instead of camera
+ML Edge Cases and Error Scenarios Boundary Conditions should cap at 5 suggestions even with 6+ above threshold
+ML Edge Cases and Error Scenarios Boundary Conditions should handle exactly 5 suggestions at threshold
+ML Edge Cases and Error Scenarios Browser Compatibility should handle TensorFlow.js initialization failure
+ML Edge Cases and Error Scenarios Browser Compatibility should handle missing WebGL gracefully
+ML Edge Cases and Error Scenarios Image Recognition Edge Cases should handle 39.9% confidence (just below threshold)
+ML Edge Cases and Error Scenarios Image Recognition Edge Cases should handle corrupt image files
+ML Edge Cases and Error Scenarios Image Recognition Edge Cases should handle empty class labels (no products)
+ML Edge Cases and Error Scenarios Image Recognition Edge Cases should handle exactly 40% confidence (boundary)
+ML Edge Cases and Error Scenarios Image Recognition Edge Cases should handle mismatched class labels and predictions
+ML Edge Cases and Error Scenarios Image Recognition Edge Cases should handle model returning NaN predictions
+ML Edge Cases and Error Scenarios Image Recognition Edge Cases should handle model returning all zeros
+ML Edge Cases and Error Scenarios Image Recognition Edge Cases should handle very high confidence (>99%)
+ML Edge Cases and Error Scenarios Model Training Edge Cases should handle model save returning incomplete artifacts
+ML Edge Cases and Error Scenarios Model Training Edge Cases should handle photos with different aspect ratios
+ML Edge Cases and Error Scenarios Model Training Edge Cases should handle single product (minimum viable dataset)
+ML Edge Cases and Error Scenarios Model Training Edge Cases should handle training timeout
+ML Edge Cases and Error Scenarios Model Training Edge Cases should handle training with imbalanced classes
+ML Edge Cases and Error Scenarios Model Training Edge Cases should handle upload returning error
+ML Edge Cases and Error Scenarios Model Training Edge Cases should handle very large dataset (100+ products)
+ML Edge Cases and Error Scenarios Network and Connectivity should handle intermittent network during photo download
+ML Edge Cases and Error Scenarios Progress Callback Behavior should never call callback with null or undefined progress
+ML Edge Cases and Error Scenarios Resource Cleanup should dispose model after training complete
+ML Edge Cases and Error Scenarios Resource Cleanup should not leak memory after multiple inferences
+ManualSalesPage should allow searching for products
+ManualSalesPage should display available stock when product is selected
+ManualSalesPage should display low stock warning after sale
+ManualSalesPage should handle error when sale creation fails
+ManualSalesPage should load and display points of sale
+ManualSalesPage should not show manual price input when POS disallows editing
+ManualSalesPage should render the page title
+ManualSalesPage should show confirmation dialog before submitting sale
+ManualSalesPage should show manual price input when POS allows editing
+ManualSalesPage should successfully create a sale
+ManualSalesPage should validate quantity against available stock
+Model Training Service checkTrainingCapabilities should detect GPU support via WebGL 2.0
+Model Training Service executeClientSideTraining should call upload with correct parameters
+Model Training Service executeClientSideTraining should complete full training workflow
+Model Training Service executeClientSideTraining should report progress from 0 to 100
+PaymentMethodService getPaymentMethods should include inactive payment methods when requested
+PaymentMethodsPage Data Loading should display error message when loading fails
+PaymentMethodsPage Data Loading should show inactive payment methods when toggle is enabled
+PaymentMethodsPage Payment Method Count should display correct count of payment methods
+PaymentMethodsPage Rendering should display show inactive toggle
+ProductEditPage Error Handling should display error when product is not found (404)
+ProductEditPage Error Handling should handle update error gracefully
+ProductEditPage Error Handling should show error when product not found
+ProductEditPage Form Pre-population (Task 12.8) should handle product with no collection
+ProductEditPage Form Pre-population (Task 12.8) should handle product with no description
+ProductEditPage Form Pre-population (Task 12.8) should load and display existing product data
+ProductEditPage Form Pre-population (Task 12.8) should pre-populate collection select with correct value
+ProductEditPage Form Pre-population (Task 12.8) should pre-populate isActive button correctly
+ProductEditPage Form Submission (Task 12.10) should disable submit button while submitting
+ProductEditPage Form Submission (Task 12.10) should not submit form with validation errors
+ProductEditPage Form Submission (Task 12.10) should show loading indicator while submitting
+ProductEditPage Form Submission (Task 12.10) should submit updated product successfully
+ProductEditPage Form Submission (Task 12.10) should update product isActive status
+ProductEditPage Form Submission (Task 12.10) should update product with collection change
+ProductEditPage Form Validation (Task 12.10) should not show validation errors for valid data
+ProductEditPage Form Validation (Task 12.10) should show validation error for empty name
+ProductEditPage Form Validation (Task 12.10) should show validation error for invalid price (negative)
+ProductEditPage Form Validation (Task 12.10) should show validation error for invalid price (zero)
+ProductEditPage Form Validation (Task 12.10) should show validation error for non-numeric price
+ProductEditPage Loading States should hide loading indicator after product is loaded
+ProductEditPage Loading States should show loading indicator while fetching product
+ProductEditPage Navigation should navigate back to catalog when back button is clicked
+ProductEditPage Navigation should navigate to products page after successful update
+ProductEditPage Photo Upload Component Integration should render photo upload component with product ID
+ProductEditPage SKU Field Disabled State (Task 12.9) should display SKU field with visual indication of being non-editable
+ProductEditPage SKU Field Disabled State (Task 12.9) should prevent SKU field from being modified
+ProductEditPage SKU Field Disabled State (Task 12.9) should render SKU field as disabled
+ProductEditPage should render Code128 barcode section for product with SKU
+ProductEditPage should render QR code section for product with SKU
+ProductEditPage should show loading state initially
+ProductEditPage should show placeholder when product has no SKU
+ProductPhotoUpload Accessibility and Edge Cases should accept file input by clicking select button
+ProductPhotoUpload Accessibility and Edge Cases should disable actions during upload
+ProductPhotoUpload Component Rendering (Task 16.7) should render upload zone for admin users
+ProductPhotoUpload Drag and Drop Interactions (Task 16.8) should upload photo on file drop
+ProductPhotoUpload Error Handling (Task 16.9) should handle upload error gracefully
+ProductPhotoUpload File Upload (Task 16.7) should disable upload zone while uploading
+ProductPhotoUpload File Upload (Task 16.7) should show loading indicator while uploading
+ProductPhotoUpload File Upload (Task 16.7) should upload photo when valid file is selected
+ProductPhotoUpload File Validation Feedback (Task 16.9) should accept valid JPG file
+ProductPhotoUpload File Validation Feedback (Task 16.9) should accept valid PNG file
+ProductPhotoUpload File Validation Feedback (Task 16.9) should show error toast for file too large
+ProductPhotoUpload File Validation Feedback (Task 16.9) should show error toast for invalid format
+SalesPage should show "Escanear Código" tile
+ScanningPage should render loading state initially
+productService getProducts should fetch all products
+productService getProducts should fetch only active products when includeInactive is false

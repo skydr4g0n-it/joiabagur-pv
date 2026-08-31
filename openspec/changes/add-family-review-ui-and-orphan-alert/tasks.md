@@ -6,19 +6,19 @@
 
 ## 1. Línea base, respaldo y medición previa
 
-- [ ] 1.1 Volcar `public` y `ai` a `pre-c18b.dump` dentro del contenedor `jpv-pv-postgres`, como hizo C18a con `pre-c18a.dump`. Verificar el tamaño del fichero y que contiene ambos esquemas.
-- [ ] 1.2 Anotar la línea base en el borrador del informe: familias (156), miembros (486), familias `Manual` (0), documentos (1.168), con `family_id` (486), activos sin familia (682) y de ellos con `piece_type` (671). Consulta reproducible incluida en el informe.
-- [ ] 1.3 Medir la línea base de las dos suites de test con `git stash push -u`, guardando la **lista de nombres** de los tests que fallan, no el recuento. `git stash pop` al terminar.
-- [ ] 1.4 Reproducir la curva del margen de huérfanos sobre el estado actual (`θ = 0 / 0,02 / 0,05 / 0,08`) y la tabla A-vs-B por `data_origin`, y dejarlas en el informe como punto de partida verificable.
+- [x] 1.1 Volcar `public` y `ai` a `pre-c18b.dump` dentro del contenedor `jpv-pv-postgres`, como hizo C18a con `pre-c18a.dump`. Verificar el tamaño del fichero y que contiene ambos esquemas.
+- [x] 1.2 Anotar la línea base en el borrador del informe: familias (156), miembros (486), familias `Manual` (0), documentos (1.168), con `family_id` (486), activos sin familia (682) y de ellos con `piece_type` (671). Consulta reproducible incluida en el informe.
+- [x] 1.3 Medir la línea base de las dos suites de test con `git stash push -u`, guardando la **lista de nombres** de los tests que fallan, no el recuento. `git stash pop` al terminar.
+- [x] 1.4 Reproducir la curva del margen de huérfanos sobre el estado actual (`θ = 0 / 0,02 / 0,05 / 0,08`) y la tabla A-vs-B por `data_origin`, y dejarlas en el informe como punto de partida verificable.
 
 ## 2. El sinónimo `dorado`, y su diff antes de aceptarlo
 
-- [ ] 2.1 Capturar la salida completa de `POST /v1/families/suggest` **antes** del cambio, como fichero de referencia para el diff.
-- [ ] 2.2 Añadir `dorado: baño de oro` a `materials.synonyms` en `ai-service/src/jbg_ai/enrichment/vocabularies.yaml`.
-- [ ] 2.3 Re-ejecutar `suggest` y **diffear las propuestas completas**, no sólo los tres casos buscados. Verificar que ninguna raíz que antes formaba familia queda degradada al tipo de pieza pelado, y que no aparecen fusiones nuevas indeseadas.
-- [ ] 2.4 Verificar que los tres huérfanos previstos —`Pendientes botón erizo de mar S dorado`, `Colgante Lapa Mini Dorado`, `Pendientes botón estrella de mar dorado`— pasan a proponerse en su familia. Si en su lugar aparecen rechazados por `duplicate_variant_labels`, el mapeo correcto era `oro`: revertir y documentar.
-- [ ] 2.5 Espejar el término en `frontend/src/lib/materials-vocabulary.ts` y actualizar su test de fijación.
-- [ ] 2.6 Registrar el diff en el informe. Si el paso 2.3 encuentra degradación, revertir el sinónimo y dejar el caso escrito: el resto del change no depende de él.
+- [x] 2.1 Capturar la salida completa de `POST /v1/families/suggest` **antes** del cambio, como fichero de referencia para el diff.
+- [x] 2.2 Añadir `dorado: baño de oro` a `materials.synonyms` en `ai-service/src/jbg_ai/enrichment/vocabularies.yaml`.
+- [x] 2.3 Re-ejecutar `suggest` y **diffear las propuestas completas**, no sólo los tres casos buscados. Verificar que ninguna raíz que antes formaba familia queda degradada al tipo de pieza pelado, y que no aparecen fusiones nuevas indeseadas.
+- [x] 2.4 ~~Verificar que los tres huérfanos previstos pasan a proponerse en su familia~~ → **corregida al medir.** Los tres siguen huérfanos, y no por el sinónimo: **sus familias ya existen** (4, 3 y 3 miembros) y la convergencia excluye del pool a los que ya pertenecen, así que la variante `dorado` no tiene con quién agruparse. Van a la cola de huérfanos, no a `suggest`. Lo que **sí** valida D14 es que las 6 familias nuevas salen con etiquetas `None` / `baño de oro` distintas y **ningún** grupo nuevo rechazado por `duplicate_variant_labels` — que era la forma en que la hipótesis podía caerse.
+- [x] 2.5 ~~Espejar el término en `frontend/src/lib/materials-vocabulary.ts`~~ → **sin trabajo, y la premisa era errónea.** Ese fichero es espejo de `materials.**terms**`, no de `synonyms`, y su test fija los nueve términos canónicos. `baño de oro` ya está; `dorado` es sinónimo y **no debe** aparecer, o el panel ofrecería un filtro que el recuperador nunca casa.
+- [x] 2.6 Registrar el diff en el informe. Si el paso 2.3 encuentra degradación, revertir el sinónimo y dejar el caso escrito: el resto del change no depende de él.
 
 ## 3. Auditoría en `ai-service`
 
@@ -87,5 +87,5 @@
 - [ ] 10.2 Enlazar HU-AIENG-018b en `Documentos/epicas.md` (EP13).
 - [ ] 10.3 Añadir `FamilyReviewVerdict` a `Documentos/modelo-de-datos.md` con sus relaciones e índices.
 - [ ] 10.4 Actualizar `openspec/project.md` y los README afectados si la décima ruta o la entidad nueva dejan algo desactualizado.
-- [ ] 10.5 Comparar las dos suites contra la línea base de 1.3 por **nombres** de test, y dejar constancia de que el conjunto de fallos es el mismo.
+- [ ] 10.5 Comparar las dos suites contra las listas versionadas en [`baseline/`](./baseline/) por **nombres** de test —47 backend, 113 frontend—, y dejar constancia de que el conjunto de fallos es el mismo.
 - [ ] 10.6 `openspec validate --all --strict` en **`0 failed`** antes de archivar.

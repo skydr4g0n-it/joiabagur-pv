@@ -44,6 +44,7 @@ materials:
     gold: oro
     hilo encerado: hilo
     chapado en oro: baño de oro
+    dorado: baño de oro
     gold plated: baño de oro
 
 stone_type:
