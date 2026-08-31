@@ -29,6 +29,24 @@ Grouping MUST NOT cross piece types. A product whose `piece_type` is null MUST N
 - **THEN** it is not proposed as a member of any family
 - **AND** the remaining products may still form a family among themselves
 
+### Requirement: The piece-type gate names what it excludes
+
+The system SHALL report, alongside the proposals, every product the piece-type gate removed from consideration, naming the product and the reason. A product without a piece type disappears from the review queue as well as from families, and no other output would ever mention it: an exclusion nobody can see is indistinguishable from a product that simply had no siblings.
+
+Products skipped because they already belong to a family MUST be reported as a count rather than named individually. That exclusion is the convergence rule working as designed, and after the first approved batch it covers hundreds of products, which would bury the exclusions worth reading.
+
+#### Scenario: A product without a piece type is named, not silently dropped
+
+- **WHEN** the catalogue contains a product whose piece type is null
+- **THEN** it appears in the reported exclusions with its identifier, SKU, name and the reason
+- **AND** it is absent from every proposal
+
+#### Scenario: Products already in a family are counted, not listed
+
+- **WHEN** suggestions are requested after a batch has been approved
+- **THEN** the products belonging to a family are reported as a count
+- **AND** they do not appear individually among the reported exclusions
+
 ### Requirement: Material distinguishes variants by fusing groups, never by stripping roots
 
 The system SHALL treat a material token as a variant axis by **merging two already-formed groups whose roots differ in exactly one material token**, and MUST NOT remove material tokens from the root before grouping. Removing them globally collapses legitimate roots: `Anillo plata S/M/L/XL` would reduce to the bare piece type and absorb unrelated products.

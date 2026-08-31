@@ -31,7 +31,7 @@ The `jbg-ai` service SHALL expose the following internal endpoints under `/v1`, 
 
 `POST /v1/families/suggest` SHALL accept an optional scoping body — a piece type and a maximum number of proposals — and MUST return, for each proposal, the normalized root, the piece type, and the ordered members. Each member MUST carry the product identifier, its SKU, its name, its variant label as a nullable value, and its position. A member the relative embedding veto flagged MUST be marked as such together with its distance, and MUST still be present in the proposal.
 
-The response MUST report, separately from the proposals, the groups that a guard rejected together with the reason, so that a caller can surface them as catalogue quality incidences without inferring them from an absence.
+The response MUST carry **three** lists, not one: the proposals, the groups a guard rejected together with the reason, and the products the piece-type gate excluded with theirs. A caller must be able to surface both kinds of omission as catalogue quality incidences without inferring them from an absence. Products skipped for already belonging to a family MUST be reported as a count rather than enumerated.
 
 Under stub mode the route MUST return a deterministic fixture that validates against the declared response model, without touching the database.
 

@@ -122,7 +122,23 @@ Se escriben **todas** de una vez porque el corpus debe moverse una sola vez. Esc
 
 `POST /v1/index/sync` sin `full`. Un `--full` reindexaría todo y **taparía** un fallo de estampado en lugar de exponerlo. El incremental es la única prueba real de que la decisión 1 se implementó bien, y por eso el criterio de aceptación exige contar que los emitidos sean exactamente los estampados.
 
-### 9 · Los parámetros del veto viven en configuración
+### 9 · Lo que la puerta excluye se nombra, y lo que no es joyería sale del índice en este mismo lote
+
+*(Decisión añadida el 2026-08-31, a partir de un hallazgo de la implementación.)*
+
+La guarda de raíz degenerada encontró que **el catálogo contiene cosas que no son joyas terminadas**, y que están indexadas y por tanto en la búsqueda asistida: servicios de taller (`Arreglos`, `Cambiar hilo`, `Comprobar pureza del oro`), experiencias (`Joyero por un día`), velas y regalo, envío, merchandising, y cierres de pendiente. En seis de ellas **C09 forzó un tipo de pieza** —`Arreglos oro`→`collar`, `Encargos`→`collar`, `Presión`→`anillo`— porque su vocabulario cerrado no admite «no es una pieza» y el extractor tuvo que elegir algo.
+
+**La palanca correcta ya existía y nadie la había usado:** `ProfileReviewStatus`. El predicado de indexabilidad es `Product.IsActive AND profile.ReviewStatus == Approved`, y C08 separó estado de origen precisamente *«so the indexing feed selects by status alone»*. Poner `Rejected` las saca del índice y **las deja vendibles**. Las 1.200 estaban en `Approved`.
+
+**`IsActive = false` sería un error**, y conviene dejarlo escrito para que nadie lo intente: también las sacaría del TPV, y `Encargos` es una línea de caja real de 10 €. Se arreglaría la búsqueda rompiendo la venta.
+
+**Va en este lote, no después**, porque el principio de la decisión 7 —el corpus se mueve una sola vez— **aplica igual a las bajas que a las altas**: 32 documentos que desaparecen son un movimiento del corpus, y hacerlo tras la línea base de C24 invalidaría la tabla de ablations exactamente igual que hacerlo con las altas. Una sola sincronización incremental reconcilia ambas cosas.
+
+**Y la puerta deja de ser muda.** Un `piece_type` nulo excluye al producto de las familias *y de la cola de revisión*, de modo que nada volvería a mencionarlo: `Arreglos plata` desapareció así. La respuesta de `suggest` gana una tercera lista con los productos excluidos y su motivo. Los que ya pertenecen a una familia se cuentan en vez de enumerarse: tras el primer lote son cientos y su exclusión es la regla de convergencia funcionando, no un hallazgo.
+
+**Lo que esta decisión NO resuelve**, y queda anotado como change propio: **9 joyas sintéticas legítimas** de 160 a 1.300 € —5 diademas, 2 gemelos, un cinturón— tienen `piece_type` nulo porque `piece_type.terms` sólo nombra ocho tipos y no incluye los suyos. Ahí el nulo **no** significa «no es una pieza» sino «mi vocabulario no la sabe nombrar», y el arreglo es el contrario: ampliar el vocabulario y reenriquecer. Eso mueve el corpus una tercera vez, así que necesita su propia decisión de cuándo, y no se toma aquí.
+
+### 10 · Los parámetros del veto viven en configuración
 
 `k = 2` sobre los 5 vecinos más próximos, leídos de `pydantic-settings`. El valor sale de una muestra pequeña —los 6 solapamientos medidos— y C24 lo revisará con datos. Un umbral incrustado en el código no se puede barrer.
 
@@ -150,7 +166,9 @@ Se escriben **todas** de una vez porque el corpus debe moverse una sola vez. Esc
 
 ## Open Questions
 
-**Ninguna bloqueante.** Las seis que el ticket abrió el 2026-08-31 se cerraron el mismo día aplicando su opción por defecto, y quedan registradas con su motivo en [`ticket.md`](./ticket.md) § *Decisiones cerradas* y en la HU como D9–D14: `piece_type` nulo como valor propio de la puerta, `k = 2` sobre 5 vecinos en configuración, `Alianzas Plata/oro` a la cola de revisión, vocabulario de materiales propio en Python con test de fijación, doble etiquetado del golden set de C24 remitido a la reestructuración del plan, e informe del lote versionado.
+**Ninguna bloqueante.** Las seis que el ticket abrió el 2026-08-31 se cerraron el mismo día aplicando su opción por defecto, y quedan registradas con su motivo en [`ticket.md`](./ticket.md) § *Decisiones cerradas* y en la HU como D9–D14: `piece_type` nulo como valor propio de la puerta, `k = 2` sobre 5 vecinos en configuración, `Alianzas Plata/oro` a la cola de revisión, vocabularios **reutilizados** de `enrichment/vocabularies.yaml`, doble etiquetado del golden set de C24 remitido a la reestructuración del plan, e informe del lote versionado.
+
+> **D12, revisada el 2026-08-31 al implementar.** La decisión original decía «declarar el vocabulario de materiales en Python y aceptar la duplicación como deuda». Es al revés: [`enrichment/vocabularies.yaml`](../../../ai-service/src/jbg_ai/enrichment/vocabularies.yaml) (C09) ya declara materiales, tipo de pieza y `size_label` **con las dos escalas** y sus sinónimos, y `enrichment.vocab.fold` ya hace la normalización que la decisión 5 describe. El fichero del frontend es el espejo de ése, no su origen. Declarar una lista dentro de `families/` habría creado la duplicación que D12 quería evitar, un borde más adentro. **Lo único nuevo es el rango canónico de tallas** —el vocabulario agrupa por escala, no ordena por magnitud, y el orden es lo que `Position` necesita— y la regla de que `variant_label` guarda la subcadena del nombre y no la forma canónica que `resolve()` devolvería.
 
 Dos cuestiones siguen vivas, ambas fuera del alcance de este change y anotadas para que no se pierdan:
 

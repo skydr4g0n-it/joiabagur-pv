@@ -4,23 +4,23 @@
 
 ## 1. Línea base y medición previa
 
-- [ ] 1.1 Levantar el Postgres local y registrar la línea base: recuento de `ProductFamilies`, de `ProductFamilyMembers` y de `ai.product_document` con `family_id` no nulo. Verificación: los tres son 0.
-- [ ] 1.2 **Medir la tasa de nulos de `piece_type`** en `ai.product_document` y anotarla. Confirma D9 y dimensiona su efecto; **no** cambia la regla, que ya está fijada.
-- [ ] 1.3 Medir el baseline de la suite antes de tocar nada (`git stash push -u` → `dotnet test` y `uv run pytest` → `git stash pop`) y guardar los **nombres** de los tests en rojo, no el recuento. La suite de backend arrastra ~53 fallos preexistentes y la de frontend ~118.
+- [x] 1.1 Levantar el Postgres local y registrar la línea base: recuento de `ProductFamilies`, de `ProductFamilyMembers` y de `ai.product_document` con `family_id` no nulo. Verificación: los tres son 0.
+- [x] 1.2 **Medir la tasa de nulos de `piece_type`** en `ai.product_document` y anotarla. Confirma D9 y dimensiona su efecto; **no** cambia la regla, que ya está fijada.
+- [x] 1.3 Medir el baseline de la suite antes de tocar nada (`git stash push -u` → `dotnet test` y `uv run pytest` → `git stash pop`) y guardar los **nombres** de los tests en rojo, no el recuento. La suite de backend arrastra ~53 fallos preexistentes y la de frontend ~118.
 
 ## 2. Librería de agrupación en `ai-service`
 
-- [ ] 2.1 Crear el paquete `ai-service/src/jbg_ai/families/` y su espejo `ai-service/tests/families/`, siguiendo la convención de `ai-service/tests/README.md`.
-- [ ] 2.2 Declarar el **vocabulario cerrado de materiales** con test de fijación (D12), y anotar en `design.md` la deuda de duplicación con `frontend/src/lib/materials-vocabulary.ts`.
-- [ ] 2.3 Declarar el **vocabulario de talla** en sus dos escalas (latina insensible a caja, y palabra) y el **rango canónico interno** que ordena ambas.
-- [ ] 2.4 Implementar la **normalización de raíz**: casefold, `NFD` sin diacríticos, puntuación y paréntesis a espacio, espacios colapsados, sufijo de talla retirado.
-- [ ] 2.5 Implementar la **agrupación por raíz** con la puerta de `piece_type`, tratando el nulo como valor propio que no agrupa con nadie.
-- [ ] 2.6 Implementar la **fusión por material** entre grupos cuyas raíces difieran en exactamente un token, **sin** retirar material de la raíz.
-- [ ] 2.7 Implementar la **guarda de raíz degenerada** (raíz igual al tipo de pieza pelado, o de menos de dos tokens) y devolver los grupos rechazados **con su motivo**, no descartarlos en silencio.
+- [x] 2.1 Crear el paquete `ai-service/src/jbg_ai/families/` y su espejo `ai-service/tests/families/`, siguiendo la convención de `ai-service/tests/README.md`.
+- [x] 2.2 **Reutilizar** los vocabularios cerrados de `jbg_ai/enrichment/vocabularies.yaml` (C09) para materiales, talla y tipo de pieza. **No se declara ninguna lista nueva**: Python es el original y `frontend/src/lib/materials-vocabulary.ts` es el espejo, como su propia cabecera dice. D12 revisada el 2026-08-31.
+- [x] 2.3 Declarar **únicamente el rango canónico de tallas**, que es lo que el vocabulario no puede tener: su lista está agrupada por escala, no ordenada por magnitud. Un token de talla que el rango no nombre ordena al final, nunca lanza.
+- [x] 2.4 Implementar la **normalización de raíz** sobre `enrichment.vocab.fold` —que ya hace casefold, `NFD` sin diacríticos, puntuación a espacio y espacios colapsados— añadiendo sólo la retirada del sufijo de talla.
+- [x] 2.5 Implementar la **agrupación por raíz** con la puerta de `piece_type`, tratando el nulo como valor propio que no agrupa con nadie.
+- [x] 2.6 Implementar la **fusión por material** entre grupos cuyas raíces difieran en exactamente un token, **sin** retirar material de la raíz.
+- [x] 2.7 Implementar la **guarda de raíz degenerada** (raíz igual al tipo de pieza pelado, o de menos de dos tokens) y devolver los grupos rechazados **con su motivo**, no descartarlos en silencio.
 - [ ] 2.8 Implementar el **veto relativo por embedding** (`mediana − k·MAD` contra el centroide del propio grupo) que **marca y no elimina**, con `k` y el número de vecinos leídos de `pydantic-settings` (D10).
-- [ ] 2.9 Implementar la **detección de `variant_label`** como el fragmento retirado verbatim normalizado, admitiendo la etiqueta nula para la pieza base y la etiqueta compuesta en las familias de dos ejes.
-- [ ] 2.10 Implementar el cálculo de `position` por rango canónico, **sin** persistir el rango como etiqueta.
-- [ ] 2.11 Implementar la **exclusión de productos ya asignados** a una familia, que es lo que hace converger la repetición.
+- [x] 2.9 Implementar la **detección de `variant_label`** como el fragmento retirado verbatim normalizado, admitiendo la etiqueta nula para la pieza base y la etiqueta compuesta en las familias de dos ejes.
+- [x] 2.10 Implementar el cálculo de `position` por rango canónico, **sin** persistir el rango como etiqueta.
+- [x] 2.11 Implementar la **exclusión de productos ya asignados** a una familia, que es lo que hace converger la repetición.
 - [ ] 2.12 Puerto de lectura sobre `ai.product_document`. **No** se lee ni se escribe `public` por SQL, **no** se llama al proveedor de embeddings y **no** se modifica `indexing/embeddings.py`.
 
 ## 3. Tests de la librería
@@ -31,6 +31,7 @@
 - [ ] 3.4 `test_degenerate_root_is_rejected_and_reported` (los casos `Encargos` y `Arreglos`).
 - [ ] 3.5 `test_veto_flags_member_without_removing_it` y `test_no_global_threshold_decides_membership`.
 - [ ] 3.6 `test_veto_parameters_come_from_configuration` — falla si `k` o el número de vecinos están incrustados en el código.
+- [ ] 3.6b `test_family_vocabulary_reuses_enrichment_terms` — falla si alguien vuelve a declarar una lista de materiales o de tallas dentro de `families/`, que es la regresión que D12 revisada existe para impedir.
 - [ ] 3.7 `test_variant_label_is_verbatim_not_translated` (`mini` no se convierte en `XS`) y `test_base_member_has_null_variant_label`.
 - [ ] 3.8 `test_members_ordered_by_canonical_rank_not_alphabetically` y `test_two_axis_family_labels_stay_unique`.
 - [ ] 3.9 `test_suggestion_is_deterministic_for_same_catalog_and_config` y `test_suggestion_calls_no_provider`.
@@ -72,12 +73,13 @@
 
 ## 8. Ejecución del lote y reconciliación
 
-- [ ] 8.1 Ejecutar `family-suggestions` sobre el corpus y revisar las propuestas y los grupos rechazados antes de aplicar.
-- [ ] 8.2 Ejecutar `apply` con el lote completo. Verificación: ~155 familias y ~450 miembros creados, todos con `Origin = AiApproved`.
-- [ ] 8.3 Ejecutar `POST /v1/index/sync` **sin `full`**. Verificación: los emitidos son **exactamente** los productos estampados, y `family_id` deja de ser nulo sólo en ésos.
+- [ ] 8.1 Ejecutar `family-suggestions` sobre el corpus y revisar propuestas, grupos rechazados y productos excluidos antes de aplicar.
+- [ ] 8.2 Ejecutar `apply` con el lote completo. Verificación: **156 familias y 486 miembros** creados, todos con `Origin = AiApproved`.
+- [ ] 8.2b **Sacar del índice las 32 entradas que no son joyería terminada**, poniendo `ReviewStatus = Rejected` en su `ProductAiProfile`. **Nunca `IsActive = false`**: la tienda las vende —`Encargos` es una línea de caja de 10 €— y desactivarlas rompería el TPV para arreglar la búsqueda. La lista, validada el 2026-08-31: los 6 con tipo forzado (`Arreglos oro`, `Encargos Oro`, `Encargos plata`, `Presión Oro`, `Presión plata`, `Presión plata (x2)`) más los 26 nulos reales que son servicios, experiencias, velas y regalo, envío y merchandising `Neus`. **Se quedan dentro** `Llavero Cala Galdana` (28 €) y `Llavero Cape Nao pequeño` (85 €): son pieza artesanal propia, no reventa.
+- [ ] 8.3 Ejecutar **un solo** `POST /v1/index/sync` **sin `full`** que reconcilie a la vez las altas de familia y las bajas de 8.2b — el corpus se mueve una vez, y eso incluye las bajas. Verificación: los emitidos son **exactamente** los productos estampados más los 32 tombstones, y `family_id` deja de ser nulo sólo en los miembros.
 - [ ] 8.4 Comprobar que `doc_text` de esos documentos incluye `Familia:` y `Variante:`, que su `source_hash` cambió y que el embedding se recalculó.
 - [ ] 8.5 Comprobar que `source-text/v1` y `embedding_version` **no** han cambiado — es lo que obliga al orden, y conviene verificarlo en vez de suponerlo.
-- [ ] 8.6 Escribir [`Documentos/Proyecto Final AIEng/informes/c18a-family-suggestion-report.md`](../../../Documentos/Proyecto%20Final%20AIEng/informes/) con recuentos, cola de revisión, tasa de nulos de `piece_type` y los parámetros del veto usados (D14).
+- [ ] 8.6 Escribir [`Documentos/Proyecto Final AIEng/informes/c18a-family-suggestion-report.md`](../../../Documentos/Proyecto%20Final%20AIEng/informes/) con recuentos, cola de revisión, tasa de nulos de `piece_type` y los parámetros del veto usados (D14). Debe recoger además los cuatro hallazgos de calidad de catálogo: **(a)** las 32 entradas retiradas del índice y por qué; **(b)** que C09 **forzó** un tipo de pieza a seis servicios (`Arreglos oro`→collar, `Encargos`→collar, `Presión`→anillo) porque su vocabulario cerrado no admite «no es una pieza»; **(c)** que **9 joyas sintéticas legítimas** de 160 a 1.300 € —5 diademas, 2 gemelos, 1 cinturón, 1 «Joya del Zodiaco»— tienen `piece_type` nulo porque `piece_type.terms` sólo nombra ocho tipos y no incluye los suyos, incoherencia entre lo que C06b generó y lo que C09 puede expresar; **(d)** que `Cadena Barbara oro 40/42/45 cm` es una familia real que el agrupador **no ve**, porque su eje de variante son centímetros y el vocabulario de talla no tiene escala métrica.
 
 ## 9. Documentación y cierre
 
@@ -85,6 +87,7 @@
 - [ ] 9.2 **Reestructurar el plan de changes** al orden **C18a → C19 → C18b**: tabla maestra (§2), grafo de dependencias (§4) —hoy no dibuja C18→C25, C18→C26, C18→C30 ni C18→C36—, calendario (§5) y lista de *nunca se recorta* (§6), donde C30 y C36 son irrecortables mientras C18 no lo es. Renombrar la ficha y anunciar C18b como `add-family-review-ui-and-orphan-alert`.
 - [ ] 9.3 Añadir al §0 del plan la **revisión fechada con la medición del coseno** que corrige el enunciado del §7.5 del diseño.
 - [ ] 9.4 Dejar planteada en el §0 la decisión sobre el **doble etiquetado del golden set de C24** trabajando en solitario, para resolver antes de abrir C24 (D13).
+- [ ] 9.4b Anotar como **candidatos a change propio** los tres arreglos de raíz que C18a destapa y no resuelve: ampliar `piece_type.terms` con `diadema`, `gemelos` y `cinturon` —lo que obliga a reenriquecer esos 9 productos y **volverá a mover el corpus**, así que necesita su propia decisión de cuándo—; dar a C09 una salida explícita «no es una pieza» en vez de forzar un tipo; y llevar los cierres `Presión` a `ProductComponents` (EP10), que es donde conceptualmente viven.
 - [ ] 9.5 Anotar la **divergencia spec/código de `Product.CollectionId`**: la spec viva `product-family` apela a una cardinalidad 1..N que el código no tiene (`Guid? CollectionId`, FK única y anulable). Los discriminadores reales son el tipo de pieza y el tamaño.
 - [ ] 9.6 Actualizar la documentación afectada según la tabla *Post-Implementation Documentation Update* de `openspec/project.md`.
 - [ ] 9.7 Comparar la suite contra la línea base de 1.3 **por nombres de test**, no por recuento, y dejar constancia en `qa.md`.
