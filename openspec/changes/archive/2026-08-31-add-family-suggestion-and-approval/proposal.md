@@ -6,7 +6,7 @@ Se hace ahora, y no más tarde, por una razón de orden que no es de convenienci
 
 ## What Changes
 
-- **Motor de agrupación determinista** en `ai-service/src/jbg_ai/families/`, sin LLM y sin red: normalización de raíz, agrupación por raíz tras retirar el sufijo de talla, **fusión** de grupos que difieren en un token de material, puerta de `piece_type`, guarda de raíz degenerada, y **veto relativo por embedding** —nunca por umbral absoluto— que marca para revisión en lugar de eliminar.
+- **Motor de agrupación determinista** en `ai-service/src/jbg_ai/families/`, sin LLM y sin red: normalización de raíz, agrupación por raíz tras retirar el token de talla —esté donde esté en el nombre—, **fusión** de grupos que difieren en un material, puerta de `piece_type`, guarda de raíz degenerada, y **veto relativo por embedding** —nunca por umbral absoluto— que marca para revisión en lugar de eliminar.
 - **BREAKING** — **`POST /v1/families/suggest`**: novena ruta de la superficie `/v1`, hasta ahora congelada en ocho. `ai-service/openapi.json` regenerado con la orden canónica del README, y `test_snapshot_covers_the_frozen_surface` actualizado con la ruta nueva. **Hecho el 2026-08-31**: el test de deriva se comprobó en rojo *antes* de regenerar, que es la señal de que la frontera se movió de verdad, y en verde después. Es una ruta **de catálogo**, no de punto de venta: usa `get_catalog_principal` y responde `TracedResponse` sin `effective_pos_id`, como las rutas de índice de C13.
 - **`IAiGatewayClient.SuggestFamiliesAsync`**: cuarta operación del cliente .NET, junto a `SearchAsync`, `EnrichAsync` y `HealthAsync`.
 - **`POST /api/ai/catalog/family-suggestions`** y **`/apply`** en `AiCatalogController`, sólo administradores: el primero devuelve propuestas **sin escribir nada**, el segundo persiste el subconjunto que el llamante acepta. **Sin persistencia de propuestas**: no hay tabla nueva ni estado intermedio.
@@ -28,7 +28,7 @@ Se hace ahora, y no más tarde, por una razón de orden que no es de convenienci
 
 ## Impact
 
-- **`ai-service/`** — paquete nuevo `src/jbg_ai/families/`, router `api/routers/families.py`, esquemas `api/schemas/families.py`, entrada en `stubs/`, dos ajustes de `pydantic-settings` (parámetros del veto), snapshot `openapi.json`, árbol de tests `tests/families/`.
+- **`ai-service/`** — paquete nuevo `src/jbg_ai/families/`, router `api/routers/families.py`, esquemas `api/schemas/families.py`, entrada en `stubs/`, un ajuste de `pydantic-settings` (el margen del veto), snapshot `openapi.json`, árbol de tests `tests/families/`.
 - **`backend/`** — `Application`: operación e interfaces del gateway, DTOs y validadores; `Infrastructure`: implementación en `AiGatewayClient`; `API`: dos acciones en `AiCatalogController`; `Tests`: unitarios de servicio e integración de los dos endpoints.
 - **Datos** — se crean ~155 `ProductFamily` y ~450 `ProductFamilyMember`. **Ninguna columna nueva.** El estampado de `Product.UpdatedAt` que hace `ProductFamilyService` es lo que permite al feed incremental ver el cambio; escribir por SQL lo rompería en silencio.
 - **Corpus** — ~358 documentos cambian `doc_text`, `source_hash`, `tsv` y embedding. `source-text/v1` y `embedding_version` **no** cambian, y esa es precisamente la razón por la que este change debe preceder a C20, C21 y C24.

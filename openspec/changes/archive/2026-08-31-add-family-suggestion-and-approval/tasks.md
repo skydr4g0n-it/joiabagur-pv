@@ -13,7 +13,7 @@
 - [x] 2.1 Crear el paquete `ai-service/src/jbg_ai/families/` y su espejo `ai-service/tests/families/`, siguiendo la convención de `ai-service/tests/README.md`.
 - [x] 2.2 **Reutilizar** los vocabularios cerrados de `jbg_ai/enrichment/vocabularies.yaml` (C09) para materiales, talla y tipo de pieza. **No se declara ninguna lista nueva**: Python es el original y `frontend/src/lib/materials-vocabulary.ts` es el espejo, como su propia cabecera dice. D12 revisada el 2026-08-31.
 - [x] 2.3 Declarar **únicamente el rango canónico de tallas**, que es lo que el vocabulario no puede tener: su lista está agrupada por escala, no ordenada por magnitud. Un token de talla que el rango no nombre ordena al final, nunca lanza.
-- [x] 2.4 Implementar la **normalización de raíz** sobre `enrichment.vocab.fold` —que ya hace casefold, `NFD` sin diacríticos, puntuación a espacio y espacios colapsados— añadiendo sólo la retirada del sufijo de talla.
+- [x] 2.4 Implementar la **normalización de raíz** sobre `enrichment.vocab.fold` —que ya hace casefold, `NFD` sin diacríticos, puntuación a espacio y espacios colapsados— añadiendo sólo la retirada del token de talla. **En cualquier posición, no sólo al final**: `Anillo lapislázuli mediano oro` esconde la talla detrás de un material y `Anillo mini conchiglie` nunca llegaría a `Anillo conchiglie`. Los términos de varias palabras (`extra mini`, `baño de oro`) se emparejan enteros y con preferencia sobre cualquier palabra suelta que contengan.
 - [x] 2.5 Implementar la **agrupación por raíz** con la puerta de `piece_type`, tratando el nulo como valor propio que no agrupa con nadie.
 - [x] 2.6 Implementar la **fusión por material** entre grupos cuyas raíces difieran en exactamente un token, **sin** retirar material de la raíz.
 - [x] 2.7 Implementar la **guarda de raíz degenerada** (raíz igual al tipo de pieza pelado, o de menos de dos tokens) y devolver los grupos rechazados **con su motivo**, no descartarlos en silencio.
@@ -58,15 +58,15 @@
 - [x] 6.4 Validadores FluentValidation del cuerpo de `apply`, invocados **explícitamente** en la acción: este proyecto registra validadores sin pipeline automático.
 - [x] 6.5 `POST /api/ai/catalog/family-suggestions` en `AiCatalogController` — sólo administradores, **sin escribir nada**.
 - [x] 6.6 `POST /api/ai/catalog/family-suggestions/apply` — persiste el subconjunto recibido **a través de `ProductFamilyService`**, con `Origin = AiApproved`, aprobador e instante.
-- [x] 6.7 Propagación del conflicto por producto (409 con el detalle de qué familia retiene cada uno) sin dejar familias a medias.
+- [x] 6.7 Propagación del conflicto **por familia**, con el detalle de qué familia retiene cada producto en disputa y sin dejar ninguna a medias. **200 y no 409**: el lote es de ~156 familias y un producto en disputa no puede costarle al administrador las otras 155. La familia contestada se salta entera y se nombra en la respuesta; el 409 sigue siendo la respuesta de los endpoints manuales de C07, que crean una familia y sólo una.
 
 ## 7. Tests .NET
 
-- [x] 7.1 `SuggestFamilies_ReturnsProposals_WithoutWritingAnything` — ni familia, ni miembro, ni `Product.UpdatedAt`.
+- [x] 7.1 `SuggestFamilies_ReturnsProposals_WithoutWritingAnything` — ni familia, ni miembro, ni `Product.UpdatedAt`. Exige **sustituir el gateway por un doble** que devuelva propuestas sobre los productos del fixture: contra el gateway real la llamada acaba en 503 y las afirmaciones no prueban nada, porque una petición que no devolvió propuesta tampoco pudo persistirla.
 - [x] 7.2 `ApplyFamilySuggestions_RecordsAiApprovedOriginWithApprover` y `CreateFamily_StillRecordsManualOrigin`.
 - [x] 7.3 `ApplyFamilySuggestions_MakesMembersVisibleToAnIncrementalPull` — se afirma **sobre el feed**, no sobre `Product.UpdatedAt`. Crear una familia mueve el watermark por `Family.UpdatedAt`, así que el timestamp del producto era el detalle de implementación y el feed es el requisito. El primer intento afirmaba el timestamp y falló, con razón.
 - [x] 7.4 `ApplyFamilySuggestions_ReportsConflict_WithoutPartialFamily`.
-- [x] 7.5 `ApplyFamilySuggestions_IsIdempotent_ForIdenticalMemberList` — no reescribe filas ni toca `UpdatedAt`.
+- [x] 7.5 `ApplyFamilySuggestions_AppliedTwice_WritesNothingTheSecondTime` — no reescribe filas ni toca `UpdatedAt`. **No es el cortocircuito de lista idéntica de C07**, que era el nombre con el que salió esta tarea: la segunda aprobación toma el camino del conflicto, porque los productos ya pertenecen a la familia que creó la primera. No se escribe nada igualmente, y reportarlo es mejor que absorberlo — aprobar dos veces el mismo lote es un error que conviene ver.
 - [x] 7.6 `SuggestFamilies_ReturnsForbidden_ForOperator` y `SuggestFamilies_ReturnsUnauthorized_ForAnonymous`. **Pedir un cliente nuevo a la factoría**: el `HttpClient` compartido conserva las cookies de cada login y no es anónimo.
 - [x] 7.7 `SuggestFamilies_ReturnsServiceUnavailable_WhenGatewayNotImplemented` y el equivalente para indisponibilidad.
 - [x] 7.8 Al fijar datos con los *object mothers*, anclar `PointOfSale.Phone` explícitamente: Bogus genera teléfonos que no caben en `varchar(20)`.

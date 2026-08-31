@@ -1,13 +1,15 @@
 # ai-service-api-contracts Specification
 
 ## Purpose
-Frozen `/v1` endpoint surface of `jbg-ai`: explicit Pydantic request/response models for retrieval, sale assistance, inventory, enrichment and index sync with a keyset cursor, deterministic stub responses with no external I/O, 501 for unimplemented routes when stubs are off, a development-only evaluations route, and a versioned OpenAPI snapshot that detects contract drift.
+Frozen `/v1` endpoint surface of `jbg-ai`: explicit Pydantic request/response models for retrieval, sale assistance, inventory, enrichment, assisted family grouping and index sync with a keyset cursor, deterministic stub responses with no external I/O, 501 for unimplemented routes when stubs are off, a development-only evaluations route, and a versioned OpenAPI snapshot that detects contract drift.
 ## Requirements
 ### Requirement: Frozen `/v1` endpoint surface
-The `jbg-ai` service SHALL expose the following internal endpoints under `/v1`, each backed by explicit Pydantic request and response models: `POST /v1/retrieval/products`, `POST /v1/retrieval/substitutes`, `POST /v1/assist/sale`, `POST /v1/inventory/propose`, `POST /v1/enrich/products`, `POST /v1/index/sync`, `GET /v1/index/status`, and `GET /v1/evals/runs` (development profile only). Every `/v1` endpoint MUST require a valid internal service token. `GET /health` MUST remain public and its contract MUST NOT change with respect to C01. Response bodies MUST validate against the declared response model; the service MUST NOT return undeclared shapes.
+The `jbg-ai` service SHALL expose the following internal endpoints under `/v1`, each backed by explicit Pydantic request and response models: `POST /v1/retrieval/products`, `POST /v1/retrieval/substitutes`, `POST /v1/assist/sale`, `POST /v1/inventory/propose`, `POST /v1/enrich/products`, `POST /v1/families/suggest`, `POST /v1/index/sync`, `GET /v1/index/status`, and `GET /v1/evals/runs` (development profile only). Every `/v1` endpoint MUST require a valid internal service token. `GET /health` MUST remain public and its contract MUST NOT change with respect to C01. Response bodies MUST validate against the declared response model; the service MUST NOT return undeclared shapes.
+
+`POST /v1/families/suggest` is the ninth route and the first addition to this surface since it was frozen. Adding it moves the boundary with the .NET client deliberately: the committed `ai-service/openapi.json` MUST be regenerated in the same change that adds the route, and `test_openapi_snapshot_is_stable` MUST pass against that regenerated snapshot. A route added without regenerating the snapshot MUST fail the build.
 
 #### Scenario: Every frozen route answers with its declared model
-- **WHEN** an authenticated client calls any of the eight `/v1` endpoints with a valid request body in stub mode
+- **WHEN** an authenticated client calls any of the nine `/v1` endpoints with a valid request body in stub mode
 - **THEN** the response status is 200
 - **AND** the body validates against that endpoint's declared response model
 
@@ -15,6 +17,16 @@ The `jbg-ai` service SHALL expose the following internal endpoints under `/v1`, 
 - **WHEN** a client calls `GET /health` without a token
 - **THEN** the response is HTTP 200 with an OK status indicator and the configured service version
 - **AND** the shape is the same one C01 published
+
+#### Scenario: The family suggestion route requires the service token
+- **WHEN** an unauthenticated client calls `POST /v1/families/suggest`
+- **THEN** the request is rejected before any work is done
+- **AND** no proposal is computed
+
+#### Scenario: The regenerated snapshot matches the live schema
+- **WHEN** `test_openapi_snapshot_is_stable` runs against the working tree of the change that added the route
+- **THEN** the live OpenAPI schema equals the committed `ai-service/openapi.json`
+- **AND** that snapshot contains the nine `/v1` paths
 
 ### Requirement: Retrieval contract carries materials, family and variant
 Retrieval request models MUST accept `query`, `top_k`, `filters` (including `materials` as a list of strings) and `mode`, plus an optional `pos_id` that is accepted for client compatibility and ignored. Each retrieval result MUST expose `product_id`, `sku`, `score`, `match_reasons`, `materials` as a list, `family_id`, `variant_label`, and an optional `debug` object. `family_id` and `variant_label` MUST be nullable and MUST be null when unknown rather than omitted or defaulted to a placeholder value. The retrieval response MUST expose `results`, `candidates_returned`, `low_confidence` and `trace_id`. `POST /v1/retrieval/substitutes` MUST return the same result shape plus `similarity_signals`.
@@ -98,6 +110,33 @@ Provenance is not decoration: the consuming capability routes a sensitive field 
 - **THEN** the response returns upsert counters and keyset fields `since` / `since_id` and `cursor` / `cursor_id`
 - **WHEN** the same client calls `GET /v1/index/status`
 - **THEN** the response returns `drift_count` and `last_full_sync_at`
+
+### Requirement: Family suggestion contract carries members, labels and review flags
+`POST /v1/families/suggest` SHALL accept an optional scoping body — a piece type and a maximum number of proposals — and MUST return, for each proposal, the normalized root, the piece type, and the ordered members. Each member MUST carry the product identifier, its SKU, its name, its variant label as a nullable value, and its position. A member the relative embedding veto flagged MUST be marked as such together with its distance, and MUST still be present in the proposal.
+
+The response MUST carry **three** lists, not one: the proposals, the groups a guard rejected together with the reason, and the products the piece-type gate excluded with theirs. A caller must be able to surface both kinds of omission as catalogue quality incidences without inferring them from an absence. Products skipped for already belonging to a family MUST be reported as a count rather than enumerated.
+
+Under stub mode the route MUST return a deterministic fixture that validates against the declared response model, without touching the database.
+
+#### Scenario: A proposal carries its members in order with their labels
+- **WHEN** an authenticated client requests suggestions and a family is proposed
+- **THEN** the proposal reports the root, the piece type and the ordered members
+- **AND** each member carries its product identifier, SKU, name, position and nullable variant label
+
+#### Scenario: A flagged member is reported and retained
+- **WHEN** a proposal contains a member the relative veto flagged
+- **THEN** that member is present in the members list
+- **AND** it is marked for review with its distance
+
+#### Scenario: Rejected groups are reported explicitly
+- **WHEN** a candidate group is rejected by the degenerate-root guard
+- **THEN** the response lists it with the reason for the rejection
+- **AND** it does not appear among the proposals
+
+#### Scenario: Stub mode answers without a database
+- **WHEN** the route is called with stub mode enabled
+- **THEN** the response is a deterministic fixture that validates against the declared model
+- **AND** no database connection is opened
 
 ### Requirement: Index sync contract carries a keyset cursor
 `POST /v1/index/sync` MUST accept `since` (datetime or null), `since_id` (uuid or null), `full` (boolean, default false) and `batch_size` (integer 1–1000, default 100). `since_id` is the second component of the catalog feed keyset; it MUST NOT be required when `since` is null. The response MUST include `upserted`, `skipped`, `deleted`, `failed`, the starting keyset `since` / `since_id`, and the ending keyset `cursor` / `cursor_id`. `skipped` MUST mean embeddings omitted, not rows ignored. `batch_size` MUST remain in the schema for compatibility and MUST NOT select the feed page size. After this change the committed `ai-service/openapi.json` MUST include these fields and `test_openapi_snapshot_is_stable` MUST pass against that regenerated snapshot. Stub-mode responses MUST populate `since_id` and `cursor_id` (null or a deterministic fixture) so the body still validates.

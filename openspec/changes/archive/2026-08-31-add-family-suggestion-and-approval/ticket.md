@@ -70,9 +70,11 @@ Determinista, sin LLM y sin llamadas de red. Cuatro etapas y tres guardas:
 | Etapa | Qué hace |
 |---|---|
 | **1. Normalización de raíz** | *casefold*, `NFD` sin diacríticos, puntuación y paréntesis a espacio, espacios colapsados |
-| **2. Agrupación L2** | agrupa por raíz tras retirar el **sufijo de talla**: latino (`XS`, `S`, `M`, `L`, `XL`, insensible a caja — el catálogo real contiene `Xs`) y en palabra (`mini`, `pequeño/a`, `mediano/a`, `grande`) |
-| **3. Fusión por material** | fusiona dos grupos cuyas raíces difieran en **exactamente un token de material** (`plata`, `oro`, `latón`, `bronce`, `acero`) |
-| **4. Veto relativo** | dentro de cada candidato, el miembro cuyo coseno al centroide caiga por debajo de `mediana − k·MAD` **del propio grupo** se **marca para revisión**, nunca se elimina. **`k = 2` sobre los 5 vecinos más próximos**, ambos leídos de `pydantic-settings` y no incrustados en el código |
+| **2. Agrupación L2** | agrupa por raíz tras retirar el **token de talla, esté donde esté en el nombre**: latino (`XS`, `S`, `M`, `L`, `XL`, insensible a caja — el catálogo real contiene `Xs`) y en palabra (`mini`, `pequeño/a`, `mediano/a`, `grande`). Un término de varias palabras (`extra mini`) se empareja entero |
+| **3. Fusión por material** | fusiona dos grupos cuyas raíces difieran en **exactamente un material** (`plata`, `oro`, `latón`, `bronce`, `acero`), contando `baño de oro` como uno solo |
+| **4. Veto relativo** | se marca —nunca se elimina— al miembro que tiene un producto de **otra familia propuesta** más cerca que su propio **peor hermano**, por más de un **margen** leído de `pydantic-settings` y no incrustado en el código |
+
+> **Revisada el 2026-08-31, al implementar.** La etapa 4 salió del ticket como `mediana − k·MAD` contra el centroide del propio grupo, con `k = 2` sobre los 5 vecinos más próximos. Esa es una prueba **dentro** del grupo, mientras que la medición que la justificaba era **entre** grupos: marcaba al miembro menos típico de cada clúster —que todo clúster tiene por definición— y disparaba al 16,9 %. La sustituye la prueba comparativa de arriba, que es la que se midió, y con ella desaparecen la `k` y el número de vecinos: queda **un** parámetro, el margen, calibrado en 0,05 → 15 miembros de 486 en 5 familias. El detalle está en la decisión 4 del [`design.md`](./design.md).
 
 **Guardas** (las tres bloquean la propuesta, no la corrigen):
 
@@ -223,3 +225,4 @@ No existe credencial de escritura Python→.NET, y crearla significaría un admi
 |---|---|---|
 | 2026-08-31 | Sergio Valdueza | Creación del ticket a partir de la sesión de exploración del 2026-08-30/31, con las decisiones D1–D8 acordadas y la medición sobre los 1.200 vectores reales |
 | 2026-08-31 | Sergio Valdueza | Cerradas las seis preguntas abiertas aplicando su opción por defecto (D9–D14 en la HU): `piece_type` nulo como valor propio de la puerta, `k = 2` sobre 5 vecinos en configuración, `Alianzas` a la cola de revisión, vocabulario de materiales propio con test de fijación, doble etiquetado de C24 remitido a la reestructuración del plan, e informe del lote versionado. Propagadas a las especificaciones técnicas, al DoD y a los riesgos |
+| 2026-08-31 | Sergio Valdueza | **Dos de esas seis se revisaron al implementarlas, y la fila de arriba queda como lo que se decidió, no como lo que se entregó.** **D10**: el veto pasa de `mediana − k·MAD` dentro del grupo a la comparación entre grupos, y sus dos parámetros quedan en uno, el margen. **D12**: los vocabularios se **reutilizan** de `enrichment/vocabularies.yaml` en vez de declararse aquí, que era la duplicación que la decisión quería evitar. Ambas revisadas en la etapa 4 de este ticket y en las decisiones 4, 10 y *Open Questions* del `design.md` |

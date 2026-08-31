@@ -2,7 +2,11 @@
 
 ### Requirement: Suggestion groups by normalized name root within one piece type
 
-The system SHALL propose product families by grouping products whose **normalized name root** coincides, where normalization case-folds, strips diacritics, reduces punctuation and parentheses to whitespace, collapses runs of whitespace, and removes a trailing size token. The size vocabulary MUST cover the Latin scale (`XS`, `S`, `M`, `L`, `XL`, matched case-insensitively because the real catalogue contains `Xs`) and the Spanish word scale (`mini`, `pequeño/a`, `mediano/a`, `grande`).
+The system SHALL propose product families by grouping products whose **normalized name root** coincides, where normalization case-folds, strips diacritics, reduces punctuation and parentheses to whitespace, collapses runs of whitespace, and removes one size token.
+
+The size token MUST be removed from **any position in the name, not only the last**. Restricting removal to the suffix satisfies the synthetic corpus, built entirely of `<name> <SIZE>`, and fails the real one: `Anillo lapislázuli mediano oro` carries its size behind a material, and `Anillo mini conchiglie` would never reach `Anillo conchiglie`. Removing from any position is safe because of an asymmetry — when a size word is genuinely part of a model's name, every member carries it and every root is shortened alike, so the grouping is unchanged; it only alters the outcome where some members carry it and others do not, which is exactly the case where the size *is* the variant axis.
+
+The size vocabulary MUST cover the Latin scale (`XS`, `S`, `M`, `L`, `XL`, matched case-insensitively because the real catalogue contains `Xs`) and the Spanish word scale (`mini`, `pequeño/a`, `mediano/a`, `grande`). A vocabulary entry spanning more than one word MUST be matched whole and in preference to any single word inside it, so that `extra mini` is one size rather than a stray `extra` left in the root beside a size of `mini`.
 
 Grouping MUST NOT cross piece types. A product whose `piece_type` is null MUST NOT group with any other product: the null is a value of the gate, not a wildcard.
 
@@ -29,6 +33,19 @@ Grouping MUST NOT cross piece types. A product whose `piece_type` is null MUST N
 - **THEN** it is not proposed as a member of any family
 - **AND** the remaining products may still form a family among themselves
 
+#### Scenario: A size hidden inside the name is still removed
+
+- **WHEN** the catalogue contains `Anillo mini conchiglie` and `Anillo conchiglie`
+- **THEN** the two are proposed as members of one family
+- **AND** the size is removed from the middle of the name, not only from its end
+
+#### Scenario: A multi-word size is removed whole
+
+- **WHEN** the catalogue contains `Anillo conchiglie extra mini` and `Anillo conchiglie mini`
+- **THEN** the two are proposed as members of one family
+- **AND** the first is labelled `extra mini`
+- **AND** no fragment of that size is left behind in the root
+
 ### Requirement: The piece-type gate names what it excludes
 
 The system SHALL report, alongside the proposals, every product the piece-type gate removed from consideration, naming the product and the reason. A product without a piece type disappears from the review queue as well as from families, and no other output would ever mention it: an exclusion nobody can see is indistinguishable from a product that simply had no siblings.
@@ -49,7 +66,7 @@ Products skipped because they already belong to a family MUST be reported as a c
 
 ### Requirement: Material distinguishes variants by fusing groups, never by stripping roots
 
-The system SHALL treat a material token as a variant axis by **merging two already-formed groups whose roots differ in exactly one material token**, and MUST NOT remove material tokens from the root before grouping. Removing them globally collapses legitimate roots: `Anillo plata S/M/L/XL` would reduce to the bare piece type and absorb unrelated products.
+The system SHALL treat a material as a variant axis by **merging two already-formed groups whose roots differ in exactly one material**, and MUST NOT remove material tokens from the root before grouping. Removing them globally collapses legitimate roots: `Anillo plata S/M/L/XL` would reduce to the bare piece type and absorb unrelated products. A material named by more than one word counts as **one** material, matched whole and in preference to any single word inside it, so that `baño de oro` is not read as plain `oro` with a residue of `baño de` left in the root to keep the two groups apart.
 
 A merge MUST be rejected when the resulting root equals the bare piece type or falls below two tokens. A rejected merge MUST be reported as a review item rather than silently dropped, because the same guard surfaces catalogue entries that are not products at all.
 
@@ -114,17 +131,25 @@ A flagged member MUST remain in the proposal, marked for review together with th
 
 ### Requirement: Variant labels are stored verbatim and member order follows a canonical size rank
 
-The system SHALL derive each member's variant label from the **fragment removed during normalization**, normalized but otherwise verbatim. A label MUST NOT be translated onto another scale: `mini` is the word the workshop uses and MUST NOT be recorded as `XS`. A member of a family that carries no distinguishing token — the base piece — MUST be proposed with no variant label, which is a legitimate state and not a defect.
+The system SHALL derive each member's **size** label from the fragment removed during normalization, normalized but otherwise verbatim, down to its accent and its capitalisation. A size label MUST NOT be translated onto another scale: `mini` is the word the workshop uses and MUST NOT be recorded as `XS`. A member of a family that carries no distinguishing token — the base piece — MUST be proposed with no variant label, which is a legitimate state and not a defect.
+
+The **material** half of a label MUST instead be recorded as the material's canonical term. The two halves differ because the risk differs: `mini` and `XS` are two sizes, so keeping both as written records what the shop said, whereas `Oro` and `18k` are one material spelled twice, and keeping both as written would give two members different labels for the same thing — a pair that walks past the uniqueness guard, which compares labels rather than meanings, and reaches the shop as a family whose two variants are indistinguishable in the case.
 
 Member order MUST be derived from an **internal canonical size rank** rather than from alphabetical order, so that `XL` does not precede `S`. That rank MUST NOT be persisted as a label.
 
-Where a family varies along two axes at once, the label MUST be the composite of the removed fragments, which still satisfies the uniqueness of variant label within a family.
+Where a family varies along two axes at once, the label MUST be the composite of both, which still satisfies the uniqueness of variant label within a family.
 
 #### Scenario: A word-scale label is preserved as written
 
 - **WHEN** a family groups `Colgante hoja roble pequeña`, `mediana` and `grande`
 - **THEN** the persisted variant labels are `pequeña`, `mediana` and `grande`
 - **AND** none of them is recorded as `S`, `M` or `L`
+
+#### Scenario: One material spelled two ways does not become two variants
+
+- **WHEN** a candidate group differs only in two spellings of a single material, as with `Oro` and `18k`
+- **THEN** both members resolve to the same material term and therefore to the same label
+- **AND** the group is reported as a review item rather than proposed as a family
 
 #### Scenario: Members are ordered by size rank, not alphabetically
 

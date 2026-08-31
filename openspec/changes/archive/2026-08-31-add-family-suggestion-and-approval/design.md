@@ -150,16 +150,18 @@ La guarda de raíz degenerada encontró que **el catálogo contiene cosas que no
 
 **Lo que esta decisión NO resuelve**, y queda anotado como change propio: **9 joyas sintéticas legítimas** de 160 a 1.300 € —5 diademas, 2 gemelos, un cinturón— tienen `piece_type` nulo porque `piece_type.terms` sólo nombra ocho tipos y no incluye los suyos. Ahí el nulo **no** significa «no es una pieza» sino «mi vocabulario no la sabe nombrar», y el arreglo es el contrario: ampliar el vocabulario y reenriquecer. Eso mueve el corpus una tercera vez, así que necesita su propia decisión de cuándo, y no se toma aquí.
 
-### 10 · Los parámetros del veto viven en configuración
+### 10 · El parámetro del veto vive en configuración
 
-`k = 2` sobre los 5 vecinos más próximos, leídos de `pydantic-settings`. El valor sale de una muestra pequeña —los 6 solapamientos medidos— y C24 lo revisará con datos. Un umbral incrustado en el código no se puede barrer.
+**Un solo ajuste**, `JPV_FAMILY_VETO_MARGIN`, leído de `pydantic-settings` y calibrado en **0,05**. Es la distancia por la que el mejor extraño tiene que ganarle al peor hermano para que el miembro se marque: por debajo, un empate es ruido. Medido sobre el corpus, 0,05 → 15 miembros de 486 en 5 familias; 0,02 → 33 en 18; 0,08 → 9 en 2. C24 lo revisará con el golden set, y un umbral incrustado en el código no se puede barrer.
+
+> **Revisada el 2026-08-31, al implementar.** Esta decisión decía «`k = 2` sobre los 5 vecinos más próximos», que eran los parámetros de la prueba `mediana − k·MAD` **dentro** del grupo. Esa prueba se sustituyó por la comparación **entre** grupos de la decisión 4 —el motivo está allí— y con ella desaparecieron tanto la `k` como el número de vecinos: la prueba comparativa no elige vecinos, los mira todos. Queda un parámetro donde se anunciaban dos, y es el margen.
 
 ## Risks / Trade-offs
 
 - **Escribir por SQL directo rompería el índice en silencio** → Decisión 1: se escribe siempre por `ProductFamilyService`, y el escenario de aceptación lo verifica con sincronización **incremental**, que es la que falla si el estampado falta.
 - **El corpus se mueve y `embedding_version` no lo distingue** → Se mueve **una sola vez** (decisión 7) y este change precede a C20, C21 y C24. Queda anotado en el informe del lote y en la reestructuración del plan.
 - **Sobre-agrupamiento por la fusión de material** → Guarda de raíz degenerada, puerta de `piece_type` y veto relativo. Las excepciones van a la cola de revisión, no a una regla; ninguna se resuelve con una excepción codificada por nombre.
-- **El veto puede quedar mal calibrado** (`k = 2` sale de 6 casos) → Decisión 9: vive en configuración y se barre con C24 sin tocar código.
+- **El veto puede quedar mal calibrado** (el margen 0,05 sale de una muestra corta) → Decisión 10: vive en configuración y se barre con C24 sin tocar código.
 - **La cola de revisión no tiene pantalla hasta C18b** → Aceptado. En C18a la aprobación es por lotes y las ~11 excepciones se listan en el informe versionado.
 - **`piece_type` sin medir** (el contenedor de Postgres se detuvo durante la exploración) → El nulo se trata como valor propio de la puerta: no agrupa con nadie, que es el lado seguro. La medición del apply confirma y dimensiona, no decide.
 - **Mover el contrato congelado** rompe `test_openapi_snapshot_is_stable` → Deliberado y regenerado en el mismo change. Trabajando en solitario, el acuerdo con «quien posee el cliente .NET» que pide `CLAUDE.md` es una nota, no un bloqueo.
@@ -178,7 +180,7 @@ La guarda de raíz degenerada encontró que **el catálogo contiene cosas que no
 
 ## Open Questions
 
-**Ninguna bloqueante.** Las seis que el ticket abrió el 2026-08-31 se cerraron el mismo día aplicando su opción por defecto, y quedan registradas con su motivo en [`ticket.md`](./ticket.md) § *Decisiones cerradas* y en la HU como D9–D14: `piece_type` nulo como valor propio de la puerta, `k = 2` sobre 5 vecinos en configuración, `Alianzas Plata/oro` a la cola de revisión, vocabularios **reutilizados** de `enrichment/vocabularies.yaml`, doble etiquetado del golden set de C24 remitido a la reestructuración del plan, e informe del lote versionado.
+**Ninguna bloqueante.** Las seis que el ticket abrió el 2026-08-31 se cerraron el mismo día aplicando su opción por defecto, y quedan registradas con su motivo en [`ticket.md`](./ticket.md) § *Decisiones cerradas* y en la HU como D9–D14: `piece_type` nulo como valor propio de la puerta, los parámetros del veto en configuración —que al implementar quedaron en **uno**, el margen; ver la revisión de la decisión 10—, `Alianzas Plata/oro` a la cola de revisión, vocabularios **reutilizados** de `enrichment/vocabularies.yaml`, doble etiquetado del golden set de C24 remitido a la reestructuración del plan, e informe del lote versionado.
 
 > **D12, revisada el 2026-08-31 al implementar.** La decisión original decía «declarar el vocabulario de materiales en Python y aceptar la duplicación como deuda». Es al revés: [`enrichment/vocabularies.yaml`](../../../ai-service/src/jbg_ai/enrichment/vocabularies.yaml) (C09) ya declara materiales, tipo de pieza y `size_label` **con las dos escalas** y sus sinónimos, y `enrichment.vocab.fold` ya hace la normalización que la decisión 5 describe. El fichero del frontend es el espejo de ése, no su origen. Declarar una lista dentro de `families/` habría creado la duplicación que D12 quería evitar, un borde más adentro. **Lo único nuevo es el rango canónico de tallas** —el vocabulario agrupa por escala, no ordena por magnitud, y el orden es lo que `Position` necesita— y la regla de que `variant_label` guarda la subcadena del nombre y no la forma canónica que `resolve()` devolvería.
 
