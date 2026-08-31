@@ -38,10 +38,10 @@
 
 ## 5. Entidad, migración y endpoints .NET
 
-- [ ] 5.1 `FamilyReviewVerdict` en `JoiabagurPV.Domain/Entities`: par `(ProductId, FamilyId)`, veredicto, `ReviewedByUserId`, `ReviewedAt`, `MarginAtReview` nullable y `Note` (máx. 500).
-- [ ] 5.2 Configuración EF en `Infrastructure/Data`: índice **único** sobre `(ProductId, FamilyId)`, índice de apoyo sobre `FamilyId`, y borrado **en cascada** desde `ProductFamily`.
-- [ ] 5.3 Crear y aplicar la migración. Verificar `Down` sobre base limpia.
-- [ ] 5.4 Test de desfase modelo↔migración con el arnés de C04, más aserciones sobre `information_schema` y `pg_indexes` para el índice único y la cascada.
+- [x] 5.1 `FamilyReviewVerdict` en `JoiabagurPV.Domain/Entities`: par `(ProductId, FamilyId)`, veredicto, `ReviewedByUserId`, `ReviewedAt`, `MarginAtReview` nullable y `Note` (máx. 500).
+- [x] 5.2 Configuración EF en `Infrastructure/Data`: índice **único** sobre `(ProductId, FamilyId)`, índice de apoyo sobre `FamilyId`, y borrado **en cascada** desde `ProductFamily`.
+- [x] 5.3 Crear y aplicar la migración. Verificar `Down` sobre base limpia.
+- [x] 5.4 Test de desfase modelo↔migración con el arnés de C04, más aserciones sobre `information_schema` y `pg_indexes` para el índice único y la cascada.
 - [ ] 5.5 `IAiGatewayClient.AuditFamiliesAsync` y sus DTOs, con `snake_case` en el cable y sin filtrar, reordenar ni truncar las dos listas.
 - [ ] 5.6 `POST /api/ai/catalog/family-audit` en `AiCatalogController`: adjunta los pares ya juzgados leídos de `FamilyReviewVerdict`, y maneja `AiNotImplementedException` → 503 y `AiUnavailableException` como estableció C09.
 - [ ] 5.7 `POST /api/ai/catalog/family-verdicts`: registro en bloque, idempotente por par, con cota de lote espejada como constante y validación FluentValidation.
