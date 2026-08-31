@@ -177,7 +177,24 @@ def build_candidate_groups(
                 )
             )
             continue
-        proposals.append(_build_proposal(root, piece_type, entries, vocabulary))
+        proposal = _build_proposal(root, piece_type, entries, vocabulary)
+        labels = [member.variant_label for member in proposal.members]
+        if len(set(labels)) != len(labels):
+            # Two members the algorithm cannot tell apart on any axis it knows.
+            # Emitting this would produce a proposal the family service refuses on
+            # its uniqueness index — a constraint error instead of something a
+            # person can act on. Two indistinguishable products are a catalogue
+            # question ("are these really two products?"), so they go to review.
+            rejected.append(
+                RejectedGroup(
+                    root=root,
+                    piece_type=piece_type,
+                    reason="duplicate_variant_labels",
+                    product_names=tuple(sorted(e.product.name for e in entries)),
+                )
+            )
+            continue
+        proposals.append(proposal)
 
     return GroupingOutcome(
         proposals=tuple(proposals),

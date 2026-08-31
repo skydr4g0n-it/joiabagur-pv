@@ -25,17 +25,17 @@
 
 ## 3. Tests de la librería
 
-- [ ] 3.1 `test_groups_products_differing_only_in_size_suffix` y `test_inconsistent_capitalisation_does_not_split_family` (el caso real `Anillo erizo de mar` / `Anillo Erizo de mar XL`).
-- [ ] 3.2 `test_does_not_group_across_piece_types` y `test_null_piece_type_groups_with_nobody`.
-- [ ] 3.3 `test_merges_groups_differing_in_one_material_token` y `test_material_in_root_is_not_stripped` (el caso `Anillo plata S/M/L/XL`, que debe seguir siendo familia).
-- [ ] 3.4 `test_degenerate_root_is_rejected_and_reported` (los casos `Encargos` y `Arreglos`).
-- [ ] 3.5 `test_veto_flags_member_without_removing_it` y `test_no_global_threshold_decides_membership`.
-- [ ] 3.6 `test_veto_parameters_come_from_configuration` — falla si `k` o el número de vecinos están incrustados en el código.
-- [ ] 3.6b `test_family_vocabulary_reuses_enrichment_terms` — falla si alguien vuelve a declarar una lista de materiales o de tallas dentro de `families/`, que es la regresión que D12 revisada existe para impedir.
-- [ ] 3.7 `test_variant_label_is_verbatim_not_translated` (`mini` no se convierte en `XS`) y `test_base_member_has_null_variant_label`.
-- [ ] 3.8 `test_members_ordered_by_canonical_rank_not_alphabetically` y `test_two_axis_family_labels_stay_unique`.
-- [ ] 3.9 `test_suggestion_is_deterministic_for_same_catalog_and_config` y `test_suggestion_calls_no_provider`.
-- [ ] 3.10 Tests de **propiedades** sobre los invariantes del agrupador —pertenencia única, orden sin huecos, etiquetas únicas por familia— y no sobre valores concretos.
+- [x] 3.1 `test_groups_products_differing_only_in_size_suffix` y `test_inconsistent_capitalisation_does_not_split_family` (el caso real `Anillo erizo de mar` / `Anillo Erizo de mar XL`).
+- [x] 3.2 `test_does_not_group_across_piece_types` y `test_null_piece_type_groups_with_nobody`.
+- [x] 3.3 `test_merges_groups_differing_in_one_material_token` y `test_material_in_root_is_not_stripped` (el caso `Anillo plata S/M/L/XL`, que debe seguir siendo familia).
+- [x] 3.4 `test_degenerate_root_is_rejected_and_reported` (los casos `Encargos` y `Arreglos`).
+- [x] 3.5 `test_veto_flags_member_without_removing_it` y `test_no_global_threshold_decides_membership`.
+- [x] 3.6 `test_veto_parameters_come_from_configuration` — falla si `k` o el número de vecinos están incrustados en el código.
+- [x] 3.6b `test_family_vocabulary_reuses_enrichment_terms` — falla si alguien vuelve a declarar una lista de materiales o de tallas dentro de `families/`, que es la regresión que D12 revisada existe para impedir.
+- [x] 3.7 `test_variant_label_is_verbatim_not_translated` (`mini` no se convierte en `XS`) y `test_base_member_has_null_variant_label`.
+- [x] 3.8 `test_members_ordered_by_canonical_rank_not_alphabetically` y `test_two_axis_family_labels_stay_unique`.
+- [x] 3.9 `test_suggestion_is_deterministic_for_same_catalog_and_config` y `test_suggestion_calls_no_provider`.
+- [x] 3.10 Tests de **propiedades** sobre los invariantes del agrupador —pertenencia única, orden sin huecos, etiquetas únicas por familia— y no sobre valores concretos.
 
 ## 4. Ruta HTTP en `jbg-ai`
 

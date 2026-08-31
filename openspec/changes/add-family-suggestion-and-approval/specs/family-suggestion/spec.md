@@ -53,6 +53,8 @@ The system SHALL treat a material token as a variant axis by **merging two alrea
 
 A merge MUST be rejected when the resulting root equals the bare piece type or falls below two tokens. A rejected merge MUST be reported as a review item rather than silently dropped, because the same guard surfaces catalogue entries that are not products at all.
 
+A group whose members cannot all be given **distinct** variant labels MUST also be rejected and reported, never proposed. Two members sharing a label are indistinguishable on every axis the grouping knows, and a proposal carrying them would be refused downstream by the family's uniqueness index — turning a question a person can answer into a database constraint error.
+
 #### Scenario: Two groups differing in one material token are merged
 
 - **WHEN** the catalogue contains `Colgante conchiglie`, `Colgante conchiglie Oro`, `Colgante mini conchiglie` and `Colgante mini conchiglie Oro`
@@ -75,6 +77,12 @@ A merge MUST be rejected when the resulting root equals the bare piece type or f
 - **WHEN** merging two groups would leave a root equal to the bare piece type or shorter than two tokens, as with `Encargos plata` and `Encargos Oro`
 - **THEN** no family is proposed for them
 - **AND** they appear in the review list with the reason for the rejection
+
+#### Scenario: A group whose members cannot be told apart is rejected
+
+- **WHEN** two members of a candidate group would receive the same variant label
+- **THEN** no family is proposed for that group
+- **AND** it appears in the review list with the reason for the rejection
 
 ### Requirement: The embedding veto is relative to the other proposals and marks rather than removes
 
