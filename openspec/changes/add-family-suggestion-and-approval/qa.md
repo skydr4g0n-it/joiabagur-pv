@@ -52,7 +52,7 @@ Por el camino completo `.NET → jbg-ai`, con respaldo previo (`pre-c18a.dump`, 
 - **Sin interfaz.** La pantalla de revisión es C18b, y sin ella la cola de 15 miembros marcados, 4 grupos rechazados y 37 productos excluidos sólo se lee en el informe.
 - **Un rechazo no se recuerda.** Al repetir `suggest`, una propuesta descartada reaparece. Es el precio de no persistir propuestas, y la lista de descartes es de C18b.
 - **La alerta de huérfanos no existe.** Necesita familias ya creadas; ahora que existen, C18b puede construirla.
-- **Los tres arreglos de raíz del catálogo** que el informe destapa —salida «no es una pieza» para C09, ampliar `piece_type.terms`, escala métrica en las tallas— quedan anotados en el §0 del plan como changes propios.
+- **Las lagunas del vocabulario de enriquecimiento** que el informe destapa quedan anotadas en el §0 del plan como **un solo change propuesto**, `fix-enrichment-vocabulary-gaps`: ampliar `piece_type.terms` y decirle al prompt que el catálogo contiene cosas que no son joyería. Al costearlo aparecieron dos correcciones a lo que este informe decía — el problema afecta a **once** productos y no a treinta y siete, porque la limpieza de C18a se llevó los demás; y la salida «no es una pieza» **ya existe** en el prompt (*«o null»*), de modo que lo que falta es advertir al modelo, no ampliar el contrato. La escala métrica en las tallas queda **descartada**: `Cadena Barbara 40/42/45 cm` son tres cadenas de longitud distinta, no variantes de una pieza.
 
 ## 5. Dos obstáculos de entorno, ninguno del producto
 

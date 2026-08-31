@@ -115,7 +115,11 @@ Y por tanto la búsqueda asistida las devolvía. El caso más claro es `Comproba
 
 ### (b) C09 clasifica servicios como joyas porque no puede decir otra cosa
 
-`piece_type.terms` tiene ocho términos y ninguno significa «esto no es una pieza», así que el extractor asigna el más plausible. **Arreglo de raíz pendiente, y es un change propio:** dar a C09 una salida explícita. Mientras no exista, la guarda de raíz degenerada de C18a es lo único que los saca a la luz.
+`piece_type.terms` tiene ocho términos y ninguno significa «esto no es una pieza», así que el extractor asigna el más plausible.
+
+> **Corregido el 2026-08-31, al costear el arreglo.** La frase de arriba está mal en su premisa: **la salida ya existe**. El prompt dice literalmente *«`piece_type`: un hiperónimo de la lista cerrada, **o null**»*, y C09 la usó bien para las velas y el palo santo. Lo que falta no es la opción sino **el encargo**: el prompt abre con *«Eres un extractor de atributos de joyería»* y no contempla que el catálogo contenga otra cosa. Ante `Arreglos oro` hace exactamente lo que se le pidió, y *collar* es una conjetura razonable para algo que menciona oro. **No es un fallo del modelo sino una laguna del enunciado**, y cuesta una línea.
+
+Mientras no se arregle, la guarda de raíz degenerada de C18a es lo único que los saca a la luz — y sólo cuando vienen en pareja: un servicio suelto no formaría raíz degenerada con nadie y pasaría.
 
 ### (c) Nueve joyas sintéticas legítimas que el vocabulario no sabe nombrar
 
@@ -127,9 +131,20 @@ De 160 a 1.300 €: cinco diademas, dos gemelos, un cinturón y una «Joya del Z
 
 `Colgante estrella de mar` agrupa siete productos reales y uno sintético, `Colgante Estrella de Mar`, cuyo nombre colisiona con el real pese a que C06b tenía por regla no reutilizar nombres de colección. **El veto lo encontró solo**: ocho de los quince marcados son esta familia, encabezados por márgenes de 0,16. Es la mejor validación que el veto podía tener, y va a la cola de revisión de C18b.
 
-### (e) Una familia real que el agrupador no ve
+### (e) `Cadena Barbara oro 40/42/45 cm` — **descartado, no pendiente**
 
-`Cadena Barbara oro 40 cm / 42 cm / 45 cm` (345–370 €) es una familia de variantes por longitud, y el vocabulario de talla **no tiene escala métrica**. No es un fallo del agrupamiento sino una laguna de vocabulario, del mismo tipo que (c). Anotada.
+Lo anoté como «una familia real que el agrupador no ve» por falta de escala métrica en el vocabulario de talla. **Decidido el 2026-08-31: no lo es.** Son **tres cadenas de longitud distinta**, no una pieza en tres tallas, y declararlas familia forzaría el modelo — la familia agrupa variantes de una pieza, no productos parecidos. Caerán juntas por proximidad de vector cuando alguien busque una cadena de esa colección, que es el comportamiento correcto sin pertenencia declarada. **No se añade escala métrica.**
+
+---
+
+## Nota posterior: el coste de arreglar (b) y (c), medido el 2026-08-31
+
+Al costearlos aparecieron dos correcciones a este mismo informe, ambas hacia abajo:
+
+- **El problema afecta a once productos, no a treinta y siete.** La limpieza de la sección 4 se llevó los otros veintiséis. Quedan las nueve joyas sintéticas y los dos llaveros conservados.
+- **La salida «no es una pieza» ya existía**, como recoge la corrección de (b).
+
+Ambos arreglos tocan los mismos dos ficheros —`vocabularies.yaml` y el prompt, que **duplica la lista como texto plano**— exigen el mismo salto a `enrichment/v2` y mueven el corpus por el mismo camino, así que van en **un solo change**: `fix-enrichment-vocabulary-gaps`, propuesto en el §0 del plan. Coste: cuatro ficheros, once reenriquecimientos, **0,9 % del corpus**. Compra filtro y búsqueda por tipo, **no familias** — las nueve tienen nueve raíces distintas.
 
 ---
 

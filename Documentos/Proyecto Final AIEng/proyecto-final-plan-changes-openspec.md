@@ -33,7 +33,44 @@ El grafo del §4 tampoco dibujaba las aristas **C18→C25, C26, C30 y C36**. Ya 
 
 1. **El doble etiquetado del golden set de C24.** Su ficha lo da por hecho entre dos personas y el §6 lo declara irrenunciable; trabajando en solitario no existe. **Debe resolverse antes de abrir C24**, no dentro de él.
 2. **`Product.CollectionId` es una FK única y anulable**, pero la spec viva `product-family` justifica la distinción con las colecciones diciendo que un producto puede pertenecer *«to one of many unrelated collections»*. Ambas cardinalidades son 0..1. Los discriminadores reales, medidos: una colección abarca 1–154 productos (mediana 15) y **13–16 tipos de pieza**; una familia, 2–4 de **un solo tipo**.
-3. **Tres arreglos de raíz del catálogo**, cada uno con entidad de change propio. **(a)** Dar a C09 una salida explícita «no es una pieza»: hoy fuerza un tipo, y por eso `Arreglos oro` figuraba como *collar* y `Presión` como *anillo*. **(b)** Ampliar `piece_type.terms` con `diadema`, `gemelos` y `cinturon` — nueve joyas sintéticas de hasta 1.300 € tienen tipo nulo porque C06b generó tipos que C09 no puede expresar; **reenriquecerlas vuelve a mover el corpus**, así que necesita su propia decisión de cuándo. **(c)** Añadir escala métrica al vocabulario de talla: `Cadena Barbara oro 40/42/45 cm` es una familia real que el agrupador no ve.
+3. **Las lagunas del vocabulario de enriquecimiento**, en **un solo change** y no tres. Ver la propuesta de abajo. ~~Escala métrica en el vocabulario de talla~~ → **descartado el 2026-08-31**: `Cadena Barbara oro 40/42/45 cm` no son tallas de una misma pieza sino **tres cadenas de longitud distinta**, y declararlas familia forzaría el modelo — la familia agrupa variantes de una pieza, no productos parecidos. Caerán juntas por proximidad de vector cuando alguien busque una cadena de esa colección, que es el comportamiento correcto sin pertenencia declarada.
+
+### 2026-08-31 — Propuesta: `fix-enrichment-vocabulary-gaps` 🟢, un change y no tres
+
+Sale de C18a y **corrige dos cosas que su propio informe dejó mal escritas.**
+
+**La primera: el problema es tres veces más pequeño de lo que decía.** La limpieza de C18a se llevó 26 de los 37 productos con `piece_type` nulo. Quedan **once**: las nueve joyas sintéticas que el vocabulario no sabe nombrar —un cinturón de 1.300 €, cinco diademas de 340 a 1.040 €, dos gemelos y una «Joya del Zodiaco»— y los dos llaveros reales que se decidió conservar en el índice.
+
+**La segunda: la premisa de «dar a C09 una salida *no es una pieza*» era falsa.** Esa salida ya existe — el prompt dice literalmente *«`piece_type`: un hiperónimo de la lista cerrada, **o null**»*. Lo que falta no es la opción sino **el encargo**: el prompt abre con *«Eres un extractor de atributos de joyería»* y no contempla que el catálogo contenga otra cosa. Ante `Arreglos oro` hace exactamente lo que se le pidió —extraer atributos de joyería de algo que menciona oro— y *collar* es una conjetura razonable. **No es un fallo del modelo sino una laguna del enunciado**, y se arregla con una línea, no con un cambio de contrato.
+
+**Por qué un solo change.** Los dos arreglos tocan los mismos dos ficheros, exigen el mismo salto de versión de prompt y mueven el corpus por el mismo camino. Separarlos significa bumpear el prompt dos veces y mover el corpus dos veces, que es justo lo que C18a existe para no hacer.
+
+**Alcance.** `piece_type.terms` += `diadema`, `gemelos`, `cinturon` y **`llavero`** —los dos conservados dejan de ser invisibles al filtro, y el cuarto término sale gratis—; prompt **`enrichment/v2`** con la lista nueva más la línea que advierte de servicios, consumibles y regalo; espejo `materials-vocabulary.ts` y su test de fijación; reenriquecer **sólo los once** con `ignoreHash`; una sola sincronización incremental.
+
+**Fuera de alcance: reenriquecer los 1.200 con `v2`.** Serían ~1.200 llamadas y, peor, podría **reclasificar productos existentes** —algo hoy etiquetado `collar` podría pasar a `cinturon`— cambiando el comportamiento de búsqueda de forma difusa y sin que nadie lo pidiera.
+
+**Coste.** Cuatro ficheros, once productos, **0,9 % del corpus**. Menos de media sesión: no hay algoritmo, ni migración, ni interfaz. **Lo que compra es filtro y búsqueda por tipo**, no familias: las nueve tienen nueve raíces distintas y ninguna agruparía con otra.
+
+**Cuándo.** Mueve el corpus, así que **antes de la línea base de C24**, por el mismo argumento que ordenó C18a: `preprocessing_id` sigue siendo `source-text/v1` y no delataría el cambio.
+
+**Riesgo a comprobar, no a suponer.** Reenriquecer con `v2` puede cambiar otros campos de esos once —materiales, etiquetas— además del tipo. Hay que mirar el diff completo, no sólo `piece_type`.
+
+#### ¿Pueden convivir perfiles `v1` y `v2` en el catálogo? Sí, y el campo existe para eso
+
+Conviene no confundir dos versionados que se parecen y no lo son:
+
+| | `PromptVersion` | `embedding_version` |
+|---|---|---|
+| Dónde vive | `ProductAiProfiles`, lado .NET | `ai.product_document`, lado Python |
+| Qué registra | qué prompt produjo los **atributos** | `modelo : dims : preprocessing_id` |
+| ¿Llega al índice? | **No.** Ni al DTO del feed ni a `source_text.py` ni al `source_hash` | **Es** el índice |
+| Mezclar versiones | **seguro y trazable** | **la corrupción silenciosa de S11** |
+
+Mezclar `embedding_version` es comparar dos espacios geométricos: la base devuelve un número plausible que no significa nada, sin error. **Este change no lo toca**: la plantilla del documento no cambia, sólo el contenido de once filas.
+
+Mezclar `PromptVersion` es otra cosa. Son dos poblaciones de atributos producidas con instrucciones distintas, comparables como dato, y **el campo se creó para hacer visible esa diferencia en lugar de evitarla** — el perfil problemático es el que no dice con qué prompt nació, no el que sí lo dice.
+
+La única consecuencia real es de **informe, no de corrección**: las métricas que agregan sobre todo el corpus —tasa de corrección por campo de C28, métricas de enriquecimiento del §11.5— mezclarían dos poblaciones. Se resuelve **reportando por `PromptVersion`**, la misma disciplina que C24 ya aplica al reportar por `data_origin`. Estado a 2026-08-31: los 1.200 perfiles están en `enrichment/v1`.
 
 ### 2026-08-30 — C17, al cerrar: el riesgo se materializó, y no donde se esperaba
 
