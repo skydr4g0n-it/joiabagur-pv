@@ -15,13 +15,14 @@ The review queue this change was originally meant to paint no longer exists. The
 - **BREAKING** — the frozen AI service contract moves from nine routes to ten, and its snapshot test is regenerated in this change, as C18a did for the ninth.
 - **The grouping vocabulary gains one material synonym.** Three of the strongest orphan candidates were missed for the same reason: a finish the vocabulary does not name. Because grouping reads the product name and not the stored attributes, the synonym recovers those families without re-enriching anything.
 - **A review surface in the administration UI**, built as the first tenant of a shell that the profile-review change will reuse: only what that change already specifies in writing is generalised, nothing anticipated.
-- Not included: widening the closed piece-type vocabulary and its prompt version, re-enriching any product, persisting suggestions, and distinguishing "the AI service did not answer" from "there is nothing to review".
+- **An unavailable audit is never painted as a clean catalogue.** Each list reports whether it was computed and came back empty or could not be computed at all, and the review of existing families — which needs no vectors — stays usable while the audit does not. On a catalogue-quality screen, "nothing to review" reads as "nothing is wrong", which is the conclusion this change exists to support with evidence rather than to assert by accident.
+- Not included: widening the closed piece-type vocabulary and its prompt version, re-enriching any product, and persisting suggestions.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `family-review`: human review of families that already exist — the audit that recomputes unsupported memberships over persisted families and nominates unassigned products as candidates, the persisted verdict on a `(product, family)` pair that is at once the dismissal record and the per-item approval stamp, the restriction of all of it to administrators, and the requirement that auditing reads without writing.
+- `family-review`: human review of families that already exist — the audit that recomputes unsupported memberships over persisted families and nominates unassigned products as candidates, the persisted verdict on a `(product, family)` pair that is at once the dismissal record and the per-item approval stamp, the restriction of all of it to administrators, the requirement that auditing reads without writing, and the requirement that a list which could not be computed is never presented as a list that came back empty.
 
 ### Modified Capabilities
 

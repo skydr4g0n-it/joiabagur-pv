@@ -57,8 +57,8 @@
 - [ ] 6.3 Constante de ruta en `routing/routes.tsx` y entrada bajo `AdminRoute` + `Layout8` en `app-routing-setup.tsx`, con carga diferida.
 - [ ] 6.4 Pantalla con TanStack Table: paneles de familias, miembros marcados, huérfanos e incidencias; navegación por teclado; confirmación en bloque; y **cronómetro por ítem**.
 - [ ] 6.5 Acciones que declaran su camino de escritura: producto sin familia → `family-suggestions/apply`; producto con familia → `PUT /api/product-families/{id}/members`.
-- [ ] 6.6 Estados de carga y error convencionales. **No** se implementa distinguir «el servicio no contestó» de «no hay nada que revisar» — recortado, decisión 9 del `design.md`.
-- [ ] 6.7 Tests: `should list families a page at a time`, `should keep a dismissed suggestion out of the next run`, `should show why a group was rejected`, `should record the reviewer when a family is confirmed`, `should require the administrator role to open the review screen`. Envolver en el provider o mockear el hook — copiar `pages/sales/__tests__/cart.test.tsx`.
+- [ ] 6.6 **Tres estados por lista** —*calculada y vacía*, *no disponible*, *con contenido*— con el estado modelado **por lista y no por página**, de modo que la revisión de familias siga operativa mientras la auditoría no lo esté (decisión 9 del `design.md`). Verificar a mano con `jbg-ai` parado, no sólo con MSW.
+- [ ] 6.7 Tests: `should list families a page at a time`, `should keep a dismissed suggestion out of the next run`, `should show why a group was rejected`, `should record the reviewer when a family is confirmed`, `should require the administrator role to open the review screen`, `should show the audit as unavailable when the ai service does not answer`, `should show an empty audit as computed and empty`, `should keep family review usable when the audit is unavailable`. Envolver en el provider o mockear el hook — copiar `pages/sales/__tests__/cart.test.tsx`.
 - [ ] 6.8 `npm run build` en verde. Leer la **línea de resumen** de `npm run test`, no el código de salida: `vitest` sale 0 cuando se le pipea.
 
 ## 7. Auditoría de miembros y limpieza

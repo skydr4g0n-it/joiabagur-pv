@@ -36,7 +36,7 @@ Y con ello **dejó sin objeto la ficha de este change**, escrita antes de conoce
 - Reenriquecer producto alguno; cambiar `source-text/v1`, `embedding_version` o `indexing/embeddings.py`.
 - Tocar la fusión por material, la guarda de raíz degenerada o el rango canónico de tallas de C18a.
 - Persistir propuestas de `suggest`: lo que se persiste es el **veredicto sobre un par**, no una propuesta.
-- Distinguir «el servicio no contestó» de «no hay nada que revisar» — recortado deliberadamente; ver decisión 9.
+- Bifurcar `/health` o reabrir `aiAvailable: false`: distinguir servicio caído de lista vacía es **de esta pantalla y de su cliente** (decisión 9), no del contrato de salud, que C16 y C17 cerraron.
 
 ## Decisions
 
@@ -137,11 +137,27 @@ Son contratos distintos con semánticas distintas, y la pantalla vive a caballo.
 
 Y el segundo camino pisa **una mina ya documentada**. El apply de C07 dejó escrito que el reemplazo declarativo falla si las altas se declaran añadiéndolas a la colección de navegación —`BaseEntity` asigna el `Guid` en el constructor, así que EF toma al miembro nuevo por una fila existente y emite un `UPDATE` contra nada— y que *«sólo se manifiesta cuando una misma petición borra e inserta a la vez»*. **Mover un producto de una familia a otra es exactamente ese caso**, y lo cubre un test que reordena e intercambia etiquetas.
 
-### 9 · Faltan dos endpoints de familia, y el recorte del servicio caído
+### 9 · Faltan dos endpoints de familia, y la pantalla distingue tres estados por lista
 
 `ProductFamiliesController` tiene `GET {id}`, `POST`, `PUT {id}` y `PUT {id}/members`. **No hay listado** —una pantalla que revisa 156 familias no puede enumerarlas— ni **borrado**: disolver una familia mala obligaría a vaciarla con `ReplaceMembers([])`, dejando una familia fantasma sin miembros. La spec viva admite ese estado como legítimo, pero como resultado de «esta familia estaba mal» es basura. Ambos se añaden, sólo administradores, y el listado paginado a 50 como el resto.
 
-**Y un recorte deliberado**, decidido el 2026-08-31: el comportamiento de la pantalla cuando `jbg-ai` no responde **sale de alcance**. Lleva los estados de carga y error convencionales de cualquier página del proyecto, pero no se especifica ni se prueba que distinga «el servicio no contestó» de «no hay nada que revisar». Queda anotado como limitación conocida **a sabiendas de que es la forma exacta en que se materializó el riesgo de C17**, donde la búsqueda devolvía diez resultados plausibles por el camino léxico sin decir que la asistencia estaba apagada. Cerrarlo más adelante cuesta un escenario y un test, no un rediseño.
+**Y una decisión que se tomó dos veces el mismo día, porque la primera estaba mal.** Se recortó el comportamiento con `jbg-ai` caído, dejando el requisito de distinguir un fallo de una auditoría sin hallazgos **sólo en `ai-gateway-client`**. Revertido: **entra en alcance, y la pantalla distingue tres estados por lista**.
+
+```
+   ┌─ MIEMBROS MARCADOS ──────┐   ┌─ HUÉRFANOS ──────────────┐   ┌─ FAMILIAS (156) ─────────┐
+   │  calculada · 0 hallazgos │   │  no disponible           │   │  calculada · 156         │
+   │  «nada marcado»          │   │  «el servicio no         │   │  la revisión sigue       │
+   │                          │   │   contestó»              │   │  operativa: no usa       │
+   │                          │   │                          │   │  vectores                │
+   └──────────────────────────┘   └──────────────────────────┘   └──────────────────────────┘
+        estado (1)                       estado (2)                      estado (3)
+```
+
+Son estados **por lista y no de página**: la revisión de familias no depende de vectores y debe seguir funcionando mientras la auditoría no esté disponible.
+
+El motivo del giro es que el requisito no puede vivir sólo en el cliente. `ai-gateway-client` sí debe distinguir un fallo de un resultado vacío —y su spec lo exige— pero eso no alcanza a la superficie que la persona mira: **una lista vacía pintada sin más *es* la respuesta equivocada, la distinga o no la capa de debajo**. Y aquí el daño es peor que en C17, donde la búsqueda devolvía diez resultados plausibles por el camino léxico sin decir que la asistencia estaba apagada: sobre una pantalla de **calidad de catálogo**, «no hay nada que revisar» se lee como **«el catálogo está limpio»**, que es justo la conclusión que el change existe para poder sostener con evidencia.
+
+**Alternativa considerada.** *Dejarlo en el cliente y confiar en el manejo de error genérico del frontend*: es el recorte original, y falla porque el estado vacío y el estado no disponible se renderizan igual salvo que alguien lo pida explícitamente. Cuesta un escenario y un test, no un rediseño — y ése fue el argumento para recortarlo, que resultó ser el argumento para no hacerlo.
 
 ### 10 · El sinónimo `dorado` entra aquí, y su efecto se comprueba
 
@@ -175,7 +191,7 @@ Lo que se generaliza es **exclusivamente lo que la ficha de C28 pide por escrito
 - **Revisar 156 familias puede degenerar en dar al botón**, que es el fallo que el mecanismo existe para evitar → El cronómetro por ítem hace visible el problema en la propia métrica de entrega.
 - **La séptima migración** es la primera desde C08 → El arnés de desfase modelo↔migración existe desde C04 y lo heredaron C07 y C08. Y no compite por turno: la única otra viva es la de C27, con la que no se abre a la vez.
 - **Los 21 huérfanos cuyo tipo de pieza no tiene ninguna familia** quedan fuera de la alerta por construcción → No es defecto: no hay familia a la que pertenecer. Se cuenta en el informe.
-- **Con `jbg-ai` caído, una lista vacía no se distingue de «nada que revisar»** → Riesgo **aceptado** por el recorte de la decisión 9, y anotado como limitación conocida.
+- **Con `jbg-ai` caído, una lista vacía se leería como «el catálogo está limpio»** → Decisión 9: tres estados por lista, con escenario de aceptación y test. Es el riesgo de C17 trasladado a esta pantalla, y aquí la conclusión errónea es exactamente la que el change existe para sostener con evidencia.
 
 ## Migration Plan
 
@@ -191,7 +207,7 @@ Lo que se generaliza es **exclusivamente lo que la ficha de C28 pide por escrito
 
 ## Open Questions
 
-**Ninguna bloqueante.** Las seis que el ticket abrió el 2026-08-31 se cerraron el mismo día confirmando su opción por defecto, y quedan registradas con su motivo en [`ticket.md`](./ticket.md) § *Decisiones cerradas* y en la HU como **D14–D20**: `dorado` es sinónimo de `baño de oro` y no de `oro`; se acepta la etiqueta canónica aunque el taller diga `dorado`; un veredicto no se invalida solo; θ se fija tras la auditoría de miembros arrancando en `0`; el registro de veredictos es endpoint propio; y de la carcasa se extrae sólo lo que C28 pide por escrito. El recorte del escenario de servicio caído se cerró con ellas.
+**Ninguna bloqueante.** Las seis que el ticket abrió el 2026-08-31 se cerraron el mismo día confirmando su opción por defecto, y quedan registradas con su motivo en [`ticket.md`](./ticket.md) § *Decisiones cerradas* y en la HU como **D14–D20**: `dorado` es sinónimo de `baño de oro` y no de `oro`; se acepta la etiqueta canónica aunque el taller diga `dorado`; un veredicto no se invalida solo; θ se fija tras la auditoría de miembros arrancando en `0`; el registro de veredictos es endpoint propio; y de la carcasa se extrae sólo lo que C28 pide por escrito. La séptima, el comportamiento con `jbg-ai` caído, se cerró dos veces el mismo día: primero como recorte y después revertida, al comprobar que dejar el requisito sólo en el cliente no alcanza a la pantalla (decisión 9).
 
 Dos cuestiones siguen vivas, ambas **fuera del alcance de este change** y anotadas para que no se pierdan:
 

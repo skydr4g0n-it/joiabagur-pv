@@ -141,7 +141,7 @@ Entidad `FamilyReviewVerdict` en `public`, junto a `Origin` / `ApprovedByUserId`
 - `types/family-review.types.ts` espejando los DTOs.
 - Tabla con **TanStack Table** (ya en dependencias), navegación por teclado, confirmación en bloque y cronómetro por ítem.
 - Componentes de [`analisis-metronic-frontend.md`](../../../Documentos/Propuestas/analisis-metronic-frontend.md) **antes** de crear ninguno nuevo.
-- Estados de carga y error **convencionales**, los mismos que cualquier otra página. **Fuera de alcance** distinguir «el servicio no contestó» de «no hay nada que revisar»: recortado el 2026-08-31, y anotado como limitación conocida en la HU.
+- **Tres estados distinguibles por lista** (D20): *calculada y vacía*, *no disponible porque el servicio no contestó*, y *calculada con contenido*. El segundo nunca se pinta como el primero. Las listas que dependen de vectores —marcados y huérfanos— pueden estar no disponibles mientras la revisión de familias, que no los necesita, sigue operativa: son estados por lista, no de página.
 - UI en es-ES, moneda EUR (€).
 - Lo que C28 reutilizará se extrae **sólo** donde su ficha lo pide por escrito —tabla editable, atajos de teclado, aprobación masiva, registro de quién revisó y qué cambió—, no por conjetura.
 
@@ -172,6 +172,7 @@ Entidad `FamilyReviewVerdict` en `public`, junto a `Origin` / `ApprovedByUserId`
 - [ ] Migración de EF Core creada, aplicable y con test de desfase modelo↔migración
 - [ ] **Línea base medida y anotada antes de tocar nada**: 156 familias, 486 miembros, 682 huérfanos activos, 1.168 documentos
 - [ ] **Diff completo de propuestas antes y después del sinónimo `dorado`**, no sólo los tres casos buscados
+- [ ] **Comprobación manual con `jbg-ai` parado** (D20): cada lista dice si está vacía o no disponible, y la revisión de familias sigue siendo posible. MSW no basta — el fallo de C17 fue precisamente que el camino degradado parecía correcto
 - [ ] Reconciliación por **sincronización incremental**, verificando que se emiten exactamente los productos estampados y ninguno más
 - [ ] Informe del lote versionado en `Documentos/Proyecto Final AIEng/informes/c18b-family-review-report.md`, con tasa de corrección del agrupador, tiempo medio de revisión y reparto por `data_origin`
 - [ ] Specs delta actualizadas y `openspec validate --all --strict` en **`0 failed`**
@@ -194,7 +195,7 @@ Entidad `FamilyReviewVerdict` en `public`, junto a `Origin` / `ApprovedByUserId`
 
 ## Preguntas Abiertas
 
-**Ninguna bloqueante.** Las seis que este ticket abrió el 2026-08-31 se cerraron el mismo día, todas confirmando su opción por defecto, y con ellas se cerró además el recorte del escenario de servicio caído. Quedan registradas abajo con su motivo, y en la HU como **D14–D20**.
+**Ninguna bloqueante.** Las seis que este ticket abrió el 2026-08-31 se cerraron el mismo día, todas confirmando su opción por defecto. Quedan registradas abajo con su motivo, y en la HU como **D14–D20**. La séptima, **D20**, se abrió y se cerró en dos pasos el mismo día: primero como recorte, después revertida al comprobar que el requisito no podía vivir sólo en el cliente.
 
 Una sola cuestión sigue viva, y es **de otro change**: `fix-enrichment-vocabulary-gaps` —ampliar `piece_type.terms` con `diadema`, `gemelos`, `cinturon` y `llavero`, y saltar a `enrichment/v2`— no tiene número asignado ni ficha en la tabla maestra, y **debe ordenarse antes de la línea base de C24** por el mismo argumento que ordena a éste. C18b no lo resuelve ni lo bloquea.
 
@@ -208,7 +209,7 @@ Una sola cuestión sigue viva, y es **de otro change**: `fix-enrichment-vocabula
 | **D17** | **`JPV_FAMILY_ORPHAN_MARGIN` se fija después de la auditoría de miembros**, sobre números recalculados, arrancando en `0` | Fijarlo antes sería calibrarlo contra el imán que el propio change arregla: `Colgante estrella de mar`, con peor hermano 0,778, se lleva 4 de los 25 primeros. Y con los veredictos persistidos, **un descarte se paga una vez**, mientras que un huérfano que el margen dejó fuera no aparece jamás: la asimetría favorece arrancar generoso |
 | **D18** | **El registro de veredictos es endpoint propio** (`family-verdicts`), no un modo de `family-audit` | Auditar es lectura y no debe escribir nunca. Es la misma separación que C18a impuso entre `suggest` y `apply`, y el escenario de aceptación que exige que la auditoría no toque nada sólo es verificable si el camino de escritura es otro |
 | **D19** | **De la carcasa se extrae sólo lo que la ficha de C28 pide por escrito**: tabla editable, atajos de teclado, aprobación masiva y registro de quién revisó y qué cambió | Diseñar para dos inquilinos con uno solo a la vista produce abstracciones equivocadas. Lo que está especificado se comparte; lo conjeturado, no. Si C28 necesita más, lo extrae C28, que es cuando se sabrá qué |
-| **D20** | **El comportamiento con `jbg-ai` caído sale de alcance** *(decidido el 2026-08-31)*. La página lleva estados de carga y error convencionales, pero no se especifica ni se prueba que distinga «el servicio no contestó» de «no hay nada que revisar» | Recorte deliberado. Se asume a sabiendas de que es la forma exacta en que se materializó el riesgo de C17, y queda anotado como limitación conocida en la HU. Cerrarlo más adelante cuesta un escenario y un test, no un rediseño |
+| **D20** | ~~El comportamiento con `jbg-ai` caído sale de alcance~~ → **revisada el mismo 2026-08-31: entra en alcance.** La pantalla distingue tres estados por lista —*calculada y vacía*, *no disponible*, *con contenido*— con escenario de aceptación y test | El recorte dejaba el requisito en `ai-gateway-client`, que sí debe distinguir un fallo de una auditoría sin hallazgos, pero **no en la superficie que la persona mira**, y ahí el cliente no basta: una lista vacía pintada sin más **es** la respuesta equivocada, la distinga o no la capa de debajo. Es la forma exacta en que se materializó el riesgo de C17 —resultados plausibles por el camino léxico sin decir que la asistencia estaba apagada— y sobre una pantalla de calidad de catálogo el daño es peor, porque «nada que revisar» se lee como **«el catálogo está limpio»** |
 
 ---
 

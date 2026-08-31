@@ -137,6 +137,32 @@ The system SHALL restrict requesting the audit, recording verdicts, listing fami
 - **WHEN** an unauthenticated caller invokes any family review operation
 - **THEN** the request is rejected with 401 Unauthorized
 
+### Requirement: A list that could not be computed is never presented as a list that came back empty
+
+The system SHALL report, for each list the review surface presents, whether it was computed and returned no findings or could not be computed at all. The two states MUST be distinguishable to the reviewer, and an audit that failed MUST NOT be rendered as an audit that found nothing.
+
+The distinction cannot live only in the client that calls the service. An empty list drawn without qualification **is** the wrong answer regardless of what the layer beneath it knew, and on a screen whose subject is catalogue quality "nothing to review" is read as "nothing is wrong" — the conclusion this capability exists to support with evidence rather than to assert by accident.
+
+Availability MUST be tracked per list rather than per screen: reviewing the families that exist requires no vectors, so it MUST remain usable while the lists that do require them are unavailable.
+
+#### Scenario: An unavailable audit is shown as unavailable
+
+- **WHEN** the audit cannot be computed because the AI service did not answer
+- **THEN** the lists that depend on it report that they are unavailable
+- **AND** they are distinguishable from a list that was computed and returned no findings
+
+#### Scenario: A computed empty list is shown as empty
+
+- **WHEN** the audit is computed and finds no flagged member and no candidate
+- **THEN** those lists report that they were computed and found nothing
+- **AND** they are not reported as unavailable
+
+#### Scenario: Family review survives an unavailable audit
+
+- **WHEN** the audit cannot be computed
+- **THEN** the families that exist are still listed and can still be reviewed and judged
+- **AND** the unavailability is confined to the lists that need the vectors
+
 ### Requirement: The audit is deterministic and calls no model
 
 The system SHALL produce the same audit for the same catalogue state, the same verdicts and the same configuration. The audit MUST NOT call a language model, MUST NOT call the embedding provider — the vectors are already persisted on the index — and MUST NOT read or write the transactional catalogue schema by SQL from the AI service.

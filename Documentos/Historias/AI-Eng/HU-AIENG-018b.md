@@ -117,7 +117,6 @@ El `design.md` de C18a rechazó persistir descartes con este argumento explícit
 - **Reenriquecer producto alguno.** C18b no llama al extractor ni al proveedor de embeddings más allá de la reindexación que provoquen los cambios de pertenencia.
 - **Cambiar el algoritmo de agrupación de C18a** más allá del sinónimo `dorado`: no se toca la fusión por material, ni la guarda de raíz degenerada, ni el rango canónico de tallas.
 - **Persistir propuestas de `suggest`.** La decisión D3 de C18a sigue vigente: lo que se persiste es el **veredicto sobre un par (producto, familia)**, no una propuesta.
-- **El comportamiento de la pantalla cuando `jbg-ai` no responde**, como requisito propio *(sacado de alcance el 2026-08-31)*. La página lleva los estados de carga y error convencionales del frontend, como cualquier otra, pero **no se especifica ni se prueba** que distinga «el servicio no contestó» de «no hay nada que revisar». Queda anotado como limitación conocida: es la lección de C17 —donde la búsqueda devolvía diez resultados plausibles por el camino léxico sin decir que la asistencia estaba apagada— y esta historia no la recoge.
 - **Reabrir `aiAvailable: false`**, `source-text/v1`, `embedding_version` ni `indexing/embeddings.py`.
 - La agrupación por familia en la venta asistida (**C30**) y la confirmación de variante en la interfaz (**C36**).
 - Escala métrica de longitud en el vocabulario de talla: **descartada el 2026-08-31** (`Cadena Barbara oro 40/42/45 cm` son tres cadenas distintas, no una pieza en tres tallas).
@@ -146,7 +145,7 @@ Cerradas en la sesión de exploración del 2026-08-31, con medición sobre el co
 
 ### Parámetros y recortes fijados el 2026-08-31
 
-Cerrados confirmando la opción por defecto de las seis preguntas abiertas del ticket, más el recorte del escenario de servicio caído. Ninguno bloquea el apply.
+Cerrados confirmando la opción por defecto de las seis preguntas abiertas del ticket. Ninguno bloquea el apply.
 
 | # | Decisión | Motivo |
 |---|---|---|
@@ -156,7 +155,7 @@ Cerrados confirmando la opción por defecto de las seis preguntas abiertas del t
 | **D17** | **`JPV_FAMILY_ORPHAN_MARGIN` se fija tras la auditoría de miembros**, arrancando en `0` | Fijarlo antes sería calibrarlo contra el imán que el propio change arregla (D6). Y con veredictos persistidos **un descarte se paga una vez**, mientras que un huérfano que el margen dejó fuera no aparece jamás: la asimetría favorece la generosidad |
 | **D18** | **El registro de veredictos es endpoint propio**, no un modo de la auditoría | Auditar es lectura y no debe escribir nunca — la misma separación que C18a impuso entre `suggest` y `apply`. El escenario 1, que exige que la auditoría no toque nada, sólo es verificable si el camino de escritura es otro |
 | **D19** | **De la carcasa se extrae sólo lo que la ficha de C28 pide por escrito** | Diseñar para dos inquilinos con uno a la vista produce abstracciones equivocadas. Lo especificado se comparte; lo conjeturado, no. Si C28 necesita más, lo extrae C28, que es cuando se sabrá qué |
-| **D20** | **El comportamiento con `jbg-ai` caído sale de alcance.** La página lleva estados de error convencionales, pero no se especifica ni se prueba que distinga «el servicio no contestó» de «no hay nada que revisar» | Recorte deliberado, asumido a sabiendas de que es la forma exacta en que se materializó el riesgo de C17. Cerrarlo más adelante cuesta un escenario y un test, no un rediseño |
+| **D20** | ~~El comportamiento con `jbg-ai` caído sale de alcance~~ → **revisada el 2026-08-31: entra en alcance.** La pantalla **debe distinguir** «el servicio no contestó» de «no hay nada que revisar», con escenario de aceptación y test | El recorte inicial dejaba el requisito en el cliente .NET —que sí debe distinguir los dos casos— pero no en la superficie que la persona mira, y ahí el cliente no basta: una lista vacía pintada sin más **es** la respuesta equivocada, la distinga o no la capa de debajo. Es además la forma exacta en que se materializó el riesgo de C17, donde la búsqueda devolvía diez resultados plausibles por el camino léxico sin decir que la asistencia estaba apagada. Y aquí el daño sería peor: sobre una pantalla de calidad de catálogo, «no hay nada que revisar» se lee como **«el catálogo está limpio»** |
 
 ---
 
@@ -244,7 +243,16 @@ Cerrados confirmando la opción por defecto de las seis preguntas abiertas del t
 - **Y** no se crea, modifica ni elimina ningún dato
 - **Y** un usuario no autenticado recibe 401 Unauthorized
 
-### Escenario 11: Fuera de alcance explícito
+### Escenario 11: El servicio de IA no responde y la pantalla no lo presenta como catálogo limpio
+
+- **Dado que** `jbg-ai` no está disponible o el circuito está abierto
+- **Cuando** el administrador abre la pantalla de revisión
+- **Entonces** las listas que dependen de vectores —miembros marcados y huérfanos candidatos— se declaran **no disponibles** de forma explícita
+- **Y** ese estado se distingue visualmente de la lista que sí se pudo calcular y salió vacía
+- **Y** la revisión de las familias existentes sigue siendo posible, porque no necesita vectores
+- **Y** en ningún caso se presenta una lista vacía como si significara «no hay nada que revisar»
+
+### Escenario 12: Fuera de alcance explícito
 
 - **Dado que** esta historia entrega la carcasa de revisión
 - **Cuando** se completa
@@ -261,7 +269,7 @@ Cerrados confirmando la opción por defecto de las seis preguntas abiertas del t
 - **El cuello de botella es de atención, no de calendario.** El §7.8 del diseño lo corrigió el 2026-08-31: *«es una sola persona revisando»*. El riesgo real no es tardar, es que revisar degenere en dar al botón — que es exactamente el fallo que el mecanismo existe para evitar. De ahí que la carcasa lleve cronómetro por ítem: el tiempo medio es a la vez métrica de entrega y señal de que la revisión sigue siendo real.
 - **Limitación conocida:** un veredicto no se invalida solo cuando la evidencia cambia. Si un producto se reenriquece o se reembebe, su vecindad cambia y un descarte antiguo puede quedar obsoleto. Se mitiga guardando el **margen en el momento de revisar** y mostrando la comparación con el actual, en lugar de inventar una lógica de reaparición automática que nadie va a mantener.
 - **Limitación conocida:** los 21 huérfanos cuyo `piece_type` no tiene ninguna familia existente no pueden puntuar contra nada y quedan fuera de la alerta por construcción. No es un defecto: no hay familia a la que pertenecer.
-- **Limitación conocida, aceptada al recortar el alcance el 2026-08-31:** con `jbg-ai` caído o el circuito abierto, la pantalla mostrará su estado de error genérico, pero **nada garantiza que una lista vacía se distinga de «no hay nada que revisar»**. Es exactamente la forma en que el riesgo de C17 se materializó, y se asume a sabiendas. Si más adelante se quiere cerrar, el requisito es un escenario de aceptación y un test, no un rediseño.
+- **Tres estados que la pantalla no puede confundir**, y que es lo que D20 exige tras revisarse: *(1)* la lista se calculó y salió vacía; *(2)* el servicio no contestó, así que no se sabe; *(3)* la lista se calculó y tiene contenido. El segundo pintado como el primero es el fallo de C17 repetido, y sobre una pantalla de calidad de catálogo se lee como «el catálogo está limpio». La revisión de familias no depende de vectores y sigue disponible en el estado *(2)*.
 - **Divergencia heredada, sin resolver aquí:** la spec viva `product-family` justifica la distinción con las colecciones diciendo que un producto puede pertenecer *«to one of many unrelated collections»*, pero [`Product.cs:31`](../../../backend/src/JoiabagurPV.Domain/Entities/Product.cs#L31) declara `Guid? CollectionId`, una FK única y anulable: ambas cardinalidades son 0..1. Los discriminadores reales, medidos: una colección abarca 1–154 productos (mediana 15) y 13–16 tipos de pieza; una familia, 2–4 de un solo tipo.
 - **Change asociado:** [`add-family-review-ui-and-orphan-alert`](../../../openspec/changes/add-family-review-ui-and-orphan-alert/), rama `c18b-add-family-review-ui-and-orphan-alert`, creada desde `ai-eng` en `6ffd390`.
 
@@ -293,7 +301,7 @@ Cerrados confirmando la opción por defecto de las seis preguntas abiertas del t
 7. **`FamilyReviewVerdict`**: entidad, configuración EF, **séptima migración**, índice único por par `(ProductId, FamilyId)` y borrado en cascada desde la familia. Test de desfase modelo↔migración con el arnés de C04.
 8. **`GET /api/product-families`** paginado con filtros, y **`DELETE /api/product-families/{id}`**, ambos sólo administradores, con FluentValidation.
 9. **`POST /api/ai/catalog/family-audit`** en `AiCatalogController`, con el manejo de `AiNotImplementedException` / `AiUnavailableException` establecido por C09, y el endpoint de registro de veredictos.
-10. **Carcasa de revisión en frontend**: ruta de administrador, servicio `family-review.service.ts`, tipos de los DTOs, tabla con TanStack Table, navegación por teclado, confirmación en bloque, cronómetro por ítem y estados de carga y error. Reutilizar componentes de [`analisis-metronic-frontend.md`](../../Propuestas/analisis-metronic-frontend.md) antes de crear ninguno.
+10. **Carcasa de revisión en frontend**: ruta de administrador, servicio `family-review.service.ts`, tipos de los DTOs, tabla con TanStack Table, navegación por teclado, confirmación en bloque, cronómetro por ítem, y estados que distinguen «no disponible» de «vacío» (D20). Reutilizar componentes de [`analisis-metronic-frontend.md`](../../Propuestas/analisis-metronic-frontend.md) antes de crear ninguno.
 11. **Ejecutar la revisión**: primero los miembros marcados (D6), después fijar θ sobre números recalculados (D7), después los huérfanos, y las 156 familias ítem a ítem (D8).
 12. **Sincronización incremental** tras los cambios de pertenencia, verificando que se emiten exactamente los productos estampados y ninguno más.
 13. **Informe del lote** en [`informes/c18b-family-review-report.md`](../../Proyecto%20Final%20AIEng/informes/) con la tasa de corrección del agrupador, el tiempo medio de revisión, el reparto por `data_origin` y el diff del sinónimo `dorado` (D13).
