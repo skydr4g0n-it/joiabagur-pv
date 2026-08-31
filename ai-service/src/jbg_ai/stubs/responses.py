@@ -28,6 +28,14 @@ from jbg_ai.api.schemas.enrich import (
 from jbg_ai.api.schemas.enrich import (
     MAX_BATCH_SIZE as ENRICH_MAX_BATCH_SIZE,
 )
+from jbg_ai.api.schemas.families import (
+    ExcludedProductModel,
+    FamilyProposalModel,
+    FamilySuggestRequest,
+    FamilySuggestResponse,
+    ProposedFamilyMember,
+    RejectedGroupModel,
+)
 from jbg_ai.api.schemas.evals import EvalMetric, EvalRun, EvalRunsResponse
 from jbg_ai.api.schemas.index import (
     IndexStatusResponse,
@@ -378,5 +386,63 @@ def evals_runs_stub(principal: ServicePrincipal) -> EvalRunsResponse:
                 metrics=[EvalMetric(name="grounding_rate", value=0.74)],
             ),
         ],
+        trace_id=principal.trace_id,
+    )
+
+
+def families_suggest_stub(
+    request: FamilySuggestRequest, principal: ServicePrincipal
+) -> FamilySuggestResponse:
+    """One proposal, one refused group and one excluded product.
+
+    All three lists are populated on purpose. A stub that only returned proposals
+    would let a client ship without ever handling the two kinds of refusal, and
+    those are where the catalogue problems surface.
+    """
+    piece_type = request.piece_type or "anillo"
+    return FamilySuggestResponse(
+        proposals=[
+            FamilyProposalModel(
+                root="anillo erizo de mar",
+                suggested_name="Anillo erizo de mar",
+                piece_type=piece_type,
+                members=[
+                    ProposedFamilyMember(
+                        product_id="11111111-1111-1111-1111-111111111111",
+                        sku="SKU-STUB-1",
+                        name="Anillo erizo de mar S",
+                        variant_label="S",
+                        position=0,
+                    ),
+                    ProposedFamilyMember(
+                        product_id="22222222-2222-2222-2222-222222222222",
+                        sku="SKU-STUB-2",
+                        name="Anillo erizo de mar M",
+                        variant_label="M",
+                        position=1,
+                        flagged_for_review=True,
+                        review_reason="closer_to_another_family",
+                        margin=0.12,
+                    ),
+                ],
+            )
+        ],
+        rejected_groups=[
+            RejectedGroupModel(
+                root="encargos",
+                piece_type="collar",
+                reason="root_too_short",
+                product_names=["Encargos Oro", "Encargos plata"],
+            )
+        ],
+        excluded_products=[
+            ExcludedProductModel(
+                product_id="33333333-3333-3333-3333-333333333333",
+                sku="SKU-STUB-3",
+                name="Vela Cerámica grande",
+                reason="no_piece_type",
+            )
+        ],
+        already_in_family_count=0,
         trace_id=principal.trace_id,
     )

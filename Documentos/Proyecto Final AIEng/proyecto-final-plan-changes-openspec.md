@@ -12,6 +12,66 @@
 
 Este documento se escribió antes de implementar. Cuando una sesión de diseño de un change concreto altera lo que su ficha decía, el cambio se registra aquí con fecha y motivo, y la ficha afectada se corrige en el sitio.
 
+### 2026-08-31 — C18, al aplicar: el umbral del §7.5 no existe, y el plan se contradecía
+
+**C18 se parte en C18a y C18b** por la regla 5: primero la mitad que desbloquea. C18a es el motor y el camino de escritura; C18b la pantalla y la alerta de huérfanos, que necesitan familias existentes para tener algo que revisar. Y **C18a entra en la lista de nunca-recortar**, porque el plan tenía una contradicción: declaraba irrecortables a C30 y C36 —cuyos tests de familia son `test_variants_grouped_by_family_id` y `should require variant confirmation when family has multiple members`— y recortable al único change que crea familias. Con cero familias esos dos tests pasan en vacío, que es la firma que este proyecto lleva persiguiendo desde C17.
+
+El grafo del §4 tampoco dibujaba las aristas **C18→C25, C26, C30 y C36**. Ya están.
+
+**Lo que la medición sobre los 1.200 vectores obligó a corregir del §7.5 del diseño.** Su enunciado —*«agrupa candidatos por similitud de embedding (umbral alto) + mismo `piece_type` + raíz común de nombre»*— **no funciona**: las poblaciones de «peor hermano» y «mejor extraño» se solapan (real 0,847–0,920 frente a 0,867–0,936), y dos familias sintéticas distintas por construcción llegan a quedar a **cinco milésimas**. Ningún corte absoluto las separa. Pero en relativo el vector es excelente —el vecino más próximo es hermano en 96,2 % de los miembros reales y 99,7 % de los sintéticos—, así que **la raíz del nombre agrupa y el embedding veta**, comparando contra las otras pertenencias propuestas y nunca contra una constante.
+
+| Lo que decía la ficha | Lo que el apply obligó | Motivo |
+|---|---|---|
+| Umbral alto de similitud | **Veto relativo entre grupos**, margen 0,05 en configuración | Medido: no existe corte absoluto. Y la primera implementación, `mediana − k·MAD` contra el centroide, era una prueba *dentro* del grupo y disparaba al 16,9 % marcando al miembro menos típico de cada clúster |
+| «raíz común de nombre» | Raíz **más fusión por material**, nunca stripping global | Quitar talla y material a la vez degenera `Anillo plata S/M/L/XL` a la raíz `anillo`, que absorbería cualquier otro «Anillo ‹material›» |
+| El 1,7 % de la exploración | **3,1 %** (15 de 486 en 5 familias) | Aquella cifra se midió sobre familias de sufijo de talla solamente —24 reales en vez de 68— cuyos miembros son mucho más homogéneos. Más riqueza, más dispersión, más marcas |
+| «pantalla de revisión que crea las familias» | La creación es de **C18a**, la pantalla de **C18b** | Sin partirlo, `family_id` seguiría nulo hasta que existiera un frontend |
+
+**Y un matiz de mecanismo que sólo apareció al escribir el test.** El estampado de `Product.UpdatedAt` es la mitad de la historia: el watermark del feed es `greatest(Product, perfil, familia cuando es miembro actual)`, así que **crear** una familia lo mueve por el `UpdatedAt` de la propia familia. El estampado hace falta en el **reemplazo**, donde un producto que sale deja de unirse a la fila de familia. La regla —escribir siempre por `ProductFamilyService`— no cambia; el argumento correcto es que el servicio mantiene el watermark coherente en las **dos** direcciones.
+
+**Decisiones que C18a deja planteadas y no resuelve:**
+
+1. **El doble etiquetado del golden set de C24.** Su ficha lo da por hecho entre dos personas y el §6 lo declara irrenunciable; trabajando en solitario no existe. **Debe resolverse antes de abrir C24**, no dentro de él.
+2. **`Product.CollectionId` es una FK única y anulable**, pero la spec viva `product-family` justifica la distinción con las colecciones diciendo que un producto puede pertenecer *«to one of many unrelated collections»*. Ambas cardinalidades son 0..1. Los discriminadores reales, medidos: una colección abarca 1–154 productos (mediana 15) y **13–16 tipos de pieza**; una familia, 2–4 de **un solo tipo**.
+3. **Las lagunas del vocabulario de enriquecimiento**, en **un solo change** y no tres. Ver la propuesta de abajo. ~~Escala métrica en el vocabulario de talla~~ → **descartado el 2026-08-31**: `Cadena Barbara oro 40/42/45 cm` no son tallas de una misma pieza sino **tres cadenas de longitud distinta**, y declararlas familia forzaría el modelo — la familia agrupa variantes de una pieza, no productos parecidos. Caerán juntas por proximidad de vector cuando alguien busque una cadena de esa colección, que es el comportamiento correcto sin pertenencia declarada.
+
+### 2026-08-31 — Propuesta: `fix-enrichment-vocabulary-gaps` 🟢, un change y no tres
+
+Sale de C18a y **corrige dos cosas que su propio informe dejó mal escritas.**
+
+**La primera: el problema es tres veces más pequeño de lo que decía.** La limpieza de C18a se llevó 26 de los 37 productos con `piece_type` nulo. Quedan **once**: las nueve joyas sintéticas que el vocabulario no sabe nombrar —un cinturón de 1.300 €, cinco diademas de 340 a 1.040 €, dos gemelos y una «Joya del Zodiaco»— y los dos llaveros reales que se decidió conservar en el índice.
+
+**La segunda: la premisa de «dar a C09 una salida *no es una pieza*» era falsa.** Esa salida ya existe — el prompt dice literalmente *«`piece_type`: un hiperónimo de la lista cerrada, **o null**»*. Lo que falta no es la opción sino **el encargo**: el prompt abre con *«Eres un extractor de atributos de joyería»* y no contempla que el catálogo contenga otra cosa. Ante `Arreglos oro` hace exactamente lo que se le pidió —extraer atributos de joyería de algo que menciona oro— y *collar* es una conjetura razonable. **No es un fallo del modelo sino una laguna del enunciado**, y se arregla con una línea, no con un cambio de contrato.
+
+**Por qué un solo change.** Los dos arreglos tocan los mismos dos ficheros, exigen el mismo salto de versión de prompt y mueven el corpus por el mismo camino. Separarlos significa bumpear el prompt dos veces y mover el corpus dos veces, que es justo lo que C18a existe para no hacer.
+
+**Alcance.** `piece_type.terms` += `diadema`, `gemelos`, `cinturon` y **`llavero`** —los dos conservados dejan de ser invisibles al filtro, y el cuarto término sale gratis—; prompt **`enrichment/v2`** con la lista nueva más la línea que advierte de servicios, consumibles y regalo; espejo `materials-vocabulary.ts` y su test de fijación; reenriquecer **sólo los once** con `ignoreHash`; una sola sincronización incremental.
+
+**Fuera de alcance: reenriquecer los 1.200 con `v2`.** Serían ~1.200 llamadas y, peor, podría **reclasificar productos existentes** —algo hoy etiquetado `collar` podría pasar a `cinturon`— cambiando el comportamiento de búsqueda de forma difusa y sin que nadie lo pidiera.
+
+**Coste.** Cuatro ficheros, once productos, **0,9 % del corpus**. Menos de media sesión: no hay algoritmo, ni migración, ni interfaz. **Lo que compra es filtro y búsqueda por tipo**, no familias: las nueve tienen nueve raíces distintas y ninguna agruparía con otra.
+
+**Cuándo.** Mueve el corpus, así que **antes de la línea base de C24**, por el mismo argumento que ordenó C18a: `preprocessing_id` sigue siendo `source-text/v1` y no delataría el cambio.
+
+**Riesgo a comprobar, no a suponer.** Reenriquecer con `v2` puede cambiar otros campos de esos once —materiales, etiquetas— además del tipo. Hay que mirar el diff completo, no sólo `piece_type`.
+
+#### ¿Pueden convivir perfiles `v1` y `v2` en el catálogo? Sí, y el campo existe para eso
+
+Conviene no confundir dos versionados que se parecen y no lo son:
+
+| | `PromptVersion` | `embedding_version` |
+|---|---|---|
+| Dónde vive | `ProductAiProfiles`, lado .NET | `ai.product_document`, lado Python |
+| Qué registra | qué prompt produjo los **atributos** | `modelo : dims : preprocessing_id` |
+| ¿Llega al índice? | **No.** Ni al DTO del feed ni a `source_text.py` ni al `source_hash` | **Es** el índice |
+| Mezclar versiones | **seguro y trazable** | **la corrupción silenciosa de S11** |
+
+Mezclar `embedding_version` es comparar dos espacios geométricos: la base devuelve un número plausible que no significa nada, sin error. **Este change no lo toca**: la plantilla del documento no cambia, sólo el contenido de once filas.
+
+Mezclar `PromptVersion` es otra cosa. Son dos poblaciones de atributos producidas con instrucciones distintas, comparables como dato, y **el campo se creó para hacer visible esa diferencia en lugar de evitarla** — el perfil problemático es el que no dice con qué prompt nació, no el que sí lo dice.
+
+La única consecuencia real es de **informe, no de corrección**: las métricas que agregan sobre todo el corpus —tasa de corrección por campo de C28, métricas de enriquecimiento del §11.5— mezclarían dos poblaciones. Se resuelve **reportando por `PromptVersion`**, la misma disciplina que C24 ya aplica al reportar por `data_origin`. Estado a 2026-08-31: los 1.200 perfiles están en `enrichment/v1`.
+
 ### 2026-08-30 — C17, al cerrar: el riesgo se materializó, y no donde se esperaba
 
 C17 quedó archivado con 86/86 tareas y el entorno vivo. La entrada de abajo advertía de que el change podía «terminar en verde y entregar una URL pública donde *Buscar con ayuda* no encuentra nada». **Ese riesgo se materializó, en una forma que la advertencia no anticipaba**: el índice llegó lleno —1.200 documentos, `drift_count = 0`— y aun así la búsqueda devolvía **200 con diez resultados plausibles** servidos por el camino **léxico**, porque C16 había dejado la búsqueda asistida tras una puerta de despliegue progresivo (`AiSearch:EnabledByDefault`, en `false`) que `compose.demo.yaml` no abría. Sin error, sin traza, y con resultados en pantalla.
@@ -371,7 +431,8 @@ Cada entrada es **un change OpenSpec completo**, ejecutable de principio a fin e
 | **C15** | `add-dotnet-ai-search-endpoint` | .NET | C03, C14 | 🔴 | **rev. dec. 11**, **28 ago · archivado** |
 | **C16** | `add-frontend-assisted-search-panel` | Frontend + .NET | C15 | 🔴 | **rev. 29 ago · archivado** |
 | **C17** | `add-ai-service-deployment` | Infra + Python + .NET + FE | C15 | 🔴 | **rev. 29 ago** |
-| **C18** | `add-family-suggestion-and-review` | Python + .NET + FE | C07, C13 | 🟢 | **rev. dec. 2** |
+| **C18a** | `add-family-suggestion-and-approval` | Python + .NET | C07, C13 | 🟢 | **rev. dec. 2**, **31 ago · archivado** |
+| **C18b** | `add-family-review-ui-and-orphan-alert` | Frontend | C18a | 🟢 | **rev. dec. 2**, **partido el 31 ago** |
 | **C19** | `add-demand-signal-service` | .NET 🗄️ | C10 | 🟢 | **rev. dec. 6** |
 | **C20** | `add-synonym-dictionary` ⏳ | Python | C14 | 🟢 | **rev. dec. 4** |
 | **C21** | `add-hybrid-search-rrf` | Python | C14, C20 | 🔴 | — |
@@ -647,12 +708,22 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ---
 
-#### C18 · `add-family-suggestion-and-review` 🟢
+#### C18a · `add-family-suggestion-and-approval` 🟢 *(archivado 2026-08-31)*
 
-**Objetivo.** Flujo mixto de familias: la IA propone, el admin aprueba. Resuelve la decisión abierta 4 de las specs v2 y hace viable la decisión 2 de la revisión.
-**Prereq.** C07, C13 · **Zona.** Python + .NET + frontend
-**Alcance.** Agrupación de candidatos por similitud de embedding (umbral alto) + mismo `piece_type` + raíz común de nombre; detección de `variant_label`; `POST /v1/families/suggest`; pantalla de revisión por lotes que crea `ProductFamily`/`ProductFamilyMember` reales al aprobar; **alerta de huérfanos** (producto muy similar a una familia sin pertenecer a ella).
-**Tests.** `test_suggests_family_for_same_piece_type_and_high_similarity`; `test_does_not_group_across_piece_types`; `test_detects_size_label_from_name`; `test_orphan_detection_lists_unassigned_similar_products`; frontend: `should create family when suggestion is approved`.
+**Objetivo.** La mitad que desbloquea del flujo mixto: la IA propone y el administrador aprueba **por lotes**. Es lo que hace que `family_id` deje de ser nulo, y con ello que dejen de ser vacuos los tests de familia de C25, C26, C30 y C36.
+**Prereq.** C07, C13 · **Zona.** `ai-service/src/jbg_ai/families/`, `backend/` · **Lleva `design.md`**
+**Alcance.** Motor determinista sin LLM: raíz normalizada, **fusión por material** (nunca stripping global), guarda de raíz degenerada, puerta de `piece_type` con el nulo como valor propio, **veto relativo por embedding** que marca y no elimina, `variant_label` verbatim y `position` por rango canónico. **Novena ruta del contrato congelado**, `POST /v1/families/suggest`. En .NET, `POST /api/ai/catalog/family-suggestions` y `/apply`, que persiste vía `ProductFamilyService` —nunca por SQL— y escribe `Origin = AiApproved` con aprobador e instante. Sin migración, sin frontend, sin persistir propuestas.
+
+**Hecho (2026-08-31).** **156 familias y 486 miembros**, cero conflictos. 32 entradas que no son joyería terminada retiradas del índice con `ReviewStatus = Rejected` —nunca `IsActive`: la tienda las vende—. Reconciliación en **una sola** sincronización incremental: `upserted 486, deleted 32, failed 0`. Cola de revisión de **15 miembros en 5 familias** (margen 0,05). Informe: [`informes/c18a-family-suggestion-report.md`](informes/c18a-family-suggestion-report.md). Change [`add-family-suggestion-and-approval`](../../openspec/changes/add-family-suggestion-and-approval/).
+
+**Tres correcciones que el apply obligó a hacer.** *(1)* El **umbral absoluto del §7.5 no existe**: peor hermano y mejor extraño se solapan (real 0,847–0,936). La raíz agrupa y el embedding veta, **en relativo**. *(2)* El **stripping global de material degenera** `Anillo plata S/M/L/XL` a la raíz `anillo`; la fusión no. *(3)* El 1,7 % que la exploración midió describía familias de sufijo de talla solamente; sobre el algoritmo entregado la cifra honesta es **3,1 %**.
+
+#### C18b · `add-family-review-ui-and-orphan-alert` 🟢
+
+**Objetivo.** El segundo caso de intervención humana del PF: revisión por **ítem**, no por lote.
+**Prereq.** C18a · **Zona.** frontend + `Application/`
+**Alcance.** Pantalla de revisión por lotes sobre los dos endpoints que C18a ya expone —el frontend es lo único nuevo—; lista de **descartes** persistente, que es lo que C18a no tiene y hace que una propuesta rechazada reaparezca; **alerta de huérfanos** (producto muy similar a una familia sin pertenecer a ella), que necesita familias existentes y por eso es de aquí; y pintar la cola de revisión que C18a ya calcula: 15 miembros marcados, 4 grupos rechazados y 37 productos excluidos por la puerta.
+**Tests.** `should create family when suggestion is approved`; `should keep a dismissed suggestion out of the next run`; `test_orphan_detection_lists_unassigned_similar_products`; `should show why a group was rejected`.
 
 ---
 
@@ -875,14 +946,15 @@ flowchart LR
     C05 --> C11
     C06a --> C06b & C09 & C10
     C06b --> C11
-    C07 --> C12 & C18 & C30
+    C07 --> C12 & C18a & C30
     C08 --> C12 & C28
     C09 --> C11
     C10 --> C19 & C22 & C27
     C11 --> C13 & C23
     C12 --> C13 & C22
-    C13 --> C14 & C18
+    C13 --> C14 & C18a
     C14 --> C15 & C20 & C21 & C22 & C24
+    C18a --> C18b & C25 & C26 & C30 & C36
     C15 --> C16 & C17 & C34
     C16 --> C36
     C19 --> C29 & C33
@@ -944,7 +1016,7 @@ Si el **26 de agosto** (fin de O3) no están la tabla de ablations y el sistema 
 7. **Golden set de C24** 70 → 45 consultas, **nunca renunciando al doble etiquetado**
 8. **C35** agente de inventario → las recomendaciones se generan por reglas puras (C29), sin capa agéntica ni redacción LLM
 
-**Nunca se recortan:** C01, C02, C03, C05, **C06a**, C07, C09, C11, C12, C13, C14, C15, C16, C17, C21, C22, C24, C30, C32, C34, C36, el validador de C38 y C39. **C06b sí admite recorte**: si no llega, el corpus se queda en los 436 reales, todas las métricas se reportan sobre ellos y el README declara que no hubo ampliación sintética. Se pierde volumen y las categorías del golden set que necesiten productos inexistentes, no el sistema.
+**Nunca se recortan:** C01, C02, C03, C05, **C06a**, C07, C09, C11, C12, C13, C14, C15, C16, C17, **C18a**, C21, C22, C24, C30, C32, C34, C36, el validador de C38 y C39. **C06b sí admite recorte**: si no llega, el corpus se queda en los 436 reales, todas las métricas se reportan sobre ellos y el README declara que no hubo ampliación sintética. Se pierde volumen y las categorías del golden set que necesiten productos inexistentes, no el sistema.
 
 ---
 

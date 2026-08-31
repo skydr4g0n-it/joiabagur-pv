@@ -24,13 +24,14 @@ tests/
 ├── migrations/       # Alembic upgrade/downgrade, schema `ai`, index definitions
 ├── data/             # catalog corpus and synthetic world generators
 ├── enrichment/       # LLM extraction, closed vocabularies, per-field confidence
+├── families/         # name-root grouping, material fusion, guards, relative embedding veto
 ├── indexing/         # source text, hashing, embeddings, upsert, drift
 ├── retrieval/        # vector/lexical search, RRF, filters, ranking, substitutes
 ├── assist/           # generation, guardrails, agent loops, inventory proposals
 └── evals/            # harness, metrics, baselines, scenario replays
 ```
 
-Folders are created **on demand**, not up front. `api/`, `config/`, `support/`, `db/`, `migrations/`, `data/`, `enrichment/`, `indexing/` and `retrieval/` are populated; the rest are reserved names so nobody invents a
+Folders are created **on demand**, not up front. `api/`, `config/`, `support/`, `db/`, `migrations/`, `data/`, `enrichment/`, `families/`, `indexing/` and `retrieval/` are populated; the rest are reserved names so nobody invents a
 parallel taxonomy later.
 
 ## Which folder for which change
@@ -43,13 +44,14 @@ parallel taxonomy later.
 | `migrations/` | C05, C13 (landed: `text_provenance`, `sync_checkpoint`) |
 | `data/` | C06b (landed: generate/ingest CLI), C10 (landed: `world/`), C23 |
 | `enrichment/` | C09 |
+| `families/` | C18a (landed: root grouping, material fusion, guards, relative veto, `POST /v1/families/suggest`) |
 | `indexing/` | C11 (landed: source-text/v1 + embeddings), C13 (landed: catalog drain + `sku_provenance.json`), C22, C23 |
-| `retrieval/` | C14, C18, C20, C21, C22, C25, C26, C27 |
+| `retrieval/` | C14, C20, C21, C22, C25, C26, C27 |
 | `assist/` | C30, C31, C32, C33, C35 |
 | `evals/` | C24, C38 |
 
-Changes with no Python zone (C03, C04, C07, C08, C12, C15, C16, C19, C28, C29, C34,
-C36, C37) are tested on the .NET or frontend side. C17 also ships a post-deploy smoke
+Changes with no Python zone (C03, C04, C07, C08, C12, C15, C16, C18b, C19, C28, C29,
+C34, C36, C37) are tested on the .NET or frontend side. C17 also ships a post-deploy smoke
 check that belongs to the deployment pipeline rather than here — but it does have a
 Python zone after all: the enriched `/health` is tested in `api/test_health_report.py`,
 with its probe double in `support/fake_health_probe.py`.

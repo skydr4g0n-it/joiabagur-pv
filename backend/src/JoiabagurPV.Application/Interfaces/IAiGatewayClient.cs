@@ -84,4 +84,43 @@ public interface IAiGatewayClient
     /// Timeout, transport failure, or a non-success status. There is no retry and no breaker.
     /// </exception>
     Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Asks jbg-ai to propose product families over the indexed catalog.
+    /// </summary>
+    /// <param name="request">Optional narrowing by piece type and proposal cap.</param>
+    /// <param name="scope">Caller identity. Must be a catalog scope.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>
+    /// The proposals, plus the two kinds of omission: groups a guard refused and products the
+    /// piece-type gate excluded. All three are returned as received — filtering or reordering
+    /// them here would decide on the administrator's behalf what is worth looking at.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// The call proposes and never writes. Creating the approved families is this side's work,
+    /// through <see cref="IProductFamilyService"/>, because only that path stamps
+    /// <c>Product.UpdatedAt</c> on entering and leaving products — the watermark an incremental
+    /// index pull reads. Writing the membership rows any other way leaves the index blind to
+    /// them, and does so without raising anything.
+    /// </para>
+    /// <para>
+    /// <strong>There is no degraded mode.</strong> Unlike search, which drops to the lexical
+    /// index when the service is unreachable, a partial grouping would mean inventing catalog
+    /// structure. A failure here produces no proposals at all.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="Exceptions.AiUnavailableException">
+    /// Timeout, transport failure, open circuit, or a server error other than 501.
+    /// </exception>
+    /// <exception cref="Exceptions.AiNotImplementedException">
+    /// The route is contracted but has no implementation yet.
+    /// </exception>
+    /// <exception cref="Exceptions.AiGatewayConfigurationException">
+    /// The service rejected the credentials.
+    /// </exception>
+    Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
+        AiFamilySuggestRequest request,
+        AiCallScope scope,
+        CancellationToken cancellationToken = default);
 }
