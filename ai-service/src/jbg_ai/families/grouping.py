@@ -47,14 +47,18 @@ MIN_ROOT_TOKENS = 2
 
 @dataclass(frozen=True)
 class CandidateProduct:
-    """One catalogue row as the grouper needs it. Vectors are optional here."""
+    """One catalogue row as the grouper needs it.
+
+    No vector: grouping is pure text, and the veto that does use the vectors compares
+    them inside PostgreSQL rather than in Python, so carrying 1536 floats per product
+    through this layer would buy nothing.
+    """
 
     product_id: UUID
     sku: str
     name: str
     piece_type: str | None
     family_id: UUID | None = None
-    embedding: tuple[float, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -258,10 +262,24 @@ def _fuse_on_material(
 
 
 def _without_materials(root: str, vocabulary: FamilyVocabulary) -> str:
-    """The root with every material token removed. Used only as a fusion key."""
-    return " ".join(
-        token for token in root.split() if vocabulary.canonical_material(token) is None
-    )
+    """The root with every material removed. Used only as a fusion key.
+
+    Materials are matched as phrases for the same reason `naming.parse_name` does it:
+    a token-at-a-time scan turns `baño de oro` into the residue `bano de`, which is a
+    different fusion key from the `oro` variant's and would keep two groups that
+    differ by exactly one material from ever meeting.
+    """
+    tokens = root.split()
+    kept: list[str] = []
+    index = 0
+    while index < len(tokens):
+        found = vocabulary.material_at(tokens, index)
+        if found is None:
+            kept.append(tokens[index])
+            index += 1
+        else:
+            index += found[0]
+    return " ".join(kept)
 
 
 def _guard_reason(root: str, vocabulary: FamilyVocabulary) -> str | None:
@@ -310,6 +328,14 @@ def _distinguishing_labels(ordered: list[_Parsed]) -> list[str | None]:
     every member carries: including them would produce labels that repeat, which
     the family's uniqueness index rejects. What survives is the composite the
     two-axis families need — `mini oro` — and nothing more.
+
+    The two halves are not treated alike, and the asymmetry is deliberate. The size
+    is the fragment the catalogue wrote, kept verbatim down to its accent, because
+    `mini` and `XS` are different sizes and translating one into the other would
+    record something the shop never said. The material is its **canonical** term,
+    because `Oro` and `18k` are one material spelled twice: keeping both verbatim
+    would make one product look like two variants and would walk past the duplicate
+    label guard, which compares labels and not meanings.
     """
     sizes = {entry.parsed.size_label for entry in ordered}
     size_distinguishes = len(sizes) > 1

@@ -11,12 +11,14 @@ namespace JoiabagurPV.Application.Services;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The split is not stylistic. Only <see cref="IProductFamilyService"/> stamps
-/// <c>Product.UpdatedAt</c> on the products entering and leaving a family, and that timestamp is
-/// the cursor the catalog indexing feed reads. Writing the membership rows any other way — a
-/// direct <c>INSERT</c> from the Python side, say — leaves the incremental pull blind to them,
-/// and leaves it blind without raising anything at all: the index would simply keep reporting no
-/// families forever.
+/// The split is not stylistic. Only <see cref="IProductFamilyService"/> keeps the catalog feed's
+/// watermark coherent, and it is coherent in two directions: creating a family moves the cursor
+/// through the family row's own <c>UpdatedAt</c>, which the feed joins on for current members,
+/// while replacing a membership stamps <c>Product.UpdatedAt</c> on the products entering and
+/// leaving — the ones that stop joining that row and would otherwise drop out of the cursor.
+/// Writing the membership rows any other way — a direct <c>INSERT</c> from the Python side, say —
+/// leaves the incremental pull blind to them, and leaves it blind without raising anything at
+/// all: the index would simply keep reporting no families forever.
 /// </para>
 /// <para>
 /// Proposing and applying are two calls because the proposal is not persisted anywhere. The

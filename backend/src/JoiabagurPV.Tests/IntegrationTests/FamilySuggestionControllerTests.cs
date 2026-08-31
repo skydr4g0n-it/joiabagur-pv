@@ -19,10 +19,11 @@ namespace JoiabagurPV.Tests.IntegrationTests;
 /// Integration tests for the assisted family flow: jbg-ai proposes, this side persists.
 /// </summary>
 /// <remarks>
-/// The test that matters most is <see cref="ApplyFamilySuggestions_StampsUpdatedAtOfEnteringProducts"/>.
-/// Everything else here would also pass against an implementation that wrote the membership rows
-/// by direct SQL — and that implementation would leave the vector index blind to every family it
-/// ever created, without raising anything. The watermark is the only observable difference.
+/// The test that matters most is
+/// <see cref="ApplyFamilySuggestions_MakesMembersVisibleToAnIncrementalPull"/>. Everything else
+/// here would also pass against an implementation that wrote the membership rows by direct SQL —
+/// and that implementation would leave the vector index blind to every family it ever created,
+/// without raising anything. The watermark is the only observable difference.
 /// </remarks>
 [Collection(IntegrationTestCollection.Name)]
 public class FamilySuggestionControllerTests : IAsyncLifetime
@@ -70,6 +71,52 @@ public class FamilySuggestionControllerTests : IAsyncLifetime
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
+
+    // ── Suggesting ────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Asking for suggestions returns them and leaves the catalog exactly as it was found.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The gateway is replaced by a stub proposing the fixture's own products. Without one the
+    /// call ends at the real service and the assertions prove nothing: a request that returned no
+    /// proposal could not have persisted one either, so the test would pass on a controller that
+    /// writes eagerly the moment it does receive proposals.
+    /// </para>
+    /// <para>
+    /// <c>UpdatedAt</c> is asserted alongside the row counts because it is the half of "wrote
+    /// nothing" that has no visible row: stamping a product with no family attached creates
+    /// nothing and still drags it into the next incremental pull.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task SuggestFamilies_ReturnsProposals_WithoutWritingAnything()
+    {
+        var before = await ProductTimestampsAsync();
+
+        using var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+                services.AddScoped<IAiGatewayClient>(_ => new ProposingGateway(_small, _medium))));
+
+        var admin = await AuthenticateAgainstAsync(factory, "admin", "Admin123!");
+
+        var response = await admin.PostAsJsonAsync(SuggestEndpoint, new FamilySuggestionsRequest());
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<AiFamilySuggestResponse>();
+        body!.Proposals.Should().ContainSingle()
+            .Which.Members.Should().HaveCount(2, "the proposal must reach the caller intact");
+
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await context.ProductFamilies.CountAsync()).Should().Be(0,
+            "proposing is not approving: the write path is /apply and nothing else");
+        (await context.ProductFamilyMembers.CountAsync()).Should().Be(0);
+
+        (await ProductTimestampsAsync()).Should().Equal(before,
+            "a product nothing happened to must stay out of the incremental feed's cursor");
+    }
 
     // ── Applying ──────────────────────────────────────────────────────────────────────────────
 
@@ -391,14 +438,22 @@ public class FamilySuggestionControllerTests : IAsyncLifetime
         return [.. page.Items.OfType<CatalogUpsertItemDto>().Select(item => item.ProductId)];
     }
 
-    private async Task<HttpClient> AuthenticateAsync(string username, string password)
+    private Task<HttpClient> AuthenticateAsync(string username, string password) =>
+        AuthenticateAgainstAsync(_factory, username, password);
+
+    /// <summary>
+    /// Logs in against a specific host, which the gateway-replacing tests need: their host is a
+    /// different one from the class's, and a cookie issued by one is no use to the other.
+    /// </summary>
+    private static async Task<HttpClient> AuthenticateAgainstAsync(
+        WebApplicationFactory<Program> factory, string username, string password)
     {
-        var login = await _client.PostAsJsonAsync(
+        var login = await factory.CreateClient().PostAsJsonAsync(
             "/api/auth/login",
             new LoginRequest { Username = username, Password = password });
         login.EnsureSuccessStatusCode();
 
-        var authenticated = _factory.CreateClient();
+        var authenticated = factory.CreateClient();
         foreach (var cookie in login.Headers.GetValues("Set-Cookie"))
         {
             var parts = cookie.Split(';')[0].Split('=');
@@ -409,5 +464,68 @@ public class FamilySuggestionControllerTests : IAsyncLifetime
         }
 
         return authenticated;
+    }
+
+    /// <summary>Every product's <c>UpdatedAt</c>, in a stable order, to compare before and after.</summary>
+    private async Task<List<DateTime>> ProductTimestampsAsync()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        return await context.Products
+            .OrderBy(product => product.SKU)
+            .Select(product => product.UpdatedAt)
+            .ToListAsync();
+    }
+
+    /// <summary>Proposes the fixture's own products, so any write would land on rows this test reads.</summary>
+    private sealed class ProposingGateway(Product first, Product second) : IAiGatewayClient
+    {
+        public Task<AiSearchResponse> SearchAsync(
+            AiSearchRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AiEnrichResponse> EnrichAsync(
+            AiEnrichRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
+            AiFamilySuggestRequest request,
+            AiCallScope scope,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AiFamilySuggestResponse
+            {
+                Proposals =
+                [
+                    new AiFamilyProposal
+                    {
+                        Root = "anillo erizo de mar",
+                        SuggestedName = "Anillo erizo de mar",
+                        PieceType = "anillo",
+                        Members =
+                        [
+                            new AiProposedFamilyMember
+                            {
+                                ProductId = first.Id.ToString(),
+                                Sku = first.SKU,
+                                Name = first.Name,
+                                VariantLabel = "S",
+                                Position = 0
+                            },
+                            new AiProposedFamilyMember
+                            {
+                                ProductId = second.Id.ToString(),
+                                Sku = second.SKU,
+                                Name = second.Name,
+                                VariantLabel = "M",
+                                Position = 1
+                            }
+                        ]
+                    }
+                ]
+            });
     }
 }

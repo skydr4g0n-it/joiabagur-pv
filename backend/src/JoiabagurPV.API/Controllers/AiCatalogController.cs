@@ -183,9 +183,11 @@ public class AiCatalogController : ControllerBase
     /// <param name="request">The accepted subset, returned by the caller.</param>
     /// <returns>Counts of what was created, and the families a conflict skipped.</returns>
     /// <remarks>
-    /// The only write path of the assisted flow, and it goes through the family service so that
-    /// <c>Product.UpdatedAt</c> is stamped on entering products — the watermark the incremental
-    /// catalog feed reads. It does not reach jbg-ai at all: the proposal already travelled.
+    /// The only write path of the assisted flow, and it goes through the family service because
+    /// that service is the one thing that keeps the incremental catalog feed's watermark
+    /// coherent — here through the new family's own <c>UpdatedAt</c>, which the feed joins on for
+    /// current members, and on a later replace through the stamp it puts on entering and leaving
+    /// products. It does not reach jbg-ai at all: the proposal already travelled.
     /// </remarks>
     [HttpPost("family-suggestions/apply")]
     [ProducesResponseType(typeof(ApplyFamilySuggestionsResponse), StatusCodes.Status200OK)]

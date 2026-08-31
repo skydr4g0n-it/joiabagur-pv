@@ -37,8 +37,12 @@ async def suggest_families(
     candidates = await load_candidates(settings, piece_type)
     outcome = build_candidate_groups(candidates, vocabulary)
 
+    # Keyed by piece type *and* root, which is how the grouper keys a proposal. Two
+    # families of different piece types can share a root, and collapsing them here
+    # would make each other's members look like siblings and cancel the veto between
+    # them.
     membership = {
-        member.sku: proposal.root
+        member.sku: (proposal.piece_type, proposal.root)
         for proposal in outcome.proposals
         for member in proposal.members
     }

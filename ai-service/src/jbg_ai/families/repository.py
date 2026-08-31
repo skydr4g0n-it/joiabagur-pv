@@ -26,15 +26,15 @@ SELECT
   sku,
   name,
   piece_type,
-  family_id,
-  embedding::real[] AS embedding
+  family_id
 FROM ai.product_document
 WHERE is_active IS TRUE
 """
-# `embedding::real[]` rather than the bare column: the pgvector type is not
-# registered on this connection, so the driver would hand back the literal
-# `'[0.1,0.2,...]'` and the caller would parse text. The cast makes the database
-# produce floats and keeps the parsing out of Python.
+# No `embedding` column on purpose. An earlier version selected it as
+# `embedding::real[]` so the veto could run in Python, and then the veto turned out
+# to be a comparison between groups that PostgreSQL answers far better with `<=>`
+# (see `load_member_similarities`). Reading it here spent 1200 x 1536 floats per
+# call on a value nothing went on to look at.
 
 _ORDER_BY = "\nORDER BY sku"
 
@@ -61,9 +61,9 @@ async def load_candidates(
     a family proposal, and including it would offer the administrator a grouping
     that the feed would tombstone straight afterwards.
 
-    The embedding is read as a vector and carried on the candidate so the veto can
-    run without a second query per group — the connection pool is capped at five
-    for the whole service, and a query per family would spend it.
+    Text columns only. The vectors are never loaded into Python: the veto needs
+    similarities between products rather than the vectors themselves, and one
+    `load_member_similarities` statement computes them all in the database.
     """
     sql = _compile_candidates_sql(piece_type)
     params = {} if piece_type is None else {"piece_type": piece_type}
@@ -76,14 +76,12 @@ async def load_candidates(
 
 
 def _to_candidate(row: dict[str, object]) -> CandidateProduct:
-    embedding = row["embedding"]
     return CandidateProduct(
         product_id=row["product_id"],  # type: ignore[arg-type]
         sku=str(row["sku"]),
         name=str(row["name"]),
         piece_type=str(row["piece_type"]) if row["piece_type"] is not None else None,
         family_id=row["family_id"],  # type: ignore[arg-type]
-        embedding=tuple(float(value) for value in embedding) if embedding is not None else None,
     )
 
 
@@ -102,16 +100,21 @@ WHERE a.sku = ANY(:skus)
 
 
 async def load_member_similarities(
-    settings: Settings, membership: dict[str, str]
+    settings: Settings, membership: dict[str, tuple[str, str]]
 ) -> dict[str, MemberSimilarity]:
     """Worst-sibling and best-stranger similarity for every proposed member.
 
-    `membership` maps SKU to the root of the family it was proposed for, so the
-    query can be restricted to proposed members only. That restriction is the
-    decision, not an optimisation: a product competing for no membership is not an
-    alternative membership and must not be able to veto one. Widening the universe
-    to the whole catalogue flags 16% of members against products that were never
-    candidates for anything.
+    `membership` maps SKU to the identity of the family it was proposed for — its
+    piece type and its root, which is what the grouper keys proposals by. The root
+    alone would not do: two proposals of **different** piece types can carry the same
+    root, since a root is the folded name and the piece type comes from enrichment
+    rather than from the name, and keying on it alone would read those two families
+    as one and quietly lose every veto between them.
+
+    Restricting the query to proposed members is the decision, not an optimisation: a
+    product competing for no membership is not an alternative membership and must not
+    be able to veto one. Widening the universe to the whole catalogue flags 16% of
+    members against products that were never candidates for anything.
 
     One statement rather than one per member: the connection pool is capped at five
     for the whole service.
@@ -138,7 +141,7 @@ async def load_member_similarities(
                 worst[member] = similarity
         elif similarity > best.get(member, -2.0):
             best[member] = similarity
-            best_family[member] = membership[other]
+            best_family[member] = membership[other][1]
 
     return {
         sku: MemberSimilarity(

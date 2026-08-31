@@ -265,6 +265,53 @@ def test_a_material_every_member_shares_is_not_a_label() -> None:
     assert labels == ["mini", None]
 
 
+def test_a_multi_word_size_leaves_no_residue_in_the_root() -> None:
+    """Read token by token, `extra mini` labels `mini` and strands `extra` in the root.
+
+    The two products would then land in different roots and never form a family. No
+    catalogue name carries a multi-word size today; this is the guard for the day one
+    does, because the failure is silent — a family that simply fails to appear.
+    """
+    proposal = _only(
+        [
+            _product("Anillo conchiglie extra mini"),
+            _product("Anillo conchiglie mini"),
+        ]
+    )
+    assert proposal.root == "anillo conchiglie"
+    assert [member.variant_label for member in proposal.members] == ["extra mini", "mini"]
+
+
+def test_a_multi_word_material_fuses_like_a_single_token_one() -> None:
+    """`baño de oro` must reduce away whole, or its group never meets the plain one."""
+    proposal = _only(
+        [
+            _product("Colgante hoja roble", "colgante"),
+            _product("Colgante hoja roble baño de oro", "colgante"),
+        ]
+    )
+    assert proposal.root == "colgante hoja roble"
+    assert [member.variant_label for member in proposal.members] == [None, "baño de oro"]
+
+
+def test_one_material_spelled_two_ways_does_not_become_two_variants() -> None:
+    """`Oro` and `18k` are one material, so the pair is a review item, not a family.
+
+    This is what the canonical material term in a label buys. Keeping both spellings
+    verbatim would produce two different labels, the uniqueness guard would see no
+    duplicate, and the shop would get a family whose two variants are the same thing.
+    """
+    outcome = build_candidate_groups(
+        [
+            _product("Anillo conchiglie Oro"),
+            _product("Anillo conchiglie 18k"),
+        ],
+        VOCAB,
+    )
+    assert outcome.proposals == ()
+    assert [group.reason for group in outcome.rejected] == ["duplicate_variant_labels"]
+
+
 def test_a_single_product_is_not_a_family() -> None:
     outcome = build_candidate_groups([_product("Anillo erizo de mar S")], VOCAB)
     assert outcome.proposals == ()

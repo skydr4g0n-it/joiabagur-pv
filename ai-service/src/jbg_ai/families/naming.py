@@ -10,10 +10,18 @@ Two rules here are measured decisions, not preferences:
   collapses `Anillo plata S/M/L/XL` onto the bare piece type `anillo`, which
   would then absorb every other "Anillo <material>". Material is handled by
   *merging* already-formed groups (see `grouping`), never by stripping.
-* **The label is the substring the catalogue wrote.** `ClosedVocab.resolve`
+* **The size label is the substring the catalogue wrote.** `ClosedVocab.resolve`
   canonicalises `pequeña` to `pequeno`; persisting that would contradict the
   requirement that the label stays verbatim. Detection uses the vocabulary —
   so the synonym is recognised — and storage keeps what the shop typed.
+
+The material axis is deliberately **not** symmetrical with that last rule, and
+`grouping._distinguishing_labels` is where it shows: a material reaches a label as
+its *canonical* term. Two spellings of one material (`Oro` and `18k`, `plata` and
+`925`) would otherwise read as two distinct variants and slip past the duplicate
+label guard, presenting the same product twice over. The size scales cannot cause
+that — `mini` and `XS` are different sizes, not two spellings of one — so there
+the verbatim rule is free of consequences and applies.
 """
 
 from __future__ import annotations
@@ -30,15 +38,13 @@ __all__ = ["ParsedName", "parse_name"]
 class ParsedName:
     """A product name split into the part that groups and the part that varies."""
 
-    #: Folded name with the trailing size token removed. Groups products.
+    #: Folded name with the size removed, from wherever it sat. Groups products.
     root: str
     #: Size token exactly as the catalogue wrote it, or None for the base piece.
     size_label: str | None
     #: Canonical size term behind `size_label`, used only for ordering.
     canonical_size: str | None
-    #: Folded material tokens present anywhere in the name, in order of appearance.
-    materials: tuple[str, ...]
-    #: Canonical material terms behind `materials`, deduplicated, order preserved.
+    #: Canonical material terms found in the name, deduplicated, order preserved.
     canonical_materials: tuple[str, ...]
 
     @property
@@ -63,56 +69,71 @@ def parse_name(name: str, vocabulary: FamilyVocabulary) -> ParsedName:
 
     A name that is nothing but a size keeps it: emptying the root would group
     every such product together.
+
+    Sizes and materials are matched as **phrases**, longest first, because several
+    vocabulary entries span more than one word (`extra mini`, `baño de oro`). A
+    single-token scan sees only their last word, which strands `extra` in the root
+    and truncates the label to `mini` — silently, and only for the names that carry
+    one. No product name in today's catalogue does; the scan is what keeps the next
+    one from breaking quietly.
     """
     folded = fold(name)
     if not folded:
-        return ParsedName("", None, None, (), ())
+        return ParsedName("", None, None, ())
 
     tokens = folded.split()
     size_label: str | None = None
     canonical_size: str | None = None
 
-    for index, token in enumerate(tokens):
-        candidate = vocabulary.canonical_size(token)
-        if candidate is None:
+    index = 0
+    while index < len(tokens):
+        found = vocabulary.size_at(tokens, index)
+        if found is None:
+            index += 1
             continue
-        if len(tokens) == 1:
-            break  # the whole name is a size token; keep it as the root
+        length, canonical = found
+        if length == len(tokens):
+            break  # the whole name is a size; keep it as the root
         # Recover the surface form from the original string rather than from the
         # folded one, so the label keeps its accent: `pequeña`, never `pequena`.
-        size_label = _surface_form(name, token)
-        canonical_size = candidate
-        tokens = tokens[:index] + tokens[index + 1 :]
+        size_label = _surface_form(name, " ".join(tokens[index : index + length]))
+        canonical_size = canonical
+        tokens = tokens[:index] + tokens[index + length :]
         break
 
-    materials: list[str] = []
     canonical_materials: list[str] = []
-    for token in tokens:
-        canonical_material = vocabulary.canonical_material(token)
-        if canonical_material is not None:
-            materials.append(token)
-            if canonical_material not in canonical_materials:
-                canonical_materials.append(canonical_material)
+    index = 0
+    while index < len(tokens):
+        found = vocabulary.material_at(tokens, index)
+        if found is None:
+            index += 1
+            continue
+        length, canonical = found
+        if canonical not in canonical_materials:
+            canonical_materials.append(canonical)
+        index += length
 
     return ParsedName(
         root=" ".join(tokens),
         size_label=size_label,
         canonical_size=canonical_size,
-        materials=tuple(materials),
         canonical_materials=tuple(canonical_materials),
     )
 
 
-def _surface_form(name: str, folded_token: str) -> str:
-    """The chunk of the original name that folds to `folded_token`.
+def _surface_form(name: str, folded_phrase: str) -> str:
+    """The stretch of the original name that folds to `folded_phrase`.
 
-    Matched by folding rather than by index, because folding turns punctuation
-    into whitespace and the two token streams need not line up. Keeps the
-    catalogue's spelling — accent and capitalisation included — which is what
-    the operator reads on the label.
+    Matched by folding rather than by index, because folding turns punctuation into
+    whitespace and the two token streams need not line up: `extra-mini` is one chunk
+    of the name and two folded tokens. Widening windows handle both directions.
+    Keeps the catalogue's spelling — accent and capitalisation included — which is
+    what the operator reads on the label.
     """
-    for chunk in name.strip().split():
-        trimmed = chunk.strip("()+.,;:")
-        if fold(trimmed) == folded_token:
-            return trimmed
-    return folded_token
+    chunks = [chunk.strip("()+.,;:") for chunk in name.strip().split()]
+    for start in range(len(chunks)):
+        for end in range(start + 1, len(chunks) + 1):
+            window = " ".join(chunks[start:end])
+            if fold(window) == folded_phrase:
+                return window
+    return folded_phrase

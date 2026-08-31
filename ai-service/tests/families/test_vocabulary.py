@@ -80,3 +80,24 @@ def test_a_multi_word_piece_type_is_not_mistaken_for_a_bare_one() -> None:
     assert VOCAB.is_piece_type("anillo")
     assert not VOCAB.is_piece_type("anillo plata")
     assert not VOCAB.is_piece_type("")
+
+
+def test_a_multi_word_material_is_matched_whole_and_not_by_its_last_word() -> None:
+    """`baño de oro` is its own material. Read one token at a time it becomes `oro`."""
+    tokens = ["colgante", "bano", "de", "oro"]
+
+    assert VOCAB.material_at(tokens, 1) == (3, "baño de oro")
+    assert VOCAB.material_at(tokens, 3) == (1, "oro"), "the last word alone is still gold"
+    assert VOCAB.material_at(tokens, 0) is None
+
+
+def test_a_multi_word_size_synonym_is_matched_whole() -> None:
+    """`extra mini` is a size of its own; the `mini` inside it must not win."""
+    assert VOCAB.size_at(["anillo", "extra", "mini"], 1) == (2, "extramini")
+    assert VOCAB.size_at(["anillo", "mini"], 1) == (1, "mini")
+
+
+def test_the_phrase_scan_is_bounded_by_the_vocabulary_itself() -> None:
+    """A constant bound would silently stop matching the day a longer term is added."""
+    assert VOCAB.material_span == max(len(entry.split()) for entry in VOCAB.material_tokens)
+    assert VOCAB.size_span == max(len(entry.split()) for entry in VOCAB.size_tokens)
