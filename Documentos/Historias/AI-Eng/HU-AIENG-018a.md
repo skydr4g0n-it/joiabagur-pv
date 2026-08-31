@@ -117,11 +117,11 @@ Ese último caso obliga a un ajuste del algoritmo: **`Anillo plata S/M/L/XL` tie
 
 - **Librería de agrupamiento en Python**, determinista, sin LLM y sin llamadas de red, en `ai-service/src/jbg_ai/families/`:
   - normalización de raíz (*casefold*, sin acentos, puntuación y espacios colapsados);
-  - agrupación **L2** por raíz tras retirar el sufijo de talla (latino y en palabra);
-  - **fusión** de grupos cuyas raíces difieran en exactamente un token de material;
+  - agrupación **L2** por raíz tras retirar el token de talla —latino y en palabra— **esté donde esté en el nombre**, y emparejando entero un término de varias palabras como `extra mini`;
+  - **fusión** de grupos cuyas raíces difieran en exactamente un material, contando `baño de oro` como uno solo;
   - **guardas**: no fusionar si la raíz resultante queda en el tipo de pieza pelado o por debajo de dos tokens;
   - puerta de `piece_type`: nunca se agrupa a través de tipos de pieza, y **un `piece_type` nulo no agrupa con ninguno** — el nulo es valor propio de la puerta, no comodín;
-  - **veto relativo por embedding** sobre los candidatos ya formados — el miembro cuyo coseno al centroide cae por debajo de `mediana − k·MAD` **se marca para revisión, no se elimina**. **`k = 2` sobre los 5 vecinos más próximos, y ambos en configuración, nunca en el código**;
+  - **veto relativo por embedding** sobre los candidatos ya formados — se **marca para revisión, nunca se elimina**, al miembro que tiene un producto de **otra familia propuesta** más cerca que su propio peor hermano, por más de un **margen en configuración, nunca en el código** (D10 revisada: la versión inicial medía `mediana − k·MAD` contra el centroide, que es una prueba *dentro* del grupo mientras que la medición que la justificaba era *entre* grupos);
   - **reutilización de los vocabularios cerrados de [`enrichment/vocabularies.yaml`](../../../ai-service/src/jbg_ai/enrichment/vocabularies.yaml)** (materiales, talla en sus dos escalas, tipo de pieza) y de su `fold()`, sin declarar ninguna lista nueva (D12 revisada);
   - **rango canónico de tallas**, lo único que el vocabulario no puede aportar porque su lista está agrupada por escala y no ordenada por magnitud (D12b);
   - detección de `variant_label` como el fragmento retirado, **verbatim normalizado**;
@@ -294,7 +294,7 @@ Cerrados aplicando la opción por defecto de las preguntas abiertas del ticket. 
 ## Tareas
 
 1. Completar los artefactos OpenSpec del change: `proposal`, **`design.md`** —hay decisión con alternativas reales y medición para resolverla—, specs delta y `tasks`.
-2. **Librería `jbg_ai.families`**: normalización de raíz, agrupación L2, fusión por material con guardas, puerta de `piece_type` (nulo = valor propio, D9), veto relativo por embedding con `k = 2` sobre 5 vecinos leídos de configuración (D10), detección de `variant_label` y rango canónico de tallas. Sin LLM, sin red, determinista.
+2. **Librería `jbg_ai.families`**: normalización de raíz, agrupación L2, fusión por material con guardas, puerta de `piece_type` (nulo = valor propio, D9), veto relativo por embedding entre familias propuestas, con su margen leído de configuración (D10 revisada), detección de `variant_label` y rango canónico de tallas. Sin LLM, sin red, determinista.
 3. **Reutilizar los vocabularios de `enrichment/vocabularies.yaml`** (D12 revisada) y declarar sólo el rango canónico de tallas (D12b), con un test que falla si alguien vuelve a declarar una lista dentro de `families/`.
 4. **`POST /v1/families/suggest`**: router, modelos Pydantic, exclusión de productos ya asignados, respuesta determinista bajo `STUB_MODE`.
 5. **Regenerar `ai-service/openapi.json`** con la orden del README y actualizar `test_openapi_snapshot_is_stable`.
@@ -324,5 +324,5 @@ Cerrados aplicando la opción por defecto de las preguntas abiertas del ticket. 
   - **Sobre-agrupamiento por fusión de material.** Mitigado con la guarda de raíz degenerada, la puerta de `piece_type` y el veto relativo; las excepciones van a la cola de revisión y no a una regla.
   - **La cola de revisión no tiene pantalla hasta C18b.** Aceptado: en C18a la aprobación es por lotes y las excepciones se listan en el informe.
   - **`piece_type` sin medir.** Si su tasa de nulos fuese alta, la puerta perdería fuerza y el peso recaería sobre el veto del embedding. **Mitigado por D9**, que fija el comportamiento por el lado seguro sin esperar a la medición; la tarea 12 la confirma y la anota.
-  - **El veto relativo puede quedar mal calibrado.** `k = 2` sobre 5 vecinos sale de los 6 solapamientos medidos, que es una muestra pequeña. **Mitigado por D10**, que lo deja en configuración: si C24 muestra que corta de más o de menos, se barre sin tocar código.
+  - **El veto relativo puede quedar mal calibrado.** El margen 0,05 sale de una muestra corta. **Mitigado por D10**, que lo deja en configuración: si C24 muestra que corta de más o de menos, se barre sin tocar código.
   - **Dependencia de orden con C19:** ninguna técnica. C19 es 🗄️ y C18a no, así que no compiten por el turno de migración y pueden ejecutarse seguidos en cualquier orden. El plan se reordena a C18a → C19 → C18b sólo porque C18a gatea la medición y C19 no.

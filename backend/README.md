@@ -239,6 +239,8 @@ The system has two roles:
 | `POST /api/ai/search` | ✅‡ | ✅* |
 | `POST /api/ai/search-events/{id}/selection` | ✅** | ✅** |
 | `POST /api/ai/catalog/enrich-batch` | ✅ | ❌ |
+| `POST /api/ai/catalog/family-suggestions` | ✅ | ❌ |
+| `POST /api/ai/catalog/family-suggestions/apply` | ✅ | ❌ |
 | `POST /api/product-families` | ✅ | ❌ |
 | `GET /api/product-families/{id}` | ✅ | ✅ |
 | `PUT /api/product-families/{id}` | ✅ | ❌ |
@@ -283,6 +285,26 @@ family holding each of them.
 middle case is ordinary rather than exceptional — a sizeable share of the catalogue is deliberately
 unfamilied — and collapsing it into the `404` would leave callers unable to tell a quality incidence
 from a bad identifier.
+
+#### Assisted grouping
+
+Families can also be created from a proposal `jbg-ai` computes. The two operations are separate
+endpoints because they do different things: `POST /api/ai/catalog/family-suggestions` asks the
+service for groupings and **writes nothing at all** — no family, no membership, no watermark — while
+`POST /api/ai/catalog/family-suggestions/apply` persists the subset the administrator hands back.
+Nothing is stored between the two calls, so there is no proposal store to keep in step with the
+catalog.
+
+Applying goes through the same `ProductFamilyService` as the manual endpoints, never by direct SQL,
+which is what keeps the indexing feed's watermark coherent, and records `Origin = AiApproved` with
+the approving administrator and the instant — the first write of three columns the family schema
+reserved and had left empty. A family created through the manual endpoints still records `Manual`.
+
+**A contested product answers `200`, not `409`.** The batch is on the order of a hundred and fifty
+families, and one product that meanwhile joined another family must not cost the administrator the
+rest of the approvals: that family is skipped whole — never half-created — and named in the response
+alongside whoever holds its products, while the others are created. The `409` above stays the answer
+of the manual endpoints, which create one family and only one.
 
 ### Catalog AI enrichment
 

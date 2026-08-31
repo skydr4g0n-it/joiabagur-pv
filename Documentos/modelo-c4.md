@@ -84,7 +84,7 @@ El sistema está compuesto por cinco contenedores principales: una aplicación w
 - **Responsabilidades**:
   - Recuperación vectorial e híbrida sobre el índice del catálogo (pgvector)
   - Generación con LLM, atribución con citas y guardrails
-  - Enriquecimiento del catálogo e indexación (`/v1/enrich`, `/v1/index`)
+  - Enriquecimiento del catálogo, agrupación asistida en familias e indexación (`/v1/enrich`, `/v1/families`, `/v1/index`)
   - Bucles agénticos de asistencia a la venta y de inventario
   - Evaluación offline (golden set, métricas de recuperación y generación)
 - **Lo que NO hace**: no calcula precio, stock ni permisos; no escribe ni lee el esquema `public` por SQL; no atiende al navegador
@@ -207,7 +207,9 @@ Viven en la misma capa de aplicación que los anteriores; se listan aparte porqu
 
 - **Profile Review Policy** (C08): decide, campo a campo, qué necesita mirar una persona. Clase **pura** —sin base de datos, sin HTTP, sin reloj— con sus umbrales en configuración validada al arranque, porque están pensados para recalibrarse contra el golden set de evaluación.
 
-- **Product Family Service** (C07): gestión de las familias de producto y de su pertenencia. La lista de miembros se **declara entera** y el orden sale de la posición en ella, de modo que huecos y órdenes duplicados no se pueden expresar; declarar la lista que la familia ya tiene no escribe nada. La exclusión —un producto en una familia como máximo— la garantiza un índice único de la base, no una comprobación del servicio.
+- **Product Family Service** (C07): gestión de las familias de producto y de su pertenencia. La lista de miembros se **declara entera** y el orden sale de la posición en ella, de modo que huecos y órdenes duplicados no se pueden expresar; declarar la lista que la familia ya tiene no escribe nada. La exclusión —un producto en una familia como máximo— la garantiza un índice único de la base, no una comprobación del servicio. Es la **única vía de escritura** de familias, también para la aprobación asistida de C18a: es lo único que mantiene coherente el watermark del feed de indexación, por el `UpdatedAt` de la propia familia al crearla y por el estampado de los productos que entran y salen al reemplazar.
+
+- **Family Suggestion Service** (C18a): orquesta la agrupación asistida. `jbg-ai` propone y este lado persiste, con el mismo patrón que el enriquecimiento por lotes de C09. **Proponer no escribe absolutamente nada** —ni familia, ni pertenencia, ni watermark—; aplicar recorre el lote familia a familia y registra `Origin = AiApproved` con el administrador y el instante. Un producto en disputa **no tumba el lote**: esa familia se salta entera y se nombra en la respuesta, y las demás se crean.
 
 - **AI Gateway Client** (C03, C08): cliente tipado hacia `jbg-ai`, con una familia de ruta por tipo de llamada y **cortacircuitos aislados entre ellas**, de modo que un enriquecimiento lento no pueda empujar la búsqueda del operador a su vía léxica degradada.
 
@@ -256,7 +258,8 @@ C4Component
         Component(searchEventService, "Product Search Event Service", "C#", "Telemetría de búsqueda asistida (C04) · nunca lanza")
         Component(aiProfileService, "Product AI Profile Service", "C#", "Enriquecimiento por lotes y perfil IA revisable (C08)")
         Component(reviewPolicy, "Profile Review Policy", "C#", "Revisión híbrida por campo (C08) · clase pura")
-        Component(familyService, "Product Family Service", "C#", "Familias de producto y pertenencia declarativa (C07)")
+        Component(familyService, "Product Family Service", "C#", "Familias de producto y pertenencia declarativa (C07) · única vía de escritura, también para la aprobación asistida (C18a)")
+        Component(familySuggestionService, "Family Suggestion Service", "C#", "Agrupación asistida (C18a) · jbg-ai propone, este lado persiste; proponer no escribe nada")
         Component(aiGatewayClient, "AI Gateway Client", "C#", "Cliente tipado hacia jbg-ai (C03, C08) · breakers aislados por familia de ruta")
         Component(assistedSearchService, "Assisted Search Service", "C#", "Búsqueda asistida (C15) · ventana máxima en una llamada, hidratación autoritativa, degradación acotada")
         Component(assistedSearchRepo, "Assisted Search Repository", "C#", "Hidratación conjunta por POS y buscador léxico español en consulta (C15)")
@@ -421,7 +424,7 @@ C4Component
 
 ### 3.3 Componentes del Servicio de IA
 
-El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y generación, y servicios transversales. **Estado actual (C14):** existen la fábrica de aplicación, el health, el middleware de trazas, los seis routers de dominio con sus esquemas congelados, la capa de stubs deterministas, la dependencia de autenticación de servicio, la **capa de persistencia** (esquema `ai` con pgvector, migraciones Alembic y motor con pool acotado), el **extractor de enriquecimiento (C09)**, el **indexador de `product_document` (C13)** y el **retriever vectorial de `POST /v1/retrieval/products` (C14)** — umbral 0,65, hybrid/lexical = vector hasta C21. Sustitutos, assist, inventory, evals y la fusión RRF siguen planificados.
+El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y generación, y servicios transversales. **Estado actual (C18a):** existen la fábrica de aplicación, el health, el middleware de trazas, los **siete** routers de dominio con sus esquemas congelados, la capa de stubs deterministas, la dependencia de autenticación de servicio, la **capa de persistencia** (esquema `ai` con pgvector, migraciones Alembic y motor con pool acotado), el **extractor de enriquecimiento (C09)**, el **indexador de `product_document` (C13)**, el **retriever vectorial de `POST /v1/retrieval/products` (C14)** — umbral 0,65, hybrid/lexical = vector hasta C21 — y el **agrupador de familias (C18a)**. Sustitutos, assist, inventory, evals y la fusión RRF siguen planificados.
 
 #### Routers de Dominio (`/v1/*`)
 
@@ -429,6 +432,7 @@ El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y 
 - **Assist Router**: generación de respuesta estructurada agrupada por familia, con avisos calculados por reglas y citas verificables.
 - **Inventory Router**: propuestas de reposición, traslado y rotación generadas por el agente de inventario.
 - **Enrich Router**: extracción estructurada de perfiles de producto con confianza por campo.
+- **Families Router**: propuestas de agrupación de productos en familias de variantes. **Existe (C18a)**, y es la novena ruta del contrato congelado. Propone y **no escribe**: aprobar es de .NET.
 - **Index Router**: sincronización del índice mediante cursor `since` y consulta de deriva.
 - **Evals Router**: resultados del harness de evaluación (solo perfil de desarrollo).
 
@@ -437,6 +441,7 @@ El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y 
 - **Hybrid Retriever**: fusiona búsqueda vectorial (HNSW sobre pgvector) y léxica (`ts_rank` en español con expansión de sinónimos) mediante RRF. **Pendiente C21; C14 ejecuta solo la rama vectorial.**
 - **Query Analyzer**: extrae por reglas las restricciones estructurales de la consulta (banda de precio, tipo de pieza, talla, materiales).
 - **Embedding Client**: genera embeddings solo cuando cambia el `source_hash`, con versionado por modelo.
+- **Family Grouper** (`jbg_ai.families`): agrupa por raíz de nombre dentro de un tipo de pieza, fusiona por material y guarda contra raíces degeneradas. **Existe (C18a).** Determinista y sin red: **no llama a ningún LLM ni al proveedor de embeddings**, porque los vectores ya están en el índice. El embedding **veta, no agrupa**, y lo hace en relativo —contra las otras familias propuestas, nunca contra un umbral absoluto— marcando al miembro para revisión en lugar de eliminarlo.
 - **Generation Service**: redacta el argumentario a partir de metadatos aprobados y chunks del corpus, emitiendo `{{price}}` y `{{stock}}` como placeholders que resuelve .NET.
 - **Guardrails / Intent Router**: clasifica la intención, detecta consultas fuera de dominio y aplica la política de abstención.
 - **Agent Loop**: bucles agénticos con *tools* de solo lectura y puntos de intervención humana.
@@ -446,7 +451,7 @@ El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y 
 - **Settings**: configuración por entorno con pydantic-settings y *fail-fast* de variables obligatorias. **Existe (C01).**
 - **TraceId Middleware**: propaga `trace_id` desde la cabecera o el claim del JWT hacia los logs estructurados. **Existe (C01).**
 - **Service Auth Dependency**: valida el JWT interno HS256 y construye el `ServicePrincipal`; el scope del token prevalece sobre el body. **Existe (C02).**
-- **Stub Layer**: respuestas deterministas bajo `STUB_MODE`; con el flag desactivado, la ruta sin implementación real responde 501. **Existe (C02).** Excepciones reales: enrich (C09), index (C13), `POST /v1/retrieval/products` (C14).
+- **Stub Layer**: respuestas deterministas bajo `STUB_MODE`; con el flag desactivado, la ruta sin implementación real responde 501. **Existe (C02).** Excepciones reales: enrich (C09), index (C13), `POST /v1/retrieval/products` (C14) y `POST /v1/families/suggest` (C18a).
 - **Service Auth Dependency**: valida el JWT interno HS256 y construye el `ServicePrincipal`; el scope del token prevalece sobre el body.
 - **Stub Layer**: respuestas deterministas bajo `STUB_MODE` para que .NET integre sin LLM ni base de datos.
 - **Eval Harness**: golden set, métricas de recuperación y validador anti-alucinación (ejecución offline).
@@ -462,6 +467,7 @@ C4Component
         Component(assistRouter, "Assist Router", "FastAPI", "Venta asistida con citas")
         Component(inventoryRouter, "Inventory Router", "FastAPI", "Propuestas de inventario")
         Component(enrichRouter, "Enrich Router", "FastAPI", "Enriquecimiento de catálogo")
+        Component(familiesRouter, "Families Router", "FastAPI", "Propuestas de familia (C18a) · no escribe")
         Component(indexRouter, "Index Router", "FastAPI", "Sincronización del índice")
         Component(evalsRouter, "Evals Router", "FastAPI", "Resultados de evaluación (dev)")
 

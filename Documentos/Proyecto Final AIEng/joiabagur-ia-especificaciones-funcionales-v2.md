@@ -1069,7 +1069,7 @@ Recomendación inicial:
 1. Definir si existe almacén/tienda central como POS origen preferente.
 2. Definir umbrales iniciales por tipo de hotel: principal vs resto.
 3. Definir proveedor de embeddings y modelo.
-4. Definir si `ProductFamily` se crea manualmente, por IA o mediante flujo mixto.
+4. ~~Definir si `ProductFamily` se crea manualmente, por IA o mediante flujo mixto.~~ **Resuelta el 2026-08-31 por C18a: flujo mixto.** Un algoritmo determinista y sin LLM propone las familias —agrupa por raíz de nombre dentro de un tipo de pieza, fusiona por material, y el embedding **veta en relativo** marcando para revisión en lugar de eliminar—, y una persona las aprueba por lote antes de que se escriba nada. Proponer y aplicar son dos operaciones separadas y solo la segunda escribe. La creación manual de C07 sigue existiendo y se distingue después por el origen registrado. Detalle en [HU-AIENG-018a](../Historias/AI-Eng/HU-AIENG-018a.md) y en el [informe del lote](informes/c18a-family-suggestion-report.md).
 5. Definir si las packing lists aplicadas crean movimientos de inventario directamente o solo guían el ajuste manual existente.
 6. Definir si se capturará feedback del operador en sustitutos y venta asistida.
 7. Definir si `StoneType` debe seguir siendo un único valor o evolucionar también a array en el futuro.

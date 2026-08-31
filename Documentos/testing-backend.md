@@ -262,6 +262,26 @@ Sobre los dos primeros conviene una precisión que ahorra tests engañosos. Al p
 > El procedimiento y las cuatro pasadas están en
 > `openspec/changes/archive/2026-08-28-add-dotnet-ai-search-endpoint/qa.md` §1.1 y §10.
 
+> **Actualización del 2026-08-31, sobre `c18a-add-family-suggestion-and-approval`.** La suite tiene
+> ahora **920 tests**. La línea base de ese change dio **897 y 47**, y al cierre **907 y 50**.
+>
+> Esta medición aporta el caso **más limpio de todos**, y por eso conviene tenerlo a mano cuando
+> alguien pregunte si de verdad hace falta comparar por nombres. Al verificar el change se ejecutó
+> la suite completa **dos veces seguidas sobre el mismo árbol**, sin recompilar y sin tocar una sola
+> línea entre las dos: **51 fallos la primera y 50 la segunda**. No hay aquí tests nuevos de por
+> medio ni orden alterado entre pasadas; el mismo binario, dos números. Los 50 se reparten por **17
+> clases**, y **ninguna es de las que el change toca**: cero fallos en `FamilySuggestionControllerTests`,
+> `AiGatewayFamilySuggestionTests`, `AiCatalogControllerTests` y cualquier `ProductFamily*`. La clase
+> nueva, ejecutada aparte, pasa 13 de 13.
+>
+> **Un descuadre anotado y sin explicar:** el cierre registró 907 tests descubiertos y la verificación
+> descubre 920, con un solo test añadido entre medias. La diferencia no sale del change y no se
+> rastreó. Queda escrito porque un recuento que aparece de la nada es exactamente lo que esta
+> sección advierte que no debe usarse como señal.
+>
+> El detalle está en
+> `openspec/changes/archive/2026-08-31-add-family-suggestion-and-approval/qa.md` §2 y §11.
+
 ### Por qué se acumularon sin que nadie los viera
 
 Los dos árboles se comportan de forma muy distinta, y esa es la clave:
