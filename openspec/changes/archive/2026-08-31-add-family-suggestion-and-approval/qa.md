@@ -73,7 +73,7 @@ YA NO      AssignProduct_WithNonExistentPOS_ShouldReturnNotFound
 
 Ejecutada `InventoryIntegrationTests` **en aislamiento** falla **ocho**, y con nombres distintos otra vez — `AssignProduct_WithValidProduct_ShouldSucceed` y `EndToEnd_AssignAdjustView_Workflow` aparecen sólo ahí. **Tres ejecuciones, tres conjuntos distintos.** Es la dependencia de orden que `CLAUDE.md` advierte, agitada porque la clase de test nueva entra en la misma colección y cambia el orden. **Ninguna regresión es de C18a**, y los 22 tests nuevos del backend pasan.
 
-**Reejecutada en la 2ª pasada**, con el test de 7.1 añadido: **920 descubiertos**, y dos ejecuciones seguidas del **mismo** árbol dan **51 fallos** y **50**. Nada cambió entre ellas, que es el argumento entero contra comparar recuentos. Los 50 se reparten por **17 clases** y **ninguno pertenece a una clase que este change toque**: cero en `FamilySuggestionControllerTests`, `AiGatewayFamilySuggestionTests`, `AiCatalogControllerTests` y cualquier `ProductFamily*`. La clase nueva, ejecutada aparte, pasa **13 de 13**.
+**Reejecutada en la 2ª pasada**, con el test de 7.1 añadido: **920 descubiertos**, y dos ejecuciones seguidas del **mismo** árbol dan **51 fallos** y **50**. Nada cambió entre ellas, que es el argumento entero contra comparar recuentos. Los 50 se reparten por **17 clases** y **ninguno pertenece a una clase que este change toque**: cero en `FamilySuggestionControllerTests`, `AiGatewayFamilySuggestionTests`, `AiCatalogControllerTests` y cualquier `ProductFamily*`. La clase nueva, ejecutada aparte, pasa **12 de 12**.
 
 > **Un descuadre que no explico y no maquillo.** El cierre registró 907 tests descubiertos y esta pasada descubre 920, con un solo test añadido por medio. La diferencia no sale de este change y no la he rastreado; queda anotada porque un recuento que aparece de la nada es exactamente lo que esta sección advierte que no hay que usar como señal.
 
@@ -273,7 +273,7 @@ Ambos son de desarrollo local en Windows, **no tocan el repositorio**, y están 
 | `openspec validate --all --strict` | **46 passed, 0 failed** |
 | `openspec status --change` | 4/4 artefactos |
 | `dotnet build JoiabagurPV.sln` | sin errores. Sin `CS1574` tras arreglar el `<see cref>` roto (§11.4) |
-| `dotnet test` (2ª pasada) | 50–51 fallos preexistentes de 920, **ninguno en una clase de C18a**; la clase nueva 13/13 |
+| `dotnet test` (2ª pasada) | 50–51 fallos preexistentes de 920, **ninguno en una clase de C18a**; la clase nueva 12/12 |
 | `uv run pytest` | 2 failed / 442 passed — los del baseline, por nombre |
 | `test_openapi_snapshot_is_stable` | verde tras regeneración deliberada |
 | Migración EF / Alembic | **ninguna**, verificado |
