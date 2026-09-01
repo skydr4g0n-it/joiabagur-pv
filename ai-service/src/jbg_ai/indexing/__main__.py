@@ -1,5 +1,5 @@
 """`python -m jbg_ai.indexing sync [--full]`."""
 
-from jbg_ai.indexing.cli import main
+from jbg_ai.indexing.cli import run_module
 
-raise SystemExit(main())
+raise SystemExit(run_module())

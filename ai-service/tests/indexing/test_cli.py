@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from jbg_ai.indexing.cli import main, run_cli_sync
+import pytest
+
+import jbg_ai.data.envload as envload
+from jbg_ai.indexing.cli import main, run_cli_sync, run_module
+from jbg_ai.indexing.orchestrator import CatalogSyncResult
 from support.index_fakes import (
     FakeEmbeddingClient,
     FakeIndexFeedClient,
@@ -66,3 +70,39 @@ def test_cli_full_flag_parses() -> None:
         assert captured["full"] is False
     finally:
         cli.run_cli_sync = original
+
+
+async def _noop_sync(**_kwargs: object) -> CatalogSyncResult:
+    return CatalogSyncResult()
+
+
+def test_module_entrypoint_loads_the_shared_env_file(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`python -m jbg_ai.indexing` reads backend/.env like `python -m jbg_ai.data` does."""
+    calls: list[str] = []
+    monkeypatch.setattr(envload, "load_local_env", lambda: calls.append("loaded"))
+    monkeypatch.setattr(
+        "jbg_ai.indexing.cli.main",
+        lambda argv=None: (calls.append(str(argv)) or 0),
+    )
+
+    assert run_module(["sync", "--full"]) == 0
+    assert calls == ["loaded", "['sync', '--full']"]
+
+
+def test_main_does_not_load_the_shared_env_file(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The importable entry point stays inert: tests must not inherit real credentials.
+
+    `support.settings.build_settings` pins the optional fields to None so an exported
+    credential cannot make an "absent configuration" case stop failing. Loading the env
+    file from `main` would reach the test process and undo that guarantee.
+    """
+
+    def _forbidden() -> None:
+        raise AssertionError("main must not load backend/.env")
+
+    monkeypatch.setattr(envload, "load_local_env", _forbidden)
+    monkeypatch.setattr("jbg_ai.indexing.cli.run_cli_sync", _noop_sync)
+
+    assert main(["sync"]) == 0
