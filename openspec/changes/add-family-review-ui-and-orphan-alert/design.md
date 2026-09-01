@@ -100,6 +100,14 @@ Se resuelve con orden y no con lógica. Limpiar la familia sube su peor hermano 
 
 **Alternativa considerada.** *Sustituir el mínimo por un cuantil robusto* (p25 de las similitudes intra-familia). Añade un parámetro y una explicación por un efecto que el orden de ejecución ya elimina. Se anota por si tras la limpieza siguieran apareciendo imanes.
 
+> **Revisión del 2026-09-01, al cerrar: la premisa no se cumplió, y la decisión queda sin comprobar.**
+>
+> Esta decisión da por hecho que `SKU610` es un intruso y que sacarlo subirá el peor hermano de `Colgante estrella de mar`. **La persona que revisó lo confirmó como miembro legítimo**, y es difícil llevarle la contraria: es un colgante de estrella de mar y la familia agrupa eso. La etiqueta `synthetic` marca la procedencia del dato, no un error semántico; C18a leyó *«un sintético dentro de una familia real»* como contaminación porque cruzó una frontera de origen, y el revisor leyó la única que le importa al catálogo.
+>
+> De modo que **no hubo limpieza, el listón no subió, y θ se fijó en 0 sobre los números de antes** — exactamente lo que esta decisión quería evitar, aunque por un motivo que no había previsto: no que se calibrara pronto, sino que no hubiera defecto que arreglar. La predicción **no queda refutada: queda sin comprobar**, porque el experimento no llegó a hacerse.
+>
+> Y la dispersión de esa familia resulta ser **real y no contaminación**: va de XS a L en dos acabados, y ese recorrido es el que hunde el peor hermano a 0,778. Eso reabre la alternativa que este apartado anotaba — un cuantil robusto discriminaría entre una familia amplia y una rota, cosa que el mínimo no hace —, y con una cola ya revisada por una persona hay por fin contra qué calibrarla. Medición completa en el §7.3 del informe del lote.
+
 ### 6 · El veredicto se persiste en .NET, y es a la vez descarte y sello por ítem
 
 `FamilyReviewVerdict` sobre el par `(ProductId, FamilyId)`, con veredicto, revisor, instante, `MarginAtReview` y nota. Índice **único** sobre el par: un segundo juicio es una corrección, no una fila nueva. Borrado **en cascada** desde la familia.
@@ -178,6 +186,14 @@ Y sale barato en lo que más preocupa: **confirmar una familia sin cambiarla esc
 C18b y C28 son la misma pantalla dos veces —ambas *frontend + `Application/`*, sólo administrador, revisión por lotes de salida de IA— y EP13 ya las agrupa. C18b construye la carcasa; C28 es el segundo inquilino.
 
 Lo que se generaliza es **exclusivamente lo que la ficha de C28 pide por escrito**: tabla editable, atajos de teclado, aprobación masiva y registro de quién revisó y qué cambió. Nada conjeturado. Diseñar para dos inquilinos con uno solo a la vista es la forma habitual de producir la abstracción equivocada; si C28 necesita más, lo extrae C28, que es cuando se sabrá qué.
+
+> **Revisión del 2026-09-01, al cerrar: la carcasa no se extrajo, y C28 debe planificar con eso.**
+>
+> `/opsx:verify` lo destapó: **no se extrajo ni un componente compartido**. Todo vive en [`family-review.tsx`](../../../frontend/src/pages/admin/family-review.tsx), 920 líneas, y los únicos ficheros nuevos de `frontend/` son esa página, su servicio, sus tipos, su test, la ruta y la entrada de menú. La frase *«C18b construye la carcasa»* sobrepromete y hay que leerla corregida: **C18b construye la primera pantalla; la carcasa, si hace falta, la extrae C28 de ella.**
+>
+> No se arregla extrayendo ahora, y el motivo es esta misma decisión: abstraer con un solo inquilino a la vista produce la abstracción equivocada. Con la pantalla escrita y usada de verdad, C28 tiene delante el caso concreto que aquí faltaba — y **de las cuatro cosas que la ficha de C28 pide por escrito, tres ya existen** en esta página: tabla editable *(edición de etiqueta por miembro)*, aprobación masiva *(los veredictos se acumulan y se envían en un lote)*, y registro de quién revisó y qué cambió *(`FamilyReviewVerdict`, con revisor, instante, margen y segundos)*.
+>
+> **La cuarta, los atajos de teclado, no se entregó y se descopa explícitamente.** La tarea 6.4 la daba por hecha y no existe: cero manejadores de teclado en la página. Entra en el alcance de C28, que es quien la pide por escrito, en vez de añadirse a última hora a una pantalla ya revisada por una persona — donde la prueba que importa es volver a recorrer una cola con ella, no un test que compruebe que el manejador está enganchado.
 
 ### 13 · Tres cosas que sólo aparecieron al revisar de verdad
 

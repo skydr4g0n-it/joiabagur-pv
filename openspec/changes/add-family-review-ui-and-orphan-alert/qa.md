@@ -3,7 +3,7 @@
 > Registro de las comprobaciones **realmente ejecutadas** sobre la implementación del change, con sus resultados.
 > **Fechas:** implementación y revisión humana el **2026-08-31**; cierre, backfill y pasada de verificación el **2026-09-01** · **Rama:** `c18b-add-family-review-ui-and-orphan-alert`, creada desde `ai-eng`
 > **Alcance al cierre:** 68/68 tareas (62 del change + 6 de esta pasada) · 7/7 artefactos · **3 migraciones EF Core**, no una · 54 escenarios de spec
-> **Pasada de verificación** el 2026-09-01, registrada en §11: **ocho tests que la spec o `tasks.md` exigían y no existían**, y una divergencia entre lo que un requisito afirmaba y lo que el código hace.
+> **Pasada de verificación** el 2026-09-01, registrada en §11: **ocho tests que la spec o `tasks.md` exigían y no existían**, una tarea marcada con dos entregables de pantalla inexistentes, una carcasa prometida y no extraída, una premisa de diseño que no se cumplió, y un requisito que afirmaba una distinción que el código no hace.
 > **Idioma:** cuerpo en español, identificadores técnicos en inglés, por coherencia con [ticket.md](ticket.md) y con la HU.
 
 ---
@@ -316,13 +316,15 @@ Se ejecutó `DELETE FROM "FamilyReviewVerdicts"` sobre la base de desarrollo dan
 - **La predicción de la decisión 5 del diseño queda sin comprobar.** El revisor **confirmó** el sintético `SKU610` como miembro legítimo, así que no hubo intruso que sacar y el peor hermano de esa familia no subió. No refutada: sin comprobar.
 - **`ai.sync_failure` no se drena.** Sus columnas `attempts` y `next_retry_at` no las lee nadie y nada borra de la tabla. Sus 9 filas son la traza de un incidente resuelto y se dejan: vaciarlas con un `DELETE` para poner verde una casilla sería destruir el registro y llamarlo cierre.
 - **El estampado del watermark sigue sin verificarse.** El segundo pase de sincronización salió con `since: null` y barrió los 1.168 documentos. El estado final es correcto y está verificado, pero un barrido completo tapa exactamente el fallo que la tarea 9.3 buscaba.
+- **Los atajos de teclado de la pantalla, descopados a C28** el 2026-09-01 con nota fechada en el `design.md` y en las dos fichas del plan. La tarea 6.4 los daba por hechos y no existen; entran donde la ficha que los pide por escrito, en vez de añadirse a una pantalla ya revisada por una persona.
+- **La carcasa compartida no se extrajo**, y no se extrae ahora: abstraer con un solo inquilino a la vista produce la abstracción equivocada. Tres de las cuatro cosas que C28 pide por escrito ya están en la página; extraerlas es de C28.
 - **Un 4xx que emite el servicio no se distingue por tipo de una indisponibilidad.** `TranslateStatus` es compartido por todas las rutas del cliente y estrecharlo no es de este change. Ver §11.2.
 
 ---
 
 ## 11. La pasada de verificación
 
-Recorrió los seis artefactos frente a la implementación en vez de frente al recuerdo de haberla escrito, y encontró **ocho escenarios sin un solo test** y **un requisito que afirmaba algo que el código no hace**. Se arreglan aquí porque las specs delta se sincronizan a `openspec/specs/` al archivar, y **un requisito falso sincronizado sobrevive al change que lo escribió**.
+Recorrió los siete artefactos frente a la implementación en vez de frente al recuerdo de haberla escrito, y encontró **ocho escenarios sin un solo test**, **una tarea marcada cuyos entregables no existían**, **una carcasa prometida y no extraída**, **una premisa de diseño incumplida** y **un requisito que afirmaba algo que el código no hace**. Se arreglan aquí porque las specs delta se sincronizan a `openspec/specs/` al archivar, y **un requisito falso sincronizado sobrevive al change que lo escribió**.
 
 ### 11.1 Ocho escenarios exigidos y sin cubrir, cinco de ellos con nombre propio en `tasks.md`
 
@@ -351,7 +353,28 @@ Arreglar el código habría cambiado la conducta de **todas** las rutas del clie
 
 El escenario se reescribe a eso, y el requisito gana una frase que **nombra el límite en vez de taparlo**. Se añade además un escenario que faltaba y que el código sí implementa —un cuerpo vacío es un fallo y nunca una auditoría vacía—, que en esta ruta es la diferencia entre *«no hay nada que revisar»* y *«no se sabe»*.
 
-### 11.3 Un test escrito en esta pasada afirmaba contra el doble y no contra el sistema
+### 11.3 Una tarea marcada afirmaba dos entregables de pantalla que no existen
+
+La tarea 6.4 decía *«Pantalla con **TanStack Table** … **navegación por teclado**; confirmación en bloque; y cronómetro por ítem»*. Las dos últimas están; las dos primeras no: cero referencias a TanStack Table y cero manejadores de teclado en las 920 líneas de `family-review.tsx`.
+
+Es el **tercer caso del mismo patrón** en este change, tras los cinco nombres de test del §11.1 y los ocho escenarios sin cubrir: tareas marcadas leyendo lo que decían en vez de comprobando lo que existía.
+
+Las dos mitades se resuelven distinto porque no son la misma clase de error:
+
+- **TanStack Table es una elección, y la elección fue correcta.** Sólo 9 de las 85 pantallas del proyecto lo usan, y todas son listados CRUD planos; ésta tiene filas desplegables, cronómetro por fila y tres estados por lista, formas que un data grid no da y estorba. Lo que está mal es el texto de la tarea, y se corrige.
+- **La navegación por teclado falta de verdad**, y está en alcance por la regla que la propia decisión 12 fija: se generaliza lo que la ficha de C28 pide por escrito, y esa ficha pide atajos de teclado. **Se descopa explícitamente a C28**, con nota fechada en el `design.md` y en las dos fichas del plan — no se añade a última hora a una pantalla ya revisada por una persona, porque la prueba que importa es volver a recorrer una cola con ella y no un test que compruebe que el manejador está enganchado.
+
+### 11.4 La carcasa que la decisión 12 prometía no se extrajo
+
+*«C18b construye la carcasa; C28 es el segundo inquilino.»* No se extrajo **ni un componente compartido**: todo vive en un fichero, y los únicos ficheros nuevos de `frontend/` son la página, su servicio, sus tipos, su test, la ruta y el menú.
+
+No se arregla extrayendo ahora, y el motivo es esa misma decisión: abstraer con un solo inquilino a la vista produce la abstracción equivocada. Lo que se arregla es la frase, con una revisión fechada que dice lo que hay — **C18b construye la primera pantalla; la carcasa, si hace falta, la extrae C28 de ella** — y que anota que **tres de las cuatro cosas que C28 pide por escrito ya existen** en esa página.
+
+### 11.5 La premisa de la decisión 5 no se cumplió
+
+El diseño apoya el orden del change en que limpiar `Colgante estrella de mar` subirá su peor hermano de 0,778 y disolverá los falsos positivos. **No ocurrió:** el revisor confirmó `SKU610` como miembro legítimo, así que no hubo limpieza y θ se fijó igualmente en 0. Revisión fechada en D5: la predicción **no queda refutada, queda sin comprobar**, y la dispersión de esa familia resulta ser real — lo que reabre el cuantil robusto que aquel apartado anotaba como alternativa, ahora con una cola revisada contra la que calibrarlo.
+
+### 11.6 Un test escrito en esta pasada afirmaba contra el doble y no contra el sistema
 
 `Verdict_KeepsTheMarginItWasTakenAt_…` se escribió afirmando dos cosas: que el margen registrado sobrevive, y que el par juzgado **no vuelve a aparecer** en la auditoría siguiente. La segunda **falló al ejecutarla**, y el fallo tenía razón.
 
@@ -365,13 +388,13 @@ Corregido a lo que este lado sí posee —**el par viaja en la petición**, comp
 
 **Listo para archivar.** Los **54** escenarios de las cuatro specs tienen test nombrado; las tres suites no registran ninguna regresión atribuible al change comparadas por nombre —y el frontend cierra exacto, 113 = 113—; el alcance negativo está verificado con `git diff`; las cuatro guardas se comprobaron **fallando**; y el camino del dato se ejecutó de verdad, con 58 juicios humanos, 7 decisiones aplicadas y un índice reconciliado a 491 pertenencias.
 
-**Sin huecos abiertos.** Los ocho del §11.1 se cerraron con test, y la divergencia del §11.2 corrigiendo el requisito en vez del código, con el motivo escrito. Lo que queda fuera es alcance de otros changes y está en el §10.
+**Sin huecos abiertos.** Los ocho del §11.1 se cerraron con test; la divergencia del §11.2 corrigiendo el requisito en vez del código; y las tres del §11.3 al §11.5 con revisiones fechadas que dicen lo que hay, más un descope explícito a C28. Ninguna se resolvió reescribiendo un documento para que cuadrara sin decirlo. Lo que queda fuera es alcance de otros changes y está en el §10.
 
 Cuatro cosas de esta pasada merecen sobrevivir al change:
 
 **El hueco del cliente tipado se repitió exactamente.** C18a lo encontró en su §8.5, sobre el mismo cliente y la ruta hermana; C18b lo repitió sobre la ruta nueva. Dos veces seguidas no es descuido, es que la cobertura por integración **parece** cubrir el cliente y no lo hace. Merece ser lo primero que se mire en C28.
 
-**Cinco nombres de test vivían en `tasks.md` y en ningún fichero.** Las tareas se marcaron leyendo lo que decían, no comprobando lo que existía — y el §4 de este documento existe para que eso no vuelva a pasarse por alto.
+**Tres veces se marcó una tarea leyendo lo que decía, no comprobando lo que existía.** Cinco nombres de test que vivían en `tasks.md` y en ningún fichero, ocho escenarios de spec sin cubrir, y una tarea de pantalla que afirmaba una librería que no se usa y unos atajos de teclado que no existen. El §4 de este documento existe para que el primer caso no vuelva a pasarse por alto; los otros dos dicen que la comprobación tiene que alcanzar también a lo que una tarea promete en prosa.
 
 **Un test escrito para cerrar un hueco casi abrió otro.** El del §11.3 afirmaba contra el doble de gateway en vez de contra el sistema, y sólo se supo porque falló. Un test de integración con un doble que responde desde un fixture puede comprobar lo que el sistema envía, nunca lo que el servicio decide con ello — y confundir las dos cosas produce verde sin evidencia, que es la misma enfermedad que esta pasada vino a curar.
 
