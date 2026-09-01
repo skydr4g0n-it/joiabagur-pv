@@ -318,3 +318,90 @@ def test_embed_failure_is_a_dependency_error() -> None:
                 search=search,
             )
         )
+
+
+def test_expand_stage_log_carries_trace_id(caplog: pytest.LogCaptureFixture) -> None:
+    search = FakeProductSearch([_row(A, "S1", 0.1)])
+    with caplog.at_level(logging.INFO, logger="jbg_ai.retrieval.orchestrator"):
+        _run(
+            retrieve_products(
+                _request(query="sortija de plata"),
+                PRINCIPAL,
+                settings=build_settings(),
+                embed=FakeEmbeddingClient(),
+                search=search,
+            )
+        )
+
+    expand_logs = [msg for msg in (r.getMessage() for r in caplog.records) if "stage=expand" in msg]
+    assert expand_logs
+    assert all(TOKEN_TRACE_ID in msg for msg in expand_logs)
+    assert "enabled=True" in expand_logs[0]
+    assert "matched_terms=" in expand_logs[0]
+    assert "consumed=False" in expand_logs[0], "C21 is the consumer; C20 must not claim one"
+
+
+def test_expansion_flag_sweeps_two_configurations_in_one_process(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """C24 needs this: an environment-only switch would force a restart per config."""
+    settings = build_settings(jpv_query_expansion_enabled=True)
+    responses = []
+    with caplog.at_level(logging.INFO, logger="jbg_ai.retrieval.orchestrator"):
+        for enabled in (True, False):
+            search = FakeProductSearch([_row(A, "S1", 0.1)])
+            responses.append(
+                _run(
+                    retrieve_products(
+                        _request(query="sortija de plata"),
+                        PRINCIPAL,
+                        settings=settings,
+                        embed=FakeEmbeddingClient(),
+                        search=search,
+                        expand_synonyms=enabled,
+                    )
+                )
+            )
+
+    assert settings.jpv_query_expansion_enabled is True, "the settings object is not mutated"
+    expand_logs = [msg for msg in (r.getMessage() for r in caplog.records) if "stage=expand" in msg]
+    assert any("enabled=True" in msg for msg in expand_logs)
+    assert any("enabled=False" in msg for msg in expand_logs)
+    assert responses[0].model_dump() == responses[1].model_dump()
+
+
+def test_response_is_unchanged_while_expansion_has_no_consumer() -> None:
+    """Until C21 reads the groups, the endpoint must answer exactly as it did before."""
+    bodies = []
+    for enabled in (True, False):
+        search = FakeProductSearch([_row(A, "S1", 0.1), _row(B, "S2", 0.2)])
+        response = _run(
+            retrieve_products(
+                _request(query="gargantilla dorada"),
+                PRINCIPAL,
+                settings=build_settings(jpv_query_expansion_enabled=enabled),
+                embed=FakeEmbeddingClient(),
+                search=search,
+            )
+        )
+        bodies.append(response.model_dump())
+
+    assert bodies[0] == bodies[1]
+    assert all(item["match_reasons"] == ["vector"] for item in bodies[0]["results"])
+
+
+def test_vector_branch_embeds_the_original_text() -> None:
+    """The expansion feeds the lexical branch only; the vector query is never rewritten."""
+    embed = FakeEmbeddingClient()
+    search = FakeProductSearch([_row(A, "S1", 0.1)])
+    _run(
+        retrieve_products(
+            _request(query="sortija de plata"),
+            PRINCIPAL,
+            settings=build_settings(jpv_query_expansion_enabled=True),
+            embed=embed,
+            search=search,
+        )
+    )
+
+    assert embed.provider_calls == [["sortija de plata"]]

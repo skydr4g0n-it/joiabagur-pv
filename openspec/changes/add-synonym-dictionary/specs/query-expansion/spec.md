@@ -25,7 +25,7 @@ The service MUST expose a query expansion function that takes the operator query
 - **AND** no socket is opened
 
 ### Requirement: The dictionary is layered over the enrichment vocabulary without modifying it
-The dictionary MUST be built from two sources: the closed vocabularies of the enrichment pipeline, read as base equivalence classes, and a query-only overlay file versioned in the repository. The enrichment vocabulary file MUST NOT be modified by this capability. The overlay MAY add surface forms to an existing base class and MAY create new classes; it MUST NOT reassign a term that the base already maps to a canonical. The dictionary MUST be loaded once per process and cached.
+The dictionary MUST be built from two sources: the closed vocabularies of the enrichment pipeline, read as base equivalence classes, and a query-only overlay file versioned in the repository. The enrichment vocabulary file MUST NOT be modified by this capability. The overlay MAY add surface forms to an existing base class. Every overlay anchor MUST name a canonical the base already defines — a term the base does not know is a vocabulary gap and not a synonym — and the overlay MUST NOT reassign a term that the base already maps to a canonical. Both MUST fail at load time, naming the offending term. The dictionary MUST be loaded once per process and cached.
 
 #### Scenario: The base vocabulary file is not modified
 - **WHEN** the change is applied
@@ -60,7 +60,7 @@ Term lookup MUST be performed on folded text — lowercased, accent-stripped, wi
 - **AND** neither form is dropped in favour of the other
 
 ### Requirement: Stemmer-split terms are expanded as dictionary content
-Terms whose Spanish stem does not match the stem of their own canonical form MUST be declared in the overlay and expanded like any other class member, because the text-search configuration cannot relate them. This MUST cover at least the singular and plural of the piece types whose stems diverge, and the unaccented spellings of canonical terms containing `ñ`. The capability MUST NOT install a PostgreSQL extension and MUST NOT create or alter a text-search configuration to solve this.
+A query term whose Spanish stem does not match the stem of its own canonical form MUST still produce a group containing both surface forms, because the text-search configuration cannot relate them. Whether that comes from an overlay entry or from the plural reduction below is an implementation detail; the emitted group is what matters. This MUST cover at least the singular and plural of the piece types whose stems diverge, and the unaccented spellings of canonical terms containing `ñ`. The capability MUST NOT install a PostgreSQL extension and MUST NOT create or alter a text-search configuration to solve this.
 
 #### Scenario: A plural whose stem diverges from its singular is expanded
 - **GIVEN** the Spanish configuration stems `collar` and `collares` to different lexemes
@@ -72,6 +72,24 @@ Terms whose Spanish stem does not match the stem of their own canonical form MUS
 - **THEN** no PostgreSQL extension is installed
 - **AND** no custom text-search configuration is created
 - **AND** the generated document vector column and its index are not rebuilt
+
+### Requirement: Bridges between vocabularies are directional
+The overlay MAY declare that one equivalence class is widened with the surface forms of another. Such a bridge MUST apply in the declared direction only and MUST NOT be inferred symmetrically. Donations MUST be taken from the classes as they stood before any bridge was applied, so that a direction cannot leak transitively through a second bridge.
+
+#### Scenario: The colour reaches solid gold and the plating does not
+- **GIVEN** the overlay widens the gold colour with the plating and the solid metal
+- **AND** it widens the plating with the colour only
+- **WHEN** the query `dorado` is expanded
+- **THEN** the group contains the plating and the solid metal
+- **WHEN** the query `baño de oro` is expanded
+- **THEN** the group contains the colour
+- **AND** the group does not contain the solid metal
+
+#### Scenario: Direction does not leak through a second bridge
+- **GIVEN** one bridge widens the colour towards the solid metal
+- **AND** a second bridge widens the plating towards the colour
+- **WHEN** the query naming the plating is expanded
+- **THEN** the group does not contain the solid metal
 
 ### Requirement: Inflections resolve without one entry per form and the longest phrase wins
 The dictionary loader MUST reduce plural forms on both the dictionary keys and the query tokens, and MUST apply the reduction only when the reduced form already exists in the dictionary, so that no canonical is invented for an unknown word. When more than one dictionary entry matches at a position, the entry spanning the most words MUST win.

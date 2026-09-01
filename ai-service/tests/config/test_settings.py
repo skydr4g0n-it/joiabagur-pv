@@ -348,3 +348,38 @@ def test_canonical_openapi_settings_pin_retrieval_threshold() -> None:
     settings = canonical_openapi_settings()
 
     assert settings.jpv_retrieval_distance_threshold == 0.65
+
+
+def test_query_expansion_flag_defaults_to_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.delenv("JPV_QUERY_EXPANSION_ENABLED", raising=False)
+    get_settings.cache_clear()
+
+    assert get_settings().jpv_query_expansion_enabled is True
+
+
+def test_blank_query_expansion_flag_is_treated_as_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A blank export means "unset", not "false"."""
+    _minimal_env(monkeypatch)
+    monkeypatch.setenv("JPV_QUERY_EXPANSION_ENABLED", "   ")
+    get_settings.cache_clear()
+
+    assert get_settings().jpv_query_expansion_enabled is True
+
+
+def test_query_expansion_flag_can_be_turned_off_by_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.setenv("JPV_QUERY_EXPANSION_ENABLED", "false")
+    get_settings.cache_clear()
+
+    assert get_settings().jpv_query_expansion_enabled is False
+
+
+def test_canonical_openapi_settings_pin_query_expansion_flag() -> None:
+    settings = canonical_openapi_settings()
+
+    assert settings.jpv_query_expansion_enabled is True

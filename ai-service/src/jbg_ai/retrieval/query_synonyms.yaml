@@ -1,0 +1,181 @@
+# Query-side synonym overlay. Delivered by C20.
+#
+# This file is the SECOND layer of the dictionary. The first is
+# `jbg_ai/enrichment/vocabularies.yaml`, which is read as the base equivalence
+# classes and is NEVER modified from here: touching it forces a prompt version
+# bump and re-enrichment of the corpus, which is `fix-enrichment-vocabulary-gaps`.
+#
+# What belongs here, and nothing else:
+#   * terms the Spanish text-search configuration cannot relate to their own
+#     canonical, or surface forms the base cannot emit because it only keeps the
+#     canonical with its diacritics;
+#   * colloquial variants of the trade that are not extraction synonyms;
+#   * bridges between two closed vocabularies that a query should cross.
+#
+# Rules the loader enforces, so they cannot rot:
+#   * every anchor MUST name a canonical that already exists in the base — a term
+#     the base does not know is a VOCABULARY GAP, not a synonym, and belongs to
+#     `fix-enrichment-vocabulary-gaps`;
+#   * an overlay form MUST NOT already resolve to a different base canonical.
+#
+# Every entry carries the measurement that justifies it, taken on 2026-09-01
+# against the 1.168 live rows of `ai.product_document`. An entry without a number
+# does not go in. The `exclusions` section at the bottom is not decoration: it is
+# where the rule is visible at the moment somebody is tempted to break it.
+
+classes:
+  # ---------------------------------------------------------------- piece_type
+  - field: piece_type
+    canonical: anillo
+    forms: [aro de dedo]
+    why: >-
+      Named in design §7.4. Must beat `aro` -> pendientes by phrase length: all 6
+      documents matching `aro de dedo` are rings, while all 15 sampled `aro`/`aros`
+      documents are earrings, so both mappings are safe only if the longer wins.
+
+  - field: piece_type
+    canonical: pendientes
+    forms: [pendiente, aro, aros, arete, aretes, criolla, zarcillos]
+    why: >-
+      `pendiente` is the singular of the most common piece type (275 documents) and
+      the base has no entry for it, so an operator typing it matched nothing.
+      `aro` and `aros` stem to different lexemes ('aro' and 'aros') and reach
+      disjoint sets of 32 and 24 documents, so the class must carry both surface
+      forms. `criolla` is missing from the base, which only has the plural.
+      `arete`/`aretes` (4 documents) and `zarcillos` (0) are Latin-American variants:
+      correct, cheap, and harmless when the corpus does not use them.
+
+  - field: piece_type
+    canonical: collar
+    forms: [choker]
+    why: >-
+      0 documents today against 140 for the canonical. Costs nothing and is the
+      word a younger customer uses.
+
+  - field: piece_type
+    canonical: colgante
+    forms: [dije, medalla]
+    why: >-
+      Neither is in the base. `dije` reaches 1 document on its own and `medalla` 0,
+      against 195 for the canonical.
+
+  - field: piece_type
+    canonical: broche
+    forms: [prendedor, alfiler]
+    why: >-
+      `alfiler` reaches 2 documents and `prendedor` 0, against 86 for the canonical.
+
+  # ----------------------------------------------------------------- materials
+  - field: materials
+    canonical: baño de oro
+    forms: [banado en oro]
+    why: >-
+      The stemmer folds acute accents but NOT `ñ`, so `bano` stems to 'ban' and
+      never meets 'bañ': `bano de oro` reached 0 documents against 38. The base
+      already rescues `bano de oro` because lookup is folded, but not
+      `banado en oro`.
+
+  - field: materials
+    canonical: hilo
+    forms: [cordon, cuerda]
+    why: >-
+      Both reach 0 documents alone against 104 for the canonical, which the corpus
+      writes as `hilo` and `hilo encerado`.
+
+  - field: materials
+    canonical: latón
+    forms: [bronce]
+    why: 3 documents against 78 for the canonical, and no shopper says "latón".
+
+  - field: materials
+    canonical: resina
+    forms: [acrilico]
+    why: 0 documents against 4. Small class, but the word an operator would reach for.
+
+  - field: materials
+    canonical: acero
+    forms: [acero inoxidable]
+    why: >-
+      1 document against 3. Tiny either way; included because the phrase is how the
+      material is named on a label and phrase matching must not miss it.
+
+  # ---------------------------------------------------------------- color_tags
+  - field: color_tags
+    canonical: dorado
+    forms: [dorada, dorados]
+    why: >-
+      `dorada` is the feminine the base lacks, and it is half of `gargantilla dorada` —
+      the query that reaches 0 documents unexpanded. It anchors to the COLOUR and not to
+      the plating on purpose: an operator saying "dorada" is describing what the piece
+      looks like, and only the colour class is widened towards `oro` below.
+
+  # ---------------------------------------------------------------- size_label
+  - field: size_label
+    canonical: pequeno
+    forms: [pequeño]
+    why: >-
+      EMISSION, not matching: the base already resolves `pequeño` because lookup is
+      folded, but it can only emit the canonical, and `pequeño` stems to 'pequeñ'
+      while `pequeno` stems to 'pequen'. They reach different sets of 134 and 71
+      documents — the accented form lives in the prose, the unaccented one in the
+      canonical `Talla:` line — so dropping either loses documents.
+
+bridges:
+  # Bridges are DIRECTIONAL, and the direction was measured. A symmetric union looks
+  # tidier and is wrong here: it made a query for `baño de oro` — the plating, average
+  # 420 EUR — also match the 282 solid-gold pieces averaging 587 EUR, which is the
+  # opposite of what an operator asking for the cheaper finish wants.
+  - widens:
+      - { field: color_tags, canonical: dorado }
+    with:
+      - { field: materials, canonical: baño de oro }
+      - { field: materials, canonical: oro }
+    why: >-
+      A gold-COLOURED necklace is gold-coloured whether the gold is solid or plated, so
+      the colour reaches both. Measured on `gargantilla dorada`: `dorado` alone 22
+      documents, `dorado | baño de oro` still 22, and the full union 64. The whole gain
+      comes from `oro`, so this direction earns its place.
+
+  - widens:
+      - { field: materials, canonical: baño de oro }
+    with:
+      - { field: color_tags, canonical: dorado }
+    why: >-
+      The plating reaches the colour word the corpus actually uses — `dorado` alone
+      matches 145 documents against 38 for `baño de oro` — but NOT `oro`, which is the
+      direction that would drag solid gold into a query for plating. This also removes
+      the ambiguity of `dorado` being canonical in `color_tags` and a synonym of
+      `baño de oro` in `materials`: whichever one a lookup returns, the emitted forms
+      now contain both.
+
+exclusions:
+  - term: piel
+    rejected_target: cuero
+    why: >-
+      FALSE FRIEND, measured. All 7 matching documents say "sobre la piel" or
+      "acaricia la piel" — human skin in marketing prose. `cuero` has ONE product
+      in the whole catalogue, so the mapping would inject seven wrong results into
+      every leather query. This is the entry that explains why the dictionary is
+      curated against the corpus instead of generated.
+
+  - term: llavero
+    why: >-
+      Not a synonym: a `piece_type` gap. Belongs to `fix-enrichment-vocabulary-gaps`,
+      whose own ficha claims it. The loader rejects it structurally, because its
+      canonical does not exist in the base.
+
+  - term: diadema
+    why: Same as `llavero`. 11 documents that no synonym can reach.
+
+  - term: gemelos
+    why: Same as `llavero`. 4 documents.
+
+  - term: cinturon
+    why: Same as `llavero`. 3 documents.
+
+  - term: filigrana
+    why: >-
+      Needs no expansion at all: it reaches 66 documents on its own, spread across
+      every piece type — it is a technique, not a piece. It is a `style_tags` gap
+      and a real Menorcan domain term; one of the 12 recorded operator searches is
+      literally "anillo de filigrana tradicional menorquina".
