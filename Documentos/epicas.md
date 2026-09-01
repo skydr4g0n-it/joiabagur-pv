@@ -432,6 +432,7 @@ Resuelve el caso de negocio crítico: variantes visualmente casi idénticas que 
 
 - [HU-AIENG-007: Entidad de familia de producto y edición manual](Historias/AI-Eng/HU-AIENG-007.md) *(C07 — hecho)*
 - [HU-AIENG-018a: Propuesta asistida de familias y aprobación por lotes](Historias/AI-Eng/HU-AIENG-018a.md) *(C18a — hecho; 156 familias / 486 miembros; `Origin = AiApproved`; 32 entradas que no son joyería retiradas del índice con `ReviewStatus = Rejected`, nunca con `IsActive`; cola de revisión de 15 miembros en 5 familias)*
+- [HU-AIENG-018b: Revisión humana de familias, alerta de huérfanos y veredicto persistente](Historias/AI-Eng/HU-AIENG-018b.md) *(C18b — hecho, 2026-09-01; **la cola de 15 miembros de C18a ya no existía** y el change se reformuló de «pintar una cola» a «auditar lo que hay»: aquella cola vivía en una respuesta de `suggest` que nunca se persistió, y sus productos ya pertenecen a familias. `POST /v1/families/audit` —**décima ruta** del contrato congelado— recomputa sobre las familias persistidas, reutilizando el veto relativo con otro universo, y en la misma llamada nomina huérfanos: son la misma comparación leída desde los dos lados de la pertenencia. **Nominación por margen relativo, nunca por umbral absoluto** — medido, la pureza de vecindario dispara sobre los casi-duplicados sintéticos y el margen sobre huecos reales del catálogo; la pureza queda como señal de orden. Entidad nueva `FamilyReviewVerdict` sobre el par `(producto, familia)` —**séptima migración del plan, más dos que la propia revisión obligó a añadir**— que es a la vez el registro de descarte y el sello de aprobación por ítem que la aprobación por lotes no podía dar. Listado paginado y disolución de familias en `ProductFamiliesController`. Pantalla de administración en [`/admin/family-review`](../frontend/src/pages/admin/family-review.tsx) con **tres estados por lista** puestos en el tipo (`AuditOutcome`) y no en el render: una auditoría que no se pudo calcular **nunca** se pinta como catálogo limpio. Revisión real ejecutada: **58 juicios, 17 de 18 pertenencias confirmadas y 6 de 40 candidatos aceptados**, 7 aplicados al catálogo. Sinónimo `dorado` → `baño de oro` en el vocabulario de enriquecimiento. Informe en [c18b-family-review-report.md](Proyecto%20Final%20AIEng/informes/c18b-family-review-report.md))*
 
 ---
 
@@ -545,7 +546,7 @@ Se miden por *changes* de OpenSpec, no por número de historias: la serie `HU-AI
 |-------|-------------------|---------|--------------|
 | **EP11** | Plataforma del Servicio de IA | C01, C02, C03, C05, C17 | 🔴 completa |
 | **EP12** | Corpus y Enriquecimiento del Catálogo | C06a (hecho), C06b (hecho), C08, C09 (hecho), C10 (hecho), C11 (hecho), C23 | 🔴 parcial |
-| **EP13** | Familias de Producto y Desambiguación | C07 (hecho), C18a (hecho), C18b, C28 | 🟢 parcial |
+| **EP13** | Familias de Producto y Desambiguación | C07 (hecho), C18a (hecho), C18b (hecho), C28 | 🟢 parcial |
 | **EP14** | Búsqueda Semántica Híbrida | C12, C13, C14, C15, C16, C20, C21, C22, C25 | 🔴 mayoritaria |
 | **EP15** | Venta Asistida, Sustitutos y Agentes | C26, C27, C30, C31, C32, C34, C36 | 🔴 parcial |
 | **EP16** | Inventario Asistido y Señales de Demanda | C19, C29, C33, C35, C37 | 🟢 |

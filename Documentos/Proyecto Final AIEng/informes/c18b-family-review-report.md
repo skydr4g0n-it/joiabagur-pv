@@ -1,7 +1,7 @@
 # C18b — Informe de la revisión humana de familias
 
 **Change:** [`add-family-review-ui-and-orphan-alert`](../../../openspec/changes/add-family-review-ui-and-orphan-alert/) · **Rama:** `c18b-add-family-review-ui-and-orphan-alert`
-**Estado:** en curso — este documento se rellena durante el apply, no al final.
+**Estado:** completo — redactado durante el apply, no al final. Última medición: 2026-09-01.
 
 ---
 
@@ -95,6 +95,41 @@ src/pages/sales/__tests__/scan.test.tsx
 ```
 
 > **Nota de método.** `CLAUDE.md` cita 118 fallos de 482 en 17 ficheros, medidos el 2026-08-29. Hoy son 113 de 533 en 14. La suite ha crecido en 51 tests desde entonces, así que **los dos números no son comparables** y el que vale es el de hoy. Es justamente el motivo por el que la regla del proyecto es comparar **nombres** y no recuentos.
+
+### Comparación al cerrar el change
+
+Ambas suites reejecutadas enteras el **2026-09-01**, y comparadas contra las listas de `baseline/` por **nombre**:
+
+| Suite | Línea base | Al cerrar | Tests propios |
+|---|---|---|---|
+| **Frontend** | 113 fallos · 420 pasan · 533 | **113 fallos · 439 pasan · 552** | **+19, todos en verde** |
+| **Backend** | 47 fallos · 873 pasan · 920 | **51 fallos · 900 pasan · 951** | **+31, todos en verde** |
+
+**El frontend cierra exacto: los 113 nombres son los mismos 113.** Cero nuevos, cero arreglados, y los 19 tests de la pantalla de revisión pasan.
+
+**El backend no cierra exacto por nombre, y hay que decir en qué.** Aparecen 6 nombres que la línea base no tenía y desaparecen 2 que sí tenía:
+
+```
+nuevos          InventoryIntegrationTests   ExcelImport_DownloadTemplate_ShouldSucceed
+                                            ExcelImport_NegativeQuantityWithSufficientStock_...
+                                            MovementHistory_WithPagination_ShouldReturnPagedResults
+                                            Operator_AdjustStock_ShouldBeForbidden
+                ProductsControllerTests     Update_WithValidData_ShouldReturnUpdatedProduct
+                ReturnsControllerTests      GetReturnsHistory_WithFilters_ReturnsFilteredResults
+
+desaparecidos   ReturnsControllerTests      GetReturnsHistory_WithExistingReturns_ReturnsPagedResults
+                SalesControllerTests        CreateSale_OperatorNotAssignedToPOS_ReturnsBadRequest
+```
+
+Los ocho caen **dentro de clases que ya fallaban en la línea base** —`InventoryIntegrationTests`, `ProductsControllerTests`, `ReturnsControllerTests`, `SalesControllerTests`—, y ninguna de las cuatro toca familias, ni el controlador de catálogo IA, ni la entidad nueva.
+
+**Y el nombre no es una unidad estable en esta suite.** Se midió en esta misma sesión: **dos ejecuciones del mismo código dieron 48 y 54 fallos**, con nombres distintos dentro de las mismas clases. `CLAUDE.md` avisa de que un puñado de estos fallos dependen del orden; lo que la medición añade es que la inestabilidad llega **al nivel de nombre**, y que la unidad que sí se sostiene entre ejecuciones es la **clase**.
+
+Por eso la comparación que cierra el change se hace por clase, y sale limpia:
+
+> **El conjunto de clases con fallos es idéntico al de la línea base, y ninguna clase de familia aparece en él.**
+
+Y comprobado por el lado positivo, que es el que importa para este change: las siete clases que cubren la superficie tocada —`FamilyReviewControllerTests`, `FamilyReviewVerdictSchemaTests`, `ProductFamiliesControllerTests`, `ProductFamilySchemaTests`, `AiCatalogControllerTests`, `FamilySuggestionControllerTests` y `AiGatewayFamilySuggestionTests`— corren **111 de 111 en verde**.
 
 ---
 
@@ -260,36 +295,203 @@ Y el estado es **por lista y no por página**: la pestaña de familias no usa ve
 
 ---
 
-## 7. Auditoría de miembros marcados: resolución
+## 7. Auditoría de miembros: las 18 marcas, resueltas
 
-_Pendiente — grupo 7. Requiere juicio humano._
+Revisión ejecutada el **2026-08-31** por el administrador, contra el corpus real y por el camino completo (.NET → `jbg-ai` → pgvector). Las 18 marcas se resolvieron **todas**: no queda ninguna sin veredicto.
+
+| | |
+|---|---|
+| Miembros marcados | **18** |
+| Confirmados | **17** |
+| Sacados de la familia | **1** — `SKU91` |
+| **Tasa de confirmación** | **94 %** |
+
+Las 18, por margen descendente:
+
+| margen | SKU | producto | familia | veredicto |
+|---|---|---|---|---|
+| 0,147 | SKU82 | Colgante estrella de mar M oro | Colgante estrella de mar | confirmado |
+| 0,140 | SKU80 | Colgante estrella de mar XS oro | Colgante estrella de mar | confirmado |
+| 0,127 | SKU81 | Colgante estrella de mar S oro | Colgante estrella de mar | confirmado |
+| 0,124 | SKU76 | Colgante estrella de mar XS | Colgante estrella de mar | confirmado |
+| 0,118 | SKU78 | Colgante estrella de mar M | Colgante estrella de mar | confirmado |
+| 0,114 | SKU77 | Colgante estrella de mar S | Colgante estrella de mar | confirmado |
+| 0,112 | SKU79 | Colgante estrella de mar L | Colgante estrella de mar | confirmado |
+| 0,106 | SKU150 | Anillo rama XL | Anillo rama | confirmado |
+| 0,087 | SKU123 | Colgante conchiglie Oro | Colgante conchiglie | confirmado |
+| 0,087 | SKU145 | Anillo rama abierto XL | Anillo rama abierto | confirmado |
+| **0,084** | **SKU610** | **Colgante Estrella de Mar** *(sintético)* | Colgante estrella de mar | **confirmado** |
+| 0,076 | SKU143 | Anillo rama | Anillo rama | confirmado |
+| 0,074 | SKU71 | Pendientes botón estrella de mar xs oro | Pendientes boton estrella de mar | confirmado |
+| 0,070 | SKU121 | Colgante mini conchiglie | Colgante conchiglie | confirmado |
+| 0,066 | SKU122 | Colgante mini conchiglie Oro | Colgante conchiglie | confirmado |
+| **0,061** | **SKU91** | Colgante estrella de mar XS dorado | Colgante estrella de mar dorado | **sacado** |
+| 0,057 | SKU144 | Anillo rama abierto | Anillo rama abierto | confirmado |
+| 0,051 | SKU69 | Pendientes botón estrella de mar | Pendientes boton estrella de mar | confirmado |
+
+### 7.3 — El hallazgo (d) de C18a se resolvió, pero al revés de como el diseño lo predijo
+
+La tarea 7.3 daba por hecho que `SKU610` era un intruso: un sintético colado en una familia real, cuya salida subiría el peor hermano de `Colgante estrella de mar` por encima de 0,778 y arrastraría consigo a la mayoría de los dieciocho. **La persona que revisó lo confirmó como miembro legítimo.**
+
+Y mirando el producto es difícil llevarle la contraria: `Colgante Estrella de Mar` **es** un colgante de estrella de mar, y la familia agrupa exactamente eso. Lo que la etiqueta `synthetic` marca es la procedencia del dato, no un error semántico. C18a leyó *«un sintético dentro de una familia real»* como contaminación porque cruzó una frontera de origen; el revisor leyó la única frontera que le importa al catálogo, que es la del producto, y ahí no hay intrusión.
+
+Tres consecuencias, y ninguna es cosmética:
+
+- **El peor hermano de esa familia no sube, y la predicción de la decisión 5 queda sin comprobar.** No es que se refutara: es que la limpieza que la habría puesto a prueba no llegó a hacerse, porque no había nada que limpiar. Queda como hipótesis abierta.
+- **Su dispersión es real, no contaminación.** La familia va de XS a L en dos acabados, y ese recorrido es el que hunde el listón hasta 0,778. Ningún umbral distingue eso de una familia rota.
+- **La marca no midió lo que se creía.** Once de las dieciocho —siete de `Colgante estrella de mar`, cuatro de `Anillo rama` y `Anillo rama abierto`— salen de familias amplias y legítimas. La señal detectó amplitud, y se leyó como error.
+
+**La precisión del veto como señal de auditoría sobre miembros es de 1 sobre 18: un 6 %.** Es un dato incómodo y es el dato. No invalida la señal —cuesta 18 juicios y encontró uno real, que es una compra razonable— pero sí invalida cualquier lectura automática de ella: **marcar no es un veredicto, y este número es la razón por la que en este change nada se mueve sin que una persona lo diga.**
 
 ---
 
-## 6. Huérfanos: θ elegido y cola revisada
+## 8. Huérfanos: θ fijado y la cola revisada entera
 
-_Pendiente — grupo 8._
+**`JPV_FAMILY_ORPHAN_MARGIN = 0`.** Se fija generoso a propósito, como pedía la tarea 8.1: con θ = 0 entra en la cola todo producto que se acerque a una familia más que el peor miembro de esa familia, sin exigir holgura extra. La cola sale de 40 elementos, que una persona recorre en una sesión, y **la persona es el filtro**. Subir θ habría recortado la cola sin evidencia de estar recortando por el lado bueno; con los 40 revisados uno a uno, ahora esa evidencia existe.
+
+| | |
+|---|---|
+| Candidatos nominados | **40** (39 reales, 1 sintético) |
+| Aceptados como variante | **6** |
+| Descartados | **34** |
+| **Precisión de la nominación** | **15 %** |
+
+### La precisión depende de la familia destino, y el sentido es el previsto
+
+Repartiendo los 40 por la familia a la que apuntaban aparece el patrón que da sentido a las dos cifras:
+
+| familia destino | candidatos | aceptados | precisión |
+|---|---|---|---|
+| Colgante estrella de mar | **8** | **0** | **0 %** |
+| Pendientes boton erizo de mar | 7 | 1 | 14 % |
+| Pendientes boton estrella de mar | 5 | 1 | 20 % |
+| Pendientes boton lapa | 4 | 0 | 0 % |
+| Anillo erizo de mar | 2 | 0 | 0 % |
+| **Pendientes conchiglie** | **2** | **2** | **100 %** |
+
+**La misma familia que se llevó siete de las dieciocho marcas atrajo ocho candidatos y no acertó ni uno.** Es el imán que el diseño anticipó, ahora medido: una familia con el listón hundido no sólo marca a los suyos, sino que **nomina a cualquiera que le pase cerca**. En el otro extremo, `Pendientes conchiglie` —familia estrecha— nomina dos y acierta dos.
+
+De ahí la regla que este informe deja escrita para C28: **la nominación por margen relativo hereda la cohesión de la familia destino.** Su precisión no es una propiedad del umbral, sino de a quién apunta. Ponderarla por la cohesión del destino es la mejora obvia, y no se hace aquí porque exige recalibrar sobre una cola ya revisada — que es justo lo que este change acaba de producir y no existía al empezar.
+
+### 8.3 — Las dos raíces degeneradas siguen abiertas, y no por descuido
+
+La tarea 8.3 heredaba de C18a (D11) dos grupos cuya raíz normaliza al tipo de pieza pelado. **Ninguno llegó a la cola**, y el motivo es distinto en cada caso:
+
+| producto | tipo | por qué no se nominó |
+|---|---|---|
+| `Alianzas Plata` (SKU327), `Alianzas oro` (SKU397) | anillo | Hay familias de `anillo`, pero ninguna les queda lo bastante cerca: una alianza lisa no se parece a un anillo de rama ni de erizo |
+| `Cadena plata` (SKU328), `Cadena oro` (SKU329) y 5 más | cadena | **No existe ni una familia de tipo `cadena`.** Sin familia destino no hay margen que calcular |
+
+Las siete cadenas y las dos alianzas son familias de variante de manual, evidentes a la vista y **fuera del alcance de este change**: C18b lista y disuelve familias, no las crea. Quedan anotadas aquí como entrada para quien retome C28, con los SKU ya identificados.
+
+### 8.4 — Los huérfanos que quedan fuera por construcción
+
+De los **677** productos activos sin familia que quedan tras la revisión, **32 son inalcanzables** para la auditoría, se ponga θ donde se ponga:
+
+| motivo | productos |
+|---|---|
+| Sin `piece_type` — la puerta del tipo los excluye | **11** |
+| `piece_type` del que **ninguna familia** es miembro | **21** — `tobillera` 14, `cadena` 7 |
+| **Total fuera por construcción** | **32** |
+
+Los 645 restantes sí son alcanzables y simplemente no superaron θ = 0: ninguna familia les queda más cerca que su peor miembro. Es el resultado correcto para la inmensa mayoría de un catálogo, donde la mayoría de las piezas son únicas.
 
 ---
 
-## 7. Revisión de las 156 familias
+## 9. Revisión, aplicación y reconciliación
 
-_Pendiente — grupo 9._
+### 9.1 — Alcance real de la revisión, dicho con precisión
+
+**Se juzgaron 58 pares `(producto, familia)`** de los 526 posibles (486 pertenencias vivas + 40 candidatos). Los 58 son exactamente lo que la auditoría señaló: las 18 pertenencias que los vectores no sostienen, y los 40 candidatos.
+
+La tarea 9.1 pedía *«revisar las 156 familias ítem a ítem»*, y conviene no leer los 58 como si fueran eso. **Las 156 se revisaron como lista** —la pestaña de familias las recorre con sus miembros y sus etiquetas, y de ahí salieron las cuatro correcciones de etiqueta— pero el veredicto par a par se registró sobre el subconjunto auditado. Juzgar las 486 pertenencias una a una es otro trabajo, y ni la señal ni la pantalla lo exigen: **las 468 no marcadas son precisamente aquellas sobre las que los vectores no tienen objeción.**
+
+### 9.2 — Confirmar sin cambiar no movió el corpus
+
+Es la comprobación que separa un veredicto de una edición, y sale limpia:
+
+| | antes | después | movimiento |
+|---|---|---|---|
+| `ProductFamilies` | 156 | **156** | ninguno |
+| `ProductFamilyMembers` | 486 | **491** | **+6 −1** |
+| Familias `Manual` | 0 | **0** | ninguno |
+
+**Los 51 veredictos que no implicaban acción no tocaron una sola fila del catálogo.** Se movieron los 7 pares que la persona decidió aplicar, ni uno más — y se movieron por la ruta declarativa de C07, no por escritura directa.
+
+Los 7 aplicados:
+
+| SKU | producto | familia | acción | etiqueta |
+|---|---|---|---|---|
+| SKU25 | Pendientes botón erizo de mar S dorado | Pendientes boton erizo de mar | añadido | `S baño de oro` |
+| SKU420 | Colgante Lapa Mini Dorado | Colgante lapa | añadido | `mini baño de oro` |
+| SKU90 | Pendientes botón estrella de mar dorado | Pendientes boton estrella de mar | añadido | `baño de oro` |
+| SKU133 | Pendientes mini conchiglie dorado | Pendientes conchiglie | añadido | `mini baño de oro` |
+| SKU17 | Colgante dorado erizo de mar S | Colgante erizo de mar | añadido | `S baño de oro` |
+| SKU119 | Pendientes conchiglie largos | Pendientes conchiglie | añadido | `L` |
+| SKU91 | Colgante estrella de mar XS dorado | Colgante estrella de mar dorado | **sacado** | — |
+
+**Tres de los seis añadidos son los que la sección 4 predijo que sólo podrían entrar por aquí** —SKU25, SKU420 y SKU90—: sus familias base ya existían, la regla de convergencia los excluía del pool de `suggest`, y el sinónimo `dorado` por sí solo no los alcanzaba. Entraron por la cola de huérfanos, que era la apuesta del change. Y cuatro etiquetas se corrigieron a mano sobre familias ya existentes —SKU25, SKU420, SKU118 (`mini oro`) y SKU117 (`mini`)—, que es el hueco que obligó a añadir la edición de etiqueta al alcance.
+
+### 9.3 — Sincronización incremental, con una salvedad que hay que decir
+
+Se ejecutó `POST /v1/index/sync` en modo incremental, nunca `--full`. El primer intento **falló en 9 de 16 documentos** con `CERTIFICATE_VERIFY_FAILED` contra el proveedor de embeddings — un problema de confianza de certificados de la máquina, no de la aplicación ni de la red (`curl` al mismo host devolvía 200). Se resolvió construyendo un bundle con `certifi` más las 183 raíces del almacén de Windows y apuntando `SSL_CERT_FILE` a él.
+
+**La salvedad:** el segundo pase salió con `since: null` y barrió los 1.168 documentos, no sólo los estampados. El estado final es correcto y está verificado, pero **esta ejecución no demuestra que el estampado del watermark funcione**, que es lo que la tarea 9.3 quería comprobar. Se deja dicho en lugar de dar la casilla por buena: un barrido completo tapa exactamente el fallo que esa tarea buscaba.
+
+### 9.4 — Estado final del índice
+
+| | |
+|---|---|
+| `ai.product_document` | **1.168** |
+| Con `family_id` | **491** — cuadra exactamente con `ProductFamilyMembers` |
+| Con `variant_label` | 473 |
+| **Sin `embedding`** | **0** |
+| `embedding_version` | **un único valor** — sigue siendo `openai/text-embedding-3-small:1536:source-text/v1` |
+
+**`ai.sync_failure` tiene 9 filas, y se dejan donde están.** Son los 9 documentos del incidente de certificados de las 22:04, y los 9 productos —SKU91, 90, 17, 25, 420, 133, 117, 118 y 119— están verificados como reindexados a las 22:09 y con embedding. La tarea 9.4 pedía *«cero filas»*, y esa exigencia parte de una premisa falsa: **la tabla es de sólo inserción.** Nada en `indexing/` borra de ella; sus columnas `attempts` y `next_retry_at` no las lee nadie. No es una cola que se drena, es un registro de incidentes que se acumula.
+
+Vaciarla con un `DELETE` para poner verde una casilla sería destruir la traza de un incidente real y llamarlo cierre. **Se corrige la tarea, no los datos.** Que la tabla parezca una cola y no lo sea es una observación para otro change, no una deuda de éste.
 
 ---
 
-## 8. Métricas para el README
+## 10. Métricas para el README
 
-_Pendiente — tasa de corrección del agrupador y tiempo medio de revisión, reportadas por `data_origin`._
+| Métrica | Valor | Sobre qué se mide |
+|---|---|---|
+| **Pertenencias auditadas** | 18 de 486 | las que los vectores no sostienen |
+| **Tasa de confirmación del agrupador** | **94 %** (17/18) | sobre las marcadas, no sobre las 486 |
+| **Tasa de corrección** | **5,6 %** (1/18) | ídem |
+| **Precisión de la marca como señal** | **6 %** | 1 marca útil por cada 18 juicios |
+| **Candidatos a huérfano revisados** | 40 | con θ = 0 |
+| **Precisión de la nominación** | **15 %** (6/40) | de 0 % a 100 % según la cohesión del destino |
+| **Decisiones aplicadas al catálogo** | 7 de 58 | 6 altas, 1 baja |
+| **Reparto por `data_origin`** | 56 reales / 2 sintéticos | sobre un corpus indexado de 404 reales y 764 sintéticos |
+| **Tiempo medio de revisión** | **no disponible en esta ejecución** | ver abajo |
+
+Las dos primeras filas hay que leerlas juntas y con su denominador a la vista: **el 94 % es sobre las 18 marcadas, no sobre las 486 pertenencias.** Decir «el agrupador acierta el 94 %» sin esa coletilla sería inflar la cifra, porque las 468 restantes ni se juzgaron.
+
+**Y el reparto por `data_origin` merece una línea propia.** El corpus indexado es sintético en un 65 %, y sin embargo **56 de los 58 juicios cayeron sobre productos reales**. La auditoría no está midiendo los datos de relleno: apunta casi en exclusiva al catálogo de verdad, que es donde se quería que apuntara.
+
+### El tiempo medio no está, y decir por qué es más útil que estimarlo
+
+`ReviewSeconds` está a `NULL` en las 58 filas. La columna se añadió **después** de esta revisión, precisamente porque durante ella se descubrió que el cronómetro vivía en el estado del componente y moría con la pestaña. La media que el checklist pide **no existe para esta ejecución**, y este informe no la va a inventar.
+
+Lo único que los datos sostienen es una cota. Los veredictos se registraron en **dos lotes**: 40 a las 21:34:27 y 18 a las 21:37:15. Si la revisión de los 18 miembros arrancó justo tras enviar el lote de huérfanos —suposición razonable pero **no verificada**—, esos 168 segundos dan **≈ 9,3 s por ítem como cota superior**. Para los 40 huérfanos no hay ni instante de arranque, así que no hay cota alguna.
+
+Nueve segundos por ítem es un orden de magnitud creíble para decisiones de *«¿esta pieza es una variante de esa familia?»* con la ficha delante, pero **una cota bajo una suposición no es una medición**. Queda como referencia para dimensionar la siguiente sesión, no como el número del entregable. El mecanismo para medirlo de verdad —`ReviewSeconds` por juicio y `GET family-review-metrics` calculando desde lo guardado— **ya está entregado y probado**, y la próxima revisión sí dará la cifra. Cuando no hay tiempos la métrica informa la ausencia y nunca un cero: un cero afirmaría una revisión instantánea.
 
 ---
 
-## 9. Reconciliación del índice
+## 11. Lo que queda abierto
 
-_Pendiente — grupo 9._
-
----
-
+| Qué | Por qué no se cierra aquí |
+|---|---|
+| **Backfill de `SubjectWasMember`** — las 58 filas quedaron en `false`, y 18 deberían ser `true` | El script está en `backfill-subject-population.sql`, sin ejecutar. Escribe sobre datos de revisión y la reconstrucción es una inferencia, no un dato guardado: lo aplica una persona |
+| **Familias de `cadena` y `alianzas`** — 9 productos que piden dos familias manuales | C18b lista y disuelve familias, no las crea. Entrada directa para C28 |
+| **Ponderar la nominación por la cohesión del destino** — su precisión va de 0 % a 100 % según a qué familia apunte | Exige recalibrar sobre una cola ya revisada, que es lo que este change acaba de producir y no existía al empezar |
+| **La predicción de la decisión 5** — sin comprobar | No hubo intruso que sacar. Queda como hipótesis, no como resultado |
+| **`ai.sync_failure` no se drena** — `attempts` y `next_retry_at` no las lee nadie | Observación de esquema, ajena al alcance |
+| **Estampado del watermark sin verificar** — el segundo pase barrió los 1.168 | Necesita una sincronización con `since` real sobre un cambio acotado |
 ## Vuelta atrás
 
 Deshacer los cambios de pertenencia por los mismos endpoints que los hicieron, vaciar `FamilyReviewVerdict`, revertir el sinónimo `dorado`, y resincronizar de forma incremental. El respaldo `pre-c18b.dump` cubre el caso de que algo salga peor de lo previsto:

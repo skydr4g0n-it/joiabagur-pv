@@ -554,6 +554,40 @@ Agrupación de los productos que son **la misma pieza en varias variantes** —e
 
 ---
 
+### FamilyReviewVerdict (Veredicto Humano sobre una Familia)
+
+El juicio de una persona sobre la relación entre **un producto y una familia**. Añadida por el change C18b (`add-family-review-ui-and-orphan-alert`, EP13), que la necesitaba para tres cosas a la vez y descubrió que eran la misma fila.
+
+**El par es la identidad, no la pertenencia.** El veredicto se registra sobre `(ProductId, ProductFamilyId)` pertenezca o no el producto a esa familia hoy, porque las dos preguntas que un revisor contesta son la misma leída desde los dos lados: *un miembro que los vectores no sostienen* y *un producto sin familia que parece pertenecer a una*. Colgar el registro de `ProductFamilyMember` habría cubierto sólo la primera — **un huérfano no tiene fila de pertenencia que lo lleve**.
+
+**Una fila hace tres trabajos**, y de ahí que no haya tres tablas:
+
+| Trabajo | Sin la fila |
+|---|---|
+| Lista de descartes | Un candidato rechazado vuelve a la cola en cada auditoría, para siempre |
+| Memoria de la auditoría | Una cola trabajada no se distingue de una cola sin tocar |
+| Sello de aprobación **por ítem** | Las 156 familias de C18a registran al administrador que disparó **un lote**, no un juicio sobre ninguna familia en concreto |
+
+**Vive en el esquema transaccional y no junto al índice.** Los vectores que plantean estas preguntas son del servicio de IA, pero poner ahí las respuestas habría sido estado que nada invalida: `ai.product_document` es una proyección que se lapida y se reconstruye, así que una tabla a su lado no hereda nada de su ciclo de vida, borrar una familia dejaría filas huérfanas que nadie limpia, y el revisor sería un identificador opaco que la pantalla no sabe resolver a un nombre. Aquí las claves ajenas resuelven las tres cosas sin una línea de código.
+
+**Campos Clave:**
+- `ProductId`, `ProductFamilyId`: el par, con **índice único**. Juzgar dos veces el mismo par es *una corrección*, no una segunda opinión; sin el índice un revisor que cambia de idea deja dos filas contradictorias y el filtro de la auditoría pasa a depender de cuál lea primero
+- `Outcome`: `Confirmed = 1` | `Dismissed = 2`, almacenado como `integer` y **nunca como `ENUM` de PostgreSQL** — por el mismo motivo que `ProductFamily.Origin`: un tipo enumerado sobrevive al borrado de su tabla y hace fallar una migración posterior con «el tipo ya existe», semanas más tarde y sin conexión aparente
+- `ReviewedByUserId`, `ReviewedAt`: quién y cuándo. El instante lo estampa **el servidor**
+- `MarginAtReview`: `double` **nulable**. Guarda el margen que la auditoría reportaba en ese momento, para poder *mostrar* un veredicto como caduco —«revisado en T con margen 0,16; hoy 0,31»— en vez de reabrirlo en silencio. La invalidación automática se consideró y se descartó: exige una regla sobre cuánto movimiento importa, y nadie la mantendría. Nulo para un juicio hecho fuera de la auditoría, que es un estado legítimo y no un dato que falte
+- `ReviewSeconds`: `double` **nulable**, el tiempo dedicado a *ese* ítem. Persistido por juicio y no acumulado en la pantalla, porque el checklist de entrega pide un tiempo medio de revisión y **un número que sólo vive en el estado del componente se pierde al cerrar la pestaña** — que es literalmente como se perdieron los tiempos de la primera sesión de revisión. Es además la única señal de que una revisión ha degenerado en pulsar: una cola despachada a dos segundos por ítem no se está leyendo. Nulable porque un veredicto puede llegar sin él, y **un cero inventado arrastraría la media hacia una cifra que nadie midió**
+- `SubjectWasMember`: `boolean`, capturado **al registrar** porque después ya no se puede recuperar. Las dos poblaciones que un revisor recorre tienen tasas base muy distintas y hay que reportarlas por separado, pero en cuanto un miembro rechazado se saca de su familia **queda idéntico a un candidato rechazado** —no es miembro, está rechazado—, así que deducir la población del estado actual falla justo en los juicios que sí se ejecutaron. Lo escribe el servidor y no el cliente: este lado conoce la pertenencia, y un dato que quien llama podría falsear no es evidencia
+- `Note`: `varchar(500)` nulable. El máximo está declarado **en la entidad** y no en la configuración de EF, para que los validadores de la petición lo vean: la capa de aplicación no referencia infraestructura, y un límite aplicado en un sitio y adivinado en el otro es como una petición pasa la validación y luego revienta contra la base
+
+**Optimizaciones:**
+- **Índice único sobre `(ProductId, ProductFamilyId)`** — la identidad del juicio, descrita arriba
+- **`CASCADE` desde la familia**: un juicio sobre una familia que ya no existe contesta a una pregunta que nadie puede hacer, y conservarlo dejaría la auditoría filtrando contra filas que apuntan a la nada. Declarado a través de la navegación, para que la regla de borrado viaje con la relación en lugar de quedarse en el valor por defecto del framework
+- **`RESTRICT` hacia `Product` y hacia `User`**: en este catálogo un producto se desactiva en vez de borrarse, pero si alguno llegara a borrarse, perder el registro de lo que una persona decidió sobre él sería silencioso e irreversible. Y hacia el usuario por lo que ya recogía `ProductFamily.ApprovedByUserId`: borrar a alguien no puede destruir la evidencia de las revisiones que hizo, que es justo la cifra que el checklist pide
+
+> **Tres migraciones, no una.** La entidad entró con la **séptima migración del plan** (`AddFamilyReviewVerdict`), y la revisión real obligó a dos más sobre su propia tabla: `AddFamilyReviewSeconds` y `AddVerdictSubjectPopulation`. Las dos salieron de usar la pantalla de verdad —el cronómetro moría con la pestaña, y la población no se podía deducir a posteriori—, no de leer el diseño. Las 58 filas anteriores a la tercera quedaron con `SubjectWasMember = false` por defecto y necesitan un backfill que sólo puede aplicar una persona, porque la reconstrucción es una inferencia y no un dato guardado.
+
+---
+
 ### PaymentMethod (Métodos de Pago)
 
 Lista general de métodos de pago disponibles en el sistema.
