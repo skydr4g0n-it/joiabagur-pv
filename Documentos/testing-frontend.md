@@ -297,6 +297,25 @@ describe('ProductCard', () => {
 > **`vitest` sale con código 0 si canalizas su salida.** `npm run test | tail` devuelve el código de `tail`, no el de la suite. Un prompt verde no significa nada: hay que leer la línea de resumen.
 
 > **Actualización del 2026-08-30, sobre `c17-add-ai-service-deployment`.** La suite tiene ahora **529 tests, 116 fallos, en 15 de los 44 ficheros** en la línea base, y **533, 113 y 14 de 45** al cierre del change. Los cuatro tests de más son los de `pages/dashboard/ai-service-status.test.tsx`, los cuatro verdes.
+
+> **Actualización del 2026-09-01, sobre `c18b-add-family-review-ui-and-orphan-alert`.** La suite
+> tiene ahora **552 tests, 113 fallos, en 14 de los 46 ficheros**. La línea base de ese change dio
+> **533 y 113**, y el cierre es el **caso más limpio que este documento registra**: los 113 nombres
+> en rojo son **exactamente los mismos 113**, cero nuevos y cero arreglados.
+>
+> Los 19 tests de más son los de `pages/admin/__tests__/family-review.test.tsx`, los diecinueve
+> verdes. Tres de ellos cubren el punto que da sentido a la pantalla —que una auditoría que **no se
+> pudo calcular** nunca se pinte igual que una que vino vacía—, y para eso los tres estados viven en
+> el tipo (`AuditOutcome`) y no en el render: un llamante no puede alcanzar las listas sin pasar por
+> el estado.
+>
+> Conviene subrayar por qué esa comparación salió exacta donde la del backend no: **aquí el nombre
+> del test sí es una unidad estable**. La inestabilidad por orden que documenta la guía del backend
+> no se da en esta suite, así que comparar por nombres da una respuesta binaria y no una
+> interpretación.
+>
+> El detalle está en
+> `openspec/changes/archive/2026-09-01-add-family-review-ui-and-orphan-alert/qa.md` §2.
 >
 > La comparación por nombres salió **subconjunto estricto**: ni un fallo nuevo, y **tres que dejaron de fallar** sin que nadie tocara sus ficheros — los tres de `pages/sales/__tests__/assisted.test.tsx`, conocidos por ser dependientes del orden. Es la segunda vez que se observa el mismo fenómeno tras el de C16, y refuerza la regla de esta misma sección: el número no sirve, el conjunto de nombres sí.
 
