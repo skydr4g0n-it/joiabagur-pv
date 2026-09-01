@@ -84,3 +84,21 @@ def test_health_generates_trace_id_when_missing(minimal_settings: Settings) -> N
 
     assert response.status_code == 200
     assert response.headers.get("X-Trace-Id")
+
+
+def test_health_does_not_load_the_synonym_dictionary(minimal_settings: Settings) -> None:
+    """The heartbeat stays cheap: C20's dictionary is loaded lazily, on first expansion.
+
+    Structural today — nothing on the health path imports it — and pinned here so that
+    pre-loading it at boot cannot slip in unnoticed. Loading costs ~28 ms and belongs to
+    the first real search, not to every probe.
+    """
+    from jbg_ai.retrieval.synonyms import load_query_dictionary
+
+    load_query_dictionary.cache_clear()
+    app = create_app(minimal_settings)
+    with TestClient(app) as client:
+        response = client.get("/health")
+
+    assert response.status_code == 200
+    assert load_query_dictionary.cache_info().currsize == 0

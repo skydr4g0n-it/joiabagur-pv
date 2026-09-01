@@ -211,3 +211,16 @@ def test_scoped_responses_echo_the_token_scope(
         response = client.post(path, json=body, headers=auth_headers)
 
         assert response.json()["effective_pos_id"] == "POS-B", path
+
+
+def test_query_expansion_is_not_part_of_the_request_contract() -> None:
+    """C20's flag supplies a default in settings and travels by parameter, never by body.
+
+    Putting it on the request would move `openapi.json`, which is frozen with the .NET
+    side. `test_openapi_snapshot_is_stable` guards the file; this guards the intent.
+    """
+    from jbg_ai.api.schemas.retrieval import RetrievalRequest
+
+    fields = set(RetrievalRequest.model_fields)
+    assert not {name for name in fields if "expan" in name or "synonym" in name}
+    assert fields == {"query", "top_k", "filters", "mode", "pos_id"}
