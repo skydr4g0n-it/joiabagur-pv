@@ -426,6 +426,7 @@ joiabagur-pv/
 │   │   ├── enrichment/                  # extractor C09 (vocabularios, talla, LiteLLM, auditor)
 │   │   ├── indexing/                    # C11 source-text/embeddings (congelado) + C13 feed/orquestador/mapa; api.main no lo importa
 │   │   ├── retrieval/                   # C14 retriever vectorial (embed max_attempts=1, <=> HNSW, filtros del body)
+│   │   │                                # + C20 expansión de consulta: diccionario en dos capas y CLI de medición
 │   │   └── stubs/                       # respuestas deterministas bajo STUB_MODE
 │   ├── prompts/                         # catalog-synth/v3 (C06b) + enrichment/v1 (C09)
 │   ├── openapi.json                     # snapshot versionado del contrato

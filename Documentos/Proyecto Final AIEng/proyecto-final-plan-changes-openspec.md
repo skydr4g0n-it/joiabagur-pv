@@ -622,7 +622,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 
 **⛔ Anulados el 2026-08-31 (5):** C19, C29, C33, C35 y C37 — la rama del agente de inventario. Motivo y consecuencias en el §0. Las fichas se conservan como registro y llevan el sello en el sitio.
 
-**Vivos: 36.** Archivados **19** (C01–C18a). Pendientes **17**: C18b, C20, C21, C22, C23, C24, C25, C26, C27, C28, C30, C31, C32, C34, C36, C38 y C39 — de los cuales C27 y C23 llevan corte pre-autorizado, y C18b es hoja del grafo.
+**Vivos: 36.** Archivados **21** (C01–C18b y C20). Pendientes **15**: C21, C22, C23, C24, C25, C26, C27, C28, C30, C31, C32, C34, C36, C38 y C39 — de los cuales C27 y C23 llevan corte pre-autorizado. **C20 se archivó el 2026-09-01 y con él cae el tapón del grafo**: C21 tiene ya sus dos prerrequisitos y es el siguiente a abrir.
 
 ---
 

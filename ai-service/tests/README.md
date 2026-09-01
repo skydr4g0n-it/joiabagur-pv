@@ -46,7 +46,7 @@ parallel taxonomy later.
 | `enrichment/` | C09 |
 | `families/` | C18a (landed: root grouping, material fusion, guards, relative veto, `POST /v1/families/suggest`), C18b (landed: audit over persisted families, orphan nomination by relative margin, source guards that the audit writes nothing and calls no provider) |
 | `indexing/` | C11 (landed: source-text/v1 + embeddings), C13 (landed: catalog drain + `sku_provenance.json`), C22, C23 |
-| `retrieval/` | C14, C20, C21, C22, C25, C26, C27 |
+| `retrieval/` | C14, C20 (landed: two-layer synonym dictionary, equivalence-group expansion, directional bridges, the enable flag swept in-process, and the measurement CLI's safe `tsquery` composition), C21, C22, C25, C26, C27 |
 | `assist/` | C30, C31, C32, C33, C35 |
 | `evals/` | C24, C38 |
 
@@ -111,7 +111,7 @@ uv run --system-certs pytest
 
 ## Current state
 
-Populated after C14: `api/`, `config/`, `db/`, `migrations/`, `data/` (C06b/C10), `enrichment/` (C09), `indexing/` (C11 + C13), `retrieval/` (C14) and `support/`. Remaining folders are reserved names. Two settings in
+Populated after C14: `api/`, `config/`, `db/`, `migrations/`, `data/` (C06b/C10), `enrichment/` (C09), `indexing/` (C11 + C13), `families/` (C18a + C18b), `retrieval/` (C14 + C20) and `support/`. Remaining folders are reserved names. Two settings in
 `pyproject.toml` hold the layout together:
 
 - `pythonpath = ["src", "tests"]` — makes `support/` importable from any subfolder.

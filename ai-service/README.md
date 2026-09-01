@@ -306,9 +306,12 @@ ai-service/
     stubs/          # deterministic fixtures
     data/           # C06b generate/ingest + C10 world/; not imported by api.main
     enrichment/     # C09 extractor: vocabs, size regex, LiteLLM port, auditor
+    families/       # C18a grouping + C18b audit over persisted families; offline, writes nothing
     indexing/       # C11 source-text/embeddings (frozen) + C13 feed client, repo, orchestrator, sku_provenance.json
-    retrieval/      # C14 vector retriever: embed max_attempts=1, <=> HNSW, body filters
+    retrieval/      # C14 vector retriever (embed max_attempts=1, <=> HNSW, body filters)
+                    # + C20 query expansion: synonyms.py, query_synonyms.yaml, measure.py CLI
   prompts/          # versioned prompts: catalog-synth/v3 (C06b generate) + enrichment/v1 (C09 extract)
+  evals/results/    # C20 measured reach report; C24 will write its runs beside it
   migrations/
     bootstrap.sql   # one-off: extension, schema, dedicated role, grants
     env.py          # version table in `ai`; provisions before revisions run
@@ -317,8 +320,9 @@ ai-service/
     api/            # contract, auth, stubs, OpenAPI snapshot
     config/         # settings and fail-fast validation
     data/           # C06b catalog CLI + C10 world/ (no provider sockets)
+    families/       # C18a grouping and C18b audit (fakes; no provider sockets)
     migrations/     # schema, indexes, reversibility (marked `db`)
-    retrieval/      # C14 vector retriever (fakes; no provider sockets)
+    retrieval/      # C14 vector retriever + C20 expansion (fakes; no provider sockets)
     support/        # shared helpers and injectable fakes
   alembic.ini       # no connection string: read from DATABASE_URL
   openapi.json      # versioned contract snapshot
