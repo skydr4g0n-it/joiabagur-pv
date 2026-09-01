@@ -241,10 +241,16 @@ The system has two roles:
 | `POST /api/ai/catalog/enrich-batch` | ✅ | ❌ |
 | `POST /api/ai/catalog/family-suggestions` | ✅ | ❌ |
 | `POST /api/ai/catalog/family-suggestions/apply` | ✅ | ❌ |
+| `POST /api/ai/catalog/family-audit` | ✅ | ❌ |
+| `POST /api/ai/catalog/family-verdicts` | ✅ | ❌ |
+| `GET /api/ai/catalog/family-verdicts` | ✅ | ❌ |
+| `GET /api/ai/catalog/family-review-metrics` | ✅ | ❌ |
+| `GET /api/product-families` | ✅ | ❌ |
 | `POST /api/product-families` | ✅ | ❌ |
 | `GET /api/product-families/{id}` | ✅ | ✅ |
 | `PUT /api/product-families/{id}` | ✅ | ❌ |
 | `PUT /api/product-families/{id}/members` | ✅ | ❌ |
+| `DELETE /api/product-families/{id}` | ✅ | ❌ |
 | `GET /api/products/{id}/family` | ✅ | ✅ |
 | `GET /api/ai/index-feed/catalog` | ❌† | ❌† |
 | `GET /api/ai/index-feed/pos-availability` | ❌† | ❌† |

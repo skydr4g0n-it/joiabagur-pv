@@ -492,6 +492,13 @@ public class FamilySuggestionControllerTests : IAsyncLifetime
         public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<AiFamilyAuditResponse> AuditFamiliesAsync(
+
+            AiFamilyAuditRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
+
+            throw new NotSupportedException();
+
+
         public Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
             AiFamilySuggestRequest request,
             AiCallScope scope,

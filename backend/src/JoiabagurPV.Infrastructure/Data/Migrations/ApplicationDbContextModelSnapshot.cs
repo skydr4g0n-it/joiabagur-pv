@@ -125,6 +125,62 @@ namespace JoiabagurPV.Infrastructure.Data.Migrations
                     b.ToTable("ComponentTemplateItems", (string)null);
                 });
 
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.FamilyReviewVerdict", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<double?>("MarginAtReview")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ProductFamilyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<double?>("ReviewSeconds")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ReviewedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("SubjectWasMember")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductFamilyId");
+
+                    b.HasIndex("ReviewedByUserId");
+
+                    b.HasIndex("ProductId", "ProductFamilyId")
+                        .IsUnique();
+
+                    b.ToTable("FamilyReviewVerdicts", (string)null);
+                });
+
             modelBuilder.Entity("JoiabagurPV.Domain.Entities.Inventory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1454,6 +1510,29 @@ namespace JoiabagurPV.Infrastructure.Data.Migrations
                     b.Navigation("Component");
 
                     b.Navigation("Template");
+                });
+
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.FamilyReviewVerdict", b =>
+                {
+                    b.HasOne("JoiabagurPV.Domain.Entities.ProductFamily", "Family")
+                        .WithMany()
+                        .HasForeignKey("ProductFamilyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("JoiabagurPV.Domain.Entities.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("JoiabagurPV.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Family");
                 });
 
             modelBuilder.Entity("JoiabagurPV.Domain.Entities.Inventory", b =>

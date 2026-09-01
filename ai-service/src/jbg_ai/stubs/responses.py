@@ -30,9 +30,13 @@ from jbg_ai.api.schemas.enrich import (
 )
 from jbg_ai.api.schemas.families import (
     ExcludedProductModel,
+    FamilyAuditRequest,
+    FamilyAuditResponse,
     FamilyProposalModel,
     FamilySuggestRequest,
     FamilySuggestResponse,
+    FlaggedMemberModel,
+    OrphanCandidateModel,
     ProposedFamilyMember,
     RejectedGroupModel,
 )
@@ -444,5 +448,80 @@ def families_suggest_stub(
             )
         ],
         already_in_family_count=0,
+        trace_id=principal.trace_id,
+    )
+
+
+def families_audit_stub(
+    request: FamilyAuditRequest, principal: ServicePrincipal
+) -> FamilyAuditResponse:
+    """One flagged member, one orphan candidate, and both kinds of refusal.
+
+    Every list is populated for the same reason `families_suggest_stub` populates
+    all three of its own: a stub that returned only the findings would let a client
+    ship without ever rendering a refusal, and those are where the catalogue problems
+    surface. The orphan carries a purity of 2 against a margin that nominated it, so
+    a client cannot quietly start treating purity as the criterion.
+
+    `judged_pairs` is honoured here too. A stub that ignored it would let the
+    dismissal path ship untested against the one behaviour it exists for.
+    """
+    judged = {(pair.product_id.lower(), pair.family_id.lower()) for pair in request.judged_pairs}
+    flagged = [
+        FlaggedMemberModel(
+            product_id="22222222-2222-2222-2222-222222222222",
+            sku="SKU-STUB-2",
+            name="Anillo erizo de mar M",
+            variant_label="M",
+            family_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            family_name="Anillo erizo de mar",
+            margin=0.12,
+            stranger_family_id="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        )
+    ]
+    orphans = [
+        OrphanCandidateModel(
+            product_id="44444444-4444-4444-4444-444444444444",
+            sku="SKU-STUB-4",
+            name="Anillo erizo de mar XL dorado",
+            piece_type=request.piece_type or "anillo",
+            data_origin="real",
+            family_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            family_name="Anillo erizo de mar",
+            similarity=0.941,
+            worst_sibling=0.874,
+            margin=0.067,
+            purity=2,
+        )
+    ]
+    return FamilyAuditResponse(
+        flagged_members=[
+            member
+            for member in flagged
+            if (member.product_id.lower(), member.family_id.lower()) not in judged
+        ],
+        orphan_candidates=[
+            orphan
+            for orphan in orphans
+            if (orphan.product_id.lower(), orphan.family_id.lower()) not in judged
+        ][: request.max_orphans],
+        rejected_groups=[
+            RejectedGroupModel(
+                root="alianzas",
+                piece_type="anillo",
+                reason="root_too_short",
+                product_names=["Alianzas Plata", "Alianzas oro"],
+            )
+        ],
+        excluded_products=[
+            ExcludedProductModel(
+                product_id="33333333-3333-3333-3333-333333333333",
+                sku="SKU-STUB-3",
+                name="Diadema perlas",
+                reason="no_piece_type",
+            )
+        ],
+        families_reviewed_count=1,
+        members_examined_count=2,
         trace_id=principal.trace_id,
     )

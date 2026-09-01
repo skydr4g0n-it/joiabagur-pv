@@ -1,0 +1,14 @@
+C:/Users/sergi/GitHub_Local/AIEng/joiabagur-pv/frontend/src/pages/payment-methods/payment-methods.test.tsx
+C:/Users/sergi/GitHub_Local/AIEng/joiabagur-pv/frontend/src/pages/products/__tests__/edit.test.tsx
+C:/Users/sergi/GitHub_Local/AIEng/joiabagur-pv/frontend/src/pages/products/components/product-photo-upload.test.tsx
+C:/Users/sergi/GitHub_Local/AIEng/joiabagur-pv/frontend/src/pages/products/edit.test.tsx
+C:/Users/sergi/GitHub_Local/AIEng/joiabagur-pv/frontend/src/pages/sales/__tests__/new-image.test.tsx
+C:/Users/sergi/GitHub_Local/AIEng/joiabagur-pv/frontend/src/pages/sales/__tests__/new.test.tsx
+C:/Users/sergi/GitHub_Local/AIEng/joiabagur-pv/frontend/src/pages/sales/__tests__/sales-index.test.tsx
+C:/Users/sergi/GitHub_Local/AIEng/joiabagur-pv/frontend/src/pages/sales/__tests__/scan.test.tsx
+C:/Users/sergi/GitHub_Local/AIEng/joiabagur-pv/frontend/src/services/__tests__/image-recognition.service.test.ts
+C:/Users/sergi/GitHub_Local/AIEng/joiabagur-pv/frontend/src/services/__tests__/ml-edge-cases.test.ts
+C:/Users/sergi/GitHub_Local/AIEng/joiabagur-pv/frontend/src/services/__tests__/model-training.service.test.ts
+C:/Users/sergi/GitHub_Local/AIEng/joiabagur-pv/frontend/src/services/auth.service.test.ts
+C:/Users/sergi/GitHub_Local/AIEng/joiabagur-pv/frontend/src/services/payment-method.service.test.ts
+C:/Users/sergi/GitHub_Local/AIEng/joiabagur-pv/frontend/src/services/product.service.test.ts

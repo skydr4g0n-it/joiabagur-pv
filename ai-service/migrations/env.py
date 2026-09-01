@@ -26,7 +26,14 @@ AI_SCHEMA = "ai"
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # `disable_existing_loggers=False` is not optional here. The default is True, and
+    # it disables every logger the ini does not name — which is all of `jbg_ai`.
+    # Harmless under the Alembic CLI, where the process exits straight afterwards, and
+    # destructive in-process: the migration tests run Alembic inside the same
+    # interpreter as the rest of the suite, so the default left the service's loggers
+    # dead for every test that ran later. It surfaced as two retrieval tests asserting
+    # on log output and finding none, passing in isolation and failing in a full run.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # Migrations are hand-written: `autogenerate` cannot express HNSW operator
 # classes, GIN over arrays or generated columns, so there is no metadata to

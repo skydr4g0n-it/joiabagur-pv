@@ -1,15 +1,17 @@
 # ai-service-api-contracts Specification
 
 ## Purpose
-Frozen `/v1` endpoint surface of `jbg-ai`: explicit Pydantic request/response models for retrieval, sale assistance, inventory, enrichment, assisted family grouping and index sync with a keyset cursor, deterministic stub responses with no external I/O, 501 for unimplemented routes when stubs are off, a development-only evaluations route, and a versioned OpenAPI snapshot that detects contract drift.
+Frozen `/v1` endpoint surface of `jbg-ai`: explicit Pydantic request/response models for retrieval, sale assistance, inventory, enrichment, assisted family grouping, the audit of persisted families and index sync with a keyset cursor, deterministic stub responses with no external I/O, 501 for unimplemented routes when stubs are off, a development-only evaluations route, and a versioned OpenAPI snapshot that detects contract drift.
 ## Requirements
 ### Requirement: Frozen `/v1` endpoint surface
-The `jbg-ai` service SHALL expose the following internal endpoints under `/v1`, each backed by explicit Pydantic request and response models: `POST /v1/retrieval/products`, `POST /v1/retrieval/substitutes`, `POST /v1/assist/sale`, `POST /v1/inventory/propose`, `POST /v1/enrich/products`, `POST /v1/families/suggest`, `POST /v1/index/sync`, `GET /v1/index/status`, and `GET /v1/evals/runs` (development profile only). Every `/v1` endpoint MUST require a valid internal service token. `GET /health` MUST remain public and its contract MUST NOT change with respect to C01. Response bodies MUST validate against the declared response model; the service MUST NOT return undeclared shapes.
+The `jbg-ai` service SHALL expose the following internal endpoints under `/v1`, each backed by explicit Pydantic request and response models: `POST /v1/retrieval/products`, `POST /v1/retrieval/substitutes`, `POST /v1/assist/sale`, `POST /v1/inventory/propose`, `POST /v1/enrich/products`, `POST /v1/families/suggest`, `POST /v1/families/audit`, `POST /v1/index/sync`, `GET /v1/index/status`, and `GET /v1/evals/runs` (development profile only). Every `/v1` endpoint MUST require a valid internal service token. `GET /health` MUST remain public and its contract MUST NOT change with respect to C01. Response bodies MUST validate against the declared response model; the service MUST NOT return undeclared shapes.
 
-`POST /v1/families/suggest` is the ninth route and the first addition to this surface since it was frozen. Adding it moves the boundary with the .NET client deliberately: the committed `ai-service/openapi.json` MUST be regenerated in the same change that adds the route, and `test_openapi_snapshot_is_stable` MUST pass against that regenerated snapshot. A route added without regenerating the snapshot MUST fail the build.
+`POST /v1/families/suggest` is the ninth route and the first addition to this surface since it was frozen. `POST /v1/families/audit` is the tenth, and it is a separate route rather than an extension of the ninth: the two read disjoint populations — suggestion reads products that belong to no family, the audit reads the families that exist — and they converge differently, since suggestion empties itself as batches are approved while the audit is a standing signal. Folding the audit into the suggestion response would move the committed snapshot just the same, so nothing is saved by it.
+
+Adding a route moves the boundary with the .NET client deliberately: the committed `ai-service/openapi.json` MUST be regenerated in the same change that adds the route, and `test_openapi_snapshot_is_stable` MUST pass against that regenerated snapshot. A route added without regenerating the snapshot MUST fail the build.
 
 #### Scenario: Every frozen route answers with its declared model
-- **WHEN** an authenticated client calls any of the nine `/v1` endpoints with a valid request body in stub mode
+- **WHEN** an authenticated client calls any of the ten `/v1` endpoints with a valid request body in stub mode
 - **THEN** the response status is 200
 - **AND** the body validates against that endpoint's declared response model
 
@@ -23,10 +25,15 @@ The `jbg-ai` service SHALL expose the following internal endpoints under `/v1`, 
 - **THEN** the request is rejected before any work is done
 - **AND** no proposal is computed
 
+#### Scenario: The family audit route requires the service token
+- **WHEN** an unauthenticated client calls `POST /v1/families/audit`
+- **THEN** the request is rejected before any work is done
+- **AND** no similarity is computed
+
 #### Scenario: The regenerated snapshot matches the live schema
 - **WHEN** `test_openapi_snapshot_is_stable` runs against the working tree of the change that added the route
 - **THEN** the live OpenAPI schema equals the committed `ai-service/openapi.json`
-- **AND** that snapshot contains the nine `/v1` paths
+- **AND** that snapshot contains the ten `/v1` paths
 
 ### Requirement: Retrieval contract carries materials, family and variant
 Retrieval request models MUST accept `query`, `top_k`, `filters` (including `materials` as a list of strings) and `mode`, plus an optional `pos_id` that is accepted for client compatibility and ignored. Each retrieval result MUST expose `product_id`, `sku`, `score`, `match_reasons`, `materials` as a list, `family_id`, `variant_label`, and an optional `debug` object. `family_id` and `variant_label` MUST be nullable and MUST be null when unknown rather than omitted or defaulted to a placeholder value. The retrieval response MUST expose `results`, `candidates_returned`, `low_confidence` and `trace_id`. `POST /v1/retrieval/substitutes` MUST return the same result shape plus `similarity_signals`.
@@ -137,6 +144,33 @@ Under stub mode the route MUST return a deterministic fixture that validates aga
 - **WHEN** the route is called with stub mode enabled
 - **THEN** the response is a deterministic fixture that validates against the declared model
 - **AND** no database connection is opened
+
+### Requirement: Family audit contract carries flags, candidates and the judgements already made
+
+The contract for `POST /v1/families/audit` SHALL carry, in one response, the members of persisted families that the vectors do not support and the unassigned products nominated as candidates for a family, together with the groups a guard refused and the products a gate excluded, recomputed over the current catalogue state.
+
+Each flagged member MUST carry its product, its family, the margin by which a product of another family beat its worst sibling, and the identity of that product. Each candidate MUST carry its product, the family it is nominated for, the similarity, the family's worst-sibling similarity, the margin between them, the data origin of the product, and the neighbourhood-purity count reported as a ranking signal only.
+
+The request MUST accept the `(product, family)` pairs that already carry a human verdict, so that the service can omit them without holding any judgement of its own. The service MUST NOT persist those pairs, and MUST NOT read the transactional catalogue schema to discover them.
+
+The request MUST accept the veto and nomination margins, falling back to configuration when they are absent, and a cap on the number of candidates returned. Flagged members, refused groups and excluded products MUST NOT be truncated by that cap.
+
+#### Scenario: One call returns both sides of the membership line
+- **WHEN** an authenticated client calls `POST /v1/families/audit` in stub mode
+- **THEN** the response contains the flagged members and the candidates in the same body
+- **AND** each flagged member carries its margin and the product that beat its worst sibling
+- **AND** each candidate carries its similarity, the target family's worst-sibling similarity, its data origin and its purity count
+
+#### Scenario: Judged pairs travel in the request and are not stored
+- **WHEN** the caller sends a set of `(product, family)` pairs that already carry a verdict
+- **THEN** none of those pairs appears among the flagged members or the candidates
+- **AND** repeating the call without them reports those pairs again
+- **AND** the service holds no record of them between calls
+
+#### Scenario: The candidate cap never truncates a refusal
+- **WHEN** the caller caps the number of candidates below the number the audit produced
+- **THEN** the candidates are truncated to that cap
+- **AND** the flagged members, the refused groups and the excluded products are returned in full
 
 ### Requirement: Index sync contract carries a keyset cursor
 `POST /v1/index/sync` MUST accept `since` (datetime or null), `since_id` (uuid or null), `full` (boolean, default false) and `batch_size` (integer 1–1000, default 100). `since_id` is the second component of the catalog feed keyset; it MUST NOT be required when `since` is null. The response MUST include `upserted`, `skipped`, `deleted`, `failed`, the starting keyset `since` / `since_id`, and the ending keyset `cursor` / `cursor_id`. `skipped` MUST mean embeddings omitted, not rows ignored. `batch_size` MUST remain in the schema for compatibility and MUST NOT select the feed page size. After this change the committed `ai-service/openapi.json` MUST include these fields and `test_openapi_snapshot_is_stable` MUST pass against that regenerated snapshot. Stub-mode responses MUST populate `since_id` and `cursor_id` (null or a deterministic fixture) so the body still validates.

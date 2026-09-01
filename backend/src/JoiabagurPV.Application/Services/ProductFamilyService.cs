@@ -2,6 +2,7 @@ using System.Data.Common;
 using JoiabagurPV.Application.DTOs.Products;
 using JoiabagurPV.Application.Exceptions;
 using JoiabagurPV.Application.Interfaces;
+using JoiabagurPV.Domain.Common;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Enums;
 using JoiabagurPV.Domain.Interfaces.Repositories;
@@ -231,6 +232,82 @@ public class ProductFamilyService : IProductFamilyService
         }
 
         await _productRepository.StampUpdatedAtAsync(toStamp);
+    }
+
+    /// <inheritdoc/>
+    public async Task<PaginatedResultDto<ProductFamilyListItemDto>> ListAsync(
+        ProductFamilyQueryParameters query)
+    {
+        var page = query.Page < 1 ? 1 : query.Page;
+        var pageSize = query.PageSize is < 1 or > ProductFamilyQueryParameters.MaxPageSize
+            ? ProductFamilyQueryParameters.MaxPageSize
+            : query.PageSize;
+
+        // An unrecognised origin narrows to nothing rather than being ignored. Silently serving the
+        // unfiltered set would answer a question nobody asked, and on a review screen that reads as
+        // "these are the manual families" when they are all of them.
+        FamilyOrigin? origin = null;
+        if (!string.IsNullOrWhiteSpace(query.Origin))
+        {
+            if (!Enum.TryParse<FamilyOrigin>(query.Origin, ignoreCase: true, out var parsed))
+            {
+                throw new ArgumentException(
+                    $"Origen de familia no reconocido: '{query.Origin}'. Valores admitidos: "
+                    + string.Join(", ", Enum.GetNames<FamilyOrigin>()) + ".",
+                    nameof(query));
+            }
+
+            origin = parsed;
+        }
+
+        var (items, totalCount) = await _familyRepository.ListAsync(
+            new ProductFamilyQuery(page, pageSize, origin, query.PieceType, query.HasRejectedMembers));
+
+        return PaginatedResultDto<ProductFamilyListItemDto>.Create(
+            items.Select(summary => new ProductFamilyListItemDto(
+                summary.Id,
+                summary.Name,
+                summary.Description,
+                summary.Origin.ToString(),
+                summary.MemberCount,
+                summary.ApprovedByUserId,
+                summary.ApprovedAt,
+                summary.ReviewedMemberCount,
+                summary.RejectedMemberCount)).ToList(),
+            totalCount,
+            page,
+            pageSize);
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> DeleteAsync(Guid id)
+    {
+        // Read the members before the delete, never after: the membership rows go with the family
+        // by cascade, and once they are gone the products that left are unreachable.
+        var departing = await _familyRepository.GetMemberProductIdsAsync(id);
+
+        var deleted = await _familyRepository.DeleteAsync(id);
+        if (!deleted)
+        {
+            return false;
+        }
+
+        if (departing.Count > 0)
+        {
+            // The same stamp the membership replacement performs, and for the same reason. The
+            // feed's catalog cursor is greatest(Product, profile, family when the product is a
+            // current member); a product that stops being a member stops joining the family row,
+            // so without this it never appears on an incremental pull again and its document keeps
+            // a family identifier that no longer resolves.
+            await _productRepository.StampUpdatedAtAsync(departing);
+        }
+
+        await _unitOfWork.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "product_family_dissolved {FamilyId} {DepartingProducts}", id, departing.Count);
+
+        return true;
     }
 
     // ── Membership rules ──────────────────────────────────────────────────────────────────────

@@ -424,7 +424,7 @@ C4Component
 
 ### 3.3 Componentes del Servicio de IA
 
-El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y generación, y servicios transversales. **Estado actual (C18a):** existen la fábrica de aplicación, el health, el middleware de trazas, los **siete** routers de dominio con sus esquemas congelados, la capa de stubs deterministas, la dependencia de autenticación de servicio, la **capa de persistencia** (esquema `ai` con pgvector, migraciones Alembic y motor con pool acotado), el **extractor de enriquecimiento (C09)**, el **indexador de `product_document` (C13)**, el **retriever vectorial de `POST /v1/retrieval/products` (C14)** — umbral 0,65, hybrid/lexical = vector hasta C21 — y el **agrupador de familias (C18a)**. Sustitutos, assist, inventory, evals y la fusión RRF siguen planificados.
+El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y generación, y servicios transversales. **Estado actual (C18b):** existen la fábrica de aplicación, el health, el middleware de trazas, los **siete** routers de dominio con sus esquemas congelados, la capa de stubs deterministas, la dependencia de autenticación de servicio, la **capa de persistencia** (esquema `ai` con pgvector, migraciones Alembic y motor con pool acotado), el **extractor de enriquecimiento (C09)**, el **indexador de `product_document` (C13)**, el **retriever vectorial de `POST /v1/retrieval/products` (C14)** — umbral 0,65, hybrid/lexical = vector hasta C21 — el **agrupador de familias (C18a)** y la **auditoría de familias persistidas (C18b)** — que reutiliza el veto relativo de C18a con otro universo, nomina huérfanos por margen relativo frente a la cohesión de la familia destino, y **no escribe nada**. Sustitutos, assist, inventory, evals y la fusión RRF siguen planificados.
 
 #### Routers de Dominio (`/v1/*`)
 
@@ -432,7 +432,7 @@ El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y 
 - **Assist Router**: generación de respuesta estructurada agrupada por familia, con avisos calculados por reglas y citas verificables.
 - **Inventory Router**: propuestas de reposición, traslado y rotación generadas por el agente de inventario.
 - **Enrich Router**: extracción estructurada de perfiles de producto con confianza por campo.
-- **Families Router**: propuestas de agrupación de productos en familias de variantes. **Existe (C18a)**, y es la novena ruta del contrato congelado. Propone y **no escribe**: aprobar es de .NET.
+- **Families Router**: agrupación de productos en familias de variantes. **Existe, con dos rutas**: `POST /v1/families/suggest` **(C18a)**, que propone familias nuevas, y `POST /v1/families/audit` **(C18b)**, que audita las que ya existen — miembros que los vectores no sostienen y huérfanos candidatos, que son la misma comparación leída desde los dos lados de la pertenencia. Fueron la novena y la décima ruta del contrato congelado. Ninguna de las dos escribe: aprobar y registrar el veredicto son de .NET.
 - **Index Router**: sincronización del índice mediante cursor `since` y consulta de deriva.
 - **Evals Router**: resultados del harness de evaluación (solo perfil de desarrollo).
 

@@ -153,6 +153,11 @@ public class ApplicationDbContext : DbContext
     public DbSet<ProductFamilyMember> ProductFamilyMembers { get; set; }
 
     /// <summary>
+    /// Gets or sets the FamilyReviewVerdicts DbSet.
+    /// </summary>
+    public DbSet<FamilyReviewVerdict> FamilyReviewVerdicts { get; set; }
+
+    /// <summary>
     /// Configures the model that was discovered by convention from the entity types
     /// exposed in Microsoft.EntityFrameworkCore.DbSet`1 properties on your derived context.
     /// </summary>

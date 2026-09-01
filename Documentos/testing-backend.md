@@ -282,6 +282,49 @@ Sobre los dos primeros conviene una precisión que ahorra tests engañosos. Al p
 > El detalle está en
 > `openspec/changes/archive/2026-08-31-add-family-suggestion-and-approval/qa.md` §2 y §11.
 
+> **Actualización del 2026-09-01, sobre `c18b-add-family-review-ui-and-orphan-alert`.** La suite
+> tiene ahora **973 tests**. La línea base de ese change dio **920 y 47**; al cierre **951 y 51**; y
+> tras la pasada de verificación, que añadió 22 tests, **973** con **49 y 52 fallos en dos
+> ejecuciones del mismo código**. La inestabilidad que la entrada anterior documentaba sigue igual
+> de viva.
+>
+> **Las clases de familia siguen limpias:** cero fallos en `FamilyReviewControllerTests`,
+> `FamilyReviewVerdictSchemaTests`, `ProductFamiliesControllerTests`, `ProductFamilySchemaTests`,
+> `AiCatalogControllerTests`, `FamilySuggestionControllerTests` y `AiGatewayFamilyAuditTests`. Las
+> siete, ejecutadas aparte, pasan **133 de 133**.
+>
+> **Y esta medición aporta una trampa nueva que conviene conocer antes de perder una hora con ella:
+> `DashboardServiceTests` aparece entre los fallos y no estaba en la línea base.** No es una
+> regresión de nada:
+>
+> ```csharp
+> var now = DateTime.UtcNow;
+> CreateSale(posId, pmId, 200m, 1, now.AddDays(-5), "Efectivo"),   // hoy: 27 de agosto
+> ...
+> result.MonthlyRevenue.Should().Be(450m);                          // exige que las dos sean del mismo mes
+> ```
+>
+> `GetGlobalStatsAsync_WithSalesToday_ShouldReturnCorrectKPIs` construye sus ventas restando días al
+> reloj y luego afirma un total **mensual**. La línea base se midió el **31 de agosto**, cuando
+> `now-5d` seguía siendo agosto; la verificación es del **1 de septiembre**, y esos cinco días caen
+> en el mes anterior, así que `MonthlyRevenue` baja de 450 a 250. Lo mismo con la devolución de
+> `now-2d` y su `MonthlyReturnsCount`.
+>
+> Es decir: **este test falla los primeros cinco días de cada mes y pasa los otros veinticinco**, en
+> un fichero que aquel change no toca. Queda anotado como candidato a arreglo —debería anclar sus
+> fechas al mes en curso en vez de restar días a `UtcNow`— y, mientras tanto, como aviso: si lo ves
+> en rojo a principios de mes, mira el calendario antes que tu diff.
+>
+> **Otras dos trampas de método**, ambas de esa misma pasada. `dotnet test` **sale con código 0
+> aunque la compilación falle**: con la API de desarrollo levantada, MSBuild no puede copiar las DLL
+> porque el proceso las bloquea, la compilación muere y el comando informa éxito. Y **filtrar a una
+> sola clase de integración tampoco vale**: `ResetDatabaseAsync` corre en `InitializeAsync` y
+> Respawn revienta con *«No tables found»* si ninguna otra clase de la colección ha creado el
+> esquema antes. Las dos se leen como veinte tests rotos y ninguna lo es.
+>
+> El detalle está en
+> `openspec/changes/archive/2026-09-01-add-family-review-ui-and-orphan-alert/qa.md` §2 y §11.
+
 ### Por qué se acumularon sin que nadie los viera
 
 Los dos árboles se comportan de forma muy distinta, y esa es la clave:

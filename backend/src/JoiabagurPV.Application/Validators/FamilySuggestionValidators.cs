@@ -1,5 +1,7 @@
 using FluentValidation;
 using JoiabagurPV.Application.DTOs.Ai;
+using JoiabagurPV.Domain.Entities;
+using JoiabagurPV.Domain.Enums;
 
 namespace JoiabagurPV.Application.Validators;
 
@@ -77,5 +79,69 @@ public class ApprovedFamilyRequestValidator : AbstractValidator<ApprovedFamilyRe
                 return labels.Distinct(StringComparer.OrdinalIgnoreCase).Count() == labels.Count;
             })
             .WithMessage("Dos miembros de una familia no pueden compartir la etiqueta de variante.");
+    }
+}
+
+/// <summary>
+/// Validates a batch of human judgements about product and family pairs.
+/// </summary>
+/// <remarks>
+/// The bounds here are the ones whose absence turns a reviewer's mistake into a database error
+/// instead of a message: an unbounded batch, a note longer than the column, and an outcome the
+/// enum does not name.
+/// </remarks>
+public class RecordFamilyVerdictsRequestValidator : AbstractValidator<RecordFamilyVerdictsRequest>
+{
+    public RecordFamilyVerdictsRequestValidator()
+    {
+        RuleFor(request => request.Verdicts)
+            .NotEmpty()
+            .WithMessage("Se necesita al menos un veredicto.");
+
+        RuleFor(request => request.Verdicts)
+            .Must(verdicts => verdicts.Count <= RecordFamilyVerdictsRequest.MaxVerdicts)
+            .WithMessage(
+                $"Un lote no puede superar los {RecordFamilyVerdictsRequest.MaxVerdicts} veredictos.");
+
+        RuleForEach(request => request.Verdicts).ChildRules(verdict =>
+        {
+            verdict.RuleFor(item => item.ProductId)
+                .NotEmpty()
+                .WithMessage("Cada veredicto necesita un producto.");
+
+            verdict.RuleFor(item => item.FamilyId)
+                .NotEmpty()
+                .WithMessage("Cada veredicto necesita una familia.");
+
+            // Checked by name rather than by parsing an integer: a numeric body that lands on the
+            // first member of the enum by accident would record "confirmado" for something nobody
+            // confirmed, and nothing downstream could tell.
+            verdict.RuleFor(item => item.Outcome)
+                .Must(outcome => Enum.TryParse<FamilyReviewOutcome>(outcome, true, out var parsed)
+                    && Enum.IsDefined(parsed))
+                .WithMessage(
+                    "El veredicto debe ser uno de: "
+                    + string.Join(", ", Enum.GetNames<FamilyReviewOutcome>()) + ".");
+
+            // Seconds, and a review that claims to have taken longer than an hour per item is a
+            // stopwatch left running rather than a measurement. Storing it would poison the very
+            // average this column exists to produce.
+            verdict.RuleFor(item => item.ReviewSeconds)
+                .InclusiveBetween(0d, 3600d)
+                .When(item => item.ReviewSeconds.HasValue)
+                .WithMessage("El tiempo de revisión debe estar entre 0 y 3600 segundos.");
+
+            verdict.RuleFor(item => item.Note)
+                .MaximumLength(FamilyReviewVerdict.NoteMaxLength)
+                .WithMessage(
+                    $"La nota no puede superar los {FamilyReviewVerdict.NoteMaxLength} caracteres.");
+
+            // A cosine margin lives in [-1, 1]. A value outside it is a client bug, and storing it
+            // would put a number in the review history that no later reading can interpret.
+            verdict.RuleFor(item => item.MarginAtReview)
+                .InclusiveBetween(-1d, 1d)
+                .When(item => item.MarginAtReview.HasValue)
+                .WithMessage("El margen registrado debe estar entre -1 y 1.");
+        });
     }
 }

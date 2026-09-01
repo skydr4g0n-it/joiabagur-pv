@@ -545,6 +545,126 @@
         "title": "ExcludedProductModel",
         "type": "object"
       },
+      "FamilyAuditRequest": {
+        "description": "Optional narrowing and thresholds. An empty body audits the whole active index.",
+        "properties": {
+          "judged_pairs": {
+            "description": "Pairs already ruled on, omitted from both lists of this response",
+            "items": {
+              "$ref": "#/components/schemas/JudgedPair"
+            },
+            "title": "Judged Pairs",
+            "type": "array"
+          },
+          "max_orphans": {
+            "default": 500,
+            "description": "Upper bound on returned candidates; refusals are never truncated",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Max Orphans",
+            "type": "integer"
+          },
+          "orphan_margin": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Overrides JPV_FAMILY_ORPHAN_MARGIN for this run; null uses configuration",
+            "title": "Orphan Margin"
+          },
+          "piece_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Restrict to one closed-vocabulary piece type; null means all",
+            "title": "Piece Type"
+          },
+          "veto_margin": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Overrides JPV_FAMILY_VETO_MARGIN for this run; null uses configuration",
+            "title": "Veto Margin"
+          }
+        },
+        "title": "FamilyAuditRequest",
+        "type": "object"
+      },
+      "FamilyAuditResponse": {
+        "description": "Both sides of the membership line, plus what the run still refuses to propose.",
+        "properties": {
+          "excluded_products": {
+            "items": {
+              "$ref": "#/components/schemas/ExcludedProductModel"
+            },
+            "title": "Excluded Products",
+            "type": "array"
+          },
+          "families_reviewed_count": {
+            "default": 0,
+            "description": "Families the audit examined, so an empty flag list is readable",
+            "minimum": 0.0,
+            "title": "Families Reviewed Count",
+            "type": "integer"
+          },
+          "flagged_members": {
+            "items": {
+              "$ref": "#/components/schemas/FlaggedMemberModel"
+            },
+            "title": "Flagged Members",
+            "type": "array"
+          },
+          "members_examined_count": {
+            "default": 0,
+            "description": "Memberships the audit examined, for the same reason",
+            "minimum": 0.0,
+            "title": "Members Examined Count",
+            "type": "integer"
+          },
+          "orphan_candidates": {
+            "items": {
+              "$ref": "#/components/schemas/OrphanCandidateModel"
+            },
+            "title": "Orphan Candidates",
+            "type": "array"
+          },
+          "rejected_groups": {
+            "items": {
+              "$ref": "#/components/schemas/RejectedGroupModel"
+            },
+            "title": "Rejected Groups",
+            "type": "array"
+          },
+          "trace_id": {
+            "description": "Correlation id, from the token claim when present",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trace_id"
+        ],
+        "title": "FamilyAuditResponse",
+        "type": "object"
+      },
       "FamilyProposalModel": {
         "description": "A candidate family: one piece type, one root, two or more members.",
         "properties": {
@@ -645,6 +765,81 @@
           "trace_id"
         ],
         "title": "FamilySuggestResponse",
+        "type": "object"
+      },
+      "FlaggedMemberModel": {
+        "description": "A member of an existing family that the vectors do not support.",
+        "properties": {
+          "family_id": {
+            "title": "Family Id",
+            "type": "string"
+          },
+          "family_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Family Name"
+          },
+          "margin": {
+            "description": "How far the nearest stranger beat this member's own worst sibling",
+            "title": "Margin",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "product_id": {
+            "title": "Product Id",
+            "type": "string"
+          },
+          "reason": {
+            "default": "closer_to_another_family",
+            "title": "Reason",
+            "type": "string"
+          },
+          "sku": {
+            "title": "Sku",
+            "type": "string"
+          },
+          "stranger_family_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Family of the product that beat the worst sibling",
+            "title": "Stranger Family Id"
+          },
+          "variant_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null is the base piece, a legitimate variant value and not a gap",
+            "title": "Variant Label"
+          }
+        },
+        "required": [
+          "product_id",
+          "sku",
+          "name",
+          "family_id",
+          "margin"
+        ],
+        "title": "FlaggedMemberModel",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -1018,6 +1213,101 @@
           "horizon_days"
         ],
         "title": "InventoryProposeResponse",
+        "type": "object"
+      },
+      "JudgedPair": {
+        "description": "A `(product, family)` pair a person has already ruled on.\n\nTravels **in the request**. The service holds no verdict of its own and must not:\nthe catalogue's truth is .NET's, and a store of judgements beside the index would\nbe state nothing invalidates. The caller brings what it knows, exactly as `apply`\nbrings back the proposals it accepted.",
+        "properties": {
+          "family_id": {
+            "title": "Family Id",
+            "type": "string"
+          },
+          "product_id": {
+            "title": "Product Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "product_id",
+          "family_id"
+        ],
+        "title": "JudgedPair",
+        "type": "object"
+      },
+      "OrphanCandidateModel": {
+        "description": "A product belonging to no family that looks like it belongs to one.",
+        "properties": {
+          "data_origin": {
+            "description": "`real` or `synthetic`. Reported because the two populations behave very differently here and every metric must be able to separate them",
+            "title": "Data Origin",
+            "type": "string"
+          },
+          "family_id": {
+            "title": "Family Id",
+            "type": "string"
+          },
+          "family_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Family Name"
+          },
+          "margin": {
+            "description": "similarity - worst_sibling. This is the nomination criterion",
+            "title": "Margin",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "piece_type": {
+            "title": "Piece Type",
+            "type": "string"
+          },
+          "product_id": {
+            "title": "Product Id",
+            "type": "string"
+          },
+          "purity": {
+            "description": "Of the five nearest neighbours of the same piece type, how many belong to this family. A **ranking signal only**: purity nominates 55 synthetic against 19 real over this corpus, because the deliberate vN families it cannot separate from a missing member are synthetic by construction",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Purity",
+            "type": "integer"
+          },
+          "similarity": {
+            "title": "Similarity",
+            "type": "number"
+          },
+          "sku": {
+            "title": "Sku",
+            "type": "string"
+          },
+          "worst_sibling": {
+            "description": "Lowest similarity observed inside the target family",
+            "title": "Worst Sibling",
+            "type": "number"
+          }
+        },
+        "required": [
+          "product_id",
+          "sku",
+          "name",
+          "piece_type",
+          "data_origin",
+          "family_id",
+          "similarity",
+          "worst_sibling",
+          "margin",
+          "purity"
+        ],
+        "title": "OrphanCandidateModel",
         "type": "object"
       },
       "ProposedFamilyMember": {
@@ -1966,6 +2256,59 @@
         "summary": "List evaluation runs (development profile only)",
         "tags": [
           "evals"
+        ]
+      }
+    },
+    "/v1/families/audit": {
+      "post": {
+        "description": "Report unsupported memberships and orphan candidates, writing nothing.\n\nThe tenth `/v1` path, and a separate route rather than an extension of `/suggest`\non purpose: the two read disjoint populations — suggestion reads products that\nbelong to no family, this reads the families that exist — and they converge\ndifferently, since suggestion empties itself as batches are approved while the\naudit is a standing signal. Folding one into the other would move the committed\nsnapshot just the same, so nothing would be saved by it.\n\nAnswers 503 rather than a degraded result when the index is unreachable, for the\nsame reason `/suggest` does — and here the stakes are higher. This route feeds a\ncatalogue-quality screen, where an empty answer reads as \"the catalogue is clean\".\nReturning one because the index did not respond would assert by accident exactly\nthe conclusion the review exists to establish with evidence.",
+        "operationId": "audit_v1_families_audit_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamilyAuditRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamilyAuditResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Invalid or missing internal service token"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "description": "Not implemented yet; delivered in a later change"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Audit existing families, and nominate the products that look like members",
+        "tags": [
+          "families"
         ]
       }
     },

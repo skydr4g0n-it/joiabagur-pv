@@ -123,4 +123,45 @@ public interface IAiGatewayClient
         AiFamilySuggestRequest request,
         AiCallScope scope,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Audits the families that already exist, and nominates the products that look like members.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A separate route from suggestion rather than a mode of it, because the two read disjoint
+    /// populations — suggestion reads products that belong to no family, this reads the families
+    /// that exist — and converge differently: suggestion empties itself as batches are approved,
+    /// while the audit is a standing signal.
+    /// </para>
+    /// <para>
+    /// <strong>Judged pairs travel in the request.</strong> The service stores no verdict, so this
+    /// side sends what it knows from <c>FamilyReviewVerdicts</c> on every call. Omitting them
+    /// simply reports judgements the administrator has already made.
+    /// </para>
+    /// <para>
+    /// <strong>Reads and never writes.</strong> Recording a verdict is a different operation and
+    /// does not pass through this client, which is what makes "the audit changed nothing" an
+    /// assertion a test can make.
+    /// </para>
+    /// <para>
+    /// <strong>A failure is not an empty audit.</strong> There is no degraded mode: this feeds a
+    /// catalog-quality screen, where an empty answer reads as "the catalog is clean". Returning
+    /// one because the service did not respond would assert by accident the very conclusion the
+    /// review exists to establish with evidence.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="Exceptions.AiUnavailableException">
+    /// Timeout, transport failure, open circuit, or a server error other than 501.
+    /// </exception>
+    /// <exception cref="Exceptions.AiNotImplementedException">
+    /// The route is contracted but has no implementation yet.
+    /// </exception>
+    /// <exception cref="Exceptions.AiGatewayConfigurationException">
+    /// The service rejected the credentials.
+    /// </exception>
+    Task<AiFamilyAuditResponse> AuditFamiliesAsync(
+        AiFamilyAuditRequest request,
+        AiCallScope scope,
+        CancellationToken cancellationToken = default);
 }

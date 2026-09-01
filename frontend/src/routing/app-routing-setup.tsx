@@ -29,6 +29,7 @@ const ReturnsPage = lazy(() => import('@/pages/returns'));
 const NewReturnPage = lazy(() => import('@/pages/returns/new'));
 const ReturnsHistoryPage = lazy(() => import('@/pages/returns/history'));
 const AIModelPage = lazy(() => import('@/pages/admin/ai-model'));
+const FamilyReviewPage = lazy(() => import('@/pages/admin/family-review'));
 const PaymentMethodsPage = lazy(() => import('@/pages/payment-methods'));
 const UsersPage = lazy(() => import('@/pages/users'));
 const PointsOfSalePage = lazy(() => import('@/pages/points-of-sale'));
@@ -111,6 +112,7 @@ export function AppRoutingSetup() {
             <Route path={ROUTES.REPORTS.PRODUCTS_WITHOUT_COMPONENTS} element={<ProductsWithoutComponentsPage />} />
             <Route path={ROUTES.REPORTS.INVENTORY_MOVEMENT_SUMMARY} element={<InventoryMovementSummaryPage />} />
             <Route path={ROUTES.AI_MODEL} element={<AIModelPage />} />
+            <Route path={ROUTES.FAMILY_REVIEW} element={<FamilyReviewPage />} />
           </Route>
         </Route>
 

@@ -313,6 +313,13 @@ public class AiCatalogControllerTests : IAsyncLifetime
         public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<AiFamilyAuditResponse> AuditFamiliesAsync(
+
+            AiFamilyAuditRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
+
+            throw new NotSupportedException();
+
+
         public Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
             AiFamilySuggestRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
@@ -331,6 +338,13 @@ public class AiCatalogControllerTests : IAsyncLifetime
 
         public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
             throw failure();
+
+        public Task<AiFamilyAuditResponse> AuditFamiliesAsync(
+
+            AiFamilyAuditRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
+
+            throw new NotSupportedException();
+
 
         public Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
             AiFamilySuggestRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
@@ -393,6 +407,13 @@ public class AiCatalogControllerTests : IAsyncLifetime
 
         public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<AiFamilyAuditResponse> AuditFamiliesAsync(
+
+            AiFamilyAuditRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
+
+            throw new NotSupportedException();
+
 
         public Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
             AiFamilySuggestRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>

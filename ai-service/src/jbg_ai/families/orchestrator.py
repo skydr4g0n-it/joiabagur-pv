@@ -24,7 +24,7 @@ from jbg_ai.families.repository import load_candidates, load_member_similarities
 from jbg_ai.families.veto import apply_relative_veto
 from jbg_ai.families.vocabulary import load_family_vocabulary
 
-__all__ = ["suggest_families"]
+__all__ = ["suggest_families", "validated_piece_type"]
 
 
 async def suggest_families(
@@ -33,7 +33,7 @@ async def suggest_families(
     """Produce family proposals plus everything the run refused to propose."""
     vocabulary = load_family_vocabulary()
 
-    piece_type = _validated_piece_type(request.piece_type, vocabulary)
+    piece_type = validated_piece_type(request.piece_type, vocabulary)
     candidates = await load_candidates(settings, piece_type)
     outcome = build_candidate_groups(candidates, vocabulary)
 
@@ -79,7 +79,7 @@ async def suggest_families(
     )
 
 
-def _validated_piece_type(raw: str | None, vocabulary: object) -> str | None:
+def validated_piece_type(raw: str | None, vocabulary: object) -> str | None:
     """Reject an unknown piece type instead of silently returning nothing.
 
     A typo would otherwise narrow the query to zero candidates and answer with an

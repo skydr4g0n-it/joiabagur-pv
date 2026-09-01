@@ -39,6 +39,56 @@ public class ProductFamiliesController : ControllerBase
     }
 
     /// <summary>
+    /// Lists families, with the counts a review screen needs to tell one apart from another.
+    /// </summary>
+    /// <remarks>
+    /// Administrators only, unlike reading a single family. Retrieval by identifier serves a
+    /// product's sibling list, which any authenticated user may see; enumerating the catalogue's
+    /// families is an administration task and its filters are review filters.
+    /// </remarks>
+    [HttpGet]
+    [Authorize(Roles = "Administrator")]
+    [ProducesResponseType(typeof(PaginatedResultDto<ProductFamilyListItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> List([FromQuery] ProductFamilyQueryParameters query)
+    {
+        try
+        {
+            return Ok(await _familyService.ListAsync(query));
+        }
+        catch (ArgumentException ex)
+        {
+            // An unrecognised origin is a typo, and serving the unfiltered set instead would
+            // answer a question nobody asked — reading, on a review screen, as "these are the
+            // manual families" when they are all of them.
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Dissolves a family. Its members stop belonging to it and are free to be assigned elsewhere.
+    /// </summary>
+    /// <remarks>
+    /// Not the same as declaring an empty membership, and the difference matters to whoever
+    /// reviews next: an empty family is a legitimate state for one being built and meaningless for
+    /// one that was wrong, so leaving the shell behind puts a row in every listing that has to be
+    /// decided about again.
+    /// </remarks>
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Administrator")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var deleted = await _familyService.DeleteAsync(id);
+        return deleted ? NoContent() : NotFound();
+    }
+
+    /// <summary>
     /// Gets a family with its members, ordered by their position within it.
     /// </summary>
     [HttpGet("{id:guid}")]

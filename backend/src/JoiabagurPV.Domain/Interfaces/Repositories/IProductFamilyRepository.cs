@@ -1,3 +1,4 @@
+using JoiabagurPV.Domain.Common;
 using JoiabagurPV.Domain.Entities;
 
 namespace JoiabagurPV.Domain.Interfaces.Repositories;
@@ -60,4 +61,25 @@ public interface IProductFamilyRepository : IRepository<ProductFamily>
     /// watermark without rewriting membership rows.
     /// </summary>
     Task StampUpdatedAtAsync(Guid familyId);
+
+    /// <summary>
+    /// Lists families matching the query, with the total that matched before paging.
+    /// </summary>
+    /// <remarks>
+    /// Retrieval by identifier used to be the only read here, which serves a product's sibling
+    /// list and is useless for review: somebody working through the catalogue's families has no
+    /// identifier to start from, and no other operation produces the set.
+    /// </remarks>
+    Task<(List<ProductFamilySummary> Items, int TotalCount)> ListAsync(ProductFamilyQuery query);
+
+    /// <summary>
+    /// Returns the products that belong to a family, so a caller can stamp them before it is gone.
+    /// </summary>
+    /// <remarks>
+    /// Read <em>before</em> the delete, never after: once the family is removed the membership
+    /// rows go with it by cascade, and the products that left become unreachable. Without the
+    /// stamp an incremental index pull never emits them, so their documents keep a family
+    /// identifier pointing at a family that no longer exists — with no error anywhere.
+    /// </remarks>
+    Task<List<Guid>> GetMemberProductIdsAsync(Guid familyId);
 }

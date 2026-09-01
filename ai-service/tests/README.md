@@ -38,19 +38,19 @@ parallel taxonomy later.
 
 | Folder | Changes that will land here |
 |---|---|
-| `api/` | C01 (health), C02 (contracts, service auth, stubs, snapshot), C08 (enrichment provenance, catalog-scoped auth), C13 (landed: `/v1/index/*` real), C14 (landed: `/v1/retrieval/products` real), C17 (landed: enriched `/health` — database, index, provider credential, model contrast) |
+| `api/` | C01 (health), C02 (contracts, service auth, stubs, snapshot), C08 (enrichment provenance, catalog-scoped auth), C13 (landed: `/v1/index/*` real), C14 (landed: `/v1/retrieval/products` real), C17 (landed: enriched `/health` — database, index, provider credential, model contrast), C18b (landed: `POST /v1/families/audit` — tenth route, service token, judged pairs travelling in the request) |
 | `config/` | C01, C02 (settings, canonical OpenAPI profile), C13 (feed settings) |
 | `db/` | C05 (engine, bounded pool, boot without a database) |
-| `migrations/` | C05, C13 (landed: `text_provenance`, `sync_checkpoint`) |
+| `migrations/` | C05, C13 (landed: `text_provenance`, `sync_checkpoint`), C18b (landed: Alembic logging isolation — `fileConfig` must not disable the service loggers, which is destructive in-process and invisible under the CLI) |
 | `data/` | C06b (landed: generate/ingest CLI), C10 (landed: `world/`), C23 |
 | `enrichment/` | C09 |
-| `families/` | C18a (landed: root grouping, material fusion, guards, relative veto, `POST /v1/families/suggest`) |
+| `families/` | C18a (landed: root grouping, material fusion, guards, relative veto, `POST /v1/families/suggest`), C18b (landed: audit over persisted families, orphan nomination by relative margin, source guards that the audit writes nothing and calls no provider) |
 | `indexing/` | C11 (landed: source-text/v1 + embeddings), C13 (landed: catalog drain + `sku_provenance.json`), C22, C23 |
 | `retrieval/` | C14, C20, C21, C22, C25, C26, C27 |
 | `assist/` | C30, C31, C32, C33, C35 |
 | `evals/` | C24, C38 |
 
-Changes with no Python zone (C03, C04, C07, C08, C12, C15, C16, C18b, C19, C28, C29,
+Changes with no Python zone (C03, C04, C07, C08, C12, C15, C16, C19, C28, C29,
 C34, C36, C37) are tested on the .NET or frontend side. C17 also ships a post-deploy smoke
 check that belongs to the deployment pipeline rather than here — but it does have a
 Python zone after all: the enriched `/health` is tested in `api/test_health_report.py`,

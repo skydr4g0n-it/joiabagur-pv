@@ -33,10 +33,16 @@ def test_snapshot_covers_the_frozen_surface() -> None:
     """The published surface, path by path.
 
     `/v1/families/suggest` is the ninth and the first addition since the surface was
-    frozen in C02. C18a moved the boundary on purpose — it is the change that first
-    calls the route — and regenerated the snapshot in the same commit. This list is
-    the second gate: the snapshot test alone would go green on a regenerated file
-    without anyone noticing a path had appeared.
+    frozen in C02. `/v1/families/audit` is the tenth, added by C18b. Both moved the
+    boundary on purpose — each is the change that first calls its route — and each
+    regenerated the snapshot in the same commit. This list is the second gate: the
+    snapshot test alone would go green on a regenerated file without anyone noticing
+    a path had appeared.
+
+    The audit is a route of its own rather than a mode of `/suggest` because the two
+    read disjoint populations and converge differently: suggestion empties itself as
+    batches are approved, while the audit is a standing signal over the families that
+    exist. Folding it in would have moved this snapshot just the same.
     """
     paths = _committed()["paths"]
 
@@ -45,6 +51,7 @@ def test_snapshot_covers_the_frozen_surface() -> None:
         "/v1/assist/sale",
         "/v1/enrich/products",
         "/v1/evals/runs",
+        "/v1/families/audit",
         "/v1/families/suggest",
         "/v1/index/status",
         "/v1/index/sync",

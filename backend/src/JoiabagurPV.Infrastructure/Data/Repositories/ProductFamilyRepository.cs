@@ -1,3 +1,5 @@
+using JoiabagurPV.Domain.Common;
+using JoiabagurPV.Domain.Enums;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Interfaces.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -75,4 +77,77 @@ public class ProductFamilyRepository : Repository<ProductFamily>, IProductFamily
             .Where(family => family.Id == familyId)
             .ExecuteUpdateAsync(setters => setters.SetProperty(family => family.UpdatedAt, now));
     }
+
+    /// <inheritdoc/>
+    public async Task<(List<ProductFamilySummary> Items, int TotalCount)> ListAsync(
+        ProductFamilyQuery query)
+    {
+        var families = _context.ProductFamilies.AsNoTracking();
+
+        if (query.Origin is not null)
+        {
+            families = families.Where(family => family.Origin == query.Origin);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.PieceType))
+        {
+            // Resolved through the members' AI profiles: the piece type is an enriched attribute of
+            // the product, not a column on the family. `Any` rather than `All` because a family
+            // whose enrichment is incomplete should still be findable by the type its other
+            // members carry — the alternative hides exactly the families worth reviewing.
+            var pieceType = query.PieceType.Trim();
+            families = families.Where(family => _context.ProductFamilyMembers
+                .Where(member => member.ProductFamilyId == family.Id)
+                .Any(member => _context.ProductAiProfiles
+                    .Any(profile => profile.ProductId == member.ProductId
+                        && profile.PieceType == pieceType)));
+        }
+
+        if (query.HasRejectedMembers == true)
+        {
+            families = families.Where(family => _context.FamilyReviewVerdicts
+                .Any(verdict => verdict.ProductFamilyId == family.Id
+                    && verdict.Outcome == FamilyReviewOutcome.Rejected));
+        }
+        else if (query.HasRejectedMembers == false)
+        {
+            families = families.Where(family => !_context.FamilyReviewVerdicts
+                .Any(verdict => verdict.ProductFamilyId == family.Id
+                    && verdict.Outcome == FamilyReviewOutcome.Rejected));
+        }
+
+        var totalCount = await families.CountAsync();
+
+        var items = await families
+            // Newest approvals first, then by name. A stable secondary key matters here: the 156
+            // families of an assisted batch share an approval instant to the second, and without
+            // it paging would return the same family on two pages and skip another.
+            .OrderByDescending(family => family.ApprovedAt)
+            .ThenBy(family => family.Name)
+            .ThenBy(family => family.Id)
+            .Skip((query.Page - 1) * query.PageSize)
+            .Take(query.PageSize)
+            .Select(family => new ProductFamilySummary(
+                family.Id,
+                family.Name,
+                family.Description,
+                family.Origin,
+                _context.ProductFamilyMembers.Count(m => m.ProductFamilyId == family.Id),
+                family.ApprovedByUserId,
+                family.ApprovedAt,
+                _context.FamilyReviewVerdicts.Count(v => v.ProductFamilyId == family.Id),
+                _context.FamilyReviewVerdicts.Count(v => v.ProductFamilyId == family.Id
+                    && v.Outcome == FamilyReviewOutcome.Rejected)))
+            .ToListAsync();
+
+        return (items, totalCount);
+    }
+
+    /// <inheritdoc/>
+    public async Task<List<Guid>> GetMemberProductIdsAsync(Guid familyId) =>
+        await _context.ProductFamilyMembers
+            .AsNoTracking()
+            .Where(member => member.ProductFamilyId == familyId)
+            .Select(member => member.ProductId)
+            .ToListAsync();
 }

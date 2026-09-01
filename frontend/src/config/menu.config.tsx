@@ -63,6 +63,11 @@ export const MENU_ADMINISTRATOR: MenuConfig = [
         path: ROUTES.AI_MODEL,
       },
       {
+        title: 'Revisión de familias',
+        icon: Users,
+        path: ROUTES.FAMILY_REVIEW,
+      },
+      {
         title: 'Métodos de Pago',
         icon: CreditCard,
         path: ROUTES.PAYMENT_METHODS,
