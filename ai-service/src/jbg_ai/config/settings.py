@@ -157,6 +157,25 @@ class Settings(BaseSettings):
         ),
     )
 
+    jpv_query_expansion_enabled: bool = Field(
+        default=True,
+        description=(
+            "C20 query-side synonym expansion for the lexical branch "
+            "(JPV_QUERY_EXPANSION_ENABLED). Optional at boot; default true. This "
+            "supplies only the DEFAULT: the effective value travels as a parameter of "
+            "the retrieval orchestration call, because C24 sweeps configurations in one "
+            "process and an environment-only switch would force a restart per config, "
+            "while a request field would move the frozen openapi.json. Default is on "
+            "because measured on the live index the lexical branch answers zero "
+            "documents to `gargantilla dorada` and `collares de plata` without it; the "
+            "flag exists so C24 can ablate, not because the finding is in doubt. Turning "
+            "it off is also the rollback for C20. Distinct from JWT_SECRET, "
+            "JPV_EMBEDDING_*, JPV_RAG_LLM_*, JPV_INDEX_FEED_*, JPV_CATALOG_LLM_* and "
+            "JPV_RETRIEVAL_DISTANCE_THRESHOLD. Not required to boot /health, which never "
+            "loads the dictionary."
+        ),
+    )
+
     jpv_family_veto_margin: float = Field(
         default=0.05,
         ge=0,
@@ -267,6 +286,14 @@ class Settings(BaseSettings):
             return 0.65
         return value
 
+    @field_validator("jpv_query_expansion_enabled", mode="before")
+    @classmethod
+    def blank_query_expansion_flag_is_default(cls, value: object) -> object:
+        """A blank export means "unset", not "false" — same rule as the other options."""
+        if isinstance(value, str) and not value.strip():
+            return True
+        return value
+
 
 @lru_cache
 def get_settings() -> Settings:
@@ -309,4 +336,5 @@ def canonical_openapi_settings() -> Settings:
         jpv_index_feed_api_key=None,
         jpv_index_sync_time_budget_seconds=180,
         jpv_retrieval_distance_threshold=0.65,
+        jpv_query_expansion_enabled=True,
     )

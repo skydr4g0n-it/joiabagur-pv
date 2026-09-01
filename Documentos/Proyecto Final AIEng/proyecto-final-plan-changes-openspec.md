@@ -14,6 +14,70 @@
 
 Este documento se escribió antes de implementar. Cuando una sesión de diseño de un change concreto altera lo que su ficha decía, el cambio se registra aquí con fecha y motivo, y la ficha afectada se corrige en el sitio.
 
+### 2026-09-01 — C20, al explorar: el diccionario no es sólo de sinónimos, y una consulta ensanchada tira el término exacto
+
+**Medido contra el Postgres local, sobre los 1.168 documentos vivos de `ai.product_document` y con 12 embeddings reales del proveedor.** La ficha describía un fichero YAML de sinónimos comerciales. Es eso y dos cosas más que nadie había nombrado.
+
+**Primero: `doc_text` ya está canonicalizado, así que la expansión tiene diana garantizada.** `build_source_text` escribe las líneas `Tipo:` y `Materiales:` con el vocabulario cerrado de C09 — presentes en **1.157 y 1.042 de 1.168** documentos. La consecuencia es exacta, no aproximada: buscar léxicamente el término canónico **equivale a filtrar por `piece_type`** (`anillo` 268 = 268, `pendientes` 275 = 275, `pulsera` 207 = 207, `collar` 140 = 140). Eso fija la dirección útil de la expansión —palabra del operador → término canónico— que es justo la que `enrichment/vocabularies.yaml` ya codifica.
+
+**Segundo: sin diccionario la rama léxica de C21 contesta cero a frases ordinarias.**
+
+| consulta del operador | sin expansión | con expansión |
+|---|---|---|
+| `gargantilla dorada` | **0** | 64 |
+| `collares de plata` | **0** | 66 |
+| `criollas de oro` | 1 | 102 |
+| `sortija de plata` | 3 | 144 |
+| `aros de plata` | 22 | 205 |
+
+**Tercero, y esto no estaba en ninguna parte: el stemmer español rompe dos sustantivos del dominio.** No es un problema de sinónimos sino de tokenizador, y se corrige con el mismo mecanismo:
+
+| par | lexemas | documentos que casan |
+|---|---|---|
+| `collar` / `collares` | `'coll'` ≠ `'collar'` | **140 frente a 1** |
+| `aro` / `aros` | `'aro'` ≠ `'aros'` | 32 y 24, conjuntos distintos |
+| `baño` / `bano` | `'bañ'` ≠ `'ban'` | `baño de oro` 38, **`bano de oro` 0** |
+| `pequeño` / `pequeno` | `'pequeñ'` ≠ `'pequen'` | 134 y 71, ambas legítimas |
+
+El matiz que lo hace tratable: **el stemmer sí pliega las tildes agudas** (`ámbar`=`ambar`, `ónix`=`onix`, `clásico`=`clasico`) **pero no la `ñ`**. Un operador en un TPV que teclea sin `ñ` obtiene cero. Se arregla en el overlay por tres entradas, **no** instalando `unaccent` ni creando una configuración `ts` propia: `tsv` es columna **generada**, y cambiar la configuración exigiría migración que la reescribe y reconstruye el GIN. C20 sigue sin ser 🗄️.
+
+**Cuarto, el hallazgo que decide el contrato: una sola `tsquery` ensanchada destruye la coincidencia exacta.** Con `(sortij|anill) & plat`, ordenado por `ts_rank`, los **tres** productos que literalmente se llaman «Sortija» caen **fuera del top-10**: `ts_rank` deja de premiar el término que el operador escribió. Es el problema de Stripe del artículo de búsqueda híbrida de S10, reproducido dentro del propio mecanismo de expansión. Fusionando por RRF (k=60) las dos listas —la original y la expandida— las tres sortijas vuelven a las posiciones **1, 2 y 3** y el recall sigue siendo de 144 candidatos. Por eso **la expansión entrega grupos de equivalencia, nunca una cadena reescrita**: la fusión es de C21, y C20 no puede quitarle la información con la que fusionar.
+
+**Quinto: la rama vectorial no cubre el hueco, y falla sin abstenerse.** Doce embeddings reales (`text-embedding-3-small`), misma búsqueda coseno de C14 con umbral 0,65, contando aciertos en el top-10 contra la diana (`piece_type` correcto y material correcto):
+
+| consulta | variante | forma canónica | solape del top-10 |
+|---|---|---|---|
+| `sortija de plata` → `anillo de plata` | **4/10** | 10/10 | 2/10 |
+| `gargantilla dorada` → `collar dorado` | **6/10** | 10/10 | **0/10** |
+| `criollas de oro` → `pendientes de oro` | **1/10** | 8/10 | 1/10 |
+| `aros de plata` → `pendientes de plata` | 9/10 | 10/10 | 0/10 |
+| `collares de plata` → `collar de plata` | 10/10 | 10/10 | 8/10 |
+
+Dos lecturas. La primera: **el vector no es sustituto del diccionario** — con «criollas de oro» acierta 1 de 10, y devuelve «Pulsera Río de Plata» como primer resultado de «sortija de plata». La segunda es peor: **siempre devuelve diez candidatos por debajo del umbral**, así que no abstiene, no marca `low_confidence` y el fallo llega a la pantalla con apariencia de acierto. Es la misma firma que C17 encontró siete veces. El plural, en cambio, el vector lo cruza sin ayuda (`collares` 10/10, solape 8/10), lo que confirma que el problema del stemmer es estrictamente léxico.
+
+**Consecuencia de reparto:** la expansión **no toca la rama vectorial en C20**. Duplicar la consulta duplicaría los embeddings, y el cliente se sigue construyendo **por petición** —la deuda asignada a C21/C22— sobre un presupuesto que ya está en los 2500 ms temporales de C16 con 1707 ms medidos en una de cada cuatro llamadas. Pero los números de arriba **son una hipótesis para la ablación de C24**, y quedan anotados como tal: una configuración que embeba también la forma canónica y fusione por RRF es defendible en cuanto el cliente sea singleton.
+
+**Sexto: el 60-70 % del diccionario ya existe, y crear un segundo fichero suelto es el error de C19.** `enrichment/vocabularies.yaml` ya tiene `sortija→anillo`, `gargantilla→collar`, `aro→pendientes`, `brazalete→pulsera`, `plata de ley→plata`, con la dirección correcta y las tildes correctas, y `ClosedVocab.resolve()` empareja sobre texto plegado con `fold()`, que quita la `ñ` — de modo que `resolve("bano de oro")` → `"baño de oro"` **ya funciona hoy**. Se adopta **base + overlay**: se lee `vocabularies.yaml` como clases de equivalencia base y **no se modifica** (tocarlo obliga a `enrichment/v2` y arrastra reenriquecimiento: eso es `fix-enrichment-vocabulary-gaps`), y se añade `retrieval/query_synonyms.yaml` **sólo de consulta** para lo que no debe entrar en el contrato de extracción. Inventariados 96 términos de operador contra el índice: **22 ya cubiertos por la base**, **46 sin acción** y **~18 de overlay** tras aplicar una singularización en ambos lados al cargar, que por sí sola resuelve `sortijas`, `alianzas`, `gargantillas`, `brazaletes`, `esclavas` y `dorados`.
+
+**Tres exclusiones con motivo medido, que son el argumento de por qué el diccionario se cura y no se genera:**
+
+- **`piel` → `cuero` se descarta.** Los 7 documentos que casan dicen «sobre la piel», «acaricia la piel»: piel humana en prosa comercial. `cuero` tiene **un** producto en todo el catálogo; el mapeo metería siete errores en cada consulta de cuero.
+- **`llavero`, `diadema`, `gemelos`, `cinturon` no son sinónimos**, son huecos de `piece_type`. Van a `fix-enrichment-vocabulary-gaps`, como su ficha ya dice.
+- **`filigrana` no necesita expansión**: casa 66 documentos por sí sola, repartidos por **todos** los tipos de pieza. Es un hueco de `style_tags`, y un término real del dominio menorquín —una de las 12 consultas registradas es literalmente *«anillo de filigrana tradicional menorquina»*—. Se anota para el mismo change, no para éste.
+
+**Y una limitación a declarar en el README, hermana de la del doble etiquetado de C24: el diccionario se cura contra el corpus, no contra demanda observada.** `public."ProductSearchEvents"` tiene **31 filas y 12 textos distintos**, todos escritos por el propio desarrollador y todos en vocabulario canónico. Las consultas de operador del D10 del diseño no existen todavía.
+
+| Lo que decía la ficha | Lo que la exploración obligó | Motivo |
+|---|---|---|
+| **Zona:** `ai-service/src/jbg_ai/retrieval/` | **`retrieval/` + lectura de `enrichment/` + una CLI de medición.** Sigue sin migración y sin tocar `openapi.json` | **Octava vez** que la zona de una ficha se queda corta, tras C08, C07, C15, C16, C17 y C18b |
+| «Fichero YAML curado a mano (~40-60 entradas)» | **Base `vocabularies.yaml` (no se toca) + overlay de consulta de ~18 entradas** | 22 de los términos inventariados ya están en la base, con la dirección y las tildes correctas. Un segundo fichero suelto es la segunda definición que divergiría: el motivo por el que se anuló C19 |
+| «Diccionario de sinónimos» | **Sinónimos comerciales *y* artefactos del stemmer** | `collar`/`collares` da 140 documentos frente a 1, y `bano de oro` da 0 frente a 38. Sin esto C21 nace con un fallo de usabilidad de TPV que nadie había nombrado |
+| «Expansión en consulta» | **Grupos de equivalencia, no una cadena reescrita** | Una sola `tsquery` ensanchada saca del top-10 los tres productos que el operador nombró. Con RRF sobre las dos listas vuelven a 1-2-3 |
+| «Se decide con la medición de C24» | **C24 está aguas abajo por C21: C20 trae su propia evidencia** | El grafo es `C20 → C21 → C24`. La ficha pedía medir con un harness que su propio change desbloquea. C20 mide sobre el índice real y deja informe versionado; C24 lo re-mide con relevancia graduada |
+| Nada sobre dónde vive el flag | **Default en `Settings`, parámetro en la firma del orquestador** | C24 barrerá `v0`/`v1`/`v2-hibrido` en el mismo proceso. Un interruptor sólo de entorno obliga a reiniciar por configuración, y llevarlo a `RetrievalRequest` movería el `openapi.json` congelado |
+
+**Un hallazgo de entorno que conviene no perder.** La clave de embeddings vive en `backend/.env`, que es la fuente única que ya usa Compose, y el cargador **ya existe**: `jbg_ai.data.envload.load_local_env()` la busca ahí primero. No hace falta symlink ni `env_file:` — el propio `backend/docker-compose.yml` lo rechaza por escrito para no inyectar claves de CLI en el runtime. Pero **`python -m jbg_ai.indexing` no llama al cargador** y depende de que la variable esté exportada a mano: mismo hueco, y conviene cerrarlo. Y en esta máquina el TLS está interceptado: `curl` pasa porque usa el almacén de Windows y Python falla con `CERTIFICATE_VERIFY_FAILED` porque usa `certifi`, que es la misma causa del `--system-certs` que `CLAUDE.md` ya documenta para `uv`. Cualquier medición contra el proveedor necesita `SSL_CERT_FILE` apuntando al almacén del sistema.
+
 ### 2026-08-31 — C18b, al explorar: su ficha describe un mundo que C18a ya no dejó en pie
 
 **Los tres números que la ficha manda pintar están caducados, y el mecanismo que los produciría ya no los produce.** La ficha dice *«pintar la cola de revisión que C18a ya calcula: 15 miembros marcados, 4 grupos rechazados y 37 productos excluidos»*. Medido contra el Postgres local el mismo día que C18a se archivó:
@@ -533,7 +597,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 | **C18a** | `add-family-suggestion-and-approval` | Python + .NET | C07, C13 | 🟢 | **rev. dec. 2**, **31 ago · archivado** |
 | **C18b** | `add-family-review-ui-and-orphan-alert` | Python + .NET 🗄️ + FE | C18a | 🟢 | **rev. dec. 2**, **partido el 31 ago**, **ficha reescrita el 31 ago**, **aplicado el 1 sep** *(3 migraciones; 62/62 tareas; pendiente de archivar)* |
 | ~~**C19**~~ | ~~`add-demand-signal-service`~~ | .NET 🗄️ | C10 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
-| **C20** | `add-synonym-dictionary` | Python | C14 | 🟢 | **rev. dec. 4** · *tapona a C21: se coge primero* |
+| **C20** | `add-synonym-dictionary` | Python | C14 | 🟢 | **rev. dec. 4** · *tapona a C21: se coge primero* · **ficha reescrita el 1 sep** |
 | **C21** | `add-hybrid-search-rrf` | Python | C14, C20 | 🔴 | — |
 | **C22** | `add-pos-projection-soft-prefilter` | Python | C10, C12, C14 | 🔴 | **rev. dec. 11** |
 | **C23** | `add-knowledge-corpus-and-indexer` | Python | C11 | 🟢 | — |
@@ -558,7 +622,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 
 **⛔ Anulados el 2026-08-31 (5):** C19, C29, C33, C35 y C37 — la rama del agente de inventario. Motivo y consecuencias en el §0. Las fichas se conservan como registro y llevan el sello en el sitio.
 
-**Vivos: 36.** Archivados **19** (C01–C18a). Pendientes **17**: C18b, C20, C21, C22, C23, C24, C25, C26, C27, C28, C30, C31, C32, C34, C36, C38 y C39 — de los cuales C27 y C23 llevan corte pre-autorizado, y C18b es hoja del grafo.
+**Vivos: 36.** Archivados **21** (C01–C18b y C20). Pendientes **15**: C21, C22, C23, C24, C25, C26, C27, C28, C30, C31, C32, C34, C36, C38 y C39 — de los cuales C27 y C23 llevan corte pre-autorizado. **C20 se archivó el 2026-09-01 y con él cae el tapón del grafo**: C21 tiene ya sus dos prerrequisitos y es el siguiente a abrir.
 
 ---
 
@@ -874,12 +938,17 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 #### C20 · `add-synonym-dictionary` 🟢
 
-> **Es el siguiente change a abrir** *(fijado el 31 ago)*. Está pintado 🟢 pero **tapona el grafo entero**: es el único prerrequisito que le falta a C21, y C21 bloquea a la vez a C24 y a C30, o sea las dos mitades del proyecto. La marca ⏳ desaparece: sin compañero no hay acuerdo que esperar, y el flag ya era el mecanismo previsto para decidir con la medición en vez de con argumentos.
+> **Es el siguiente change a abrir** *(fijado el 31 ago; ficha reescrita el 1 sep tras medir)*. Está pintado 🟢 pero **tapona el grafo entero**: es el único prerrequisito que le falta a C21, y C21 bloquea a la vez a C24 y a C30, o sea las dos mitades del proyecto. La marca ⏳ desaparece: sin compañero no hay acuerdo que esperar, y el flag ya era el mecanismo previsto para decidir con la medición en vez de con argumentos.
+>
+> **Lo que la exploración midió está en el §0.** Tres cosas que la ficha no sabía: `doc_text` ya está canonicalizado, así que la expansión tiene diana garantizada; **el stemmer español rompe `collar`/`collares` y `baño`/`bano`**, lo que hace que el diccionario no sea sólo de sinónimos; y una sola `tsquery` ensanchada **saca del top-10 los productos que el operador nombró literalmente**, lo que fija el contrato en grupos de equivalencia y no en una cadena reescrita.
 
-**Objetivo.** Sustituir `SearchAliases` sin persistir texto por producto (decisión 4). Se implementa **tras flag** precisamente para que la decisión se tome con la medición de C24 y no con argumentos.
-**Prereq.** C14 · **Zona.** `ai-service/src/jbg_ai/retrieval/`
-**Alcance.** Fichero YAML curado a mano (~40-60 entradas: sortija→anillo, gargantilla→collar, aro→pendiente…), versionado en el repo; expansión **en consulta, nunca en indexación**; flag para activarlo o desactivarlo y poder medir su efecto.
-**Tests.** `test_query_with_synonym_matches_canonical_term`; `test_expansion_does_not_modify_indexed_documents`; `test_unknown_term_passes_through_unchanged`; `test_disabled_flag_returns_original_query`.
+**Objetivo.** Sustituir `SearchAliases` sin persistir texto por producto (decisión 4), y dar a la rama léxica de C21 la capa que la hace responder algo: sin ella, `gargantilla dorada` y `collares de plata` devuelven **cero** documentos sobre el índice real. Se implementa **tras flag** para que C24 pueda medir su efecto por ablación, no para dudar de que haga falta.
+**Prereq.** C14 · **Zona.** `ai-service/src/jbg_ai/retrieval/`, lectura de `enrichment/vocabularies.yaml` (que **no se modifica**) y una CLI de medición. Sin migración, sin tocar `openapi.json`, sin `Dockerfile`.
+**Alcance.** **Base + overlay**: `vocabularies.yaml` aporta las clases de equivalencia que ya existen —`sortija→anillo`, `gargantilla→collar`, `plata de ley→plata`, con dirección y tildes correctas— y `retrieval/query_synonyms.yaml`, versionado y **sólo de consulta**, añade lo que no debe entrar en el contrato de extracción: **artefactos del stemmer** (`collares`, `aros`, `bano de oro`, `pequeño`/`pequeno`), sinónimos comerciales que la base no tiene (`arete`, `criolla`, `zarcillos`, `aro de dedo`, `choker`, `dije`, `medalla`, `prendedor`, `alfiler`, `cordon`, `cuerda`, `bronce`, `acrilico`, `acero inoxidable`) y el puente `dorado` → {color `dorado`, `baño de oro`, `oro`}. **Singularización en ambos lados al cargar**, que resuelve `sortijas`, `gargantillas`, `brazaletes`, `esclavas` y `dorados` sin una entrada por forma. `expand_query` es **función pura, sin base de datos ni proveedor**, y devuelve **grupos de equivalencia más los términos resueltos** (`término → campo, canónico`), que es lo que C21 necesita para su extracción de filtros por reglas sin construir una segunda tabla de consulta. Expansión **en consulta, nunca en indexación**, y **nunca en la rama vectorial** (medido: duplicaría los embeddings sobre un cliente que aún se construye por petición). Flag con **default en `Settings` y parámetro en la firma del orquestador**, para que C24 barra configuraciones sin reiniciar y sin mover el contrato congelado. Log estructurado `stage=expand` junto a `stage=embed` y `stage=search`, y **CLI de medición que deja informe versionado** con el alcance sobre el índice real, que C24 reutiliza como categoría de sinónimos del golden set.
+**Tests.** `test_query_with_synonym_matches_canonical_term`; `test_expansion_does_not_modify_indexed_documents`; `test_unknown_term_passes_through_unchanged`; `test_disabled_flag_returns_original_query`; `test_expansion_returns_groups_not_a_rewritten_string`; `test_stemmer_split_terms_are_expanded` (`collares`→`collar`, `bano de oro`→`baño de oro`); `test_plural_is_resolved_without_a_dedicated_entry`; `test_base_vocabulary_file_is_not_modified`; `test_overlay_never_overrides_a_base_canonical`; `test_expansion_makes_no_database_or_provider_call`.
+**Fuera de alcance.** La rama léxica, `ts_rank` y la fusión RRF (**C21**) · `vocabularies.yaml`, el salto a `enrichment/v2` y los huecos `llavero`/`diadema`/`gemelos`/`cinturon`/`filigrana` (**`fix-enrichment-vocabulary-gaps`**) · instalar `unaccent` o crear una configuración `ts` propia, que exigiría migración porque `tsv` es columna generada · el singleton del cliente de embeddings y revertir los 2500 ms de C16 (**C21/C22**, anotado en `DEFERRED_TASKS.md`) · erratas y `pg_trgm` · `ai.query_log` · regenerar `openapi.json`.
+**Exclusión con motivo medido.** `piel` → `cuero` **no entra**: los 7 documentos que casan dicen «sobre la piel», piel humana en prosa comercial, y `cuero` tiene un solo producto. Es el ejemplo de por qué el diccionario se cura y no se genera.
+**Limitación a declarar.** El diccionario se cura **contra el corpus, no contra demanda observada**: `ProductSearchEvents` tiene 31 filas y 12 textos, todos escritos por el desarrollador y en vocabulario canónico. Hermana de la ausencia de acuerdo entre anotadores que C24 declara.
 
 ---
 
@@ -1202,7 +1271,7 @@ Tres entradas nuevas en esa lista, y conviene el porqué: **C20** porque tapona 
 | Riesgo | Mitigación |
 |---|---|
 | ~~Las olas 3 y 4 concentran 19 de los 39 changes~~ | **Sin objeto desde el 31 ago.** No hay olas que equilibrar: quedan 17 changes pendientes y se ordenan por desbloqueo del grafo. La concentración se resolvió anulando cinco de ellos, no repartiéndolos |
-| **C20 tapona el grafo entero y está pintado 🟢** | Es lo único que separa a C21 de arrancar, y C21 bloquea a C24 y a C30. Marcado como siguiente a abrir en su ficha y en el §4; el color de ruta ya no decide el orden |
+| **C20 tapona el grafo entero y está pintado 🟢** | Es lo único que separa a C21 de arrancar, y C21 bloquea a C24 y a C30. Marcado como siguiente a abrir en su ficha y en el §4; el color de ruta ya no decide el orden. **Medido el 1 sep:** sin él la rama léxica de C21 devuelve **cero** documentos a `gargantilla dorada` y a `collares de plata` |
 | C02 se queda corto y el contrato cambia, invalidando C03/C15/C16 | `test_openapi_snapshot_is_stable`: cualquier cambio de contrato rompe el build y obliga a decidirlo, en vez de filtrarse |
 | C24 (golden set) bloquea C25 y C38 | El runner y las configs van por delante; el etiquetado tiene tope de 2 h y recorte definido a 45 consultas |
 | **El golden set lo etiqueta una sola persona** | No se finge la conciliación: *pooling* sobre la unión de configuraciones, relectura diferida de las dudosas, y la ausencia de acuerdo entre anotadores **declarada** en el README como limitación |

@@ -67,6 +67,26 @@ async def run_cli_sync(
         )
 
 
+def run_module(argv: Sequence[str] | None = None) -> int:
+    """Process entry point for `python -m jbg_ai.indexing`.
+
+    Loads `backend/.env` — the same file Compose interpolates, and the single place
+    the local credentials live — before any setting is read. Until this existed the
+    command silently depended on the variables already being exported by hand, while
+    `python -m jbg_ai.data` had been loading them since C06b.
+
+    It lives here and not inside `main` on purpose: tests call `main` directly, and
+    `support.settings.build_settings` pins the optional fields to `None` precisely so
+    that a developer's exported credentials cannot make an "absent configuration" case
+    stop failing as it should. Loading the file from a code path a test can reach would
+    undo that guarantee.
+    """
+    from jbg_ai.data.envload import load_local_env
+
+    load_local_env()
+    return main(argv)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m jbg_ai.indexing")
     sub = parser.add_subparsers(dest="command", required=True)

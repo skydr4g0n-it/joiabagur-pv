@@ -1,4 +1,9 @@
-"""Embed the query, search by cosine, map scores. Delivered by C14."""
+"""Embed the query, search by cosine, map scores. Delivered by C14.
+
+C20 adds the synonym expansion stage. Its result is computed and logged but not
+consumed: the lexical branch that reads it arrives with C21, and until then the
+response of this endpoint is unchanged. That is declared rather than disguised.
+"""
 
 from __future__ import annotations
 
@@ -21,6 +26,7 @@ from jbg_ai.indexing.embeddings import EmbeddingClient, LiteLlmEmbeddingClient
 from jbg_ai.indexing.errors import EmbeddingError
 from jbg_ai.retrieval.errors import InvalidFamilyIdError, RetrievalDependencyError
 from jbg_ai.retrieval.ports import ProductSearchPort, SearchFilters, SearchHit
+from jbg_ai.retrieval.synonyms import expand_query
 from jbg_ai.stubs.responses import over_retrieval_count
 
 logger = logging.getLogger(__name__)
@@ -96,10 +102,35 @@ async def retrieve_products(
     settings: Settings,
     embed: EmbeddingClient,
     search: ProductSearchPort,
+    expand_synonyms: bool | None = None,
 ) -> RetrievalResponse:
+    """`expand_synonyms` overrides the settings default for one call.
+
+    It is a parameter and not only a setting because C24 sweeps configurations inside
+    one process; putting it on `RetrievalRequest` instead would move the frozen
+    `openapi.json`.
+    """
     logger.debug(
         "operator query=%s",
         payload.query,
+        extra={"trace_id": principal.trace_id},
+    )
+
+    expansion_enabled = (
+        settings.jpv_query_expansion_enabled if expand_synonyms is None else expand_synonyms
+    )
+    expand_started = time.perf_counter()
+    expanded = expand_query(payload.query, enabled=expansion_enabled)
+    expand_ms = (time.perf_counter() - expand_started) * 1000
+    logger.info(
+        "stage=expand trace_id=%s latency_ms=%.2f enabled=%s tokens=%s matched_terms=%s "
+        "consumed=%s",
+        principal.trace_id,
+        expand_ms,
+        expansion_enabled,
+        len(expanded.groups),
+        len(expanded.matched),
+        False,
         extra={"trace_id": principal.trace_id},
     )
 
@@ -114,6 +145,9 @@ async def retrieve_products(
             "refusing to abstain over an empty or foreign index"
         )
 
+    # The ORIGINAL query, never an expanded form: expansion feeds the lexical branch
+    # only. Embedding a variant too would double the provider round trips on a client
+    # still built per request, against a budget already raised to 2500 ms in C16.
     embed_started = time.perf_counter()
     try:
         embedded = await embed.embed([payload.query])

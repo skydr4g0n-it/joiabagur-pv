@@ -46,6 +46,7 @@ def build_settings(**overrides: Any) -> Settings:
         "jpv_index_feed_api_key": None,
         "jpv_index_sync_time_budget_seconds": 180,
         "jpv_retrieval_distance_threshold": 0.65,
+        "jpv_query_expansion_enabled": True,
     }
     values.update(overrides)
     return Settings(**values)
