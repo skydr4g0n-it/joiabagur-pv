@@ -1,7 +1,7 @@
 # product-family Specification
 
 ## Purpose
-Groups the products that are one same piece sold in several variants — the same ring in sizes S, M and L — as an editable business entity distinct from a collection: a collection groups by editorial criteria and admits many memberships, whereas a family is excluding and a product belongs to at most one, a rule enforced by the database rather than by an application check. Covers the family's own metadata, membership declared as a complete ordered list with per-member variant labels, stamping `Product.UpdatedAt` of products that enter or leave so a catalog indexing feed can see both, retrieval of a product's family and siblings, administrator-only writes against reads open to any authenticated user without point-of-sale filtering, the storage that records whether a family was created by hand or approved from an assisted suggestion, and the schema constraints whose absence would fail silently.
+Groups the products that are one same piece sold in several variants — the same ring in sizes S, M and L — as an editable business entity distinct from a collection: a collection groups by editorial criteria and admits many memberships, whereas a family is excluding and a product belongs to at most one, a rule enforced by the database rather than by an application check. Covers the family's own metadata, membership declared as a complete ordered list with per-member variant labels, stamping `Product.UpdatedAt` of products that enter or leave so a catalog indexing feed can see both, retrieval of a product's family and siblings, a paginated administrator listing of the families that exist and the dissolution of one outright, administrator-only writes against reads open to any authenticated user without point-of-sale filtering, the storage that records whether a family was created by hand or approved from an assisted suggestion, and the schema constraints whose absence would fail silently.
 
 ## Requirements
 
@@ -169,6 +169,69 @@ The system SHALL expose the family a product belongs to, together with all its s
 
 - **WHEN** a caller requests the family of an identifier that matches no product
 - **THEN** the response is 404 Not Found
+
+### Requirement: Families are enumerable through a paginated listing
+
+The system SHALL expose a paginated listing of families to administrators, returning at most 50 per page, and MUST accept narrowing by how the family came to exist, by the piece type its members share, and by whether it holds members flagged by a review audit.
+
+Retrieval by identifier is not enough for review: a reviewer working through the catalogue's families has no identifier to start from, and no other operation produces the set.
+
+#### Scenario: Families are returned a page at a time
+
+- **WHEN** an administrator requests the family listing
+- **THEN** the response contains at most 50 families
+- **AND** it reports the total number of families matching the request
+- **AND** requesting the next page returns the following families with no family repeated or skipped
+
+#### Scenario: The listing narrows by how the family came to exist
+
+- **WHEN** an administrator requests only the families approved from an assisted suggestion
+- **THEN** every family returned records assisted-approval origin
+- **AND** manually created families are absent
+
+#### Scenario: The listing narrows to families holding flagged members
+
+- **WHEN** an administrator requests only the families that hold a member flagged by a review audit
+- **THEN** every family returned holds at least one such member
+- **AND** families whose members are all unflagged are absent
+
+#### Scenario: An operator cannot list families
+
+- **WHEN** a user with the operator role requests the family listing
+- **THEN** the request is rejected with 403 Forbidden
+
+### Requirement: A family can be dissolved, not only emptied
+
+The system SHALL allow an administrator to delete a family outright. Its members MUST cease to belong to it and become free to be assigned elsewhere, and the catalog watermark of every departing product MUST be stamped so that an incremental indexing pull emits them.
+
+Emptying a family through a membership declaration is not equivalent and MUST NOT be the only route: it leaves a family with no members, which is a legitimate state for a family being built and a meaningless one for a family that was wrong.
+
+Deleting a family that does not exist MUST be distinguishable from deleting one that does.
+
+#### Scenario: Dissolving a family frees its members
+
+- **WHEN** an administrator deletes a family that holds three members
+- **THEN** the family no longer exists
+- **AND** none of the three products belongs to any family
+- **AND** each of them may afterwards be declared a member of another family
+
+#### Scenario: Departing products are visible to an incremental catalog pull
+
+- **WHEN** a family is deleted and the catalog feed is pulled incrementally from a cursor earlier than the deletion
+- **THEN** the feed emits exactly the products that belonged to it
+- **AND** no additional product is emitted
+
+#### Scenario: Deleting an absent family is reported as absent
+
+- **WHEN** an administrator deletes a family that does not exist
+- **THEN** the request is rejected with 404 Not Found
+- **AND** no other family is affected
+
+#### Scenario: An operator cannot dissolve a family
+
+- **WHEN** a user with the operator role deletes a family
+- **THEN** the request is rejected with 403 Forbidden
+- **AND** the family and its members are left unchanged
 
 ### Requirement: Writing families is restricted to administrators, reading is not
 
