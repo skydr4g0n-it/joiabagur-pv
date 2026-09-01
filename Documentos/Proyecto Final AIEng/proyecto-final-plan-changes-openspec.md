@@ -198,6 +198,8 @@ El grafo del §4 tampoco dibujaba las aristas **C18→C25, C26, C30 y C36**. Ya 
 
 ### 2026-08-31 — Propuesta: `fix-enrichment-vocabulary-gaps` 🟢, un change y no tres
 
+> **Actualización del 1 sep, al cerrar C20.** La propuesta pasa de idea a **ficha propia, `FIX1`, colocada detrás de C21** en el §3 y en el grafo del §4. Se confirma que **exige change y no un commit suelto**, con un motivo que no estaba escrito: cambia el contenido normativo de `openspec/specs/catalog-enrichment-pipeline/spec.md`, que enumera los ocho `piece_type` canónicos en un MUST y fija `prompt_version` = `enrichment/v1` en un escenario — y `openspec validate --all --strict` **seguiría en verde**, porque valida estructura y no verdad. Y se fija el momento: **después de C21**, porque antes no hay rama léxica con la que demostrar que sirve de algo.
+
 Sale de C18a y **corrige dos cosas que su propio informe dejó mal escritas.**
 
 **La primera: el problema es tres veces más pequeño de lo que decía.** La limpieza de C18a se llevó 26 de los 37 productos con `piece_type` nulo. Quedan **once**: las nueve joyas sintéticas que el vocabulario no sabe nombrar —un cinturón de 1.300 €, cinco diademas de 340 a 1.040 €, dos gemelos y una «Joya del Zodiaco»— y los dos llaveros reales que se decidió conservar en el índice.
@@ -206,7 +208,9 @@ Sale de C18a y **corrige dos cosas que su propio informe dejó mal escritas.**
 
 **Por qué un solo change.** Los dos arreglos tocan los mismos dos ficheros, exigen el mismo salto de versión de prompt y mueven el corpus por el mismo camino. Separarlos significa bumpear el prompt dos veces y mover el corpus dos veces, que es justo lo que C18a existe para no hacer.
 
-**Alcance.** `piece_type.terms` += `diadema`, `gemelos`, `cinturon` y **`llavero`** —los dos conservados dejan de ser invisibles al filtro, y el cuarto término sale gratis—; prompt **`enrichment/v2`** con la lista nueva más la línea que advierte de servicios, consumibles y regalo; espejo `materials-vocabulary.ts` y su test de fijación; reenriquecer **sólo los once** con `ignoreHash`; una sola sincronización incremental.
+**Alcance.** `piece_type.terms` += `diadema`, `gemelos`, `cinturon` y **`llavero`** —los dos conservados dejan de ser invisibles al filtro, y el cuarto término sale gratis—; prompt **`enrichment/v2`** con la lista nueva más la línea que advierte de servicios, consumibles y regalo; espejo `materials-vocabulary.ts` y su test de fijación; reenriquecer **sólo los once** con **`Force`**; una sola sincronización incremental.
+
+**Corrección del 1 sep: la bandera no se llama `ignoreHash`.** Ese nombre no existe en el repositorio. El mecanismo sí está, y es `request.Force`: [`AiCatalogController.cs`](../../backend/src/JoiabagurPV.API/Controllers/AiCatalogController.cs) salta el reenriquecimiento con `if (!request.Force && stored.SourceHash == hash)`. Se corrige aquí para que nadie abra el change buscando una bandera que no está.
 
 **Fuera de alcance: reenriquecer los 1.200 con `v2`.** Serían ~1.200 llamadas y, peor, podría **reclasificar productos existentes** —algo hoy etiquetado `collar` podría pasar a `cinturon`— cambiando el comportamiento de búsqueda de forma difusa y sin que nadie lo pidiera.
 
@@ -599,6 +603,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 | ~~**C19**~~ | ~~`add-demand-signal-service`~~ | .NET 🗄️ | C10 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
 | **C20** | `add-synonym-dictionary` | Python | C14 | 🟢 | **rev. dec. 4** · *tapona a C21: se coge primero* · **ficha reescrita el 1 sep** |
 | **C21** | `add-hybrid-search-rrf` | Python | C14, C20 | 🔴 | — |
+| **FIX1** | `fix-enrichment-vocabulary-gaps` | Python + FE | C21 | 🟢 | **propuesto el 31 ago** · **ficha el 1 sep** · *fuera de la numeración C: no sale de la descomposición original* |
 | **C22** | `add-pos-projection-soft-prefilter` | Python | C10, C12, C14 | 🔴 | **rev. dec. 11** |
 | **C23** | `add-knowledge-corpus-and-indexer` | Python | C11 | 🟢 | — |
 | **C24** | `add-eval-harness-golden-set-and-baselines` | Python | C14, C21 | 🔴 | rev. dec. 12 · **etiquetado simple desde el 31 ago** |
@@ -622,7 +627,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 
 **⛔ Anulados el 2026-08-31 (5):** C19, C29, C33, C35 y C37 — la rama del agente de inventario. Motivo y consecuencias en el §0. Las fichas se conservan como registro y llevan el sello en el sitio.
 
-**Vivos: 36.** Archivados **21** (C01–C18b y C20). Pendientes **15**: C21, C22, C23, C24, C25, C26, C27, C28, C30, C31, C32, C34, C36, C38 y C39 — de los cuales C27 y C23 llevan corte pre-autorizado. **C20 se archivó el 2026-09-01 y con él cae el tapón del grafo**: C21 tiene ya sus dos prerrequisitos y es el siguiente a abrir.
+**Vivos: 37** (36 numerados más `FIX1`). Archivados **21** (C01–C18b y C20). Pendientes **16**: C21, **FIX1**, C22, C23, C24, C25, C26, C27, C28, C30, C31, C32, C34, C36, C38 y C39 — de los cuales C27 y C23 llevan corte pre-autorizado. **C20 se archivó el 2026-09-01 y con él cae el tapón del grafo**: C21 tiene ya sus dos prerrequisitos y es el siguiente a abrir.
 
 ---
 
@@ -881,7 +886,7 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 **Prereq.** C07, C13 · **Zona.** `ai-service/src/jbg_ai/families/`, `backend/` · **Lleva `design.md`**
 **Alcance.** Motor determinista sin LLM: raíz normalizada, **fusión por material** (nunca stripping global), guarda de raíz degenerada, puerta de `piece_type` con el nulo como valor propio, **veto relativo por embedding** que marca y no elimina, `variant_label` verbatim y `position` por rango canónico. **Novena ruta del contrato congelado**, `POST /v1/families/suggest`. En .NET, `POST /api/ai/catalog/family-suggestions` y `/apply`, que persiste vía `ProductFamilyService` —nunca por SQL— y escribe `Origin = AiApproved` con aprobador e instante. Sin migración, sin frontend, sin persistir propuestas.
 
-**Hecho (2026-08-31).** **156 familias y 486 miembros**, cero conflictos. 32 entradas que no son joyería terminada retiradas del índice con `ReviewStatus = Rejected` —nunca `IsActive`: la tienda las vende—. Reconciliación en **una sola** sincronización incremental: `upserted 486, deleted 32, failed 0`. Cola de revisión de **15 miembros en 5 familias** (margen 0,05). Informe: [`informes/c18a-family-suggestion-report.md`](informes/c18a-family-suggestion-report.md). Change [`add-family-suggestion-and-approval`](../../openspec/changes/add-family-suggestion-and-approval/).
+**Hecho (2026-08-31).** **156 familias y 486 miembros**, cero conflictos. 32 entradas que no son joyería terminada retiradas del índice con `ReviewStatus = Rejected` —nunca `IsActive`: la tienda las vende—. Reconciliación en **una sola** sincronización incremental: `upserted 486, deleted 32, failed 0`. Cola de revisión de **15 miembros en 5 familias** (margen 0,05). Informe: [`informes/c18a-family-suggestion-report.md`](informes/c18a-family-suggestion-report.md). Change [`add-family-suggestion-and-approval`](../../openspec/changes/archive/2026-08-31-add-family-suggestion-and-approval/).
 
 **Tres correcciones que el apply obligó a hacer.** *(1)* El **umbral absoluto del §7.5 no existe**: peor hermano y mejor extraño se solapan (real 0,847–0,936). La raíz agrupa y el embedding veta, **en relativo**. *(2)* El **stripping global de material degenera** `Anillo plata S/M/L/XL` a la raíz `anillo`; la fusión no. *(3)* El 1,7 % que la exploración midió describía familias de sufijo de talla solamente; sobre el algoritmo entregado la cifra honesta es **3,1 %**.
 
@@ -961,6 +966,25 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ---
 
+#### FIX1 · `fix-enrichment-vocabulary-gaps` 🟢
+
+> **Fuera de la numeración C por decisión propia** *(fijado el 1 sep)*. No sale de la descomposición original del proyecto sino de un hallazgo de C18a, y darle un número C sugeriría que estaba planificado. Lleva ficha porque **exige change propio**, no porque sea una ola más.
+>
+> **Por qué exige change y no un commit suelto.** Cambia el **contenido normativo de una spec viva**: `openspec/specs/catalog-enrichment-pipeline/spec.md` enumera en un MUST los ocho `piece_type` canónicos, y un escenario suyo fija `prompt_version` = `enrichment/v1`. Añadir cuatro términos y saltar a `v2` deja las dos frases mintiendo — y `openspec validate --all --strict` **seguiría en verde**, porque valida estructura y no verdad. Sería peor que las tres specs malformadas de agosto: aquéllas rompían el formato y el validador las cazó; ésta quedaría bien formada y falsa. La única vía sancionada para mover una spec viva es una delta spec dentro de un change. Se suman dos razones menores que apuntan igual: **mueve el corpus** —reenriquecer cambia `ProductAiProfile`, `doc_text`, `source_hash` y los embeddings de esos productos: es una migración de datos aunque no lleve Alembic— y es **multicomponente**, porque toca el espejo del frontend.
+
+**Objetivo.** Dar nombre a lo que el vocabulario cerrado no sabe nombrar, y arreglar la laguna del enunciado del prompt que la revisión de C18a diagnosticó: el prompt abre con *«Eres un extractor de atributos de joyería»* y no contempla que el catálogo contenga otra cosa, así que ante `Arreglos oro` conjetura *collar* porque es exactamente lo que se le pidió.
+**Prereq.** C21 · **Zona.** `ai-service/src/jbg_ai/enrichment/`, `ai-service/prompts/enrichment/`, `frontend/src/lib/`, y una pasada de reenriquecimiento por `backend/`. **Sin migración.**
+**Población, medida el 2026-09-01.** **11 productos de 1.168** sin `piece_type` — dos llaveros reales (28 € y 85 €) y nueve sintéticos: cinco diademas de 340 a 1.040 €, dos gemelos, un cinturón de 1.300 € y una «Joya del Zodiaco». Coincide exactamente con lo que midió el §0: el alcance no ha derivado.
+**Alcance.** `piece_type.terms` += `diadema`, `gemelos`, `cinturon` y **`llavero`**; prompt **`enrichment/v2`** con la lista nueva más la línea que advierte de servicios, consumibles y regalo; espejo `materials-vocabulary.ts` y su test de fijación; reenriquecer **sólo los once** con **`Force`** *(el §0 lo llamaba `ignoreHash`, que no existe: la bandera real es `request.Force` en `AiCatalogController`)*; una sola sincronización incremental; y **delta spec de `catalog-enrichment-pipeline`** que actualice la lista canónica y el escenario de `prompt_version`.
+**Tests.** `test_new_piece_types_are_canonical_and_normalised`; `test_prompt_version_is_v2_on_reenriched_profiles`; `test_service_and_consumable_rows_get_null_piece_type`; y los **dos alambres que deben saltar y actualizarse a propósito**: `test_base_vocabulary_terms_are_pinned` (`ai-service`, puesto por C20 con el motivo en su docstring) y `materials-vocabulary.test.ts` (frontend, desde C16). Que fallen es la señal correcta: obligan a que el salto de vocabulario sea un acto consciente en los tres sitios donde la lista está replicada.
+**Fuera de alcance.** **Reenriquecer los 1.200 con `v2`** — serían ~1.200 llamadas y, peor, podría **reclasificar productos existentes** cambiando el comportamiento de búsqueda de forma difusa y sin que nadie lo pidiera. Tampoco: `source-text/v1`, `embedding_version`, `indexing/embeddings.py`, ni el diccionario de consulta de C20, que es de otra capa.
+**Cuándo, y por qué ahí.** **Después de C21 y antes de la línea base de C24.** No dentro de C21: ese change tiene que calibrar RRF y `ts_rank` **contra un corpus quieto**, y meterle dentro algo que mueve documentos es calibrar sobre arena. No antes de C21, por la regla 2 del §1 —*prioridad al desbloqueo*—: C21 abre C24, C25 y C30, y esto no abre ninguna arista, es una hoja. Y hay un motivo mejor: **antes de C21 esta corrección no se puede medir**, porque la rama léxica todavía no existe y los once productos ganarían `piece_type` sin que nadie pueda enseñar que sirve de algo — la firma que este proyecto persigue desde C17. Después de C21 se demuestra de extremo a extremo: buscar «diadema» pasa de cero a resultados. El plazo duro sigue siendo el del §0: antes de que C24 etiquete, porque `preprocessing_id` sigue siendo `source-text/v1` y no delataría el cambio.
+**Riesgo a comprobar, no a suponer.** Reenriquecer con `v2` puede cambiar **otros campos** de esos once —materiales, etiquetas— además del tipo. Hay que mirar el diff completo, no sólo `piece_type`.
+**Recortable.** No entra en la lista de nunca-recortar del §6: son 11 productos, el **0,9 %** del corpus, y nueve de ellos sintéticos. Si se cae, C24 etiqueta un corpus donde once piezas no tienen tipo, y eso se declara como limitación en vez de fingirse.
+**Coste.** Cuatro ficheros de código más la delta spec. Menos de media sesión: no hay algoritmo, ni migración, ni interfaz.
+
+---
+
 #### C22 · `add-pos-projection-soft-prefilter` 🔴
 
 **Objetivo.** La proyección pondera pero **nunca excluye**. Es la decisión 11 de la revisión y la corrección técnica más importante de esta versión.
@@ -1027,7 +1051,7 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 **Alcance.** Pantalla de revisión **por lotes** con tabla editable, atajos de teclado y aprobación masiva por campo; muestra confianza y `source` (`rule`/`inferred`) por campo; registra **quién revisó, cuándo y qué cambió**; endpoint de métricas que expone **tasa de corrección por campo** y **tiempo medio de revisión** para el README.
 **Tests.** `should highlight inferred sensitive fields pending review`; `should record correction when material list is edited`; `Metrics_CorrectionRate_ComputedPerField`; `Metrics_ExcludesAutoBulkProfiles`.
 
-> **Heredado de C18b el 2026-09-01 — los atajos de teclado, que C18b dio por hechos y no entregó.** La tarea 6.4 de aquel change los daba por implementados y en la pantalla no hay un solo manejador de teclado. Se descopan aquí en vez de añadirse a última hora a una pantalla ya revisada por una persona, porque la prueba que importa es **volver a recorrer una cola con ellos**, no un test que compruebe que el manejador está enganchado. Y llegan con el caso concreto delante: de las cuatro cosas que esta ficha pide por escrito, **tres ya existen** en [`family-review.tsx`](../frontend/src/pages/admin/family-review.tsx) —tabla editable, aprobación masiva y registro de quién revisó y qué cambió—; **la carcasa compartida no se extrajo** y extraerla, si hace falta, es de C28, que es quien tendrá dos inquilinos a la vista.
+> **Heredado de C18b el 2026-09-01 — los atajos de teclado, que C18b dio por hechos y no entregó.** La tarea 6.4 de aquel change los daba por implementados y en la pantalla no hay un solo manejador de teclado. Se descopan aquí en vez de añadirse a última hora a una pantalla ya revisada por una persona, porque la prueba que importa es **volver a recorrer una cola con ellos**, no un test que compruebe que el manejador está enganchado. Y llegan con el caso concreto delante: de las cuatro cosas que esta ficha pide por escrito, **tres ya existen** en [`family-review.tsx`](../../frontend/src/pages/admin/family-review.tsx) —tabla editable, aprobación masiva y registro de quién revisó y qué cambió—; **la carcasa compartida no se extrajo** y extraerla, si hace falta, es de C28, que es quien tendrá dos inquilinos a la vista.
 
 > **Heredado de C18b el 2026-09-01 — dos familias manuales que nadie puede crear todavía.** C18b cierra dejando abiertas las dos raíces degeneradas que C18a delegó en una persona (D11 de aquella HU), y el motivo es que **su auditoría no puede verlas**: `Cadena plata` (SKU328), `Cadena oro` (SKU329), `Cadena baño oro` (SKU381), las tres `Cadena Barbara oro` (SKU398, SKU399, SKU401) y `Colgante Estel Cadena` (SKU295) son de `piece_type` **`cadena`, del que no existe ni una sola familia**, así que no hay contra qué calcular un margen; y `Alianzas Plata` (SKU327) con `Alianzas oro` (SKU397) son de `anillo`, pero una alianza lisa no se parece lo bastante a ningún anillo de rama ni de erizo como para ser nominada. Los nueve piden **dos familias de variante creadas a mano**, y C18b lista y disuelve familias pero **no las crea**. C28 hereda la pantalla, así que hereda el hueco: **crear una familia desde la revisión** es la pieza que falta, y estos nueve SKU son su caso de prueba real. Detalle en §8.3 de [`informes/c18b-family-review-report.md`](informes/c18b-family-review-report.md).
 
@@ -1181,7 +1205,8 @@ flowchart LR
     C16 --> C36
     C18a --> C18b & C25 & C26 & C30 & C36
     C20 --> C21
-    C21 --> C24 & C25 & C30
+    C21 --> C24 & C25 & C30 & FIX1
+    FIX1 --> C24
     C22 --> C25 & C26
     C23 --> C30
     C24 --> C25 & C38
@@ -1196,8 +1221,8 @@ flowchart LR
     classDef hecho fill:#d9ead3,stroke:#38761d,color:#274e13
     classDef ahora fill:#fce5cd,stroke:#b45f06,color:#7f3f00,stroke-width:3px
     classDef corte fill:#f4cccc,stroke:#a61c00,color:#660000,stroke-dasharray:4 3
-    class C01,C02,C03,C05,C06a,C06b,C07,C08,C09,C10,C11,C12,C13,C14,C15,C16,C17,C18a hecho
-    class C20 ahora
+    class C01,C02,C03,C05,C06a,C06b,C07,C08,C09,C10,C11,C12,C13,C14,C15,C16,C17,C18a,C18b,C20 hecho
+    class C21 ahora
     class C23,C27 corte
 ```
 
@@ -1209,13 +1234,14 @@ flowchart LR
 
 | Libre ahora | Desbloquea | |
 |---|---|---|
-| **C20** | **C21** → y con él C24, C25, C30 → y con ellos casi todo lo demás | **es el tapón del grafo** |
+| ~~**C20**~~ | ~~**C21** → y con él C24, C25, C30~~ | **archivado el 1 sep: el tapón ha caído** |
+| **FIX1** | nada — es una hoja | **por eso va detrás de C21 y no delante**: la regla 2 del §1 da prioridad a lo que abre aristas. Y antes de C21 no habría rama léxica con la que medir su efecto |
 | C23 | C30 | |
 | C22 | C25, C26 | |
 | C28 | nada — pero lo pide el checklist §16 del diseño | hoja obligatoria |
 | C18b | nada — pero es la única evidencia posible del checklist §16 sobre familias | hoja, ya no gratis de recortar |
 
-**Cadena crítica que queda:** `C20 → C21 → C24 → C25 → C26 → C34 → C36`, con `C22` y `C23` entrando por los lados, y `C30 → C31 → C32 → C38 → C39` cerrando.
+**Cadena crítica que queda:** `C21 → C24 → C25 → C26 → C34 → C36` *(C20 archivado el 1 sep)*, con **`FIX1`** intercalado entre C21 y C24 sin estar en la cadena —no la alarga, pero su plazo duro es esa ventana—, con `C22` y `C23` entrando por los lados, y `C30 → C31 → C32 → C38 → C39` cerrando.
 
 ---
 
