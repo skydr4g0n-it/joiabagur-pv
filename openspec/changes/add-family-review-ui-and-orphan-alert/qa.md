@@ -69,6 +69,8 @@ Una anomalía la corrigió este change y merece constar: la suite **llegó roja 
 |---|---|---|---|
 | Línea base | 47 | 873 | 920 |
 | Cierre | 51 | 900 | 951 |
+| Tras la pasada de verificación, ejecución A | 49 | 924 | **973** |
+| Tras la pasada de verificación, ejecución B | 52 | 921 | **973** |
 
 **Por nombre no cierra exacto, y hay que decir en qué.** Seis nombres que la línea base no tenía y dos que sí:
 
@@ -86,9 +88,13 @@ desaparecidos   ReturnsControllerTests      GetReturnsHistory_WithExistingReturn
 
 Los ocho caen **dentro de clases que ya fallaban en la línea base**, y ninguna de las cuatro toca familias, el controlador de catálogo IA ni la entidad nueva.
 
+**Y tras la pasada de verificación aparece una clase que la línea base no tenía: `DashboardServiceTests`.** No es de este change, y la causa es comprobable sin ejecutar nada: `GetGlobalStatsAsync_WithSalesToday_ShouldReturnCorrectKPIs` construye sus ventas contra `DateTime.UtcNow` —una a `now`, otra a `now.AddDays(-5)`— y afirma `MonthlyRevenue = 450`, que exige que las dos caigan en el mismo mes. La línea base se midió el **31 de agosto**, cuando `now-5d` seguía siendo agosto; esta ejecución es del **1 de septiembre**, y `now-5d` es el 27 de agosto. Lo mismo con la devolución de `now.AddDays(-2)` y `MonthlyReturnsCount = 1`.
+
+Es una **bomba de calendario que estalla los primeros cinco días de cada mes**, en un fichero que este change no toca —ni `DashboardServiceTests.cs` ni `DashboardService.cs` tienen un solo commit en esta rama—. Se anota aquí en vez de contarla como regresión, y queda como candidata a arreglo en otro change: el test debería anclar sus fechas al mes en curso en lugar de restar días al reloj.
+
 **Y el nombre no es unidad estable en esta suite.** Se midió aquí: **dos ejecuciones del mismo código dieron 48 y 54 fallos**, con nombres distintos dentro de las mismas clases. `CLAUDE.md` avisa de que un puñado de estos fallos dependen del orden; lo que esta medición añade es que la inestabilidad llega **al nivel de nombre**, y que la unidad que sí se sostiene es la **clase**.
 
-> **El conjunto de clases con fallos es idéntico al de la línea base, y ninguna clase de familia aparece en él.**
+> **El conjunto de clases con fallos es el de la línea base más `DashboardServiceTests`, cuya causa es el cambio de mes y no este change. Ninguna clase de familia aparece en él.**
 
 Y por el lado positivo, que es el que importa para este change: las **siete clases** que cubren la superficie tocada —`FamilyReviewControllerTests`, `FamilyReviewVerdictSchemaTests`, `ProductFamiliesControllerTests`, `ProductFamilySchemaTests`, `AiCatalogControllerTests`, `FamilySuggestionControllerTests` y `AiGatewayFamilyAuditTests`— corren **133 de 133 en verde**.
 
