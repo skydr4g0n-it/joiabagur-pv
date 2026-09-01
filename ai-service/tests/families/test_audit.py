@@ -12,7 +12,9 @@ both are the kind that get "simplified" back into the mistake they replaced:
 from __future__ import annotations
 
 import asyncio
+import inspect
 import uuid
+from pathlib import Path
 
 import pytest
 
@@ -20,6 +22,7 @@ from jbg_ai.api.schemas.families import FamilyAuditRequest, JudgedPair
 from jbg_ai.families import audit as audit_module
 from jbg_ai.families.audit import audit_families
 from jbg_ai.families.grouping import CandidateProduct
+from jbg_ai.families import repository
 from jbg_ai.families.repository import OrphanCandidate, PersistedMember
 from jbg_ai.families.veto import MemberSimilarity
 
@@ -317,3 +320,63 @@ def test_the_veto_universe_is_keyed_by_the_family_a_product_belongs_to(
     seen = wiring["membership_seen"]
     assert seen["A"] != seen["B"]
     assert seen["A"][1] == str(FAMILY_A)
+
+
+def test_orphan_without_piece_type_is_never_nominated() -> None:
+    """A product with no piece type has nothing to be compared against.
+
+    Asserted on the SQL and not through `wiring`, because the gate lives in the query:
+    the fixture replaces `load_orphan_candidates` wholesale, so a test driven through
+    it would be pinning the fake. What must not be lost is the predicate itself — the
+    orphan pool excludes a null piece type, and the join to a family is on equality of
+    piece type, so a product without one can neither enter the pool nor match a family.
+    Removing either line would nominate across the whole catalogue in silence.
+    """
+    sql = " ".join(repository._ORPHAN_SQL.split())
+
+    assert "piece_type IS NOT NULL" in sql, (
+        "the orphan pool must exclude products with no piece type"
+    )
+    assert "JOIN member m ON m.piece_type = o.piece_type" in sql, (
+        "a candidate is only ever compared against families of its own piece type"
+    )
+
+
+def test_audit_writes_nothing() -> None:
+    """The audit reads. Every statement it issues is a SELECT.
+
+    A source-level guard rather than a behavioural one, and deliberately: the audit is
+    read-only by construction, so there is no state change to observe and a test that
+    watched for one would pass on an empty database forever. What can regress is
+    someone adding a write to the repository — persisting the queue, stamping what was
+    examined — which is exactly the design decision this change argued against.
+    """
+    source = Path(inspect.getfile(repository)).read_text(encoding="utf-8")
+    code = "\n".join(
+        line for line in source.splitlines() if not line.strip().startswith(("#", '"', "*"))
+    )
+    folded = code.upper()
+
+    for verb in ("INSERT INTO", "UPDATE ", "DELETE FROM", "CREATE ", "DROP ", "ALTER "):
+        assert verb not in folded, (
+            f"families/repository.py issues {verb.strip()!r}; the audit reads and never writes"
+        )
+
+
+def test_audit_calls_no_provider() -> None:
+    """No embedding is computed. The vectors are the ones the index already holds.
+
+    The route needs no provider key at all, and answering it with one would put a paid
+    call behind a screen an administrator refreshes. The similarity is computed in the
+    database with `<=>`, which is why this holds.
+    """
+    for module in (audit_module, repository):
+        source = Path(inspect.getfile(module)).read_text(encoding="utf-8")
+        code = "\n".join(
+            line for line in source.splitlines() if not line.strip().startswith(("#", '"', "*"))
+        )
+        for forbidden in ("embeddings", "EmbeddingClient", "litellm", "aembedding"):
+            assert forbidden not in code, (
+                f"{module.__name__} references {forbidden!r}; the audit reads stored "
+                "vectors and never calls the provider"
+            )

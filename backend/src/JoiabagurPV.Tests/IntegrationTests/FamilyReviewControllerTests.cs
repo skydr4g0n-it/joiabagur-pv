@@ -188,6 +188,109 @@ public class FamilyReviewControllerTests : IAsyncLifetime
         (await CountVerdictsAsync()).Should().Be(1, "the unique index on the pair says the same thing");
     }
 
+    /// <summary>
+    /// A failed audit leaves no verdict, no family and no membership modified.
+    /// </summary>
+    /// <remarks>
+    /// The assertion is cheap and the property is not. Auditing and judging are separate routes
+    /// precisely so that a failure on the read side cannot touch the write side, and this is the
+    /// test that would notice if they were ever merged for convenience — a controller that
+    /// recorded "nothing found" as a batch of confirmations would satisfy every other test here.
+    /// </remarks>
+    /// <summary>
+    /// Confirming a family without editing it records the judgement and moves nothing.
+    /// </summary>
+    /// <remarks>
+    /// The cheap half of this — that no <c>UpdatedAt</c> moved — would pass against a system that
+    /// recorded no verdict at all, so it is asserted together with the verdicts actually written.
+    /// The expensive half is the feed: a watermark stamped by a confirmation would make an
+    /// incremental pull re-embed products nothing happened to, and it is the only assertion here
+    /// that reaches the boundary the whole ordering argument of this change rests on.
+    /// </remarks>
+    [Fact]
+    public async Task Verdict_ConfirmingWithoutEditing_RecordsTheJudgementAndMovesNothing()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var familyId = await CreateFamilyAsync(admin, ("S", _small), ("M", _medium));
+
+        var cursor = DateTime.UtcNow;
+        var before = await ProductTimestampsAsync();
+
+        await RecordVerdictAsync(admin, _small.Id, familyId, "Confirmed");
+        await RecordVerdictAsync(admin, _medium.Id, familyId, "Confirmed");
+
+        (await CountVerdictsAsync()).Should().Be(2, "a verdict is recorded for each pair judged");
+        (await ProductTimestampsAsync()).Should().Equal(before, "confirming is not editing");
+        (await ReadFeedSinceAsync(cursor)).Should().NotContain([_small.Id, _medium.Id],
+            "an incremental pull must not re-emit products a confirmation never changed");
+    }
+
+    /// <summary>
+    /// A verdict carries the margin it was taken at, so a pair whose similarity later moved can be
+    /// shown as stale instead of being silently reopened.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Automatic invalidation was considered and rejected in the design: it needs a rule for how
+    /// much movement matters and nobody would maintain it. What replaces it is this — the margin is
+    /// recorded once and survives, and the pair is sent to the service on every later audit so it
+    /// can be left out.
+    /// </para>
+    /// <para>
+    /// The omission itself is asserted on the Python side, by
+    /// <c>test_judged_pairs_are_omitted_from_both_lists</c>, and it has to be: the gateway double
+    /// here answers from a fixture and cannot filter anything, so a test that expected the flag to
+    /// disappear from this response would be asserting against the double rather than against the
+    /// system. What this side owns is that the pair <em>travels</em>, and that is what is checked.
+    /// </remarks>
+    [Fact]
+    public async Task Verdict_KeepsTheMarginItWasTakenAt_AndTravelsWithTheNextAudit()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var familyId = await CreateFamilyAsync(admin, ("S", _small), ("M", _medium));
+        await RecordVerdictAsync(admin, _medium.Id, familyId, "Rejected");
+
+        var listed = await admin.GetFromJsonAsync<List<FamilyVerdictDto>>(VerdictsEndpoint);
+
+        listed!.Should().ContainSingle(verdict => verdict.ProductId == _medium.Id)
+            .Which.MarginAtReview.Should().BeApproximately(0.16, 0.0001,
+                "the margin at review time is what makes a stale verdict legible as stale");
+
+        var gateway = new AuditingGateway(_medium, _orphan);
+        using var factory = WithGateway(gateway);
+        var againstAudit = await AuthenticateAgainstAsync(factory, "admin", "Admin123!");
+        var audit = await againstAudit.PostAsJsonAsync(AuditEndpoint, new FamilyAuditQueryRequest());
+
+        audit.StatusCode.Should().Be(HttpStatusCode.OK);
+        gateway.LastRequest!.JudgedPairs.Should().ContainSingle(pair =>
+            pair.ProductId == _medium.Id.ToString() && pair.FamilyId == familyId.ToString(),
+            "the pair judged is sent on every later audit, which is how it stays out of the queue");
+    }
+
+    [Fact]
+    public async Task Verdict_FailedAudit_ChangesNothing()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var familyId = await CreateFamilyAsync(admin, ("S", _small), ("M", _medium));
+        await RecordVerdictAsync(admin, _medium.Id, familyId, "Confirmed");
+
+        var verdictsBefore = await CountVerdictsAsync();
+        var familiesBefore = await CountFamiliesAsync();
+        var membersBefore = await CountMembersAsync();
+        var timestampsBefore = await ProductTimestampsAsync();
+
+        using var factory = WithGateway(new UnavailableGateway());
+        var againstFailure = await AuthenticateAgainstAsync(factory, "admin", "Admin123!");
+        var response = await againstFailure.PostAsJsonAsync(AuditEndpoint, new FamilyAuditQueryRequest());
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        (await CountVerdictsAsync()).Should().Be(verdictsBefore, "no verdict is created or modified");
+        (await CountFamiliesAsync()).Should().Be(familiesBefore);
+        (await CountMembersAsync()).Should().Be(membersBefore);
+        (await ProductTimestampsAsync()).Should().Equal(timestampsBefore,
+            "a failure must not stamp a watermark either");
+    }
+
     [Fact]
     public async Task Verdict_DismissedPair_ExcludedFromNextAudit()
     {
@@ -322,6 +425,47 @@ public class FamilyReviewControllerTests : IAsyncLifetime
         metrics.AverageReviewSeconds.Should().Be(20);
     }
 
+    /// <summary>
+    /// A rejected member that is then removed from its family is still counted as a member.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the whole argument for storing <c>SubjectWasMember</c> instead of deriving it. Once
+    /// the rejection is enacted the row looks exactly like a rejected candidate — not a member,
+    /// rejected — so a metric computed from present state moves the judgement into the other
+    /// population and gets both rates wrong, in opposite directions, for precisely the judgements
+    /// somebody acted on.
+    /// </para>
+    /// <para>
+    /// The first implementation derived it, and this shape is what caught it: the assertion below
+    /// read two candidates and no members.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Metrics_RejectedMemberRemovedFromItsFamily_IsStillCountedAsAMember()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var familyId = await CreateFamilyAsync(admin, ("S", _small), ("M", _medium));
+
+        await RecordVerdictAsync(admin, _medium.Id, familyId, "Rejected");
+
+        // The reviewer enacts it: the rejected product leaves the family.
+        var enacted = await admin.PutAsJsonAsync(
+            $"{FamiliesEndpoint}/{familyId}/members",
+            new ReplaceFamilyMembersRequest
+            {
+                Members = [new ProductFamilyMemberRequest { ProductId = _small.Id, VariantLabel = "S" }]
+            });
+        enacted.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var metrics = await ReadMetricsAsync(admin);
+
+        metrics.MembersJudged.Should().Be(1, "the population is the one it had when it was judged");
+        metrics.MembersConfirmed.Should().Be(0);
+        metrics.CandidatesJudged.Should().Be(0,
+            "enacting a rejection must not migrate the judgement into the other queue");
+    }
+
     [Fact]
     public async Task Metrics_ReportEachPopulationApart()
     {
@@ -389,6 +533,31 @@ public class FamilyReviewControllerTests : IAsyncLifetime
         family.RejectedMemberCount.Should().Be(1,
             "without these a reviewer cannot tell a family nobody opened from one already worked "
             + "through, and every other column of an assisted batch looks identical");
+    }
+
+    /// <summary>
+    /// The ceiling is the project's, not this screen's: fifty is what every paginated route here
+    /// serves at most, and a caller asking for more gets fifty rather than an error.
+    /// </summary>
+    /// <remarks>
+    /// Asserted on the page size the server reports rather than by seeding fifty-one families. The
+    /// clamp is what can regress — remove it and a single request drags the whole catalogue's
+    /// families with their member counts — and it regresses identically whether there are three
+    /// families or three hundred, so paying for the fixture would buy nothing.
+    /// </remarks>
+    [Fact]
+    public async Task ListFamilies_ReturnsAtMostFiftyPerPage()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        await CreateFamilyAsync(admin, ("S", _small), ("M", _medium));
+
+        var response = await admin.GetAsync($"{FamiliesEndpoint}?page=1&pageSize=200");
+        var page = await response.Content
+            .ReadFromJsonAsync<PaginatedResultDto<ProductFamilyListItemDto>>();
+
+        page!.PageSize.Should().Be(ProductFamilyQueryParameters.MaxPageSize,
+            "a request for more than the ceiling is served the ceiling, not refused");
+        page.Items.Count.Should().BeLessThanOrEqualTo(ProductFamilyQueryParameters.MaxPageSize);
     }
 
     [Fact]

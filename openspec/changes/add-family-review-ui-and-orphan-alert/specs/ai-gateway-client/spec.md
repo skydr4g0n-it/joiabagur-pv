@@ -36,7 +36,9 @@ The client MUST NOT invoke this operation on behalf of an operator: the calling 
 
 ### Requirement: Family audit failures are distinguishable by the caller
 
-The backend SHALL let the caller of the audit tell apart a route that is not implemented, a dependency the service cannot reach, and a request the service refused as invalid. An audit that fails MUST NOT be reported as an audit that found nothing: a reviewer told "there is nothing to review" when the service never answered would conclude the catalogue is clean.
+The backend SHALL let the caller of the audit tell apart a route that is not implemented, a dependency the service cannot reach, and a request the contract cannot accept. An audit that fails MUST NOT be reported as an audit that found nothing: a reviewer told "there is nothing to review" when the service never answered would conclude the catalogue is clean. An empty response body MUST be treated as a failure and never as a result, because on this route "empty" and "clean catalogue" are indistinguishable to the screen and only one of them is true.
+
+A request the contract cannot accept MUST be refused **before it is sent**, which is a stronger guarantee than telling a refusal apart afterwards. A refusal the service itself issues surfaces as an unavailable service carrying the status code: the translation from HTTP status to exception is shared by every route on this client, and narrowing it is not this change's to make.
 
 A failed audit MUST leave no verdict, no family and no membership modified.
 
@@ -46,11 +48,17 @@ A failed audit MUST leave no verdict, no family and no membership modified.
 - **THEN** the caller receives a failure distinguishable from a successful audit with no findings
 - **AND** no empty list of flagged members or candidates is returned as though it were a result
 
-#### Scenario: A refused request is distinguishable from an unavailable service
+#### Scenario: An invalid request is refused before it is sent
 
-- **WHEN** the service refuses the request as invalid
-- **THEN** the caller can tell that outcome from the service being unavailable
-- **AND** from the route not being implemented
+- **WHEN** the request carries a scope or a candidate cap the frozen contract cannot accept
+- **THEN** the client refuses it without calling the service
+- **AND** the caller can tell that refusal from an unavailable service and from a route that is not implemented
+
+#### Scenario: An empty body is a failure, not an empty audit
+
+- **WHEN** the service answers successfully with no body
+- **THEN** the caller receives a failure
+- **AND** no empty list of flagged members or candidates is returned as though it were a result
 
 #### Scenario: A failed audit changes nothing
 
