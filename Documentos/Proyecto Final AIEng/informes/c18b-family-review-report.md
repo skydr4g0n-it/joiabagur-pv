@@ -468,6 +468,16 @@ Vaciarla con un `DELETE` para poner verde una casilla sería destruir la traza d
 | **Reparto por `data_origin`** | 56 reales / 2 sintéticos | sobre un corpus indexado de 404 reales y 764 sintéticos |
 | **Tiempo medio de revisión** | **no disponible en esta ejecución** | ver abajo |
 
+Las cifras de arriba **no son un cálculo de este documento**: son lo que devuelve `GET /api/ai/catalog/family-review-metrics` una vez aplicado el backfill de `SubjectWasMember` el 2026-09-01.
+
+```json
+{"totalJudged":58,"membersJudged":18,"membersConfirmed":17,"candidatesJudged":40,
+ "candidatesConfirmed":6,"memberConfirmationRate":94.4,"candidateAcceptanceRate":15,
+ "timedJudgements":0,"averageReviewSeconds":null,"pendingActions":0}
+```
+
+**`averageReviewSeconds` viene `null` y no `0`**, que era el punto: la métrica informa la ausencia en lugar de afirmar una revisión instantánea. Y **`pendingActions: 0`** confirma por el otro lado que las 7 decisiones que implicaban movimiento están aplicadas y no queda ninguna colgando.
+
 Las dos primeras filas hay que leerlas juntas y con su denominador a la vista: **el 94 % es sobre las 18 marcadas, no sobre las 486 pertenencias.** Decir «el agrupador acierta el 94 %» sin esa coletilla sería inflar la cifra, porque las 468 restantes ni se juzgaron.
 
 **Y el reparto por `data_origin` merece una línea propia.** El corpus indexado es sintético en un 65 %, y sin embargo **56 de los 58 juicios cayeron sobre productos reales**. La auditoría no está midiendo los datos de relleno: apunta casi en exclusiva al catálogo de verdad, que es donde se quería que apuntara.
@@ -486,12 +496,13 @@ Nueve segundos por ítem es un orden de magnitud creíble para decisiones de *«
 
 | Qué | Por qué no se cierra aquí |
 |---|---|
-| **Backfill de `SubjectWasMember`** — las 58 filas quedaron en `false`, y 18 deberían ser `true` | El script está en `backfill-subject-population.sql`, sin ejecutar. Escribe sobre datos de revisión y la reconstrucción es una inferencia, no un dato guardado: lo aplica una persona |
-| **Familias de `cadena` y `alianzas`** — 9 productos que piden dos familias manuales | C18b lista y disuelve familias, no las crea. Entrada directa para C28 |
+| **Familias de `cadena` y `alianzas`** — 9 productos que piden dos familias manuales | **Delegado a C28 el 2026-09-01**, con los 9 SKU y el motivo escritos en su ficha del plan: crear una familia desde la pantalla es el hueco que hereda, y estos nueve son su caso de prueba |
 | **Ponderar la nominación por la cohesión del destino** — su precisión va de 0 % a 100 % según a qué familia apunte | Exige recalibrar sobre una cola ya revisada, que es lo que este change acaba de producir y no existía al empezar |
 | **La predicción de la decisión 5** — sin comprobar | No hubo intruso que sacar. Queda como hipótesis, no como resultado |
 | **`ai.sync_failure` no se drena** — `attempts` y `next_retry_at` no las lee nadie | Observación de esquema, ajena al alcance |
 | **Estampado del watermark sin verificar** — el segundo pase barrió los 1.168 | Necesita una sincronización con `since` real sobre un cambio acotado |
+
+**Cerrado el 2026-09-01, tras la primera versión de este informe:** el backfill de `SubjectWasMember` se ejecutó con autorización expresa (`UPDATE 18`, quedando 18 en `true` y 40 en `false`, exactamente la reconstrucción prevista); las dos raíces degeneradas se delegaron a C28 por escrito; y los tres estados por lista se verificaron **parando `jbg-ai` de verdad**, no sólo con MSW — con el servicio caído la auditoría responde **503** y nunca 200 con listas vacías, mientras el listado de las 156 familias sigue respondiendo 200. Las **62 tareas** del change quedan cerradas.
 ## Vuelta atrás
 
 Deshacer los cambios de pertenencia por los mismos endpoints que los hicieron, vaciar `FamilyReviewVerdict`, revertir el sinónimo `dorado`, y resincronizar de forma incremental. El respaldo `pre-c18b.dump` cubre el caso de que algo salga peor de lo previsto:

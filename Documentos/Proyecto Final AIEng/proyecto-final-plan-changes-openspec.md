@@ -50,7 +50,7 @@ Construir C18b literalmente entregaría **una pantalla vacía** — cuarta apari
 | «el frontend es lo único nuevo» | Faltan además **`GET /api/product-families`** y **`DELETE /api/product-families/{id}`** | No hay listado: una pantalla que revisa 156 familias no puede enumerarlas. Y sin borrado, disolver una familia mala deja **una familia fantasma sin miembros** |
 | Revisión sólo de lo marcado | **Se reaprueban las 156 ítem a ítem** | Es lo que produce la evidencia del renglón *«métricas de revisión humana»* del §16, que **hoy no tiene ninguna**: cero productos y cero familias han pasado por revisión real. Y revisar no mueve el corpus — sólo lo mueve **cambiar** |
 
-**Y una consecuencia de reparto que conviene fijar aquí:** C18b y **C28** son la misma pantalla dos veces —ambas *frontend + `Application/`*, sólo administrador, revisión por lotes de salida de IA, y EP13 ya las agrupa—. C18b construye la **carcasa** y es su primer inquilino; C28 es el segundo. Lo que se extrae es **sólo lo que la ficha de C28 pide por escrito** (tabla editable, atajos de teclado, aprobación masiva, registro de quién revisó y qué cambió), nada conjeturado. Las dos alimentan la misma tabla del README: corrección del **agrupador** y corrección del **extractor**.
+**Y una consecuencia de reparto que conviene fijar aquí:** C18b y **C28** son la misma pantalla dos veces —ambas *frontend + `Application/`*, sólo administrador, revisión por lotes de salida de IA, y EP13 ya las agrupa—. C18b construye la **carcasa** y es su primer inquilino; C28 es el segundo. Lo que se extrae es **sólo lo que la ficha de C28 pide por escrito** (tabla editable, atajos de teclado, aprobación masiva, registro de quién revisó y qué cambió), nada conjeturado. Las dos alimentan la misma tabla del README: corrección del **agrupador** y corrección del **extractor**. *(Añadido el 1 sep, al cerrar C18b: la carcasa llega a C28 con **un hueco identificado y su caso de prueba** —crear una familia desde la pantalla, para las dos raíces degeneradas que la auditoría por vecindad no puede nominar—, más una mejora medida: **ponderar la nominación por la cohesión de la familia destino**, cuya precisión va de 0 % a 100 % según a quién apunte.)*
 
 ### 2026-08-31 — Prórroga abierta y equipo de uno: se deja de planificar por calendario
 
@@ -531,7 +531,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 | **C16** | `add-frontend-assisted-search-panel` | Frontend + .NET | C15 | 🔴 | **rev. 29 ago · archivado** |
 | **C17** | `add-ai-service-deployment` | Infra + Python + .NET + FE | C15 | 🔴 | **rev. 29 ago** |
 | **C18a** | `add-family-suggestion-and-approval` | Python + .NET | C07, C13 | 🟢 | **rev. dec. 2**, **31 ago · archivado** |
-| **C18b** | `add-family-review-ui-and-orphan-alert` | Python + .NET 🗄️ + FE | C18a | 🟢 | **rev. dec. 2**, **partido el 31 ago**, **ficha reescrita el 31 ago**, **aplicado el 1 sep** *(3 migraciones; pendiente de archivar)* |
+| **C18b** | `add-family-review-ui-and-orphan-alert` | Python + .NET 🗄️ + FE | C18a | 🟢 | **rev. dec. 2**, **partido el 31 ago**, **ficha reescrita el 31 ago**, **aplicado el 1 sep** *(3 migraciones; 62/62 tareas; pendiente de archivar)* |
 | ~~**C19**~~ | ~~`add-demand-signal-service`~~ | .NET 🗄️ | C10 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
 | **C20** | `add-synonym-dictionary` | Python | C14 | 🟢 | **rev. dec. 4** · *tapona a C21: se coge primero* |
 | **C21** | `add-hybrid-search-rrf` | Python | C14, C20 | 🔴 | — |
@@ -955,6 +955,8 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 **Prereq.** C08 · **Zona.** frontend + `Application/`
 **Alcance.** Pantalla de revisión **por lotes** con tabla editable, atajos de teclado y aprobación masiva por campo; muestra confianza y `source` (`rule`/`inferred`) por campo; registra **quién revisó, cuándo y qué cambió**; endpoint de métricas que expone **tasa de corrección por campo** y **tiempo medio de revisión** para el README.
 **Tests.** `should highlight inferred sensitive fields pending review`; `should record correction when material list is edited`; `Metrics_CorrectionRate_ComputedPerField`; `Metrics_ExcludesAutoBulkProfiles`.
+
+> **Heredado de C18b el 2026-09-01 — dos familias manuales que nadie puede crear todavía.** C18b cierra dejando abiertas las dos raíces degeneradas que C18a delegó en una persona (D11 de aquella HU), y el motivo es que **su auditoría no puede verlas**: `Cadena plata` (SKU328), `Cadena oro` (SKU329), `Cadena baño oro` (SKU381), las tres `Cadena Barbara oro` (SKU398, SKU399, SKU401) y `Colgante Estel Cadena` (SKU295) son de `piece_type` **`cadena`, del que no existe ni una sola familia**, así que no hay contra qué calcular un margen; y `Alianzas Plata` (SKU327) con `Alianzas oro` (SKU397) son de `anillo`, pero una alianza lisa no se parece lo bastante a ningún anillo de rama ni de erizo como para ser nominada. Los nueve piden **dos familias de variante creadas a mano**, y C18b lista y disuelve familias pero **no las crea**. C28 hereda la pantalla, así que hereda el hueco: **crear una familia desde la revisión** es la pieza que falta, y estos nueve SKU son su caso de prueba real. Detalle en §8.3 de [`informes/c18b-family-review-report.md`](informes/c18b-family-review-report.md).
 
 ---
 
