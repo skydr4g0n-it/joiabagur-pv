@@ -258,6 +258,113 @@ public class FamilyReviewControllerTests : IAsyncLifetime
         (await CountVerdictsAsync()).Should().Be(0);
     }
 
+    /// <summary>
+    /// The stopwatch has to leave the browser, or the metric dies with the tab.
+    /// </summary>
+    /// <remarks>
+    /// The first review session's timings were lost exactly that way: the average lived only in
+    /// component state, the tab closed, and half of what the delivery checklist asks for went with
+    /// it. Persisting seconds per judgement is what makes the figure recoverable afterwards.
+    /// </remarks>
+    [Fact]
+    public async Task Verdict_RecordsTheSecondsSpentReviewing()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var familyId = await CreateFamilyAsync(admin, ("S", _small), ("M", _medium));
+
+        await RecordVerdictAsync(admin, _medium.Id, familyId, "Rejected", reviewSeconds: 12.5);
+
+        var metrics = await ReadMetricsAsync(admin);
+        metrics.TimedJudgements.Should().Be(1);
+        metrics.AverageReviewSeconds.Should().Be(12.5);
+    }
+
+    /// <summary>
+    /// Nothing timed reports null, never zero.
+    /// </summary>
+    /// <remarks>
+    /// Zero reads as "the review was instantaneous", which is a claim about how it was done. Null
+    /// reads as "not measured", which is the truth — and the difference matters because this
+    /// figure goes into the README.
+    /// </remarks>
+    [Fact]
+    public async Task Metrics_WithNoTimings_ReportsNullAverageRatherThanZero()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var familyId = await CreateFamilyAsync(admin, ("S", _small), ("M", _medium));
+
+        await RecordVerdictAsync(admin, _medium.Id, familyId, "Confirmed");
+
+        var metrics = await ReadMetricsAsync(admin);
+        metrics.TotalJudged.Should().Be(1);
+        metrics.TimedJudgements.Should().Be(0);
+        metrics.AverageReviewSeconds.Should().BeNull();
+    }
+
+    /// <summary>
+    /// Correcting a judgement without a timing keeps the one already recorded.
+    /// </summary>
+    /// <remarks>
+    /// A verdict revised through the API carries no stopwatch, and blanking the original would
+    /// quietly shrink the sample the average is computed from.
+    /// </remarks>
+    [Fact]
+    public async Task Verdict_CorrectedWithoutTiming_KeepsTheOriginalSeconds()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var familyId = await CreateFamilyAsync(admin, ("S", _small), ("M", _medium));
+
+        await RecordVerdictAsync(admin, _medium.Id, familyId, "Rejected", reviewSeconds: 20);
+        await RecordVerdictAsync(admin, _medium.Id, familyId, "Confirmed");
+
+        var metrics = await ReadMetricsAsync(admin);
+        metrics.TimedJudgements.Should().Be(1);
+        metrics.AverageReviewSeconds.Should().Be(20);
+    }
+
+    [Fact]
+    public async Task Metrics_ReportEachPopulationApart()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var familyId = await CreateFamilyAsync(admin, ("S", _small), ("M", _medium));
+
+        await RecordVerdictAsync(admin, _medium.Id, familyId, "Confirmed");
+        await RecordVerdictAsync(admin, _orphan.Id, familyId, "Rejected");
+
+        var metrics = await ReadMetricsAsync(admin);
+        metrics.MembersJudged.Should().Be(1);
+        metrics.MembersConfirmed.Should().Be(1);
+        metrics.CandidatesJudged.Should().Be(1, "a product that belongs to nothing is a candidate");
+        metrics.CandidatesConfirmed.Should().Be(0);
+        metrics.MemberConfirmationRate.Should().Be(100);
+        metrics.CandidateAcceptanceRate.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Verdict_WithImpossibleReviewSeconds_IsRefused()
+    {
+        var admin = await AuthenticateAsync("admin", "Admin123!");
+        var familyId = await CreateFamilyAsync(admin, ("S", _small), ("M", _medium));
+
+        var response = await admin.PostAsJsonAsync(VerdictsEndpoint, new RecordFamilyVerdictsRequest
+        {
+            Verdicts =
+            [
+                new FamilyVerdictRequest
+                {
+                    ProductId = _medium.Id,
+                    FamilyId = familyId,
+                    Outcome = "Confirmed",
+                    // A stopwatch left running, not a measurement. Storing it would poison the
+                    // very average the column exists to produce.
+                    ReviewSeconds = 99_999
+                }
+            ]
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     // ── Listing ───────────────────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -506,8 +613,20 @@ public class FamilyReviewControllerTests : IAsyncLifetime
         return family!.Id;
     }
 
+    private async Task<FamilyReviewMetricsDto> ReadMetricsAsync(HttpClient admin)
+    {
+        var response = await admin.GetAsync("/api/ai/catalog/family-review-metrics");
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<FamilyReviewMetricsDto>())!;
+    }
+
     private static async Task<RecordFamilyVerdictsResponse> RecordVerdictAsync(
-        HttpClient admin, Guid productId, Guid familyId, string outcome, string? note = null)
+        HttpClient admin,
+        Guid productId,
+        Guid familyId,
+        string outcome,
+        string? note = null,
+        double? reviewSeconds = null)
     {
         var response = await admin.PostAsJsonAsync(VerdictsEndpoint, new RecordFamilyVerdictsRequest
         {
@@ -519,6 +638,7 @@ public class FamilyReviewControllerTests : IAsyncLifetime
                     FamilyId = familyId,
                     Outcome = outcome,
                     MarginAtReview = 0.16,
+                    ReviewSeconds = reviewSeconds,
                     Note = note
                 }
             ]

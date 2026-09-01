@@ -34,6 +34,13 @@ public class FamilyReviewVerdictConfiguration : IEntityTypeConfiguration<FamilyR
         builder.Property(e => e.ReviewedByUserId).IsRequired();
         builder.Property(e => e.ReviewedAt).IsRequired();
         builder.Property(e => e.MarginAtReview);
+        // Nullable on purpose: a judgement recorded through the API, or corrected long after it
+        // was first made, carries no timing, and a fabricated zero would drag the average toward a
+        // figure nobody measured.
+        builder.Property(e => e.ReviewSeconds);
+
+        builder.Property(e => e.SubjectWasMember).IsRequired();
+
         builder.Property(e => e.Note).HasMaxLength(FamilyReviewVerdict.NoteMaxLength);
 
         // The pair is the identity of a judgement, so judging it twice is a correction and not a

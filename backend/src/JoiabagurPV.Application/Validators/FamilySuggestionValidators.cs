@@ -123,6 +123,14 @@ public class RecordFamilyVerdictsRequestValidator : AbstractValidator<RecordFami
                     "El veredicto debe ser uno de: "
                     + string.Join(", ", Enum.GetNames<FamilyReviewOutcome>()) + ".");
 
+            // Seconds, and a review that claims to have taken longer than an hour per item is a
+            // stopwatch left running rather than a measurement. Storing it would poison the very
+            // average this column exists to produce.
+            verdict.RuleFor(item => item.ReviewSeconds)
+                .InclusiveBetween(0d, 3600d)
+                .When(item => item.ReviewSeconds.HasValue)
+                .WithMessage("El tiempo de revisión debe estar entre 0 y 3600 segundos.");
+
             verdict.RuleFor(item => item.Note)
                 .MaximumLength(FamilyReviewVerdict.NoteMaxLength)
                 .WithMessage(

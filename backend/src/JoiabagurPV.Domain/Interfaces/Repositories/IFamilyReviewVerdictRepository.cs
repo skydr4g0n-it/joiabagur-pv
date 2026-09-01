@@ -37,4 +37,15 @@ public interface IFamilyReviewVerdictRepository : IRepository<FamilyReviewVerdic
     /// can show the decisions the catalog has not acted on yet.
     /// </remarks>
     Task<List<FamilyVerdictSummary>> ListWithMembershipAsync();
+
+    /// <summary>
+    /// Which of the given pairs are memberships right now.
+    /// </summary>
+    /// <remarks>
+    /// Read at recording time so the population a judgement belongs to is captured rather than
+    /// inferred later: once a rejected member is removed it is indistinguishable from a rejected
+    /// candidate, and the two have very different base rates.
+    /// </remarks>
+    Task<HashSet<(Guid ProductId, Guid FamilyId)>> GetCurrentMembershipsAsync(
+        IReadOnlyCollection<(Guid ProductId, Guid FamilyId)> pairs);
 }

@@ -16,7 +16,13 @@ import userEvent from '@testing-library/user-event';
 
 import FamilyReviewPage from '../family-review';
 import { familyReviewService } from '@/services/family-review.service';
-import type { FamilyAudit, PaginatedFamilies, RecordedVerdict } from '@/types/family-review.types';
+import type {
+  FamilyAudit,
+  FamilyDetail,
+  FamilyReviewMetrics,
+  PaginatedFamilies,
+  RecordedVerdict,
+} from '@/types/family-review.types';
 
 vi.mock('@/services/family-review.service');
 
@@ -122,6 +128,35 @@ const settled: RecordedVerdict = {
   pendingAction: 'none',
 };
 
+const metrics: FamilyReviewMetrics = {
+  totalJudged: 58,
+  membersJudged: 18,
+  membersConfirmed: 17,
+  candidatesJudged: 40,
+  candidatesConfirmed: 6,
+  memberConfirmationRate: 94.4,
+  candidateAcceptanceRate: 15,
+  timedJudgements: 58,
+  averageReviewSeconds: 12.4,
+  pendingActions: 1,
+};
+
+const familyDetail: FamilyDetail = {
+  id: FAMILY_ID,
+  name: 'Colgante estrella de mar',
+  description: null,
+  origin: 'AiApproved',
+  members: [
+    {
+      productId: PRODUCT_ID,
+      sku: 'SKU610',
+      name: 'Colgante Estrella de Mar',
+      variantLabel: null,
+      sortOrder: 0,
+    },
+  ],
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocked.getAudit.mockResolvedValue({ state: 'loaded', audit: populatedAudit });
@@ -130,6 +165,9 @@ beforeEach(() => {
   mocked.dissolveFamily.mockResolvedValue(undefined);
   mocked.listVerdicts.mockResolvedValue([pendingAddition, settled]);
   mocked.applyVerdict.mockResolvedValue(undefined);
+  mocked.getMetrics.mockResolvedValue(metrics);
+  mocked.getFamily.mockResolvedValue(familyDetail);
+  mocked.relabelMember.mockResolvedValue(undefined);
 });
 
 describe('family review screen', () => {
@@ -207,14 +245,17 @@ describe('family review screen', () => {
     await user.click(await screen.findByRole('button', { name: 'Confirmar pertenencia' }));
     await user.click(screen.getByRole('button', { name: /Guardar/ }));
 
+    // `objectContaining` rather than a literal: the judgement also carries the seconds the
+    // reviewer spent, and pinning an exact shape here would make the timing a breaking change
+    // for a test that is about the decision.
     await waitFor(() =>
       expect(mocked.recordVerdicts).toHaveBeenCalledWith([
-        {
+        expect.objectContaining({
           productId: PRODUCT_ID,
           familyId: FAMILY_ID,
           outcome: 'Confirmed',
           marginAtReview: 0.147,
-        },
+        }),
       ]),
     );
   });
@@ -351,6 +392,67 @@ describe('family review screen', () => {
 
     expect(await screen.findByText('Sin hallazgos')).toBeInTheDocument();
     expect(screen.getByText(/1 decisiones registradas ya están reflejadas/)).toBeInTheDocument();
+  });
+
+  /**
+   * The stopwatch has to leave the browser.
+   *
+   * The first review session's timings were lost because the average lived only in component
+   * state: the tab closed and half of the metric the delivery checklist asks for went with it.
+   * Sending seconds per judgement is what makes it survive.
+   */
+  it('should send the seconds spent with each judgement', async () => {
+    const user = userEvent.setup();
+    render(<FamilyReviewPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Marcados/ }));
+    await user.click(await screen.findByRole('button', { name: 'Confirmar pertenencia' }));
+    await user.click(screen.getByRole('button', { name: /Guardar/ }));
+
+    await waitFor(() => expect(mocked.recordVerdicts).toHaveBeenCalled());
+    const sent = mocked.recordVerdicts.mock.calls[0][0][0];
+    expect(sent.reviewSeconds).toBeGreaterThanOrEqual(0);
+    expect(typeof sent.reviewSeconds).toBe('number');
+  });
+
+  it('should show the average review time from the server, not from this session', async () => {
+    render(<FamilyReviewPage />);
+
+    expect(await screen.findByText(/58 juzgado\(s\) · 12.4 s de media/)).toBeInTheDocument();
+  });
+
+  it('should say when nothing was timed rather than showing a zero average', async () => {
+    mocked.getMetrics.mockResolvedValue({
+      ...metrics,
+      timedJudgements: 0,
+      averageReviewSeconds: null,
+    });
+    render(<FamilyReviewPage />);
+
+    expect(await screen.findByText(/sin tiempos medidos/)).toBeInTheDocument();
+  });
+
+  /**
+   * Correcting a label was the one thing the screen could not do.
+   *
+   * A member already inside a family had no edit affordance, so the first session's mistakes —
+   * a variant left blank, a material written non-canonically — had to be fixed through the API
+   * by hand.
+   */
+  it('should let the reviewer correct the variant label of a member', async () => {
+    const user = userEvent.setup();
+    render(<FamilyReviewPage />);
+
+    await user.click(
+      await screen.findByRole('button', { name: /Editar etiquetas de Colgante estrella de mar/ }),
+    );
+    const input = await screen.findByLabelText(/Etiqueta de Colgante Estrella de Mar/);
+    await user.type(input, 'S baño de oro');
+    await user.click(screen.getByRole('button', { name: 'Guardar etiqueta' }));
+
+    await waitFor(() =>
+      expect(mocked.relabelMember).toHaveBeenCalledWith(FAMILY_ID, PRODUCT_ID, 'S baño de oro'),
+    );
   });
 
   it('should report purity without ever filtering on it', async () => {

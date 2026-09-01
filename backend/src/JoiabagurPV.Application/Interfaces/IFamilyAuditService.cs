@@ -1,7 +1,5 @@
 using JoiabagurPV.Application.DTOs.Ai;
-
 namespace JoiabagurPV.Application.Interfaces;
-
 /// <summary>
 /// Auditing the families that exist, and recording what a person decided about them.
 /// </summary>
@@ -28,7 +26,6 @@ public interface IFamilyAuditService
         Guid userId,
         string role,
         CancellationToken cancellationToken = default);
-
     /// <summary>
     /// Records a batch of judgements about <c>(product, family)</c> pairs.
     /// </summary>
@@ -39,7 +36,6 @@ public interface IFamilyAuditService
     Task<RecordFamilyVerdictsResponse> RecordVerdictsAsync(
         RecordFamilyVerdictsRequest request,
         Guid reviewedByUserId);
-
     /// <summary>
     /// Lists the recorded judgements, each with the membership change it still implies.
     /// </summary>
@@ -49,4 +45,12 @@ public interface IFamilyAuditService
     /// appearing anywhere and looks like work already finished.
     /// </remarks>
     Task<List<FamilyVerdictDto>> ListVerdictsAsync();
+    /// <summary>
+    /// The figures the delivery checklist asks for, computed from the stored judgements.
+    /// </summary>
+    /// <remarks>
+    /// Computed rather than tallied in a screen. An average that lives in component state is gone
+    /// when the tab closes, and the first review session lost its timings exactly that way.
+    /// </remarks>
+    Task<FamilyReviewMetricsDto> GetMetricsAsync();
 }

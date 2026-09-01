@@ -16,13 +16,14 @@ The review queue this change was originally meant to paint no longer exists. The
 - **The grouping vocabulary gains one material synonym.** Three of the strongest orphan candidates were missed for the same reason: a finish the vocabulary does not name. Because grouping reads the product name and not the stored attributes, the synonym recovers those families without re-enriching anything.
 - **A review surface in the administration UI**, built as the first tenant of a shell that the profile-review change will reuse: only what that change already specifies in writing is generalised, nothing anticipated.
 - **An unavailable audit is never painted as a clean catalogue.** Each list reports whether it was computed and came back empty or could not be computed at all, and the review of existing families — which needs no vectors — stays usable while the audit does not. On a catalogue-quality screen, "nothing to review" reads as "nothing is wrong", which is the conclusion this change exists to support with evidence rather than to assert by accident.
+- **A judgement can be enacted, a label can be corrected, and the review is timed.** Recording a verdict does not move a membership, so the screen reports which decisions the catalogue has not acted on and lets the reviewer apply them; a member already in a family can have its variant label corrected; and the time spent per judgement is persisted rather than held in the page, because an average that dies with the tab is not evidence. Which population a judgement came from is captured when it is made, since a rejected member that was removed is indistinguishable from a rejected candidate afterwards.
 - Not included: widening the closed piece-type vocabulary and its prompt version, re-enriching any product, and persisting suggestions.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `family-review`: human review of families that already exist — the audit that recomputes unsupported memberships over persisted families and nominates unassigned products as candidates, the persisted verdict on a `(product, family)` pair that is at once the dismissal record and the per-item approval stamp, the restriction of all of it to administrators, the requirement that auditing reads without writing, and the requirement that a list which could not be computed is never presented as a list that came back empty.
+- `family-review`: human review of families that already exist — the audit that recomputes unsupported memberships over persisted families and nominates unassigned products as candidates, the persisted verdict on a `(product, family)` pair that is at once the dismissal record and the per-item approval stamp, the restriction of all of it to administrators, the requirement that auditing reads without writing, the requirement that a list which could not be computed is never presented as a list that came back empty, the gap between a judgement and the membership change it implies, correcting a member's label after the fact, and the per-judgement review time the delivery figures are computed from.
 
 ### Modified Capabilities
 

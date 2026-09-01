@@ -100,6 +100,9 @@ public class FamilyAuditService(
             .ToList();
 
         var existing = await _verdicts.GetByPairsAsync(pairs);
+        // Read now, not later. Once a rejected member is removed it is indistinguishable from a
+        // rejected candidate, and the two populations are reported apart.
+        var currentMembers = await _verdicts.GetCurrentMembershipsAsync(pairs);
         var index = existing.ToDictionary(
             verdict => (verdict.ProductId, verdict.ProductFamilyId));
 
@@ -117,6 +120,12 @@ public class FamilyAuditService(
                 stored.ReviewedByUserId = reviewedByUserId;
                 stored.ReviewedAt = now;
                 stored.MarginAtReview = verdict.MarginAtReview;
+                // Kept when the correction carries none, rather than blanked. A judgement revised
+                // through the API has no timing to offer, and overwriting the original with null
+                // would silently shrink the sample the average review time is computed from.
+                stored.ReviewSeconds = verdict.ReviewSeconds ?? stored.ReviewSeconds;
+                // The population is not revised: it records where the question came from the first
+                // time it was asked, and a correction does not move a product between queues.
                 stored.Note = verdict.Note?.Trim();
                 updated++;
                 continue;
@@ -130,6 +139,8 @@ public class FamilyAuditService(
                 ReviewedByUserId = reviewedByUserId,
                 ReviewedAt = now,
                 MarginAtReview = verdict.MarginAtReview,
+                ReviewSeconds = verdict.ReviewSeconds,
+                SubjectWasMember = currentMembers.Contains((verdict.ProductId, verdict.FamilyId)),
                 Note = verdict.Note?.Trim()
             });
             created++;
@@ -169,6 +180,44 @@ public class FamilyAuditService(
             })
             .ToList();
     }
+
+    /// <inheritdoc/>
+    public async Task<FamilyReviewMetricsDto> GetMetricsAsync()
+    {
+        var summaries = await _verdicts.ListWithMembershipAsync();
+
+        // Split by what the product was **when it was judged**, never by what it is now. Deriving
+        // the population from the present state was the first attempt and it is wrong for exactly
+        // the judgements that were acted on: a rejected member that was removed reads as a
+        // rejected candidate, inflating one queue and emptying the other.
+        var members = summaries.Where(s => s.SubjectWasMember).ToList();
+        var candidates = summaries.Where(s => !s.SubjectWasMember).ToList();
+
+        var timed = summaries.Where(s => s.ReviewSeconds.HasValue).ToList();
+
+        return new FamilyReviewMetricsDto
+        {
+            TotalJudged = summaries.Count,
+            MembersJudged = members.Count,
+            MembersConfirmed = members.Count(s => s.Outcome == FamilyReviewOutcome.Confirmed),
+            CandidatesJudged = candidates.Count,
+            CandidatesConfirmed = candidates.Count(s => s.Outcome == FamilyReviewOutcome.Confirmed),
+            MemberConfirmationRate = Rate(
+                members.Count(s => s.Outcome == FamilyReviewOutcome.Confirmed), members.Count),
+            CandidateAcceptanceRate = Rate(
+                candidates.Count(s => s.Outcome == FamilyReviewOutcome.Confirmed), candidates.Count),
+            TimedJudgements = timed.Count,
+            // Null and never zero when nothing was timed. Zero would read as an instantaneous
+            // review, which is a claim; null reads as "not measured", which is the truth.
+            AverageReviewSeconds = timed.Count == 0
+                ? null
+                : Math.Round(timed.Average(s => s.ReviewSeconds!.Value), 1),
+            PendingActions = summaries.Count(s => PendingActionFor(s) != "none")
+        };
+    }
+
+    private static double? Rate(int part, int whole) =>
+        whole == 0 ? null : Math.Round(part * 100d / whole, 1);
 
     /// <summary>
     /// What the catalog would have to change for a judgement to be honoured.

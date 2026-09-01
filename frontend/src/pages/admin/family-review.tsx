@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   CloudOff,
   Inbox,
+  Pencil,
   RefreshCw,
   Timer,
   Trash2,
@@ -50,6 +51,8 @@ import type {
   FamilyListItem,
   FamilyReviewOutcome,
   FamilyVerdict,
+  FamilyDetail,
+  FamilyReviewMetrics,
   ListState,
   RecordedVerdict,
 } from '@/types/family-review.types';
@@ -106,6 +109,7 @@ export default function FamilyReviewPage() {
   // candidate does not add it. Without this list that gap is invisible, because the audit omits
   // judged pairs — so a decision nobody acted on stops appearing anywhere and reads as done.
   const [recorded, setRecorded] = useState<RecordedVerdict[]>([]);
+  const [metrics, setMetrics] = useState<FamilyReviewMetrics | null>(null);
   const [labels, setLabels] = useState<Record<string, string>>({});
   const [applying, setApplying] = useState<string | null>(null);
 
@@ -151,7 +155,12 @@ export default function FamilyReviewPage() {
 
   const loadRecorded = useCallback(async (signal?: AbortSignal) => {
     try {
-      setRecorded(await familyReviewService.listVerdicts(signal));
+      const [verdicts, figures] = await Promise.all([
+        familyReviewService.listVerdicts(signal),
+        familyReviewService.getMetrics(signal),
+      ]);
+      setRecorded(verdicts);
+      setMetrics(figures);
     } catch {
       // Left as it was rather than cleared: an empty list here would say "nothing pending",
       // which is the one thing a failed read must not claim on this screen.
@@ -173,6 +182,50 @@ export default function FamilyReviewPage() {
   const actionable = useMemo(
     () => recorded.filter((verdict) => verdict.pendingAction !== 'none'),
     [recorded],
+  );
+
+  // The family whose members are open for correction, and the labels being typed into them.
+  // Correcting a label was the one thing a reviewer could not do here: a member already inside a
+  // family had no edit affordance at all, so the first session's mistakes had to be fixed through
+  // the API by hand.
+  const [openFamily, setOpenFamily] = useState<FamilyDetail | null>(null);
+  const [memberLabels, setMemberLabels] = useState<Record<string, string>>({});
+  const [relabelling, setRelabelling] = useState<string | null>(null);
+
+  const openMembers = useCallback(async (familyId: string) => {
+    if (openFamily?.id === familyId) {
+      setOpenFamily(null);
+      return;
+    }
+    try {
+      const family = await familyReviewService.getFamily(familyId);
+      setOpenFamily(family);
+      setMemberLabels(
+        Object.fromEntries(family.members.map((m) => [m.productId, m.variantLabel ?? ''])),
+      );
+    } catch {
+      toast.error('No se han podido leer los miembros de la familia.');
+    }
+  }, [openFamily]);
+
+  const relabel = useCallback(
+    async (familyId: string, productId: string) => {
+      setRelabelling(productId);
+      try {
+        await familyReviewService.relabelMember(familyId, productId, memberLabels[productId]);
+        toast.success('Etiqueta corregida.');
+        const family = await familyReviewService.getFamily(familyId);
+        setOpenFamily(family);
+        await loadFamilies(page);
+      } catch {
+        toast.error(
+          'No se ha podido corregir. Dos miembros de una familia no pueden compartir etiqueta.',
+        );
+      } finally {
+        setRelabelling(null);
+      }
+    },
+    [memberLabels, loadFamilies, page],
   );
 
   const applyVerdict = useCallback(
@@ -204,16 +257,21 @@ export default function FamilyReviewPage() {
 
   const recordVerdict = useCallback(
     (verdict: FamilyVerdict) => {
-      setElapsedMs((current) => current + (Date.now() - openedAt.current));
+      // Measured here and **sent with the judgement**, not merely accumulated. The average the
+      // delivery checklist asks for has to survive the tab closing, and the first review session
+      // lost its timings precisely because this number lived only in component state.
+      const spentMs = Date.now() - openedAt.current;
+      setElapsedMs((current) => current + spentMs);
       openedAt.current = Date.now();
       setReviewed((current) => current + 1);
+      const timed = { ...verdict, reviewSeconds: Math.round((spentMs / 1000) * 10) / 10 };
       // Last one wins for a pair, mirroring the server: ticking a row twice before submitting is
       // a person correcting themselves, and sending both would break the unique index.
       setPending((current) => [
         ...current.filter(
           (item) => !(item.productId === verdict.productId && item.familyId === verdict.familyId),
         ),
-        verdict,
+        timed,
       ]);
     },
     [],
@@ -281,10 +339,17 @@ export default function FamilyReviewPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Read from the server, so it survives the tab closing. The session counter beside it
+              is only the work done since this page opened. */}
           <Badge variant="secondary" className="gap-1">
             <Timer className="size-3" />
-            {reviewed} revisado(s)
-            {reviewed > 0 && ` · ${averageSeconds.toFixed(1)} s de media`}
+            {metrics
+              ? `${metrics.totalJudged} juzgado(s)` +
+                (metrics.averageReviewSeconds !== null
+                  ? ` · ${metrics.averageReviewSeconds} s de media`
+                  : ' · sin tiempos medidos')
+              : '—'}
+            {reviewed > 0 && ` · ${reviewed} en esta sesión (${averageSeconds.toFixed(1)} s)`}
           </Badge>
           <Button
             variant="outline"
@@ -441,7 +506,7 @@ export default function FamilyReviewPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {families.map((family) => (
+                      {families.map((family) => [
                         <TableRow key={family.id}>
                           <TableCell className="font-medium">{family.name}</TableCell>
                           <TableCell>
@@ -464,14 +529,61 @@ export default function FamilyReviewPage() {
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => void openMembers(family.id)}
+                              aria-label={`Editar etiquetas de ${family.name}`}
+                            >
+                              <Pencil className="size-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => void dissolve(family)}
                               aria-label={`Disolver ${family.name}`}
                             >
                               <Trash2 className="size-4" />
                             </Button>
                           </TableCell>
-                        </TableRow>
-                      ))}
+                        </TableRow>,
+                        openFamily?.id === family.id ? (
+                          <TableRow key={`${family.id}-members`}>
+                            <TableCell colSpan={6} className="bg-muted/30">
+                              <div className="flex flex-col gap-2 p-2">
+                                <span className="text-xs font-semibold">
+                                  Etiquetas de variante — una vacía significa «pieza base», y dos
+                                  miembros no pueden compartirla
+                                </span>
+                                {openFamily.members.map((member) => (
+                                  <div key={member.productId} className="flex items-center gap-2">
+                                    <span className="w-64 truncate text-sm">
+                                      {member.name}
+                                      <span className="text-muted-foreground"> · {member.sku}</span>
+                                    </span>
+                                    <Input
+                                      value={memberLabels[member.productId] ?? ''}
+                                      onChange={(event) =>
+                                        setMemberLabels((current) => ({
+                                          ...current,
+                                          [member.productId]: event.target.value,
+                                        }))
+                                      }
+                                      aria-label={`Etiqueta de ${member.name}`}
+                                      className="h-8 w-52"
+                                    />
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={relabelling === member.productId}
+                                      onClick={() => void relabel(family.id, member.productId)}
+                                    >
+                                      Guardar etiqueta
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ) : null,
+                      ]).flat().filter(Boolean)}
                     </TableBody>
                   </Table>
 

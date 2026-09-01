@@ -58,6 +58,31 @@ public class FamilyReviewVerdictRepository
     }
 
     /// <inheritdoc/>
+    public async Task<HashSet<(Guid ProductId, Guid FamilyId)>> GetCurrentMembershipsAsync(
+        IReadOnlyCollection<(Guid ProductId, Guid FamilyId)> pairs)
+    {
+        if (pairs.Count == 0)
+        {
+            return [];
+        }
+
+        var productIds = pairs.Select(pair => pair.ProductId).Distinct().ToList();
+
+        var rows = await _context.ProductFamilyMembers
+            .AsNoTracking()
+            .Where(member => productIds.Contains(member.ProductId))
+            .Select(member => new { member.ProductId, member.ProductFamilyId })
+            .ToListAsync();
+
+        var wanted = pairs.ToHashSet();
+
+        return rows
+            .Select(row => (row.ProductId, row.ProductFamilyId))
+            .Where(wanted.Contains)
+            .ToHashSet();
+    }
+
+    /// <inheritdoc/>
     public async Task<List<FamilyVerdictSummary>> ListWithMembershipAsync() =>
         await _context.FamilyReviewVerdicts
             .AsNoTracking()
@@ -87,7 +112,9 @@ public class FamilyReviewVerdictRepository
                 _context.ProductFamilyMembers.Any(member =>
                     member.ProductId == row.verdict.ProductId
                     && member.ProductFamilyId == row.verdict.ProductFamilyId),
+                row.verdict.SubjectWasMember,
                 row.verdict.MarginAtReview,
+                row.verdict.ReviewSeconds,
                 row.verdict.ReviewedAt))
             .ToListAsync();
 }

@@ -61,6 +61,18 @@
 - [x] 6.7 Tests: `should list families a page at a time`, `should keep a dismissed suggestion out of the next run`, `should show why a group was rejected`, `should record the reviewer when a family is confirmed`, `should require the administrator role to open the review screen`, `should show the audit as unavailable when the ai service does not answer`, `should show an empty audit as computed and empty`, `should keep family review usable when the audit is unavailable`. Envolver en el provider o mockear el hook — copiar `pages/sales/__tests__/cart.test.tsx`.
 - [x] 6.8 `npm run build` en verde. Leer la **línea de resumen** de `npm run test`, no el código de salida: `vitest` sale 0 cuando se le pipea.
 
+## 6b. Lo que el uso real destapó, añadido al alcance el 2026-09-01
+
+> Los tres salieron de revisar de verdad, no de leer el diseño. Ninguno se habría visto sin
+> ejecutar la revisión completa sobre el corpus.
+
+- [x] 6b.1 **Aplicar el veredicto al catálogo.** Registrar un juicio no mueve una pertenencia, y la auditoría omite los pares juzgados, así que una decisión sin ejecutar desaparecía de todas las listas y se leía como trabajo hecho. `GET /api/ai/catalog/family-verdicts` con la acción pendiente calculada en el servidor, pestaña **Aplicar** con su recuento, y ejecución por `PUT .../members`.
+- [x] 6b.2 **Corregir la etiqueta de variante de un miembro ya dentro.** No había forma de hacerlo en la pantalla: las cuatro correcciones de la primera revisión hubo que aplicarlas por API a mano. Fila desplegable con las etiquetas de la familia y guardado por miembro.
+- [x] 6b.3 **Persistir el tiempo de revisión por ítem.** El cronómetro vivía sólo en estado de componente y los tiempos de la primera sesión se perdieron al cerrar la pestaña. `ReviewSeconds` en el veredicto, enviado con cada juicio, y `GET /api/ai/catalog/family-review-metrics` que calcula la media desde lo guardado.
+- [x] 6b.4 **Capturar la población al registrar, no deducirla después.** `SubjectWasMember`: una vez que un miembro rechazado se saca de su familia queda indistinguible de un candidato rechazado, así que derivar la población del estado actual falla justo en los juicios que se ejecutaron. Lo escribe el servidor, que es quien conoce la pertenencia.
+- [x] 6b.5 Dos migraciones más sobre la misma tabla nueva —`AddFamilyReviewSeconds` y `AddVerdictSubjectPopulation`—, aplicadas y verificadas.
+- [ ] 6b.6 **Backfill de `SubjectWasMember`** para los 58 veredictos registrados antes de que la columna existiera. Preparado en [`backfill-subject-population.sql`](../../../backfill-subject-population.sql) y **sin ejecutar**: escribe sobre datos de revisión y la reconstrucción es una inferencia, no un dato guardado.
+
 ## 7. Auditoría de miembros y limpieza
 
 - [ ] 7.1 Ejecutar la auditoría de miembros sobre las 156 familias por el camino real (.NET → `jbg-ai`), y anotar cuántos se marcan.

@@ -87,5 +87,7 @@ public record FamilyVerdictSummary(
     string FamilyName,
     FamilyReviewOutcome Outcome,
     bool IsCurrentMember,
+    bool SubjectWasMember,
     double? MarginAtReview,
+    double? ReviewSeconds,
     DateTime ReviewedAt);

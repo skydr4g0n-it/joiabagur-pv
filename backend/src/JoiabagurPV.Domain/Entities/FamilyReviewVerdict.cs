@@ -75,6 +75,48 @@ public class FamilyReviewVerdict : BaseEntity
     /// </remarks>
     public double? MarginAtReview { get; set; }
 
+    /// <summary>
+    /// How long the reviewer spent on this item, in seconds.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Persisted per judgement rather than accumulated in a screen, because the delivery checklist
+    /// asks for an average review time and a number that lives only in component state is lost the
+    /// moment the tab closes — which is exactly how the first review session's timings were lost.
+    /// A metric that cannot survive a refresh is not a metric.
+    /// </para>
+    /// <para>
+    /// Also the only signal that a review has degraded into clicking through: a queue worked at two
+    /// seconds an item is not being read, and stored per item that is visible afterwards rather
+    /// than only while the session is open.
+    /// </para>
+    /// <para>
+    /// Nullable because a judgement can arrive without one — recorded through the API, or corrected
+    /// long after it was first made — and a fabricated zero would drag the average toward a figure
+    /// nobody measured.
+    /// </para>
+    /// </remarks>
+    public double? ReviewSeconds { get; set; }
+
+    /// <summary>
+    /// Whether the product belonged to the family at the moment the judgement was made.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Captured when the verdict is recorded because it <strong>cannot be recovered afterwards</strong>.
+    /// The two populations a reviewer works through — members the vectors questioned, and unassigned
+    /// products nominated as candidates — have very different base rates and must be reported apart.
+    /// But once a rejected member is actually removed it looks exactly like a rejected candidate:
+    /// not a member, rejected. Deriving the population from the present state gets it wrong for
+    /// precisely the judgements that were acted on.
+    /// </para>
+    /// <para>
+    /// Written by the server rather than sent by the client: this side knows the membership, and a
+    /// figure the caller could misreport is not evidence.
+    /// </para>
+    /// </remarks>
+    public bool SubjectWasMember { get; set; }
+
     /// <summary>Free-form note about why. Optional.</summary>
     public string? Note { get; set; }
 }

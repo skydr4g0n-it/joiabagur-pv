@@ -134,6 +134,14 @@ export interface FamilyVerdict {
   outcome: FamilyReviewOutcome;
   /** The margin the audit reported at the moment of the decision, when it came from one. */
   marginAtReview?: number;
+  /**
+   * Seconds the reviewer spent on this item.
+   *
+   * Sent per judgement rather than kept as a session total, because a number that lives only in
+   * component state disappears when the tab closes — which is how the first review session's
+   * timings were lost. The average the checklist asks for is computed server-side from these.
+   */
+  reviewSeconds?: number;
   note?: string;
 }
 
@@ -181,6 +189,23 @@ export interface FamilyDetail {
   description: string | null;
   origin: FamilyOrigin;
   members: FamilyMember[];
+}
+
+/** The human-review figures, computed from the stored judgements. */
+export interface FamilyReviewMetrics {
+  totalJudged: number;
+  membersJudged: number;
+  membersConfirmed: number;
+  candidatesJudged: number;
+  candidatesConfirmed: number;
+  /** Share of questioned memberships the reviewer upheld. */
+  memberConfirmationRate: number | null;
+  /** Share of nominated candidates the reviewer accepted. */
+  candidateAcceptanceRate: number | null;
+  timedJudgements: number;
+  /** Null when nothing was timed — never zero, which would claim an instantaneous review. */
+  averageReviewSeconds: number | null;
+  pendingActions: number;
 }
 
 /** How a batch of judgements landed. */

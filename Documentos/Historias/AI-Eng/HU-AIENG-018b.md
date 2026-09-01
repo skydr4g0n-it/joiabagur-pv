@@ -110,6 +110,29 @@ El `design.md` de C18a rechazó persistir descartes con este argumento explícit
 - **Métrica del agrupador** para el README del Proyecto Final: tasa de corrección (cuántas de 156 alteró la persona) y tiempo medio de revisión, reportadas por `data_origin`.
 - **Informe del lote** versionado en `Documentos/Proyecto Final AIEng/informes/c18b-family-review-report.md`.
 
+### Ampliación del alcance, 2026-09-01: lo que el uso real destapó
+
+Tres huecos que **no se veían leyendo el diseño** y aparecieron al ejecutar la revisión completa
+de 58 decisiones sobre el corpus. Se añaden al change en lugar de dejarse como deuda para C28,
+porque los tres afectan a lo que este change entrega y uno de ellos a la métrica del §16.
+
+- **Aplicar el veredicto al catálogo.** Registrar un juicio no mueve una pertenencia, y la
+  auditoría omite los pares juzgados a propósito, así que **siete decisiones se quedaron sin
+  efecto y nada lo señalaba**. Lectura nueva de los veredictos con la acción pendiente calculada
+  en el servidor, pestaña de aplicación, y ejecución por el camino de C07.
+- **Corregir la etiqueta de variante de un miembro ya dentro.** No existía en la pantalla: las
+  cuatro correcciones de la primera revisión hubo que aplicarlas por API a mano.
+- **Persistir el tiempo por ítem.** El cronómetro vivía en estado de componente y **los tiempos de
+  la primera sesión se perdieron al cerrar la pestaña**. Se guarda por juicio y la media se
+  calcula desde lo guardado; sin tiempos medidos se informa la ausencia, nunca un cero.
+
+Y una cuarta, aparecida al escribir el test de la métrica: **la población se captura al registrar**
+(`SubjectWasMember`), porque un miembro rechazado que se saca de su familia queda indistinguible de
+un candidato rechazado y derivarla del estado actual falla justo en los juicios ejecutados.
+
+**Coste:** dos migraciones más sobre la misma tabla nueva. Aceptadas porque el change ya tiene el
+turno y son columnas de su propia tabla.
+
 ## Fuera de alcance (no)
 
 - **La pantalla de revisión de perfiles de enriquecimiento y su endpoint de métricas** — **C28**. C18b construye la carcasa; C28 es su segundo inquilino y aporta sus campos, su confianza por campo y su `source: rule|inferred`.

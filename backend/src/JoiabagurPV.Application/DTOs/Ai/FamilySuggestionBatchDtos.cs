@@ -135,6 +135,16 @@ public class FamilyVerdictRequest
     /// <summary>The margin the audit reported at the moment of the decision, when it came from one.</summary>
     public double? MarginAtReview { get; set; }
 
+    /// <summary>
+    /// How long the reviewer spent on this item, in seconds.
+    /// </summary>
+    /// <remarks>
+    /// Sent per judgement rather than derived from a session total: the checklist asks for an
+    /// average review time, and a number that lives only in component state disappears when the
+    /// tab closes -- which is how the first session's timings were lost.
+    /// </remarks>
+    public double? ReviewSeconds { get; set; }
+
     /// <summary>Free-form note about why. Optional.</summary>
     public string? Note { get; set; }
 }
@@ -215,4 +225,65 @@ public class FamilyVerdictDto
 
     /// <summary>When it was decided.</summary>
     public DateTime ReviewedAt { get; set; }
+}
+
+/// <summary>
+/// What the human review of the assisted grouping produced, as figures the README can cite.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The delivery checklist asks for a correction rate and an average review time. Both are computed
+/// here from the stored judgements rather than tallied in a screen, because a figure that lives in
+/// component state is gone when the tab closes — which is precisely how the first session's
+/// timings were lost.
+/// </para>
+/// <para>
+/// The two populations are reported apart. A member the vectors questioned and an unassigned
+/// product nominated as a candidate are different questions with very different base rates, and
+/// one combined percentage would hide both.
+/// </para>
+/// </remarks>
+public class FamilyReviewMetricsDto
+{
+    /// <summary>Judgements recorded, across both populations.</summary>
+    public int TotalJudged { get; set; }
+
+    /// <summary>Members of existing families that were judged.</summary>
+    public int MembersJudged { get; set; }
+
+    /// <summary>Of those, how many the reviewer confirmed.</summary>
+    public int MembersConfirmed { get; set; }
+
+    /// <summary>Unassigned products that were judged as candidates.</summary>
+    public int CandidatesJudged { get; set; }
+
+    /// <summary>Of those, how many the reviewer accepted.</summary>
+    public int CandidatesConfirmed { get; set; }
+
+    /// <summary>
+    /// Share of questioned memberships the reviewer upheld, as a percentage.
+    /// </summary>
+    /// <remarks>
+    /// The grouper's correction rate read from the side that matters: a high figure means the
+    /// vectors flagged members that were fine, so the queue cost attention and bought little.
+    /// </remarks>
+    public double? MemberConfirmationRate { get; set; }
+
+    /// <summary>Share of nominated candidates the reviewer accepted, as a percentage.</summary>
+    public double? CandidateAcceptanceRate { get; set; }
+
+    /// <summary>Judgements that carry a measured review time.</summary>
+    public int TimedJudgements { get; set; }
+
+    /// <summary>
+    /// Average seconds per judgement, over the timed ones only.
+    /// </summary>
+    /// <remarks>
+    /// Null when nothing was timed, never zero. Zero would read as "instantaneous review", which
+    /// is a claim; null reads as "not measured", which is the truth.
+    /// </remarks>
+    public double? AverageReviewSeconds { get; set; }
+
+    /// <summary>Judgements the catalog has not acted on yet.</summary>
+    public int PendingActions { get; set; }
 }

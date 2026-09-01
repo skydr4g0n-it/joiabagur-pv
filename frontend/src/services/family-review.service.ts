@@ -14,6 +14,7 @@ import type {
   FamilyAudit,
   FamilyDetail,
   FamilyListQuery,
+  FamilyReviewMetrics,
   FamilyVerdict,
   PaginatedFamilies,
   RecordedVerdict,
@@ -24,6 +25,7 @@ import type { ApiError } from '@/types/api.types';
 const AUDIT_ENDPOINT = '/ai/catalog/family-audit';
 const VERDICTS_ENDPOINT = '/ai/catalog/family-verdicts';
 const FAMILIES_ENDPOINT = '/product-families';
+const METRICS_ENDPOINT = '/ai/catalog/family-review-metrics';
 
 export const familyReviewService = {
   /**
@@ -133,6 +135,53 @@ export const familyReviewService = {
           ];
 
     await apiClient.put(`${FAMILIES_ENDPOINT}/${verdict.familyId}/members`, { members });
+  },
+
+  /**
+   * The human-review figures the delivery checklist asks for.
+   *
+   * Read from the server rather than tallied here: an average kept in component state is gone the
+   * moment the tab closes, which is how the first review session's timings were lost.
+   */
+  getMetrics: async (signal?: AbortSignal): Promise<FamilyReviewMetrics> => {
+    const response = await apiClient.get<FamilyReviewMetrics>(METRICS_ENDPOINT, { signal });
+    return response.data;
+  },
+
+  /** Reads one family with its members, so a label can be corrected in place. */
+  getFamily: async (familyId: string, signal?: AbortSignal): Promise<FamilyDetail> => {
+    const response = await apiClient.get<FamilyDetail>(`${FAMILIES_ENDPOINT}/${familyId}`, {
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Rewrites one member's variant label, leaving the rest of the family alone.
+   *
+   * A label is a property of the membership, so correcting it is a membership declaration — the
+   * whole list again, with one entry changed. There is no narrower endpoint and there should not
+   * be: a partial declaration cannot express positions, which is exactly what C07's contract
+   * exists to prevent.
+   */
+  relabelMember: async (
+    familyId: string,
+    productId: string,
+    variantLabel: string | null,
+  ): Promise<void> => {
+    const family = (await apiClient.get<FamilyDetail>(`${FAMILIES_ENDPOINT}/${familyId}`)).data;
+
+    const members = family.members.map((member) => ({
+      productId: member.productId,
+      variantLabel:
+        member.productId === productId
+          ? variantLabel?.trim()
+            ? variantLabel.trim()
+            : null
+          : member.variantLabel,
+    }));
+
+    await apiClient.put(`${FAMILIES_ENDPOINT}/${familyId}/members`, { members });
   },
 
   /**

@@ -302,6 +302,21 @@ public class AiCatalogController : ControllerBase
     /// pairs on purpose -- that is what makes a dismissal stick -- so a rejected member that
     /// was never removed stops appearing anywhere and reads as work already finished.
     /// </remarks>
+    /// <summary>
+    /// The human-review figures the delivery checklist asks for.
+    /// </summary>
+    /// <returns>Correction rates per population, average review time, and what is still pending.</returns>
+    /// <remarks>
+    /// Computed from the stored judgements rather than tallied in a screen: an average that lives
+    /// in component state is gone when the tab closes.
+    /// </remarks>
+    [HttpGet("family-review-metrics")]
+    [ProducesResponseType(typeof(FamilyReviewMetricsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetFamilyReviewMetrics() =>
+        Ok(await _familyAuditService.GetMetricsAsync());
+
     [HttpGet("family-verdicts")]
     [ProducesResponseType(typeof(List<FamilyVerdictDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

@@ -179,6 +179,41 @@ C18b y C28 son la misma pantalla dos veces —ambas *frontend + `Application/`*,
 
 Lo que se generaliza es **exclusivamente lo que la ficha de C28 pide por escrito**: tabla editable, atajos de teclado, aprobación masiva y registro de quién revisó y qué cambió. Nada conjeturado. Diseñar para dos inquilinos con uno solo a la vista es la forma habitual de producir la abstracción equivocada; si C28 necesita más, lo extrae C28, que es cuando se sabrá qué.
 
+### 13 · Tres cosas que sólo aparecieron al revisar de verdad
+
+*(Añadidas al alcance el 2026-09-01, después de ejecutar la revisión completa sobre el corpus.)*
+
+Ninguna se veía leyendo el diseño. Las tres salieron de usar la pantalla para las 58 decisiones.
+
+**Un veredicto no es una pertenencia, y la pantalla no lo decía.** Se registraron 58 juicios y el
+catálogo quedó exactamente igual: 156 familias, 486 miembros, el sintético todavía dentro. Siete
+decisiones se quedaron sin efecto y **nada lo señalaba**, porque la auditoría omite los pares
+juzgados —que es lo que hace que un descarte se quede descartado— así que una decisión no ejecutada
+desaparece de todas las listas y se lee como trabajo terminado. El arreglo es una lectura nueva que
+devuelve, por cada juicio, la acción que el catálogo todavía necesita; el cálculo va en el servidor
+porque sólo este lado conoce la pertenencia.
+
+**Corregir una etiqueta era imposible desde la pantalla.** Un miembro ya dentro de una familia no
+tenía ninguna forma de edición, y las cuatro correcciones de la primera revisión —una variante
+olvidada en blanco, un material escrito de forma no canónica— hubo que aplicarlas por API a mano.
+Es un hueco obvio en retrospectiva y no lo era antes de revisar: la pantalla sabía crear una
+pertenencia y no enmendarla.
+
+**El cronómetro moría con la pestaña.** La media vivía en estado de componente, la sesión se cerró
+y con ella se perdió la mitad de lo que pide el §16. Ahora el tiempo se persiste **por juicio** y la
+media se calcula desde lo guardado; cuando nada se cronometró se informa la ausencia y nunca un
+cero, porque un cero afirma una revisión instantánea y la verdad es que no se midió.
+
+Y una cuarta que salió al escribir el test de la métrica: **la población hay que capturarla al
+registrar, no deducirla después.** Un miembro rechazado que se saca de su familia queda
+indistinguible de un candidato rechazado —ninguno es miembro, ambos rechazados— así que derivarla
+del estado actual falla exactamente en los juicios que sí se ejecutaron. `SubjectWasMember` lo
+escribe el servidor en el momento del registro.
+
+**Coste.** Dos migraciones más sobre la misma tabla nueva. Se aceptan porque el change ya tiene el
+turno y ambas son columnas de su propia tabla; la alternativa —dejar la métrica mal o no tenerla—
+falla el renglón del checklist que este change existe para cumplir.
+
 ## Risks / Trade-offs
 
 - **Construir la ficha literalmente entrega una pantalla vacía** → Decisión 1, y es verificable: el criterio de aceptación exige que la auditoría devuelva sus listas sobre 156 familias y 671 huérfanos reales, no sobre propuestas.
@@ -191,6 +226,8 @@ Lo que se generaliza es **exclusivamente lo que la ficha de C28 pide por escrito
 - **Revisar 156 familias puede degenerar en dar al botón**, que es el fallo que el mecanismo existe para evitar → El cronómetro por ítem hace visible el problema en la propia métrica de entrega.
 - **La séptima migración** es la primera desde C08 → El arnés de desfase modelo↔migración existe desde C04 y lo heredaron C07 y C08. Y no compite por turno: la única otra viva es la de C27, con la que no se abre a la vez.
 - **Los 21 huérfanos cuyo tipo de pieza no tiene ninguna familia** quedan fuera de la alerta por construcción → No es defecto: no hay familia a la que pertenecer. Se cuenta en el informe.
+- **Una decisión registrada y no ejecutada es invisible** → Decisión 13: la lista de pendientes es una lectura propia, porque la auditoría omite los pares juzgados por diseño.
+- **La métrica de tiempo se pierde si vive en la pantalla** → Decisión 13: se persiste por juicio. Ya ocurrió una vez, y el informe lo declara en lugar de rellenarlo.
 - **Con `jbg-ai` caído, una lista vacía se leería como «el catálogo está limpio»** → Decisión 9: tres estados por lista, con escenario de aceptación y test. Es el riesgo de C17 trasladado a esta pantalla, y aquí la conclusión errónea es exactamente la que el change existe para sostener con evidencia.
 
 ## Migration Plan

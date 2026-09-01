@@ -163,6 +163,96 @@ Availability MUST be tracked per list rather than per screen: reviewing the fami
 - **THEN** the families that exist are still listed and can still be reviewed and judged
 - **AND** the unavailability is confined to the lists that need the vectors
 
+### Requirement: A recorded judgement is not a membership, and the difference is visible
+
+The system SHALL report, for every recorded judgement, whether the catalogue would still have to
+change to honour it: a member the reviewer rejected must be removed, a candidate they confirmed
+must be added, and the other two combinations are decisions the catalogue already reflects.
+
+Without this the gap is invisible. The audit omits pairs that carry a verdict — which is what makes
+a dismissal stick — so a decision nobody acted on disappears from every list and reads as work
+already finished. A reviewer can complete a queue and leave the catalogue untouched.
+
+The system SHALL allow a reviewer to enact such a judgement, and the resulting membership change
+MUST go through the same path that stamps the catalog watermark of entering and leaving products.
+
+#### Scenario: A judgement the catalogue has not acted on is listed as pending
+
+- **WHEN** a reviewer rejects a member and does not remove it
+- **THEN** that judgement is reported as pending a removal
+- **AND** a candidate that was confirmed but never added is reported as pending an addition
+- **AND** a confirmed member and a dismissed candidate are reported as pending nothing
+
+#### Scenario: Enacting a judgement moves the membership and the watermark
+
+- **WHEN** a reviewer enacts a pending addition
+- **THEN** the product becomes a member of that family
+- **AND** the judgement stops being reported as pending
+- **AND** an incremental catalog pull emits that product
+
+### Requirement: A member's variant label can be corrected after the fact
+
+The system SHALL allow an administrator to change the variant label of a product already in a
+family, without disturbing the other members.
+
+A label written wrongly is not a rare case but the expected one: it is typed while judging, the
+canonical form of a material is easy to miss, and leaving it blank silently declares the product to
+be the family's base piece. A review surface that can create a membership but not correct its label
+forces the fix through the API by hand.
+
+#### Scenario: A label is corrected without touching the rest of the family
+
+- **WHEN** an administrator changes one member's variant label
+- **THEN** that member carries the new label
+- **AND** every other member keeps its own label and position
+
+#### Scenario: A label that collides with a sibling is refused
+
+- **WHEN** the new label equals another member's label in the same family
+- **THEN** the change is refused
+- **AND** neither member's label is modified
+
+### Requirement: Review time is recorded per judgement, not held in a screen
+
+The system SHALL persist the time a reviewer spent on each judgement, and MUST compute the average
+review time from those records rather than from any figure held by a client.
+
+A number that lives only in a screen is lost when it closes, and the delivery checklist asks for an
+average review time as evidence that the review happened. It is also the only signal that a queue
+has degraded into clicking through, which is the failure the review exists to avoid.
+
+When no judgement carries a timing, the system MUST report the absence rather than zero: zero
+claims an instantaneous review, and the truth is that nothing was measured.
+
+The system SHALL record which population each judgement came from — a member the vectors questioned
+or an unassigned candidate — at the moment it is made. It MUST NOT infer that afterwards from the
+current membership, because a rejected member that was removed is indistinguishable from a rejected
+candidate, and the two populations have very different rates.
+
+#### Scenario: The seconds spent survive the session
+
+- **WHEN** a reviewer judges an item and the judgement is recorded
+- **THEN** the time spent on it is stored with the judgement
+- **AND** the average review time is computed from the stored judgements
+
+#### Scenario: Nothing timed reports an absence, not a zero
+
+- **WHEN** no recorded judgement carries a timing
+- **THEN** the reported average review time is absent
+- **AND** it is not reported as zero
+
+#### Scenario: The two populations are reported apart
+
+- **WHEN** metrics are requested after both members and candidates have been judged
+- **THEN** the confirmation rate of questioned memberships is reported separately from the
+  acceptance rate of nominated candidates
+
+#### Scenario: Acting on a judgement does not move it between populations
+
+- **WHEN** a member the reviewer rejected is removed from its family
+- **THEN** that judgement is still counted among the members
+- **AND** it is not counted as a candidate
+
 ### Requirement: The audit is deterministic and calls no model
 
 The system SHALL produce the same audit for the same catalogue state, the same verdicts and the same configuration. The audit MUST NOT call a language model, MUST NOT call the embedding provider — the vectors are already persisted on the index — and MUST NOT read or write the transactional catalogue schema by SQL from the AI service.
