@@ -17,6 +17,11 @@ dependencies = [
     "psycopg[binary,pool]>=3.2",
     "pydantic-settings>=2.14.2",
     "pyjwt>=2.9.0",
+    # Direct: `data/envload.py` imports it to read `backend/.env` for the host
+    # CLIs. It also arrives transitively through pydantic-settings and litellm, but
+    # first-party code importing a package makes it a declared dependency, not a
+    # bet on someone else's requirements staying put.
+    "python-dotenv>=1.0",
     "pyyaml==6.0.3",
     "sqlalchemy[asyncio]>=2.0.36",
     "uvicorn[standard]>=0.52.1",
