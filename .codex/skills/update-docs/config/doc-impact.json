@@ -178,13 +178,21 @@
       "language": "en",
       "policy": "editable",
       "reference": "references/openspec-context.md"
+    },
+    "openspec-deferred": {
+      "path": "openspec/DEFERRED_TASKS.md",
+      "title": "Registro de trabajo aplazado de OpenSpec",
+      "language": "en",
+      "policy": "report-only",
+      "note": "No lo edita update-docs: lo edita quien cierre o difiera la tarea, en su propio change. Aqui solo se comprueba si el change recien archivado pago, agravo o creo una entrada, y se dice en el plan. Se registro tras C21, que salia como sin-clasificar pese a tocarlo 11 changes.",
+      "reference": "references/openspec-context.md"
     }
   },
 
   "areas": [
     {
       "name": "docs-themselves",
-      "globs": ["README.md", "backend/README.md", "frontend/README.md", "ai-service/README.md", "ai-service/tests/README.md", "terraform/README.md", "Documentos/**", "openspec/project.md", "openspec/config.yaml"],
+      "globs": ["README.md", "backend/README.md", "frontend/README.md", "ai-service/README.md", "ai-service/tests/README.md", "terraform/README.md", "Documentos/**", "openspec/project.md", "openspec/config.yaml", "openspec/DEFERRED_TASKS.md"],
       "docs": [],
       "reason": "El propio cambio ya toca documentacion: comprueba coherencia con el resto, no lo cuentes como disparador nuevo."
     },
@@ -335,7 +343,7 @@
     {
       "name": "openspec-changes",
       "globs": ["openspec/changes/**"],
-      "docs": ["doc-epicas", "doc-pf-plan", "doc-historias-ai", "openspec-project"],
+      "docs": ["doc-epicas", "doc-pf-plan", "doc-historias-ai", "openspec-project", "openspec-deferred"],
       "reason": "Change activo o recien archivado: alcance de la epica, plan de changes e historias asociadas."
     },
     {
