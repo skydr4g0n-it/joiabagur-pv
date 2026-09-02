@@ -424,11 +424,11 @@ C4Component
 
 ### 3.3 Componentes del Servicio de IA
 
-El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y generación, y servicios transversales. **Estado actual (C18b):** existen la fábrica de aplicación, el health, el middleware de trazas, los **siete** routers de dominio con sus esquemas congelados, la capa de stubs deterministas, la dependencia de autenticación de servicio, la **capa de persistencia** (esquema `ai` con pgvector, migraciones Alembic y motor con pool acotado), el **extractor de enriquecimiento (C09)**, el **indexador de `product_document` (C13)**, el **retriever vectorial de `POST /v1/retrieval/products` (C14)** — umbral 0,65, hybrid/lexical = vector hasta C21 — el **agrupador de familias (C18a)** y la **auditoría de familias persistidas (C18b)** — que reutiliza el veto relativo de C18a con otro universo, nomina huérfanos por margen relativo frente a la cohesión de la familia destino, y **no escribe nada**. Sustitutos, assist, inventory, evals y la fusión RRF siguen planificados.
+El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y generación, y servicios transversales. **Estado actual (C21):** existen la fábrica de aplicación, el health, el middleware de trazas, los **siete** routers de dominio con sus esquemas congelados, la capa de stubs deterministas, la dependencia de autenticación de servicio, la **capa de persistencia** (esquema `ai` con pgvector, migraciones Alembic y motor con pool acotado), el **extractor de enriquecimiento (C09)**, el **indexador de `product_document` (C13)**, el **retriever híbrido de `POST /v1/retrieval/products` (C14 + C21)** — umbral 0,65, y desde C21 fusión RRF ponderada de tres listas ordenadas — el **agrupador de familias (C18a)** y la **auditoría de familias persistidas (C18b)** — que reutiliza el veto relativo de C18a con otro universo, nomina huérfanos por margen relativo frente a la cohesión de la familia destino, y **no escribe nada**. Sustitutos, assist, inventory y evals siguen planificados.
 
 #### Routers de Dominio (`/v1/*`)
 
-- **Retrieval Router**: búsqueda de productos y sustitutos sobre el índice vectorial, con sobre-recuperación y abstención por umbral. **Products existe (C14, vector-only hasta C21); substitutes sigue 501 (C26).**
+- **Retrieval Router**: búsqueda de productos y sustitutos sobre el índice vectorial, con sobre-recuperación y abstención por umbral. **Products existe y es híbrido (C14 + C21); substitutes sigue 501 (C26).**
 - **Assist Router**: generación de respuesta estructurada agrupada por familia, con avisos calculados por reglas y citas verificables.
 - **Inventory Router**: propuestas de reposición, traslado y rotación generadas por el agente de inventario.
 - **Enrich Router**: extracción estructurada de perfiles de producto con confianza por campo.
@@ -438,7 +438,7 @@ El servicio `jbg-ai` se organiza en routers de dominio, capa de recuperación y 
 
 #### Capa de Recuperación y Generación
 
-- **Hybrid Retriever**: fusiona búsqueda vectorial (HNSW sobre pgvector) y léxica (`ts_rank` en español con expansión de sinónimos) mediante RRF. **Pendiente C21; C14 ejecuta solo la rama vectorial.**
+- **Hybrid Retriever**: fusiona búsqueda vectorial (HNSW sobre pgvector) y léxica (`ts_rank` en español sobre `tsv`, con expansión de sinónimos) mediante **RRF ponderado sobre tres listas** —la tecleada, la expandida y la vectorial— truncadas a una profundidad común. **Entregado en C21**, con la rama vectorial a menor peso y filtros estructurales que degradan sin excluir.
 - **Query Analyzer**: extrae por reglas las restricciones estructurales de la consulta (banda de precio, tipo de pieza, talla, materiales).
 - **Embedding Client**: genera embeddings solo cuando cambia el `source_hash`, con versionado por modelo.
 - **Family Grouper** (`jbg_ai.families`): agrupa por raíz de nombre dentro de un tipo de pieza, fusiona por material y guarda contra raíces degeneradas. **Existe (C18a).** Determinista y sin red: **no llama a ningún LLM ni al proveedor de embeddings**, porque los vectores ya están en el índice. El embedding **veta, no agrupa**, y lo hace en relativo —contra las otras familias propuestas, nunca contra un umbral absoluto— marcando al miembro para revisión en lugar de eliminarlo.
