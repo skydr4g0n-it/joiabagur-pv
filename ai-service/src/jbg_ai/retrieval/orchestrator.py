@@ -364,9 +364,15 @@ async def _vector_branch(
         model_id=embed.model_id,
     )
     hits = sorted(hits, key=lambda item: item.distance)[:depth]
+    # `vector_empty` and not `low_confidence`: this stage knows only whether **its own**
+    # branch returned anything, and the response-level marking is computed after the fusion.
+    # The two really do diverge — a healthy vector branch whose candidates the lexical one
+    # never saw logs `vector_empty=False` inside a response that *is* low confidence, because
+    # nothing came from both branches. Sharing the name put two opposite values under one
+    # field in a single trace, which is the kind of log that gets believed over the code.
     logger.info(
         "stage=search trace_id=%s latency_ms=%.1f distance_min=%s candidates=%s "
-        "low_confidence=%s mode=%s threshold=%s",
+        "vector_empty=%s mode=%s threshold=%s",
         principal.trace_id,
         (time.perf_counter() - started) * 1000,
         hits[0].distance if hits else None,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import socket
 
 import pytest
@@ -9,8 +10,6 @@ import pytest
 from jbg_ai.config.settings import FUSION_DEFAULTS
 from jbg_ai.retrieval import fusion as fusion_module
 from jbg_ai.retrieval.fusion import (
-    DEFAULT_BRANCH_DEPTH,
-    DEFAULT_RRF_K,
     RankedList,
     fuse,
     normalised_scores,
@@ -18,7 +17,9 @@ from jbg_ai.retrieval.fusion import (
 )
 from support.settings import build_settings
 
-K = DEFAULT_RRF_K
+#: Held here and not in `fusion.py`: the module must carry the rule, never the figure.
+K = 60
+DEPTH = 60
 
 
 def _list(name: str, weight: float, *keys: str) -> RankedList:
@@ -33,7 +34,7 @@ def test_rrf_fuses_ranked_lists_preserving_top_hit() -> None:
             _list("b", 1.0, "p", "q", "r", "s", "consensus"),
         ],
         k=K,
-        depth=DEFAULT_BRANCH_DEPTH,
+        depth=DEPTH,
     )
 
     assert fused[0].key == "consensus"
@@ -131,6 +132,19 @@ def test_fusion_weights_and_k_load_from_settings_not_hardcoded() -> None:
     assert "0.33" not in text, "the measured weights are configuration, not code"
     assert "0.5" not in text
 
+    # The smoothing constant and the depth are named by the same requirement as the weights,
+    # and a module-level default is how a figure gets written into the code without anybody
+    # deciding to: the next importer picks it up silently. Asserted on the signature rather
+    # than by scanning for "60", so the measured rationale can stay in the prose.
+    signature = inspect.signature(fuse)
+    for name in ("k", "depth"):
+        assert signature.parameters[name].default is inspect.Parameter.empty, (
+            f"`{name}` must have no default in fusion.py: it comes from settings or from the "
+            "orchestration call, never from this module"
+        )
+    assert not hasattr(fusion_module, "DEFAULT_RRF_K")
+    assert not hasattr(fusion_module, "DEFAULT_BRANCH_DEPTH")
+
 
 def test_vector_branch_weight_defaults_below_lexical() -> None:
     """Measured: branch parity is the WORST fusion, 96/120 against 105/120 at 0,33.
@@ -169,9 +183,9 @@ def test_disabled_expansion_degrades_to_single_lexical_vote() -> None:
     identical = fuse(
         [_list("typed", 0.5, *keys), _list("expanded", 0.5, *keys)],
         k=K,
-        depth=DEFAULT_BRANCH_DEPTH,
+        depth=DEPTH,
     )
-    single = fuse([_list("lexical", 1.0, *keys)], k=K, depth=DEFAULT_BRANCH_DEPTH)
+    single = fuse([_list("lexical", 1.0, *keys)], k=K, depth=DEPTH)
 
     assert [item.key for item in identical] == [item.key for item in single]
     for fused_item, single_item in zip(identical, single, strict=True):
@@ -183,7 +197,7 @@ def test_normalised_scores_start_at_one_and_never_increase() -> None:
     fused = fuse(
         [_list("a", 1.0, "x", "y", "z"), _list("b", 0.33, "y", "z")],
         k=K,
-        depth=DEFAULT_BRANCH_DEPTH,
+        depth=DEPTH,
     )
     scores = normalised_scores(fused)
 

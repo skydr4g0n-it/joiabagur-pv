@@ -160,6 +160,12 @@ The real pipeline MUST emit structured logs for at least `stage=embed`, `stage=s
 - **WHEN** an authenticated client calls `POST /v1/retrieval/products`
 - **THEN** structured logs for `stage=embed`, `stage=search`, `stage=lexical`, `stage=filters` and `stage=fuse` include that `trace_id`
 
+#### Scenario: The search stage does not borrow the response-level confidence field
+- **GIVEN** the vector branch returns no candidate while the fused response is not marked low confidence
+- **WHEN** the stage logs are read
+- **THEN** the search entry reports its own branch as empty under a name of its own
+- **AND** it does not report `low_confidence`
+
 #### Scenario: The fusion log records branch agreement
 - **GIVEN** `STUB_MODE` is disabled
 - **WHEN** an authenticated client calls `POST /v1/retrieval/products`

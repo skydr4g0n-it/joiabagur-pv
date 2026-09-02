@@ -592,3 +592,114 @@ def test_the_fuse_log_names_the_branches_that_actually_ran(
             msg for msg in (r.getMessage() for r in caplog.records) if "stage=fuse " in msg
         )
         assert expected in entry, mode
+
+
+# --------------------------------------------------------------------------------------
+# Guards closed after the verify pass
+# --------------------------------------------------------------------------------------
+
+
+def test_the_expansion_finds_what_the_typed_form_alone_would_miss() -> None:
+    """The second half of *The groups reach the lexical query*, which was unpinned.
+
+    The document says `anillo`; the operator says `sortija`. The typed list cannot reach it —
+    that is the whole reason C20 exists — and the expanded one can, because `sortija` and
+    `anillo` are the same equivalence class.
+    """
+    only_canonical = _row(
+        A, "canonical-only", 0.9, doc_text="Tipo: anillo. Materiales: plata."
+    )
+    search = FakeProductSearch([only_canonical])
+    payload = _request(query="sortija")
+
+    response = _serve(search, payload)
+
+    typed_call, expanded_call = search.lexical_calls
+    assert typed_call["request"].name == "typed"
+    assert expanded_call["request"].name == "expanded"
+    assert "anillo" in [form for group in expanded_call["request"].groups for form in group]
+
+    # The candidate exists only because the expanded list reached it.
+    assert [item.sku for item in response.results] == ["canonical-only"]
+    assert response.results[0].match_reasons == ["lexical"]
+
+    without_expansion = _serve(
+        FakeProductSearch([only_canonical]), payload, expand_synonyms=False
+    )
+    assert without_expansion.results == [], "the typed form alone matches nothing"
+
+
+def test_embedding_vectors_are_never_logged_at_information(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A 1536-float vector in a log line is a leak and a bill. Pinned, not assumed."""
+    embed = FakeEmbeddingClient()
+    with caplog.at_level(logging.INFO, logger="jbg_ai.retrieval.orchestrator"):
+        _serve(FakeProductSearch([_row(A, "S1", 0.2)]), embed=embed)
+
+    vector = _run(embed.embed(["anillo de plata"])).vectors[0]
+    assert len(vector) == 1536
+    components = {str(value) for value in vector[:8]}
+
+    for record in caplog.records:
+        if record.levelno < logging.INFO:
+            continue
+        message = record.getMessage()
+        assert not (components & {part for part in message.split()}), message
+        assert all(str(value) not in message for value in vector[:8]), message
+        # A stage line is a handful of key=value pairs; 1536 floats could not hide in one.
+        assert len(message) < 400, message
+
+
+def test_only_one_lexical_query_is_in_flight_at_a_time() -> None:
+    """The other half of D10: the branch races the provider, its two lists do not race
+    each other. Two concurrent statements would hold two of the five pool connections
+    against `max_overflow=0`, which is what racing the provider exists to avoid."""
+
+    class _CountingSearch(FakeProductSearch):
+        def __init__(self, rows):
+            super().__init__(rows)
+            self.in_flight = 0
+            self.peak = 0
+
+        async def search_lexical(self, request, *, depth, filters):
+            self.in_flight += 1
+            self.peak = max(self.peak, self.in_flight)
+            try:
+                await asyncio.sleep(0)
+                return await super().search_lexical(request, depth=depth, filters=filters)
+            finally:
+                self.in_flight -= 1
+
+    search = _CountingSearch([_row(A, "S1", 0.2)])
+    _serve(search)
+
+    assert len(search.lexical_calls) == 2
+    assert search.peak == 1, "the two lexical lists must not hold two pool connections"
+
+
+def test_the_search_stage_does_not_borrow_the_response_confidence_field(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The two fields have different subjects, and they really do diverge.
+
+    The case is a vector branch that found candidates while the lexical one found none: the
+    branch is healthy, so the search stage would have said `low_confidence=False`, and the
+    response is marked low confidence because nothing was produced by both branches. One
+    trace, one field name, two opposite values — which is the kind of log that gets believed
+    over the code.
+    """
+    rows = [_blind_row(A, "vector-only", 0.1), _blind_row(B, "also-vector", 0.2)]
+    with caplog.at_level(logging.INFO, logger="jbg_ai.retrieval.orchestrator"):
+        response = _serve(FakeProductSearch(rows))
+
+    messages = [record.getMessage() for record in caplog.records]
+    search_entry = next(msg for msg in messages if "stage=search " in msg)
+    fuse_entry = next(msg for msg in messages if "stage=fuse " in msg)
+
+    assert "candidates=2" in search_entry, "the vector branch is healthy"
+    assert "vector_empty=False" in search_entry
+    assert "low_confidence" not in search_entry
+    assert "low_confidence=True" in fuse_entry, "no candidate came from both branches"
+    assert response.low_confidence is True
+    assert len(response.results) == 2, "a signal, not a suppression"

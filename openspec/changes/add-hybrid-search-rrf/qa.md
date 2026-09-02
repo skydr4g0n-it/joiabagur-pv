@@ -3,7 +3,8 @@
 > Registro de las comprobaciones **realmente ejecutadas** sobre la implementación del change, con sus resultados.
 > **Fecha:** 2026-09-02 · **Rama:** `c21-add-hybrid-search-rrf` · **Commit de artefactos:** `73d89dc` · **Commit de implementación:** `3965cc3`
 > **Idioma:** cuerpo en español, identificadores técnicos en inglés, por coherencia con [ticket.md](ticket.md) y con la HU.
-> **Alcance:** 36/37 tareas. La 8.5 la define el propio ticket como verificación **posterior al merge** y no como puerta; ver §10.
+> **Alcance:** **38/38 tareas**. La 8.5 se ejecutó contra el índice local y el proveedor real el 2026-09-02; ver §11.
+> **Seguimiento verify:** misma fecha. 1 CRITICAL (la 8.5, ya cerrada), 3 WARNING y 2 SUGGESTION, **todas cerradas**; ver §12.
 
 ---
 
@@ -34,8 +35,9 @@ La línea base se midió **de verdad**, no se supuso: `git checkout HEAD~1`, sui
 | Suite completa tras acotar `low_confidence` (§9.6) | **594 passed**, 0 failed, 39,1 s |
 | `openspec validate --all --strict` | **49 passed, 0 failed** |
 | `openspec validate add-hybrid-search-rrf --strict` | *valid* |
+| Suite tras cerrar el verify y ejecutar la 8.5 | **598 passed**, 0 failed |
 
-**+84 tests** sobre la línea base (510 → 594). El recuento de funciones `def test_` en el diff da exactamente los mismos 84, así que no hay tests recolectados y no ejecutados.
+**+88 tests** sobre la línea base (510 → 598). El recuento de funciones `def test_` contra el commit de artefactos da exactamente los mismos 88, así que no hay tests recolectados y no ejecutados.
 
 > El recuento **sí es fiable aquí**, a diferencia de las suites de backend y frontend: la de `ai-service` parte de cero fallos y no llama a proveedores ni a RDS. Para la de frontend, que arranca en rojo, la comparación se hace por **nombres** en §6.
 
@@ -47,13 +49,13 @@ La línea base se midió **de verdad**, no se supuso: `git checkout HEAD~1`, sui
 | `tests/retrieval/test_fusion.py` | 0 → **13** | Consenso por encima del campeón de una lista; pureza (sin socket, sin sesión); scores crudos no consumidos; profundidad simétrica e independiente del overfetch; pesos desde settings y no en el código; peso vectorial por debajo del léxico; degradación exacta con expansión apagada; normalización a 1,0 monótona |
 | `tests/retrieval/test_filters.py` | 0 → **15** | Extracción de techo de precio en cinco frases naturales; número suelto que **no** es un techo; talla y materiales desde `ExpandedQuery.matched`; bloque estable que degrada y nunca borra; proyección desconocida que no degrada; documento sin materiales que no se borra; `@>` excluido con su medición; filtros del body que siguen excluyendo; `piece_type` sin `WHERE` |
 | `tests/retrieval/test_cache.py` | 0 → **7** | Cota dura con desalojo; LRU real (leer mantiene vivo); clave por texto+modelo+versión; techo `< 1` rechazado; interfaz C11 satisfecha; **freeze de `embeddings.py` por hash** |
-| `tests/retrieval/test_orchestrator.py` | 17 → **36** | Modos honestos, procedencia real, diagnóstico ausente y no inventado, score fusionado, degradación 200/503, concurrencia con el proveedor, filtros que degradan, notas de `debug`, barrido de pesos en un proceso, seis etapas de log, y el alcance de `low_confidence` (§9.6) |
+| `tests/retrieval/test_orchestrator.py` | 17 → **40** | Modos honestos, procedencia real, diagnóstico ausente y no inventado, score fusionado, degradación 200/503, concurrencia con el proveedor, filtros que degradan, notas de `debug`, barrido de pesos en un proceso, seis etapas de log, y el alcance de `low_confidence` (§9.6) |
 | `tests/retrieval/test_search_port.py` | 3 → **9** | SQL léxica con predicado GIN y los cuatro filtros del body; orden por coordinación y luego `ts_rank`; grupo muerto que no cambia el orden; campo escaso que no adelanta; profundidad de rama; ausencia de predicado de precio o stock en **ambas** ramas |
 | `tests/retrieval/test_measure.py` | 4 → **8** | El `compare` salta limpio sin base de datos; los tres brazos son los dos extremos y el default; la rúbrica se lee de la propia consulta; placeholders con nombre |
 | `tests/config/test_settings.py` | 29 → **35** | Los cinco ajustes no bloquean el arranque; blanco → default; ponderación medida preservada; override por entorno; `k` y profundidad no positivos rechazados; pin canónico |
 | `tests/api/test_retrieval_real.py` | 12 → **14** | Los cuatro modos responden 200 y la nota `vector_only_until_c21` ha desaparecido; `mode=lexical` sin llamada al proveedor; degradación a léxico con 200; 503 sin nada léxico que servir; **singleton de proceso con caché acotado** |
 | `tests/api/test_health.py` | 9 → **10** | `/health` arranca y responde sin ninguno de los cinco ajustes, y sin cargar el diccionario |
-| **Total** | **74 → 158** | **+84** |
+| **Total** | **74 → 162** | **+88** |
 
 **Fakes:** `tests/support/fake_product_search.py` gana `search_lexical`, `doc_text` y `lexical_calls`; el embed sigue siendo el `FakeEmbeddingClient` de C11. Ningún test de `tests/retrieval/` construye `SqlAlchemyProductSearch`.
 
@@ -61,7 +63,7 @@ La línea base se midió **de verdad**, no se supuso: `git checkout HEAD~1`, sui
 
 ## 2. Escenarios de las specs, uno a uno
 
-**76 escenarios `#### Scenario:`** en los cinco deltas: `hybrid-fusion` 33, `vector-retrieval` 21, `assisted-search-panel` 9, `query-expansion` 7, `ai-service-runtime` 6. Todos tienen test o comprobación nombrada.
+**77 escenarios `#### Scenario:`** en los cinco deltas: `hybrid-fusion` 33, `vector-retrieval` 22, `assisted-search-panel` 9, `query-expansion` 7, `ai-service-runtime` 6. Todos tienen test o comprobación nombrada.
 
 ### `hybrid-fusion` (33)
 
@@ -71,7 +73,7 @@ La línea base se midió **de verdad**, no se supuso: `git checkout HEAD~1`, sui
 | Fusión por rango · Raw branch scores are not consumed | `test_raw_branch_scores_are_not_consumed` (los campos de `RankedList` son exactamente `name`/`weight`/`keys`) | ✅ |
 | Fusión por rango · Fusion performs no input or output | `test_fusion_performs_no_input_or_output` (socket parcheado a fallo) | ✅ |
 | Fusión por rango · Provenance travels with each candidate | `test_provenance_reports_every_list_and_position` | ✅ |
-| Pesos y suavizado · Weights are not hardcoded | `test_fusion_weights_and_k_load_from_settings_not_hardcoded` (además: `0.33` y `0.5` **no aparecen** en `fusion.py`) | ✅ |
+| Pesos y suavizado · Weights are not hardcoded | `test_fusion_weights_and_k_load_from_settings_not_hardcoded`: `0.33` y `0.5` no aparecen en `fusion.py`, y `k`/`depth` **no tienen valor por defecto** en la firma (W1, §12) | ✅ |
 | Pesos y suavizado · Two configurations run in one process | `test_two_weight_configurations_run_in_one_process` (settings sin mutar) | ✅ |
 | Pesos y suavizado · The vector branch does not outweigh the lexical branch | `test_vector_branch_weight_defaults_below_lexical` | ✅ |
 | Pesos y suavizado · Disabled expansion degrades to a single lexical vote | `test_disabled_expansion_degrades_to_single_lexical_vote` · `test_the_two_lexical_weights_sum_to_one_lexical_list` | ✅ |
@@ -101,7 +103,7 @@ La línea base se midió **de verdad**, no se supuso: `git checkout HEAD~1`, sui
 | Suite offline · The suite stays offline | `test_fusion_performs_no_input_or_output` + construcción con fakes | ✅ |
 | Suite offline · The measured defaults are pinned | `test_vector_branch_weight_defaults_below_lexical` · `test_groups_are_ored_with_each_other_and_never_conjoined` | ✅ |
 
-### `vector-retrieval` (21 + 1 REMOVED)
+### `vector-retrieval` (22 + 1 REMOVED)
 
 | Requisito · escenario | Test | Resultado |
 |---|---|---|
@@ -126,6 +128,7 @@ La línea base se midió **de verdad**, no se supuso: `git checkout HEAD~1`, sui
 | Body filters · A price constraint from the text never deletes a candidate | `test_structural_filter_demotes_but_never_removes` · `test_neither_branch_carries_a_price_or_stock_predicate` | ✅ |
 | Logs · trace_id appears in stage logs | `test_the_new_stages_are_traceable` · `test_trace_id_appears_in_stage_logs` (HTTP, las cinco etapas) | ✅ |
 | Logs · The fusion log records branch agreement | `test_the_new_stages_are_traceable` · `test_the_fuse_log_names_the_branches_that_actually_ran` | ✅ |
+| Logs · The search stage does not borrow the response-level confidence field | `test_the_search_stage_does_not_borrow_the_response_confidence_field` (W2, §12) | ✅ |
 | **REMOVED** · Desaparece `vector_only_until_c21` | `test_vector_only_until_c21_no_longer_appears_in_any_response` (los cuatro modos) · `test_every_mode_answers_and_the_c21_placeholder_note_is_gone` | ✅ |
 
 ### `query-expansion` (7)
@@ -137,7 +140,7 @@ La línea base se midió **de verdad**, no se supuso: `git checkout HEAD~1`, sui
 | Flag sin tocar el contrato · Two configurations run in one process | `test_expansion_flag_sweeps_two_configurations_in_one_process` | ✅ |
 | Flag sin tocar el contrato · Disabling expansion degrades the fusion exactly | `test_disabled_expansion_degrades_to_single_lexical_vote` | ✅ |
 | Consumida por la rama léxica · The expansion stage is traceable | `test_the_expansion_stage_no_longer_reports_itself_unconsumed` (`consumed=True`) | ✅ |
-| Consumida por la rama léxica · The groups reach the lexical query | `test_hybrid_mode_fuses_all_three_lists` (las dos peticiones léxicas, `typed` y `expanded`) · `test_lexical_branch_ors_groups_and_ranks_by_coordination` | ✅ |
+| Consumida por la rama léxica · The groups reach the lexical query | `test_hybrid_mode_fuses_all_three_lists` (las dos peticiones) · **`test_the_expansion_finds_what_the_typed_form_alone_would_miss`** (W3, §12: la segunda cláusula, que estaba sin cubrir) | ✅ |
 | Consumida por la rama léxica · The resolved terms feed the structural filters | `test_materials_and_size_come_from_the_terms_expansion_already_resolved` | ✅ |
 
 ### `ai-service-runtime` (6)
@@ -346,8 +349,110 @@ De ahí salió también el hueco del frontal: una respuesta servida sólo por la
 
 ---
 
+## 11. Tarea 8.5, ejecutada contra el índice local
+
+Dejó de ser verificación pendiente: se ejecutó el 2026-09-02 contra los 1.168 documentos vivos y el proveedor real.
+
+### 11.1. ¿Hacía falta re-embeber tras C20?
+
+**No**, comprobado por dos vías independientes antes de medir nada.
+
+Por código: `git log` sobre lo que alimenta el texto indexado — `indexing/source_text.py`, `indexing/constants.py` y `enrichment/vocabularies.yaml` — no muestra ningún cambio de C20. El diff de C20 (`74a7451`) no toca `indexing/` en absoluto: es enteramente del lado de la consulta.
+
+Por índice, que es lo que decide:
+
+| Comprobación | Valor |
+|---|---|
+| Filas totales / activas | 1168 / 1168 |
+| Activas con `embedding` | **1168** |
+| Activas con `tsv` | **1168** |
+| Compatibles con el `model_version_key` vivo | **1168** |
+| Activas cuya `embedding_version` difiere del `document_version_key` vivo | **0** |
+| `indexed_at` más reciente | 2026-08-31 22:09 UTC |
+
+Una sola versión almacenada, `openai/text-embedding-3-small:1536:source-text/v1`, idéntica a la viva. Bastó una pasada.
+
+### 11.2. Comparación de configuraciones
+
+`python -m jbg_ai.retrieval compare`, informe versionado en [`ai-service/evals/results/c21-fusion-configuration-comparison.md`](../../../ai-service/evals/results/c21-fusion-configuration-comparison.md). **24 consultas**: las 12 curadas de C20 más las **12 grabadas** de `public."ProductSearchEvents"`.
+
+| configuración | aciertos |
+|---|---:|
+| vector-only | 157/240 |
+| lexical-only | 219/240 |
+| **fused-default** | **224/240** |
+
+El orden de los tres brazos reproduce lo medido en la exploración, y **la fusión gana a las dos ramas por separado**. El caso más claro es `pendientes de oro con piedra azul`: 3 → 6 → **9**.
+
+**Lo que el ticket pedía confirmar, y lo que salió:**
+
+| Consulta | Objetivo del ticket | Medido |
+|---|---|---|
+| `sortija de plata` | 4/10 → 10/10 | **4/10 → 10/10** ✅ exacto |
+| `criollas de oro` | 1/10 → 6/10 | 1/10 → **5/10** ⚠️ un punto corto |
+
+El primero reproduce exactamente. **El segundo no**, y no lo redondeo: la rúbrica de este CLI se deriva automáticamente de los términos que la expansión resuelve (`pendientes` + `oro`), mientras que la de la exploración se curó a mano por consulta. Con `criollas` resolviendo a `pendientes`, un resultado que sea unos pendientes de plata no cuenta, y la exploración pudo puntuar de otro modo. Los totales absolutos también se separan por lo mismo — vector-only 58/120 aquí frente a 67/120 allí sobre las mismas 12 curadas.
+
+**La conclusión no cambia y la dirección se sostiene en las 24 consultas**, pero el número exacto de `criollas de oro` queda como discrepancia declarada. Quien la persiga tiene el brazo y la rúbrica en el código; el juez de verdad es el golden set graduado de C24, que es exactamente lo que la ficha dice.
+
+`brazalete de cuero` sale 0/0/0 en los tres brazos, que es honesto y no un fallo: `cuero` tiene un producto en todo el catálogo, como C20 ya documentó.
+
+### 11.3. Latencia del pipeline completo, en frío y en caliente
+
+Seis consultas de operador, pipeline entero (expansión, dos listas léxicas, embedding, rama vectorial, fusión, filtros que degradan), con el singleton de C21 y su caché acotado de 512 entradas.
+
+| | mín | media | máx |
+|---|---:|---:|---:|
+| **En frío** (primera vez que se ve el texto) | 273 ms | 475 ms | **1328 ms** |
+| **En caliente** (acierta el caché del singleton) | **74 ms** | **76 ms** | 78 ms |
+
+**El singleton hace lo que la deuda decía que haría.** 76 ms de media en caliente es un orden de magnitud por dentro del presupuesto de 800 ms, frente a los 170-383 ms que medía el entorno de demostración *antes* de que existiera. El caché elimina por completo la ida y vuelta al proveedor en un texto repetido.
+
+**Lo que no elimina es la primera llamada de cada texto distinto**: 1328 ms en `criollas de oro`, coherente con los 1707 ms medidos en demo. Cinco de seis consultas en frío caben en 800 ms; seis de seis en caliente.
+
+Las 24 respuestas devolvieron 30 candidatos (`over_retrieval_count(10)`), con entre 4 y 25 candidatos vistos por **las dos** ramas, así que `low_confidence` fue false en todas: la fusión está fusionando de verdad y no sirviendo una rama disfrazada.
+
+`DEFERRED_TASKS.md` recoge estas cifras como la línea base que decidirá los 800 ms. La decisión sigue abierta a propósito: esto es un portátil contra una base local, no el entorno de demostración.
+
+### 11.4. Tres defectos que sólo aparecieron al ejecutarlo
+
+Los tres estaban en código que la suite daba por bueno, porque la suite corre sin base de datos y sin proveedor — que es precisamente su virtud y su límite.
+
+| # | Defecto | Corrección |
+|---|---|---|
+| 1 | `compare` construía `Settings()`, que exige `APP_ENV`, `SERVICE_VERSION` y `JWT_SECRET`. `backend/.env` sólo tiene las claves `JPV_*`, así que **el CLI saltaba precisamente en la única máquina capaz de ejecutarlo** | `ComparisonConfig.from_env()`: lee lo que usa y nada más, con `FUSION_DEFAULTS` de respaldo. Misma regla que `measure` |
+| 2 | Un fallo del proveedor reventaba con traceback en vez de saltar: litellm lanza su propia jerarquía (`InternalServerError`), que no es `EmbeddingError` | Se captura cualquier excepción del proveedor y se convierte en `MeasurementUnavailable` |
+| 3 | **El peor.** La consulta de telemetría usaba `"QueryText"`; la columna real es `"SearchText"`. El `except` mudo devolvía tupla vacía, así que el informe **decía cubrir las consultas grabadas sin haber leído ninguna** | Nombre corregido y el fallback dejó de ser mudo: ahora devuelve el motivo y lo escribe en el informe, para que un conjunto vacío no pueda hacerse pasar por uno completo |
+
+El tercero es la firma que este proyecto persigue desde C17: algo que aparenta funcionar y no se ejecuta. El primer informe generado tenía doce consultas y parecía completo.
+
+### 11.5. Dos obstáculos del entorno, que no son del servicio
+
+- **TLS.** `Norton Web/Mail Shield` intercepta la conexión con su propia raíz. El almacén de Windows la acepta, pero `httpx` —que es lo que litellm usa— va contra el bundle de `certifi`, que no la tiene, y el proveedor falla con `Connection error`. Es la misma causa que la nota de `--system-certs` de `CLAUDE.md`, que sólo cubre `uv`. Resuelto para la medición exportando `SSL_CERT_FILE` a un bundle de `certifi` más los 131 certificados del almacén de Windows.
+- **Bucle de eventos.** `psycopg` en modo async no funciona con el `ProactorEventLoop`, el de Windows por defecto. `uvicorn` fija el suyo, así que esto sólo afecta a un arnés de medición fuera del servidor; se resuelve con `WindowsSelectorEventLoopPolicy`.
+
+Ninguno de los dos es un defecto del servicio, y ambos quedan aquí porque son lo que costará repetir la medición.
+
+---
+
+## 12. Hallazgos del `/opsx:verify`, cerrados
+
+| # | Hallazgo | Corrección |
+|---|---|---|
+| W1 | La constante de suavizado **sí** estaba escrita en el código: `DEFAULT_RRF_K = 60` y `DEFAULT_BRANCH_DEPTH = 60` en `fusion.py`, y el guardián sólo escaneaba los pesos, así que una `k` cableada no la detectaba nadie | Constantes eliminadas y `k`/`depth` pasan a ser argumentos **obligatorios**. La guarda se amplía sobre la firma (`inspect.signature`), no sobre el texto, para que el razonamiento medido pueda seguir en la prosa |
+| W2 | `low_confidence` significaba dos cosas en la misma traza: en `stage=search` la rama vectorial vacía, en `stage=fuse` la marca de la respuesta. **Y divergen de verdad**: una rama vectorial sana cuyos candidatos la léxica no vio da `False` en una y `True` en la otra | Renombrado a `vector_empty` en el log de búsqueda, con el requisito de `vector-retrieval` corregido —que es el origen del nombre— y un escenario nuevo |
+| W3 | El escenario *The groups reach the lexical query* estaba cubierto a medias: el test comprobaba que se emiten las dos peticiones, no que la expandida alcance lo que la tecleada no. **Era una sobreafirmación de este mismo documento** | `test_the_expansion_finds_what_the_typed_form_alone_would_miss`: documento que dice `anillo`, operador que escribe `sortija`, y la misma consulta sin expansión devolviendo cero |
+| S1 | «Embedding vectors MUST NOT be logged at Information» era cierto por construcción y no lo fijaba nadie | `test_embedding_vectors_are_never_logged_at_information` |
+| S2 | La otra mitad de D10 —que las dos listas léxicas van secuenciales para retener **una** conexión del pool— sólo la sostenía un comentario | `test_only_one_lexical_query_is_in_flight_at_a_time`, con un fake que cuenta consultas en vuelo |
+
+**Las cinco guardas se mutaron una a una y las cinco muerden**: default restaurado en `fuse`, nombre del campo revertido, lista expandida sustituida por la tecleada, vector añadido al log de embed, y las dos léxicas puestas en `asyncio.gather`. Ninguna pasó con la mutación puesta.
+
+Dos veces durante el cierre una premisa mía fue falsa y el código tenía razón, y las dos quedan en el registro: el caso en que las dos `low_confidence` divergen es el contrario del que escribí primero, y el comentario del código lo decía mal hasta que el test lo corrigió.
+
+---
+
 ## Veredicto
 
-**Sin problemas críticos.** `uv run --system-certs pytest` **594 passed, 0 failed** sobre una línea base medida de **510**, sin abrir un socket a proveedor, LLM ni RDS. `openspec validate --all --strict` **49 passed, 0 failed**. Snapshot OpenAPI verde **sin** regenerar, y diffs vacíos en `backend/`, `openapi.json`, `embeddings.py` y `vocabularies.yaml`. `npm run build` verde y la suite de frontend con **cero fallos nuevos** comparada por nombres contra su línea base roja documentada. 76/76 escenarios con test o comprobación nombrada, 30/30 nombres exigidos por `tasks.md`, 36/37 tareas.
+**Sin problemas críticos.** `uv run --system-certs pytest` **598 passed, 0 failed** sobre una línea base medida de **510**, sin abrir un socket a proveedor, LLM ni RDS. `openspec validate --all --strict` **49 passed, 0 failed**. Snapshot OpenAPI verde **sin** regenerar, y diffs vacíos en `backend/`, `openapi.json`, `embeddings.py` y `vocabularies.yaml`. `npm run build` verde y la suite de frontend con **cero fallos nuevos** comparada por nombres contra su línea base roja documentada. 77/77 escenarios con test o comprobación nombrada, 30/30 nombres exigidos por `tasks.md`, **38/38 tareas**, y los 6 hallazgos del verify cerrados con sus guardas mutadas.
 
-**Listo para archivar**, con la 8.5 explícitamente pendiente como verificación posterior al merge.
+**Listo para archivar.** La 8.5 se ejecutó: la fusión mide **224/240** frente a 157/240 de la rama vectorial sola, `sortija de plata` reproduce exactamente el 4/10 → 10/10 del ticket, `criollas de oro` se queda en 5/10 contra los 6/10 esperados —discrepancia declarada en §11.2, no redondeada—, y el singleton lleva la latencia en caliente a **76 ms**.

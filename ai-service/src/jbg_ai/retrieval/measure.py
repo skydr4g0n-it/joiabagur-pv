@@ -249,9 +249,9 @@ COMPARISON_ARMS: tuple[tuple[str, float, float, float], ...] = (
 #: Recorded operator queries, read from the .NET side's telemetry table. Absent or empty is a
 #: normal outcome and never a failure: the curated list is the floor of this report.
 _RECORDED_QUERIES = """
-SELECT DISTINCT "QueryText"
+SELECT DISTINCT "SearchText"
 FROM public."ProductSearchEvents"
-WHERE "QueryText" IS NOT NULL AND length(trim("QueryText")) > 0
+WHERE "SearchText" IS NOT NULL AND length(trim("SearchText")) > 0
 ORDER BY 1
 LIMIT 50
 """
@@ -275,6 +275,49 @@ WHERE is_active IS TRUE
 ORDER BY ({coordination}) DESC, ts_rank(tsv, {match}) DESC
 LIMIT %(depth)s
 """
+
+
+@dataclass(frozen=True)
+class ComparisonConfig:
+    """What the comparison needs, and nothing else.
+
+    Deliberately **not** `Settings`: that demands `APP_ENV`, `SERVICE_VERSION` and
+    `JWT_SECRET`, which are the serving profile and have nothing to do with measuring. The
+    local credentials live in `backend/.env`, which carries only the `JPV_*` keys, so
+    requiring the profile made the CLI skip on the one machine that can run it. Same rule as
+    `measure`: a development aid reads what it uses.
+    """
+
+    embedding_api_key: str | None
+    embedding_model: str | None
+    embedding_base_url: str | None
+    rrf_k: int
+    branch_depth: int
+    distance_threshold: float
+
+    @classmethod
+    def from_env(cls) -> "ComparisonConfig":
+        import os
+
+        from jbg_ai.config.settings import FUSION_DEFAULTS
+
+        def _number(name: str, default, cast):
+            raw = os.environ.get(name)
+            if raw is None or not raw.strip():
+                return default
+            try:
+                return cast(raw)
+            except ValueError as exc:
+                raise MeasurementUnavailable(f"{name} is not a number: {raw!r}") from exc
+
+        return cls(
+            embedding_api_key=os.environ.get("JPV_EMBEDDING_API_KEY"),
+            embedding_model=os.environ.get("JPV_EMBEDDING_MODEL"),
+            embedding_base_url=os.environ.get("JPV_EMBEDDING_BASE_URL"),
+            rrf_k=_number("JPV_RRF_K", FUSION_DEFAULTS["jpv_rrf_k"], int),
+            branch_depth=_number("JPV_BRANCH_DEPTH", FUSION_DEFAULTS["jpv_branch_depth"], int),
+            distance_threshold=_number("JPV_RETRIEVAL_DISTANCE_THRESHOLD", 0.65, float),
+        )
 
 
 @dataclass(frozen=True)
@@ -303,6 +346,7 @@ class ComparisonReport:
     depth: int
     threshold: float
     queries: tuple[QueryComparison, ...]
+    recorded_error: str | None = None
 
 
 def _rubric(expanded: ExpandedQuery) -> tuple[str | None, tuple[str, ...]]:
@@ -356,53 +400,72 @@ def _vector_rows(cursor, vector, *, model: str, threshold: float, depth: int) ->
     ]
 
 
-def _recorded_queries(cursor) -> tuple[str, ...]:
-    """Read what operators actually typed. The table is .NET's and may simply not be there."""
+def _recorded_queries(cursor) -> tuple[tuple[str, ...], str | None]:
+    """Read what operators actually typed. Returns the queries and why there are none.
+
+    The table belongs to the .NET side and may legitimately not be there, so absence is not a
+    failure. It must not be **silent** either: the first version swallowed the exception and
+    returned an empty tuple, so a wrong column name produced a report that claimed to cover
+    recorded queries while covering none. The reason travels back and is printed and written
+    into the report.
+    """
     try:
         cursor.execute(_RECORDED_QUERIES)
-        return tuple(str(row[0]).strip() for row in cursor.fetchall())
-    except Exception:  # noqa: BLE001 - absence is a normal outcome, never a failure
+        return tuple(str(row[0]).strip() for row in cursor.fetchall()), None
+    except Exception as exc:  # noqa: BLE001 - absence is a normal outcome, never a failure
         cursor.connection.rollback()
-        return ()
+        return (), f"{type(exc).__name__}: {str(exc).splitlines()[0]}"
 
 
-def _embed_queries(texts: Sequence[str], settings) -> tuple[dict[str, list[float]], str]:
+def _embed_queries(
+    texts: Sequence[str], config: ComparisonConfig
+) -> tuple[dict[str, list[float]], str]:
     import asyncio
 
     from jbg_ai.indexing.constants import DEFAULT_EMBEDDING_MODEL
     from jbg_ai.indexing.embeddings import LiteLlmEmbeddingClient
     from jbg_ai.indexing.errors import EmbeddingError
 
-    if not settings.jpv_embedding_api_key:
+    if not config.embedding_api_key:
         raise MeasurementUnavailable(
             "JPV_EMBEDDING_API_KEY is required to measure the vector arm"
         )
     client = LiteLlmEmbeddingClient(
-        api_key=settings.jpv_embedding_api_key,
-        model=settings.jpv_embedding_model or DEFAULT_EMBEDDING_MODEL,
-        base_url=settings.jpv_embedding_base_url,
+        api_key=config.embedding_api_key,
+        model=config.embedding_model or DEFAULT_EMBEDDING_MODEL,
+        base_url=config.embedding_base_url,
         max_attempts=1,
     )
     try:
         result = asyncio.run(client.embed(list(texts)))
     except EmbeddingError as exc:
         raise MeasurementUnavailable(f"the embedding provider is not reachable: {exc}") from exc
+    except Exception as exc:  # noqa: BLE001 - litellm raises its own hierarchy, not ours
+        # A development aid must skip, never traceback. litellm surfaces transport failures as
+        # `InternalServerError` / `APIConnectionError`, none of which are `EmbeddingError`, so
+        # catching only ours turned an unreachable provider into a crash. Found by running it.
+        raise MeasurementUnavailable(
+            f"the embedding provider call failed ({type(exc).__name__}): {exc}"
+        ) from exc
     return dict(zip(texts, result.vectors, strict=True)), client.model_id
 
 
-def build_comparison(cursor, settings, dictionary: SynonymDictionary) -> ComparisonReport:
+def build_comparison(
+    cursor, config: ComparisonConfig, dictionary: SynonymDictionary
+) -> ComparisonReport:
     """Score every arm over the curated and the recorded queries. Read-only throughout."""
     cursor.execute(_COUNT_ACTIVE)
     corpus_size = int(cursor.fetchone()[0])
 
-    recorded = tuple(q for q in _recorded_queries(cursor) if q not in CURATED_QUERIES)
+    recorded_all, recorded_error = _recorded_queries(cursor)
+    recorded = tuple(q for q in recorded_all if q not in CURATED_QUERIES)
     catalogue = [(text, "curated") for text in CURATED_QUERIES]
     catalogue += [(text, "recorded") for text in recorded]
 
-    vectors, model = _embed_queries([text for text, _ in catalogue], settings)
-    k = settings.jpv_rrf_k
-    depth = settings.jpv_branch_depth
-    threshold = settings.jpv_retrieval_distance_threshold
+    vectors, model = _embed_queries([text for text, _ in catalogue], config)
+    k = config.rrf_k
+    depth = config.branch_depth
+    threshold = config.distance_threshold
 
     comparisons: list[QueryComparison] = []
     for text, source in catalogue:
@@ -457,6 +520,7 @@ def build_comparison(cursor, settings, dictionary: SynonymDictionary) -> Compari
         depth=depth,
         threshold=threshold,
         queries=tuple(comparisons),
+        recorded_error=recorded_error,
     )
 
 
@@ -481,6 +545,16 @@ def render_comparison(report: ComparisonReport, *, measured_at: datetime) -> str
         "Queries marked `recorded` come from the .NET telemetry table; the rest are the curated "
         "list C20 used. Both are developer-written, which is the limitation the README declares.",
         "",
+        *(
+            [
+                f"> **The recorded queries could not be read**: `{report.recorded_error}`. "
+                "This report covers the curated list only, and says so rather than letting an "
+                "empty set look like a complete one.",
+                "",
+            ]
+            if report.recorded_error
+            else []
+        ),
         "| query | source | expected | " + " | ".join(arm_names) + " |",
         "|---|---|---|" + "---:|" * len(arm_names),
     ]
@@ -511,19 +585,13 @@ def render_comparison(report: ComparisonReport, *, measured_at: datetime) -> str
 
 def run_comparison(out_dir: Path | None = None) -> Path:
     """Compare the arms and write the report. Skips rather than fails without a dependency."""
-    from jbg_ai.config.settings import Settings
-
     target_dir = out_dir or RESULTS_DIR
-    try:
-        settings = Settings()  # type: ignore[call-arg]
-    except Exception as exc:  # noqa: BLE001 - a missing profile is a skip, not a failure
-        raise MeasurementUnavailable(f"settings are not loadable: {exc}") from exc
-
+    config = ComparisonConfig.from_env()
     dictionary = load_query_dictionary()
     with _connect() as connection:
         connection.read_only = True
         with connection.cursor() as cursor:
-            report = build_comparison(cursor, settings, dictionary)
+            report = build_comparison(cursor, config, dictionary)
     target_dir.mkdir(parents=True, exist_ok=True)
     target = target_dir / COMPARISON_REPORT_NAME
     target.write_text(

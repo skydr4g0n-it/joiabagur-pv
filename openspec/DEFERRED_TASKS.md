@@ -256,12 +256,33 @@ cold and warm re-measurement and a funnel confirmation, which is a different kin
 a different risk from anything C21 touches.
 
 1. ~~Make the embedding client a singleton in the AI service.~~ **Done in C21.**
-2. **Measure again** against the seeded world, both cold and warm. The figures to beat are the
-   ones in *The retrieval budget, measured on the demo environment* below: warm 170-383 ms,
-   and one call in four at **1707 ms** cold. If the singleton's cache removes that cold tail,
-   the 800 ms budget becomes affordable; if it does not, it stays affordable to nobody.
+2. ~~**Measure again**, both cold and warm.~~ **Done on 2026-09-02**, against the local index
+   of 1.168 documents and the real provider, through the full C21 pipeline (expansion, both
+   lexical lists, embedding, vector branch, fusion, demoting filters), six operator queries:
+
+   | | min | media | max |
+   |---|---:|---:|---:|
+   | **Cold** (first time each text is seen) | 273 ms | 475 ms | **1328 ms** |
+   | **Warm** (the singleton's cache hits) | **74 ms** | **76 ms** | 78 ms |
+
+   **The singleton works, and the figure that matters is 76 ms** — an order of magnitude inside
+   the 800 ms budget, against 170-383 ms warm on the demo host before it existed. The cache
+   removes the provider round trip entirely on a repeated query text.
+
+   **What it does not remove is the first call for each distinct text**: 1328 ms on
+   `criollas de oro`, still well over 800 ms and consistent with the 1707 ms measured on the
+   demo host. So the budget is now comfortable for a shop that searches for similar things all
+   day and still blown by a genuinely new query.
+
+   These figures are a **laptop against a local database**, not the demo environment. They say
+   the singleton was worth paying for; they do not settle the revert, which needs step 3
+   measured where the operator actually is.
 3. Put `RetrievalTimeoutMs` back to **800 ms** in `appsettings.json` **and** in the
-   `AiGatewayOptions` default — the two must not drift apart.
+   `AiGatewayOptions` default — the two must not drift apart. **Decide with the cold tail in
+   hand**: at 800 ms a first-ever query text still degrades to the lexical searcher. That may
+   now be the right trade — C21's own lexical branch is what answers, and it scores 219/240
+   against the vector branch's 157/240 — but it is a decision to take deliberately and to
+   confirm with the funnel, not a consequence of the cache working.
 4. Confirm with the funnel log that `Origin=Assisted` and not `LexicalFallback`.
 
 **Why not leave it at 2500 ms.** A budget that no longer bites stops being a budget. With the

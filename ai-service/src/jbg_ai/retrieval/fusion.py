@@ -21,16 +21,20 @@ from collections.abc import Hashable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 
-#: `k` smooths the reciprocal so the leader does not dominate: at `k = 60`, rank 1 scores
-#: 1/61 and rank 200 still scores 1/260, which is 38 % of the leader's vote.
-DEFAULT_RRF_K = 60
-
-#: Depth is coupled to `k` rather than swept independently. A list far longer than `k` does
-#: not amplify its own head; it hands positive votes to candidates the other lists do not
-#: score at all, and that tail displaces the candidates two lists rank well without ranking
-#: first. Measured at `w_vector = 0,33`: depth 40 -> 113/120, 60 -> 111, 100 -> 107, 200 -> 107,
-#: and an asymmetric 200 lexical / 60 vector -> 105. Rule: **depth is of the order of k**.
-DEFAULT_BRANCH_DEPTH = 60
+# `k` and `depth` are **required arguments with no default here**, deliberately. The spec says
+# the weights and the smoothing constant are read from settings and are not written into the
+# code, and a module-level default is exactly how a value gets written into the code without
+# anybody deciding to: it would be picked up silently by the next importer. `config.settings`
+# owns the measured figures (`FUSION_DEFAULTS`), and every caller passes them.
+#
+# What belongs here is the *rule*, not the number. `k` smooths the reciprocal so the leader
+# does not dominate: at k = 60 rank 1 scores 1/61 and rank 200 still scores 1/260, which is
+# 38 % of the leader's vote. Depth is therefore coupled to k rather than swept independently,
+# because a list far longer than k hands positive votes to candidates the other lists do not
+# score at all, and that tail displaces the candidates two lists rank well without ranking
+# first. Measured: depth 40 -> 113/120, 60 -> 111, 100 -> 107, 200 -> 107, and an asymmetric
+# 200 lexical / 60 vector -> 105. Rule: **depth is of the order of k**, and they are swept
+# together or not at all.
 
 
 @dataclass(frozen=True)
@@ -76,8 +80,8 @@ def truncate(keys: Iterable[Hashable], *, depth: int) -> tuple[Hashable, ...]:
 def fuse(
     lists: Sequence[RankedList],
     *,
-    k: int = DEFAULT_RRF_K,
-    depth: int = DEFAULT_BRANCH_DEPTH,
+    k: int,
+    depth: int,
 ) -> tuple[FusedCandidate, ...]:
     """Fuse the lists and return the candidates in descending fused score.
 
