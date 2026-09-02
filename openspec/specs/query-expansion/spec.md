@@ -1,7 +1,7 @@
 # query-expansion Specification
 
 ## Purpose
-Query-time synonym expansion for the retrieval pipeline: a pure function that returns equivalence groups of surface forms plus what it resolved, never a rewritten query string and never `tsquery` syntax. The dictionary is two layers — the enrichment closed vocabularies read as base equivalence classes and never modified, plus a query-only overlay versioned in the repository — with folded matching and surface-form emission, plural reduction, longest-phrase-first matching, directional bridges between vocabularies and unknown-term pass-through. `JPV_QUERY_EXPANSION_ENABLED` supplies only the default; the effective flag travels as a parameter of the orchestration call and is not part of the request schema. `stage=expand` logs beside embed and search, and the result is not consumed until the lexical branch of C21, so the HTTP response is unchanged. Entries and exclusions are justified against the corpus, and a CLI command writes a versioned reach report. No PostgreSQL extension, no text-search configuration, no re-indexing, no OpenAPI regeneration.
+Query-time synonym expansion for the retrieval pipeline: a pure function that returns equivalence groups of surface forms plus what it resolved, never a rewritten query string and never `tsquery` syntax. The dictionary is two layers — the enrichment closed vocabularies read as base equivalence classes and never modified, plus a query-only overlay versioned in the repository — with folded matching and surface-form emission, plural reduction, longest-phrase-first matching, directional bridges between vocabularies and unknown-term pass-through. `JPV_QUERY_EXPANSION_ENABLED` supplies only the default; the effective flag travels as a parameter of the orchestration call and is not part of the request schema. `stage=expand` logs beside embed, search, lexical, filters and fuse, and the result is consumed by the lexical branch: its groups compose the expanded lexical query and its resolved terms are the lookup the rule-based structural filters use. Entries and exclusions are justified against the corpus, and a CLI command writes a versioned reach report. No PostgreSQL extension, no text-search configuration, no re-indexing, no OpenAPI regeneration.
 
 ## Requirements
 
@@ -119,8 +119,10 @@ A token the dictionary does not recognise MUST be emitted as a group containing 
 - **AND** the group for `anillo` carries its class
 - **AND** `matched` contains no entry for the unknown tokens
 
-### Requirement: The enable flag turns expansion off without changing the response
-Expansion MUST be controlled by a flag whose default is supplied by settings and whose effective value is passed as a parameter of the retrieval orchestration call, so that a caller can evaluate several configurations in one process. The flag MUST NOT be added to the retrieval request schema. When expansion is disabled every token MUST become a single-element group carrying its original form, `matched` MUST be empty, and the HTTP response of the retrieval endpoint MUST be unchanged.
+### Requirement: The enable flag selects the expansion arm without touching the request contract
+Expansion MUST be controlled by a flag whose default is supplied by settings and whose effective value is passed as a parameter of the retrieval orchestration call, so that a caller can evaluate several configurations in one process. The flag MUST NOT be added to the retrieval request schema and MUST NOT cause the committed OpenAPI snapshot to be regenerated. When expansion is disabled every token MUST become a single-element group carrying its original form and `matched` MUST be empty.
+
+Disabling the flag now changes what the endpoint returns, because the lexical branch consumes the groups: the expanded lexical list degenerates into the typed one. The fusion MUST degrade exactly, so that the result is the same as fusing a single lexical list at the combined lexical weight. Turning the flag off therefore remains a meaningful rollback and a valid ablation arm rather than an inconsistent state.
 
 #### Scenario: Disabled expansion yields the original tokens
 - **GIVEN** the expansion flag is disabled
@@ -139,6 +141,12 @@ Expansion MUST be controlled by a flag whose default is supplied by settings and
 - **THEN** both calls succeed without restarting the process
 - **AND** neither call mutates the settings object
 
+#### Scenario: Disabling expansion degrades the fusion exactly
+- **GIVEN** the expansion flag is disabled, so the typed and expanded lexical lists are identical
+- **WHEN** the retrieval pipeline runs
+- **THEN** the fused order equals the order produced by fusing one lexical list at the combined lexical weight
+- **AND** no candidate is counted twice for appearing in both identical lists
+
 ### Requirement: Expansion applies at query time only and never reaches indexing or the vector query
 Expansion MUST NOT modify any indexed document: document text, its generated search vector and its source hash MUST be identical before and after this change, and no document may be re-indexed. The embedding used by the vector branch MUST be computed on the original query text, not on any expanded form.
 
@@ -153,8 +161,10 @@ Expansion MUST NOT modify any indexed document: document text, its generated sea
 - **THEN** exactly one embedding is requested
 - **AND** the embedded text is the original query, not an expanded form
 
-### Requirement: Expansion emits a stage log and is not consumed until the lexical branch exists
-The retrieval pipeline MUST emit a structured log entry for the expansion stage alongside the existing embed and search stages, carrying the request trace identifier, whether expansion was enabled, the token count and the number of resolved terms. The operator query MUST be logged only at Debug level, and the full expanded classes MUST NOT be logged at Information level. Until the lexical branch exists, the expansion result MUST NOT alter the retrieval response in any way.
+### Requirement: Expansion emits a stage log and its result is consumed by the lexical branch
+The retrieval pipeline MUST emit a structured log entry for the expansion stage alongside the embed, search, lexical, filter and fusion stages, carrying the request trace identifier, whether expansion was enabled, the token count and the number of resolved terms. The operator query MUST be logged only at Debug level, and the full expanded classes MUST NOT be logged at Information level.
+
+The expansion result MUST be consumed by the lexical branch: its groups compose the expanded lexical query, and its resolved terms are the lookup the rule-based structural filters use, so that no second mapping from typed term to vocabulary field is built over the same data. The log entry MUST no longer report the result as unconsumed.
 
 #### Scenario: The expansion stage is traceable
 - **GIVEN** a request whose token carries a trace identifier
@@ -162,11 +172,17 @@ The retrieval pipeline MUST emit a structured log entry for the expansion stage 
 - **THEN** a structured log entry for the expansion stage carries that trace identifier
 - **AND** it reports whether expansion was enabled and how many terms resolved
 
-#### Scenario: The response is unchanged while no consumer exists
-- **GIVEN** expansion is enabled
-- **WHEN** an authenticated client calls the retrieval endpoint
-- **THEN** the response body is the same as it would be with expansion disabled
-- **AND** the match reasons of each result are unchanged
+#### Scenario: The groups reach the lexical query
+- **GIVEN** expansion is enabled and the query contains a known synonym
+- **WHEN** the retrieval pipeline runs
+- **THEN** the lexical branch searches for the canonical surface forms of that synonym's class
+- **AND** the response contains candidates that the typed form alone would not have matched
+
+#### Scenario: The resolved terms feed the structural filters
+- **GIVEN** expansion is enabled and the query names a material of the closed vocabulary
+- **WHEN** the rule-based structural filters are extracted
+- **THEN** they are derived from the resolved terms the expansion already reported
+- **AND** no second lookup table from typed term to vocabulary field is built
 
 ### Requirement: Dictionary entries and exclusions are justified against the corpus
 Every overlay entry MUST be accompanied in the file by the reason it exists. Terms measured to be false friends, terms that are vocabulary gaps rather than synonyms, and terms that already reach their documents without expansion MUST be recorded as explicit exclusions with their reason, so a later editor sees the rule where the temptation is.
