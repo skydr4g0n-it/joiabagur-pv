@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from typing import Protocol
 from uuid import UUID
 
+from jbg_ai.retrieval.lexical import LexicalRequest
+
 
 @dataclass(frozen=True)
 class SearchFilters:
@@ -25,10 +27,29 @@ class SearchHit:
     materials: list[str]
     family_id: UUID | None
     variant_label: str | None
+    #: Carried for the demoting filters of C21 and **never** emitted: the boundary rule is
+    #: that .NET owns price. A stale projection may reorder a candidate, never delete it.
+    price: float | None = None
+    size_label: str | None = None
+
+
+@dataclass(frozen=True)
+class LexicalHit:
+    """One row of a lexical list. `coordination` is how many counting groups it matched."""
+
+    product_id: UUID
+    sku: str
+    ts_rank: float
+    coordination: int
+    materials: list[str]
+    family_id: UUID | None
+    variant_label: str | None
+    price: float | None = None
+    size_label: str | None = None
 
 
 class ProductSearchPort(Protocol):
-    """k-NN over `ai.product_document`. Implementations must not read `public`."""
+    """k-NN and full-text over `ai.product_document`. Implementations must not read `public`."""
 
     async def count_compatible(self, *, model_version_key: str, model_id: str) -> int: ...
 
@@ -37,8 +58,16 @@ class ProductSearchPort(Protocol):
         query_vec: list[float],
         *,
         threshold: float,
-        overfetch: int,
+        depth: int,
         filters: SearchFilters,
         model_version_key: str,
         model_id: str,
     ) -> list[SearchHit]: ...
+
+    async def search_lexical(
+        self,
+        request: LexicalRequest,
+        *,
+        depth: int,
+        filters: SearchFilters,
+    ) -> list[LexicalHit]: ...

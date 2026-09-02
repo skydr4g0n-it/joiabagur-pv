@@ -28,20 +28,68 @@ export function originLabel(origin: string): string {
   return ORIGIN_LABELS[origin] ?? 'Resultado';
 }
 
+/** The retriever's name for the semantic branch. `assisted` is the operator's name for it. */
+const VECTOR_REASON = 'vector';
+const LEXICAL_REASON = 'lexical';
+
+/**
+ * Which origin this result has, from its own match reasons — never from whether the assisted
+ * path served the response.
+ *
+ * The distinction matters the moment the embedding provider fails: C21 serves the lexical
+ * branch alone with HTTP 200, so a response-wide badge would print "semantic match" over
+ * results no semantic search produced. Claiming a capability that did not run is the lie the
+ * per-result badge exists to prevent.
+ *
+ * No match reasons at all means no retriever ran: the search was answered by the .NET side's
+ * own degraded text search, which is a text search and says so. A reason this panel does not
+ * know falls back to the neutral label rather than guessing.
+ */
+export function resultOrigin(matchReasons: readonly string[]): string {
+  if (matchReasons.includes(VECTOR_REASON)) return 'assisted';
+  if (matchReasons.length === 0 || matchReasons.includes(LEXICAL_REASON)) return LEXICAL_REASON;
+  return matchReasons[0];
+}
+
+/** Which retriever answered the whole search, as far as the results can testify. */
+export type SearchOrigin = 'assisted' | 'service-lexical' | 'legacy-lexical' | 'unknown';
+
+/**
+ * Which mode the search actually fell into, derived from the results themselves.
+ *
+ * The browser never talks to the AI service and the response carries no mode field, so this
+ * is read from provenance rather than asserted. Three outcomes are distinguishable and worth
+ * distinguishing, because the middle one is invisible otherwise:
+ *
+ * - `assisted` — at least one result came from the semantic branch, so the fused path ran.
+ * - `service-lexical` — the AI service answered, but nothing came from the semantic branch.
+ *   That is the embedding provider having failed: HTTP 200, results on screen, and the panel
+ *   would look perfectly healthy while the capability the screen is named after did not run.
+ * - `legacy-lexical` — the assisted path did not serve at all and the .NET side's own text
+ *   search answered. Switched off and unavailable arrive identically here, on purpose.
+ *
+ * With no results there is no provenance to read, so the mode is `unknown` and nothing is
+ * claimed about it. That case is already covered by the empty-state messages.
+ */
+export function searchOrigin(
+  results: readonly { matchReasons: string[] }[],
+  aiAvailable: boolean,
+): SearchOrigin {
+  if (!aiAvailable) return 'legacy-lexical';
+  if (results.length === 0) return 'unknown';
+  return results.some((item) => item.matchReasons.includes(VECTOR_REASON))
+    ? 'assisted'
+    : 'service-lexical';
+}
+
 const euro = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
 
 interface AssistedSearchResultRowProps {
   result: AssistedSearchResult;
-  /** Whether the assisted path served this search. Decides the origin badge. */
-  aiAvailable: boolean;
   onSelect: (result: AssistedSearchResult) => void;
 }
 
-export function AssistedSearchResultRow({
-  result,
-  aiAvailable,
-  onSelect,
-}: AssistedSearchResultRowProps) {
+export function AssistedSearchResultRow({ result, onSelect }: AssistedSearchResultRowProps) {
   const photoUrl = getImageUrl(result.primaryPhotoUrl ?? undefined);
 
   return (
@@ -73,11 +121,12 @@ export function AssistedSearchResultRow({
 
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge variant="info" appearance="light">
-              {originLabel(aiAvailable ? 'assisted' : 'lexical')}
+              {originLabel(resultOrigin(result.matchReasons))}
             </Badge>
             {/* Closes the loop with the quick filters: you filter by silver and you can see that
-                the piece is silver. The raw match reasons are deliberately not rendered — they
-                are the constant "vector" for every result until C21. */}
+                the piece is silver. The raw match reasons are still deliberately not rendered:
+                since C21 they carry real provenance, but `vector` and `lexical` are engineering
+                vocabulary and the badge above is their translation. */}
             {result.materials.map((material) => (
               <Badge key={material} variant="secondary" appearance="outline">
                 {material}

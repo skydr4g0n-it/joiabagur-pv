@@ -32,6 +32,7 @@ When `mode` is `lexical` the handler MUST NOT call the embedding provider at all
 - **WHEN** an authenticated client calls `POST /v1/retrieval/products` with `mode` absent or `hybrid`
 - **THEN** the response status is 200
 - **AND** no returned candidate reports the vector branch among its match reasons
+- **AND** `low_confidence` is false, because only one branch ran and there was no disagreement to report
 
 #### Scenario: A provider failure with nothing lexical to serve is 503
 - **GIVEN** `STUB_MODE` is disabled and the embedding port raises a non-recoverable error
@@ -76,6 +77,13 @@ The threshold is a floor and not a discriminator: measured against this corpus i
 - **AND** `low_confidence` is true
 - **AND** the threshold is not raised for a second attempt
 
+#### Scenario: A single-branch mode that returns results is not low confidence
+- **GIVEN** `STUB_MODE` is disabled
+- **WHEN** an authenticated client calls `POST /v1/retrieval/products` with `mode=vector` or `mode=lexical`
+- **AND** at least one result is returned
+- **THEN** `low_confidence` is false
+- **AND** it is not true merely because a second branch did not run
+
 #### Scenario: Incompatible embeddings do not count as abstention
 - **GIVEN** `STUB_MODE` is disabled
 - **AND** the count of rows compatible with the live `model_version_key` is 0
@@ -84,7 +92,7 @@ The threshold is a floor and not a discriminator: measured against this corpus i
 - **AND** the status is not 200 with `low_confidence`
 
 ### Requirement: Over-retrieval applies after the distance filter
-`top_k` MUST remain the page size the .NET caller wants after hydrating. The retriever MUST return at most `min(top_k × 3, 60)` hits, using the same `over_retrieval_count` helper as the stub, applied to the fused and reordered candidate list. `candidates_returned` MUST equal the length of `results`. `effective_pos_id` MUST be the token claim, not the body `pos_id`. `low_confidence` MUST be false when at least one result is returned and at least one of them was produced by more than one branch.
+`top_k` MUST remain the page size the .NET caller wants after hydrating. The retriever MUST return at most `min(top_k × 3, 60)` hits, using the same `over_retrieval_count` helper as the stub, applied to the fused and reordered candidate list. `candidates_returned` MUST equal the length of `results`. `effective_pos_id` MUST be the token claim, not the body `pos_id`. `low_confidence` MUST be false when at least one result is returned and at least one of them was produced by more than one branch. When only one branch ran, `low_confidence` MUST NOT be derived from cross-branch consensus at all — it MUST be true only when no result is returned, which is the meaning it had before the branches existed.
 
 Each branch MUST be truncated at the configured branch depth **before** fusing, and that depth MUST be a separate parameter from the over-retrieval window even when their defaults coincide. The vector branch's depth MUST be applied as a `LIMIT` on the set already filtered by the distance threshold.
 

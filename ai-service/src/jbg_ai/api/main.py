@@ -15,6 +15,7 @@ from jbg_ai.api.health_report import (
 from jbg_ai.api.middleware import TraceIdMiddleware
 from jbg_ai.api.routers import DOMAIN_ROUTERS, evals
 from jbg_ai.config import Settings, get_settings
+from jbg_ai.retrieval.orchestrator import build_retrieval_embed_client
 
 
 def configure_logging(log_level: str) -> None:
@@ -69,6 +70,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             SqlAlchemyHealthProbe(resolved)
         )
         return await cached_health_report(request.app.state, resolved, probe)
+
+    # One embedding client per process, not per request. Building it here is what finally
+    # lets the in-memory cache frozen in C11 record a hit: until C21 the retrieval router
+    # constructed a client per call, so every search paid a full cold round trip to the
+    # provider — the cause recorded in `openspec/DEFERRED_TASKS.md`. The cache injected is
+    # bounded, because a process-lifetime `dict` keyed by every distinct operator query is a
+    # leak inside a 512 MiB container. `retrieval_embed` stays the injection seam tests use:
+    # this only fills it in when nothing else has.
+    if not resolved.stub_mode and resolved.jpv_embedding_api_key:
+        app.state.retrieval_embed = build_retrieval_embed_client(resolved)
 
     for router in DOMAIN_ROUTERS:
         app.include_router(router)

@@ -5,12 +5,23 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PRODUCTION_ENV_NAMES = frozenset({"prod", "production"})
 
 CANONICAL_OPENAPI_SERVICE_VERSION = "0.1.0"
+
+#: C21 fusion defaults, in one place so the field default, the blank-string fallback and
+#: the canonical OpenAPI profile cannot drift apart. Every figure is measured; the reasons
+#: live in the field descriptions and in `retrieval/fusion.py`.
+FUSION_DEFAULTS: dict[str, Any] = {
+    "jpv_rrf_k": 60,
+    "jpv_rrf_weight_typed": 0.5,
+    "jpv_rrf_weight_expanded": 0.5,
+    "jpv_rrf_weight_vector": 0.33,
+    "jpv_branch_depth": 60,
+}
 
 
 class Settings(BaseSettings):
@@ -176,6 +187,74 @@ class Settings(BaseSettings):
         ),
     )
 
+    jpv_rrf_k: int = Field(
+        default=FUSION_DEFAULTS["jpv_rrf_k"],
+        gt=0,
+        description=(
+            "C21 smoothing constant of the reciprocal rank fusion (JPV_RRF_K). Optional at "
+            "boot; default 60; blank -> 60. It is not independent of JPV_BRANCH_DEPTH: at "
+            "k=60 a rank-200 document still holds 38 % of the leader's vote, so depth and k "
+            "must be swept together. Distinct from JWT_SECRET, JPV_EMBEDDING_*, "
+            "JPV_RAG_LLM_*, JPV_INDEX_FEED_*, JPV_CATALOG_LLM_*, "
+            "JPV_RETRIEVAL_DISTANCE_THRESHOLD and JPV_QUERY_EXPANSION_ENABLED. Not required "
+            "to boot /health."
+        ),
+    )
+
+    jpv_rrf_weight_typed: float = Field(
+        default=FUSION_DEFAULTS["jpv_rrf_weight_typed"],
+        ge=0,
+        description=(
+            "C21 fusion weight of the lexical list built from the operator's own text "
+            "(JPV_RRF_WEIGHT_TYPED). Optional at boot; default 0.5; blank -> 0.5. Together "
+            "with JPV_RRF_WEIGHT_EXPANDED it sums to 1.0, so disabling the expansion — which "
+            "makes the two lexical lists identical — degrades to exactly one lexical list at "
+            "full weight. Supplies only the DEFAULT: the effective value travels as a "
+            "parameter of the retrieval orchestration call, because C24 sweeps configurations "
+            "in one process. Not required to boot /health."
+        ),
+    )
+
+    jpv_rrf_weight_expanded: float = Field(
+        default=FUSION_DEFAULTS["jpv_rrf_weight_expanded"],
+        ge=0,
+        description=(
+            "C21 fusion weight of the lexical list built from C20's equivalence groups "
+            "(JPV_RRF_WEIGHT_EXPANDED). Optional at boot; default 0.5; blank -> 0.5. See "
+            "JPV_RRF_WEIGHT_TYPED for why the two sum to 1.0. Not required to boot /health."
+        ),
+    )
+
+    jpv_rrf_weight_vector: float = Field(
+        default=FUSION_DEFAULTS["jpv_rrf_weight_vector"],
+        ge=0,
+        description=(
+            "C21 fusion weight of the vector list (JPV_RRF_WEIGHT_VECTOR). Optional at boot; "
+            "default 0.33; blank -> 0.33. Deliberately BELOW either lexical weight, and this "
+            "is the default easiest to undo by accident: measured over twelve operator "
+            "queries, branch parity (1.0) is the WORST fused configuration at 96/120 against "
+            "105/120 at 0.33, because the distance threshold passes essentially the whole "
+            "corpus and the vector branch therefore returns a full list whether or not it "
+            "understood the query — a branch that always fills its list always votes at full "
+            "strength. Raising it sinks `dije de plata` from 10/10 to 2/10. Not required to "
+            "boot /health."
+        ),
+    )
+
+    jpv_branch_depth: int = Field(
+        default=FUSION_DEFAULTS["jpv_branch_depth"],
+        gt=0,
+        description=(
+            "C21 depth at which EVERY fused list is truncated before fusing "
+            "(JPV_BRANCH_DEPTH). Optional at boot; default 60; blank -> 60. One value shared "
+            "by all three lists: an asymmetric 200 lexical / 60 vector costs 6-8 points of "
+            "120. Conceptually distinct from the over-retrieval window the endpoint returns, "
+            "which follows `top_k`, even though both default to 60 — reusing the existing "
+            "OVER_RETRIEVAL_CAP is one fewer arbitrary constant, not the same parameter. Not "
+            "required to boot /health."
+        ),
+    )
+
     jpv_family_veto_margin: float = Field(
         default=0.05,
         ge=0,
@@ -294,6 +373,21 @@ class Settings(BaseSettings):
             return True
         return value
 
+    @field_validator(
+        "jpv_rrf_k",
+        "jpv_rrf_weight_typed",
+        "jpv_rrf_weight_expanded",
+        "jpv_rrf_weight_vector",
+        "jpv_branch_depth",
+        mode="before",
+    )
+    @classmethod
+    def blank_fusion_setting_is_default(cls, value: object, info: ValidationInfo) -> object:
+        """A blank export means "unset". A blank weight read as 0 would silence a branch."""
+        if isinstance(value, str) and not value.strip():
+            return FUSION_DEFAULTS[str(info.field_name)]
+        return value
+
 
 @lru_cache
 def get_settings() -> Settings:
@@ -337,4 +431,7 @@ def canonical_openapi_settings() -> Settings:
         jpv_index_sync_time_budget_seconds=180,
         jpv_retrieval_distance_threshold=0.65,
         jpv_query_expansion_enabled=True,
+        # Pinned like the rest, so a process environment value cannot leak into the
+        # committed OpenAPI snapshot through a fusion weight.
+        **FUSION_DEFAULTS,
     )

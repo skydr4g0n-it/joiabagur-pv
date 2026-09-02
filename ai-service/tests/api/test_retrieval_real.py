@@ -1,4 +1,4 @@
-"""Real POST /v1/retrieval/products: stub vs vector, 503 vs abstention. Delivered by C14."""
+"""Real POST /v1/retrieval/products: fused branches, 503 vs abstention. C14 + C21."""
 
 from __future__ import annotations
 
@@ -28,6 +28,7 @@ def _row(**kwargs) -> FakeIndexedRow:
         "materials": kwargs.pop("materials", ["plata"]),
         "family_id": kwargs.pop("family_id", FAMILY),
         "piece_type": kwargs.pop("piece_type", "anillo"),
+        "doc_text": kwargs.pop("doc_text", "Tipo: anillo. Materiales: plata."),
     }
     values.update(kwargs)
     return FakeIndexedRow(**values)
@@ -139,6 +140,8 @@ def test_real_mode_is_not_501(issue_token: Callable[..., str]) -> None:
     assert response.status_code == 200
     parsed = RetrievalResponse.model_validate(response.json())
     assert parsed.results
+    assert sorted(parsed.results[0].match_reasons) == ["lexical", "vector"]
+    assert parsed.results[0].score == 1.0
     assert parsed.low_confidence is False
     assert parsed.effective_pos_id == TOKEN_POS_ID
 
@@ -186,41 +189,45 @@ def test_invalid_family_id_is_422(issue_token: Callable[..., str]) -> None:
     assert response.status_code == 422
 
 
-def test_hybrid_and_lexical_modes_are_not_501(issue_token: Callable[..., str]) -> None:
-    app = _real_app()
+def test_every_mode_answers_and_the_c21_placeholder_note_is_gone(
+    issue_token: Callable[..., str],
+) -> None:
     token = issue_token()
-    with TestClient(app) as client:
-        for body in (
-            {"query": "anillo", "top_k": 1},
-            {"query": "anillo", "top_k": 1, "mode": "hybrid"},
-            {"query": "anillo", "top_k": 1, "mode": "lexical"},
-        ):
+    for body in (
+        {"query": "anillo", "top_k": 1},
+        {"query": "anillo", "top_k": 1, "mode": "hybrid"},
+        {"query": "anillo", "top_k": 1, "mode": "lexical"},
+        {"query": "anillo", "top_k": 1, "mode": "vector"},
+    ):
+        with TestClient(_real_app()) as client:
             response = client.post(
                 "/v1/retrieval/products",
                 json=body,
                 headers={"Authorization": f"Bearer {token}"},
             )
-            assert response.status_code != 501, body
-            assert response.status_code == 200, response.text
-            notes = response.json()["results"][0]["debug"]["notes"]
-            assert "vector_only_until_c21" in notes
+        assert response.status_code == 200, response.text
+        for item in response.json()["results"]:
+            assert "vector_only_until_c21" not in item["debug"]["notes"]
 
 
-def test_vector_mode_omits_until_c21_note(issue_token: Callable[..., str]) -> None:
-    app = _real_app()
+def test_lexical_mode_makes_no_provider_call(issue_token: Callable[..., str]) -> None:
+    embed = FakeEmbeddingClient()
+    app = _real_app(embed=embed)
     with TestClient(app) as client:
         response = client.post(
             "/v1/retrieval/products",
-            json={"query": "anillo", "top_k": 1, "mode": "vector"},
+            json={"query": "anillo", "top_k": 1, "mode": "lexical"},
             headers={"Authorization": f"Bearer {issue_token()}"},
         )
 
     assert response.status_code == 200
-    notes = response.json()["results"][0]["debug"]["notes"]
-    assert "vector_only_until_c21" not in notes
+    assert embed.provider_calls == []
+    assert response.json()["results"][0]["match_reasons"] == ["lexical"]
 
 
-def test_provider_failure_is_503(issue_token: Callable[..., str]) -> None:
+def test_provider_failure_degrades_to_the_lexical_branch(
+    issue_token: Callable[..., str],
+) -> None:
     class _Boom(FakeEmbeddingClient):
         async def embed(self, texts: list[str]):
             raise EmbeddingError("provider down")
@@ -233,8 +240,62 @@ def test_provider_failure_is_503(issue_token: Callable[..., str]) -> None:
             headers={"Authorization": f"Bearer {issue_token()}"},
         )
 
+    assert response.status_code == 200
+    results = response.json()["results"]
+    assert results
+    assert all("vector" not in item["match_reasons"] for item in results)
+
+
+def test_provider_failure_with_nothing_lexical_to_serve_is_503(
+    issue_token: Callable[..., str],
+) -> None:
+    """A 200 with an empty list would be indistinguishable from a legitimate abstention."""
+
+    class _Boom(FakeEmbeddingClient):
+        async def embed(self, texts: list[str]):
+            raise EmbeddingError("provider down")
+
+    app = _real_app(
+        search=FakeProductSearch([_row(doc_text="Tipo: broche. Materiales: laton.")]),
+        embed=_Boom(),
+    )
+    with TestClient(app) as client:
+        response = client.post(
+            "/v1/retrieval/products",
+            json={"query": "anillo", "top_k": 1},
+            headers={"Authorization": f"Bearer {issue_token()}"},
+        )
+
     assert response.status_code == 503
     assert "low_confidence" not in response.json()
+
+
+def test_retrieval_embed_client_is_a_process_singleton() -> None:
+    """C21 pays half the debt of `openspec/DEFERRED_TASKS.md`: one client, bounded cache."""
+    from jbg_ai.api.main import create_app
+    from jbg_ai.retrieval.cache import BoundedEmbeddingCache
+
+    app = create_app(
+        build_settings(
+            stub_mode=False,
+            jpv_embedding_api_key="sk-test",
+            database_url="postgresql+psycopg://u:p@db:5432/jpv",
+        )
+    )
+    first = app.state.retrieval_embed
+    second = create_app(
+        build_settings(
+            stub_mode=False,
+            jpv_embedding_api_key="sk-test",
+            database_url="postgresql+psycopg://u:p@db:5432/jpv",
+        )
+    ).state.retrieval_embed
+
+    assert first is not None
+    assert first is app.state.retrieval_embed, "resolved per request, built once per process"
+    assert isinstance(first.cache, BoundedEmbeddingCache)
+    assert first.cache.max_entries > 0
+    assert first is not second, "one app, one client"
 
 
 def test_trace_id_appears_in_stage_logs(
@@ -254,5 +315,5 @@ def test_trace_id_appears_in_stage_logs(
 
     assert response.status_code == 200
     messages = [record.getMessage() for record in caplog.records]
-    assert any("stage=embed" in msg and "trace-c14" in msg for msg in messages)
-    assert any("stage=search" in msg and "trace-c14" in msg for msg in messages)
+    for stage in ("embed", "search", "lexical", "filters", "fuse"):
+        assert any(f"stage={stage} " in msg and "trace-c14" in msg for msg in messages), stage

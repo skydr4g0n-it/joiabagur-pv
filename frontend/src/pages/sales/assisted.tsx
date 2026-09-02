@@ -11,9 +11,10 @@
  *    cache is keyed on the whole query string, so no prefix can hit it: a debounced field would
  *    charge several query embeddings per query, of which at most one would be read, and would
  *    exhaust the per-user request budget in five or six searches.
- * 2. **Nothing is shown that the system has not asserted.** The retriever's match reasons are
- *    the constant `["vector"]` until C21, and the variant label is null until C18. Neither is
- *    faked; the row degrades instead.
+ * 2. **Nothing is shown that the system has not asserted.** Since C21 the retriever's match
+ *    reasons carry real provenance, so the origin is read from them per result rather than
+ *    decided once for the whole response; the variant label is still null until C18. Neither
+ *    is faked; the row degrades instead.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -36,7 +37,10 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import { AssistedSearchResultRow } from '@/components/sales/assisted-search-result-row';
+import {
+  AssistedSearchResultRow,
+  searchOrigin,
+} from '@/components/sales/assisted-search-result-row';
 import { useAuth } from '@/providers/auth-provider';
 import { aiSearchService } from '@/services/ai-search.service';
 import * as pointOfSaleService from '@/services/point-of-sale.service';
@@ -392,6 +396,20 @@ export function AssistedSalesSearchPage() {
             </Alert>
           ) : null}
 
+          {/* The AI service answered, but without its semantic branch — the embedding provider
+              failed and it served the lexical branch instead. Left unsaid this is the failure
+              that looks healthiest of all: 200, results on screen, and the capability the
+              screen is named after never ran. */}
+          {searchOrigin(response.results, response.aiAvailable) === 'service-lexical' ? (
+            <Alert variant="warning">
+              <AlertTitle>Coincidencia semántica no disponible</AlertTitle>
+              <AlertDescription>
+                Estos resultados vienen de la búsqueda por texto. Prueba a describir la pieza
+                con las palabras del catálogo.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
           {response.results.length === 0 && response.aiAvailable && response.lowConfidence ? (
             <Alert>
               <AlertTitle>No he encontrado nada que encaje</AlertTitle>
@@ -440,7 +458,6 @@ export function AssistedSalesSearchPage() {
             <AssistedSearchResultRow
               key={result.productId}
               result={result}
-              aiAvailable={response.aiAvailable}
               onSelect={handleSelect}
             />
           ))}

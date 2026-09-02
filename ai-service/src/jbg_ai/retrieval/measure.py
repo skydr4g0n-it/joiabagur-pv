@@ -1,7 +1,13 @@
-"""Measure the synonym dictionary's reach over the live index. Delivered by C20.
+"""Measure the retriever against the live index. C20 measured reach; C21 compares configurations.
 
-`python -m jbg_ai.retrieval measure` — read-only, and a development aid rather than a
-gate: it skips cleanly when no database is reachable, and no unit test depends on it.
+`python -m jbg_ai.retrieval measure` — reach of the synonym dictionary (C20).
+`python -m jbg_ai.retrieval compare` — vector-only against lexical-only against the fused
+default over the same queries (C21).
+
+Both are read-only and a development aid rather than a gate: they skip cleanly when no
+database (or, for `compare`, no embedding key) is reachable, and no unit test depends on
+either. A real evaluation CLI with graded relevance is C24; starting one here would duplicate
+the home of the same kind of report.
 
 This is the one place in C20 that composes a `tsquery`, because measuring requires it.
 The composition is the safe one — `plainto_tsquery` per surface form, OR-ed with `||`
@@ -24,6 +30,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from jbg_ai.data.paths import AI_SERVICE_ROOT
+from jbg_ai.retrieval.fusion import RankedList, fuse
+from jbg_ai.retrieval.lexical import (
+    EXPANDED_LIST,
+    TYPED_LIST,
+    build_fragments,
+    compose_group_fragments,
+    expanded_request,
+    typed_request,
+)
 from jbg_ai.retrieval.synonyms import (
     OVERLAY_RESOURCE,
     ExpandedQuery,
@@ -35,6 +50,7 @@ from jbg_ai.retrieval.synonyms import (
 
 RESULTS_DIR = AI_SERVICE_ROOT / "evals" / "results"
 REPORT_NAME = "c20-query-expansion-reach.md"
+COMPARISON_REPORT_NAME = "c21-fusion-configuration-comparison.md"
 OVERLAY_PATH = Path(__file__).resolve().parent / OVERLAY_RESOURCE
 
 #: Curated, not sampled: `ProductSearchEvents` holds 31 rows and 12 texts, all written
@@ -99,13 +115,15 @@ class MeasurementUnavailable(RuntimeError):
 
 
 def compose_tsquery(expanded: ExpandedQuery) -> tuple[str, list[str]]:
-    """Return the SQL fragment and its parameters. Terms never touch the SQL text."""
-    groups: list[str] = []
-    params: list[str] = []
-    for group in expanded.groups:
-        alternatives = " || ".join("plainto_tsquery('spanish', %s)" for _ in group)
-        groups.append(f"({alternatives})")
-        params.extend(group)
+    """Return the SQL fragment and its parameters. Terms never touch the SQL text.
+
+    The safe shape now lives in `retrieval/lexical.py`, which the serving branch uses. This
+    keeps the **conjunction** between groups on purpose: it is the composition the C20 reach
+    report measured, and `c20-query-expansion-reach.md` would stop being comparable with its
+    own earlier runs if the operator changed underneath it. C21 serves with `||` plus
+    coordination instead, for the reason recorded in `lexical.py`.
+    """
+    groups, params = compose_group_fragments(expanded.groups, placeholder=lambda _name: "%s")
     if not groups:
         return "plainto_tsquery('spanish', %s)", [""]
     return " && ".join(groups), params
@@ -219,6 +237,301 @@ def _connect():
         raise MeasurementUnavailable(f"cannot reach the index: {exc}") from exc
 
 
+#: The three arms C21's design compares, as `(name, w_typed, w_expanded, w_vector)`. The
+#: fused default is the one the service ships; the other two are its endpoints, so the report
+#: shows what fusing bought and what it cost against each branch alone.
+COMPARISON_ARMS: tuple[tuple[str, float, float, float], ...] = (
+    ("vector-only", 0.0, 0.0, 1.0),
+    ("lexical-only", 0.5, 0.5, 0.0),
+    ("fused-default", 0.5, 0.5, 0.33),
+)
+
+#: Recorded operator queries, read from the .NET side's telemetry table. Absent or empty is a
+#: normal outcome and never a failure: the curated list is the floor of this report.
+_RECORDED_QUERIES = """
+SELECT DISTINCT "QueryText"
+FROM public."ProductSearchEvents"
+WHERE "QueryText" IS NOT NULL AND length(trim("QueryText")) > 0
+ORDER BY 1
+LIMIT 50
+"""
+
+_VECTOR_SQL = """
+SELECT product_id, piece_type, materials
+FROM ai.product_document
+WHERE embedding IS NOT NULL
+  AND is_active IS TRUE
+  AND (embedding_version LIKE %(prefix)s OR embedding_model = %(model)s)
+  AND embedding <=> %(q)s::vector <= %(threshold)s
+ORDER BY embedding <=> %(q)s::vector ASC
+LIMIT %(depth)s
+"""
+
+_LEXICAL_SQL = """
+SELECT product_id, piece_type, materials
+FROM ai.product_document
+WHERE is_active IS TRUE
+  AND tsv @@ {match}
+ORDER BY ({coordination}) DESC, ts_rank(tsv, {match}) DESC
+LIMIT %(depth)s
+"""
+
+
+@dataclass(frozen=True)
+class ArmScore:
+    """Hits in the top ten for one query under one configuration."""
+
+    arm: str
+    hits: int
+    returned: int
+
+
+@dataclass(frozen=True)
+class QueryComparison:
+    query: str
+    source: str
+    expected_type: str | None
+    expected_materials: tuple[str, ...]
+    arms: tuple[ArmScore, ...]
+
+
+@dataclass(frozen=True)
+class ComparisonReport:
+    corpus_size: int
+    model: str
+    k: int
+    depth: int
+    threshold: float
+    queries: tuple[QueryComparison, ...]
+
+
+def _rubric(expanded: ExpandedQuery) -> tuple[str | None, tuple[str, ...]]:
+    """The rubric C20 used, read off the query: right `piece_type` **and** right material.
+
+    Stated plainly because it is also the lexical branch's own objective function: `doc_text`
+    carries canonical `Tipo:` and `Materiales:` lines and the expansion aims at them, so this
+    score rewards whoever matches those lines by construction. It fixes a starting point, not
+    a verdict — the judge is C24's graded golden set with a paraphrase category.
+    """
+    piece = next((m.canonical for m in expanded.matched if m.field == "piece_type"), None)
+    materials = tuple(m.canonical for m in expanded.matched if m.field == "materials")
+    return piece, materials
+
+
+def _is_hit(row: dict, expected_type: str | None, expected_materials: tuple[str, ...]) -> bool:
+    if expected_type is not None and row.get("piece_type") != expected_type:
+        return False
+    if expected_materials:
+        held = set(row.get("materials") or ())
+        if not held & set(expected_materials):
+            return False
+    return True
+
+
+def _lexical_rows(cursor, request, *, depth: int) -> list[dict]:
+    fragments = build_fragments(request, placeholder=lambda name: f"%({name})s")
+    sql = _LEXICAL_SQL.format(match=fragments.match, coordination=fragments.coordination)
+    cursor.execute(sql, {**fragments.params, "depth": depth})
+    return [
+        {"product_id": row[0], "piece_type": row[1], "materials": row[2]}
+        for row in cursor.fetchall()
+    ]
+
+
+def _vector_rows(cursor, vector, *, model: str, threshold: float, depth: int) -> list[dict]:
+    literal = "[" + ",".join(str(value) for value in vector) + "]"
+    cursor.execute(
+        _VECTOR_SQL,
+        {
+            "prefix": f"{model}:1536%",
+            "model": model,
+            "q": literal,
+            "threshold": threshold,
+            "depth": depth,
+        },
+    )
+    return [
+        {"product_id": row[0], "piece_type": row[1], "materials": row[2]}
+        for row in cursor.fetchall()
+    ]
+
+
+def _recorded_queries(cursor) -> tuple[str, ...]:
+    """Read what operators actually typed. The table is .NET's and may simply not be there."""
+    try:
+        cursor.execute(_RECORDED_QUERIES)
+        return tuple(str(row[0]).strip() for row in cursor.fetchall())
+    except Exception:  # noqa: BLE001 - absence is a normal outcome, never a failure
+        cursor.connection.rollback()
+        return ()
+
+
+def _embed_queries(texts: Sequence[str], settings) -> tuple[dict[str, list[float]], str]:
+    import asyncio
+
+    from jbg_ai.indexing.constants import DEFAULT_EMBEDDING_MODEL
+    from jbg_ai.indexing.embeddings import LiteLlmEmbeddingClient
+    from jbg_ai.indexing.errors import EmbeddingError
+
+    if not settings.jpv_embedding_api_key:
+        raise MeasurementUnavailable(
+            "JPV_EMBEDDING_API_KEY is required to measure the vector arm"
+        )
+    client = LiteLlmEmbeddingClient(
+        api_key=settings.jpv_embedding_api_key,
+        model=settings.jpv_embedding_model or DEFAULT_EMBEDDING_MODEL,
+        base_url=settings.jpv_embedding_base_url,
+        max_attempts=1,
+    )
+    try:
+        result = asyncio.run(client.embed(list(texts)))
+    except EmbeddingError as exc:
+        raise MeasurementUnavailable(f"the embedding provider is not reachable: {exc}") from exc
+    return dict(zip(texts, result.vectors, strict=True)), client.model_id
+
+
+def build_comparison(cursor, settings, dictionary: SynonymDictionary) -> ComparisonReport:
+    """Score every arm over the curated and the recorded queries. Read-only throughout."""
+    cursor.execute(_COUNT_ACTIVE)
+    corpus_size = int(cursor.fetchone()[0])
+
+    recorded = tuple(q for q in _recorded_queries(cursor) if q not in CURATED_QUERIES)
+    catalogue = [(text, "curated") for text in CURATED_QUERIES]
+    catalogue += [(text, "recorded") for text in recorded]
+
+    vectors, model = _embed_queries([text for text, _ in catalogue], settings)
+    k = settings.jpv_rrf_k
+    depth = settings.jpv_branch_depth
+    threshold = settings.jpv_retrieval_distance_threshold
+
+    comparisons: list[QueryComparison] = []
+    for text, source in catalogue:
+        expanded = expand_query(text, enabled=True, dictionary=dictionary)
+        expected_type, expected_materials = _rubric(expanded)
+
+        typed = _lexical_rows(cursor, typed_request(text), depth=depth)
+        widened = _lexical_rows(cursor, expanded_request(expanded), depth=depth)
+        vector = _vector_rows(
+            cursor, vectors[text], model=model, threshold=threshold, depth=depth
+        )
+        rows = {row["product_id"]: row for row in (*typed, *widened, *vector)}
+
+        arms: list[ArmScore] = []
+        for name, w_typed, w_expanded, w_vector in COMPARISON_ARMS:
+            fused = fuse(
+                [
+                    RankedList(TYPED_LIST, w_typed, [row["product_id"] for row in typed]),
+                    RankedList(EXPANDED_LIST, w_expanded, [row["product_id"] for row in widened]),
+                    RankedList("vector", w_vector, [row["product_id"] for row in vector]),
+                ],
+                k=k,
+                depth=depth,
+            )
+            top = [entry for entry in fused if entry.score > 0][:10]
+            arms.append(
+                ArmScore(
+                    arm=name,
+                    hits=sum(
+                        1
+                        for entry in top
+                        if _is_hit(rows[entry.key], expected_type, expected_materials)
+                    ),
+                    returned=len(top),
+                )
+            )
+
+        comparisons.append(
+            QueryComparison(
+                query=text,
+                source=source,
+                expected_type=expected_type,
+                expected_materials=expected_materials,
+                arms=tuple(arms),
+            )
+        )
+
+    return ComparisonReport(
+        corpus_size=corpus_size,
+        model=model,
+        k=k,
+        depth=depth,
+        threshold=threshold,
+        queries=tuple(comparisons),
+    )
+
+
+def render_comparison(report: ComparisonReport, *, measured_at: datetime) -> str:
+    arm_names = [name for name, *_ in COMPARISON_ARMS]
+    lines = [
+        "# C21 — hits at ten by fusion configuration",
+        "",
+        f"Measured {measured_at.date().isoformat()} against {report.corpus_size} live rows of "
+        f"`ai.product_document`, read-only, with `{report.model}`.",
+        "",
+        f"`k` = {report.k}, branch depth = {report.depth} (symmetric across the three lists), "
+        f"distance threshold = {report.threshold}.",
+        "",
+        "**The rubric is the lexical branch's own objective function.** A hit is a top-ten "
+        "result with the piece type and a material the query named, read off the expansion's "
+        "resolved terms. `doc_text` carries canonical `Tipo:` and `Materiales:` lines and the "
+        "expansion aims at them, so a lexical arm scores well here by construction. These "
+        "figures fix a **starting point, not a verdict**: the judge is C24's graded golden set "
+        "with a paraphrase category, where the vector branch wins what this rubric cannot see.",
+        "",
+        "Queries marked `recorded` come from the .NET telemetry table; the rest are the curated "
+        "list C20 used. Both are developer-written, which is the limitation the README declares.",
+        "",
+        "| query | source | expected | " + " | ".join(arm_names) + " |",
+        "|---|---|---|" + "---:|" * len(arm_names),
+    ]
+    for item in report.queries:
+        expected = "/".join(
+            part for part in (item.expected_type or "", "+".join(item.expected_materials)) if part
+        )
+        scores = " | ".join(f"{arm.hits}/{arm.returned}" for arm in item.arms)
+        lines.append(f"| `{item.query}` | {item.source} | {expected or '-'} | {scores} |")
+
+    totals = {
+        name: sum(arm.hits for item in report.queries for arm in item.arms if arm.arm == name)
+        for name in arm_names
+    }
+    ceiling = 10 * len(report.queries)
+    lines += [
+        "",
+        "## Totals",
+        "",
+        "| configuration | hits | of |",
+        "|---|---:|---:|",
+    ]
+    for name in arm_names:
+        lines.append(f"| {name} | {totals[name]} | {ceiling} |")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def run_comparison(out_dir: Path | None = None) -> Path:
+    """Compare the arms and write the report. Skips rather than fails without a dependency."""
+    from jbg_ai.config.settings import Settings
+
+    target_dir = out_dir or RESULTS_DIR
+    try:
+        settings = Settings()  # type: ignore[call-arg]
+    except Exception as exc:  # noqa: BLE001 - a missing profile is a skip, not a failure
+        raise MeasurementUnavailable(f"settings are not loadable: {exc}") from exc
+
+    dictionary = load_query_dictionary()
+    with _connect() as connection:
+        connection.read_only = True
+        with connection.cursor() as cursor:
+            report = build_comparison(cursor, settings, dictionary)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / COMPARISON_REPORT_NAME
+    target.write_text(
+        render_comparison(report, measured_at=datetime.now(tz=UTC)), encoding="utf-8"
+    )
+    return target
+
+
 def run_measurement(out_dir: Path | None = None) -> Path:
     """Measure and write the report. Raises `MeasurementUnavailable` when there is no index."""
     target_dir = out_dir or RESULTS_DIR
@@ -238,11 +551,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     measure = sub.add_parser("measure", help="Measure the dictionary reach over the live index")
     measure.add_argument("--out", default=None, help="Directory for the report")
+    compare = sub.add_parser("compare", help="Compare fusion configurations over the live index")
+    compare.add_argument("--out", default=None, help="Directory for the report")
     args = parser.parse_args(list(argv) if argv is not None else None)
-    if args.command != "measure":
+    if args.command not in ("measure", "compare"):
         parser.error("unknown command")
+    runner = run_measurement if args.command == "measure" else run_comparison
     try:
-        target = run_measurement(Path(args.out) if args.out else None)
+        target = runner(Path(args.out) if args.out else None)
     except MeasurementUnavailable as exc:
         sys.stdout.write(f"skipping measurement: {exc}\n")
         return 0

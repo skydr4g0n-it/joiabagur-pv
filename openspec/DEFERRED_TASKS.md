@@ -241,10 +241,25 @@ search pays a full cold round trip to the embedding provider. The debt was recor
 was designed and assigned to **C21 or C22**, which already work inside `retrieval/`; the fix is
 roughly three lines in `main.py` making that client a singleton.
 
-**What to do when C21/C22 land.**
+**Step 1 is paid. C21 (`add-hybrid-search-rrf`) made the client a process singleton**, and it
+was not the "three lines in `main.py`" this note assumed. `InMemoryEmbeddingCache` is a `dict`
+with no ceiling and no TTL: harmless per request, since it was born empty and died with the
+response — which is also *why* retrieval never got a hit — and a lifetime leak as a singleton
+keyed by every distinct operator query (~13 KB per vector) inside a container capped at
+512 MiB that already uses 232. `indexing/embeddings.py` stays frozen by C11, so the bound was
+injected through its existing `cache` constructor field: `retrieval/cache.py` holds a bounded
+LRU, `api/main.py` builds the client once, `api/routers/retrieval.py` resolves it from
+`app.state`, and `test_embeddings_module_is_unchanged` pins the freeze by content hash.
 
-1. Make the embedding client a singleton in the AI service.
-2. **Measure again** against the seeded world, both cold and warm.
+**Steps 2 to 4 stay open, and they are a change of their own** — they need a demo deploy, a
+cold and warm re-measurement and a funnel confirmation, which is a different kind of work and
+a different risk from anything C21 touches.
+
+1. ~~Make the embedding client a singleton in the AI service.~~ **Done in C21.**
+2. **Measure again** against the seeded world, both cold and warm. The figures to beat are the
+   ones in *The retrieval budget, measured on the demo environment* below: warm 170-383 ms,
+   and one call in four at **1707 ms** cold. If the singleton's cache removes that cold tail,
+   the 800 ms budget becomes affordable; if it does not, it stays affordable to nobody.
 3. Put `RetrievalTimeoutMs` back to **800 ms** in `appsettings.json` **and** in the
    `AiGatewayOptions` default — the two must not drift apart.
 4. Confirm with the funnel log that `Origin=Assisted` and not `LexicalFallback`.

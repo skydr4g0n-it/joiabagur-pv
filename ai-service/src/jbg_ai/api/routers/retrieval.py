@@ -51,10 +51,18 @@ def _require_real_retrieval_settings(request: Request, settings: Settings) -> No
 
 
 def _resolve_embed(request: Request, settings: Settings) -> EmbeddingClient:
+    """Resolve, never construct: `create_app` builds the singleton once per process.
+
+    Building one here is what kept the C11 cache empty forever — a client born with the request and
+    dying with the response can never record a hit. The fallback survives only for an app
+    assembled without the factory; it caches nothing across requests and is not the live path.
+    """
     injected = getattr(request.app.state, "retrieval_embed", None)
     if injected is not None:
         return injected  # type: ignore[no-any-return]
-    return build_retrieval_embed_client(settings)
+    client = build_retrieval_embed_client(settings)
+    request.app.state.retrieval_embed = client
+    return client
 
 
 def _resolve_search(request: Request, settings: Settings) -> ProductSearchPort:

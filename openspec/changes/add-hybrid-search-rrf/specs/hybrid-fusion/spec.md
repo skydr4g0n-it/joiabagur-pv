@@ -155,7 +155,11 @@ Filters inferred by rule from the operator's text — a price ceiling, a size, m
 
 ### Requirement: Each candidate reports which branches produced it, and disagreement between branches is a signal
 
-Every returned candidate MUST report the branches that produced it, and the value MUST NOT be a constant. When the vector branch contributed the candidate, its mapped distance MUST be reported as the vector diagnostic; when a lexical branch contributed it, its text-rank MUST be reported as the lexical diagnostic; a diagnostic for a branch that did not see the candidate MUST be absent rather than fabricated. The response MUST be marked low confidence when no returned candidate was produced by more than one branch, because that is the signature of the branches disagreeing entirely. That marking MUST NOT change how many candidates are returned or in what order, and MUST NOT suppress results.
+Every returned candidate MUST report the branches that produced it, and the value MUST NOT be a constant. When the vector branch contributed the candidate, its mapped distance MUST be reported as the vector diagnostic; when a lexical branch contributed it, its text-rank MUST be reported as the lexical diagnostic; a diagnostic for a branch that did not see the candidate MUST be absent rather than fabricated.
+
+**When more than one branch actually ran**, the response MUST be marked low confidence when no returned candidate was produced by more than one of them, because that is the signature of the branches disagreeing entirely. That marking MUST NOT change how many candidates are returned or in what order, and MUST NOT suppress results.
+
+**When only one branch ran** — a single-branch mode was requested, or the embedding provider failed and the request degraded to the lexical branch — the consensus rule MUST NOT be applied, because no candidate can appear in two lists when there is only one and the response would be marked low confidence unconditionally. A field that is always true carries no information, which is the same defect as the constant provenance this capability removes. In that case the marking MUST mean that the retriever returned no candidate at all. The number of branches that ran MUST be reported in the fusion stage log, so that a low-confidence marking can always be read against how it was computed.
 
 #### Scenario: Provenance is real, not constant
 - **GIVEN** a fused retrieval returning candidates from both branches
@@ -170,11 +174,30 @@ Every returned candidate MUST report the branches that produced it, and the valu
 - **AND** its vector diagnostic is absent
 
 #### Scenario: Total disagreement is reported without hiding results
-- **GIVEN** no returned candidate was produced by more than one branch
+- **GIVEN** both branches ran
+- **AND** no returned candidate was produced by more than one branch
 - **WHEN** the response is inspected
 - **THEN** it is marked low confidence
 - **AND** the candidates are still returned
 - **AND** their order is unchanged by that marking
+
+#### Scenario: A single-branch response is not marked low confidence for having one branch
+- **GIVEN** only one branch ran, because a single-branch mode was requested
+- **WHEN** candidates are returned
+- **THEN** the response is not marked low confidence
+- **AND** the marking is reserved for the case where the retriever returned nothing
+
+#### Scenario: A response degraded to one branch is not marked low confidence either
+- **GIVEN** a fused request whose embedding provider failed
+- **AND** the lexical branch produced candidates
+- **WHEN** the response is inspected
+- **THEN** it is not marked low confidence
+- **AND** its candidates report only the branch that produced them
+
+#### Scenario: The fusion log says how many branches ran
+- **WHEN** the fusion stage logs
+- **THEN** it names the branches that actually ran
+- **AND** a low-confidence marking can be read against that number
 
 ### Requirement: The fused pipeline is observable stage by stage
 

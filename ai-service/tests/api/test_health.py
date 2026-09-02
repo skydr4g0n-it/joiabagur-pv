@@ -1,5 +1,6 @@
 """Health endpoint smoke tests (no LLM / embeddings / RDS)."""
 
+import pytest
 from fastapi.testclient import TestClient
 
 from jbg_ai.api.main import create_app
@@ -98,6 +99,40 @@ def test_health_does_not_load_the_synonym_dictionary(minimal_settings: Settings)
     load_query_dictionary.cache_clear()
     app = create_app(minimal_settings)
     with TestClient(app) as client:
+        response = client.get("/health")
+
+    assert response.status_code == 200
+    assert load_query_dictionary.cache_info().currsize == 0
+
+
+def test_health_boots_and_answers_without_the_fusion_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """C21's weights are optional at boot, and the probe never runs a retrieval to answer."""
+    from jbg_ai.config.settings import get_settings
+    from jbg_ai.retrieval.synonyms import load_query_dictionary
+
+    for name in (
+        "JPV_RRF_K",
+        "JPV_RRF_WEIGHT_TYPED",
+        "JPV_RRF_WEIGHT_EXPANDED",
+        "JPV_RRF_WEIGHT_VECTOR",
+        "JPV_BRANCH_DEPTH",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("SERVICE_VERSION", "0.1.0-test")
+    monkeypatch.setenv("JWT_SECRET", "test-jwt-secret-0123456789abcdefghij")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    get_settings.cache_clear()
+
+    settings = get_settings()
+    assert settings.jpv_rrf_k == 60
+    assert settings.jpv_rrf_weight_vector == 0.33
+    assert settings.jpv_branch_depth == 60
+
+    load_query_dictionary.cache_clear()
+    with TestClient(create_app(settings)) as client:
         response = client.get("/health")
 
     assert response.status_code == 200

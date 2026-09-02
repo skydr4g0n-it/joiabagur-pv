@@ -45,9 +45,13 @@ export interface AssistedSearchResult {
   /** Relevance score from the retriever, or null on the degraded path. */
   score?: number | null;
   /**
-   * Raw retriever signals. Deliberately **not rendered**: it is the constant `["vector"]` for
-   * every result until the lexical branch (C21) exists, so showing it would put a word of
-   * engineering in front of the operator.
+   * Which branches of the retriever produced this result — `vector`, `lexical`, or both since
+   * C21 fused them. Empty on the degraded path, where no retriever ran and the .NET side's own
+   * text search answered.
+   *
+   * The raw values are still **not rendered**: they are engineering vocabulary. The row
+   * translates them into one origin badge per result, which is what lets a search served after
+   * an embedding-provider failure say so instead of claiming a semantic match.
    */
   matchReasons: string[];
   /**
@@ -69,6 +73,10 @@ export interface AssistedSearchResult {
  * `aiAvailable` and `lowConfidence` are what separate the ways a search can return nothing.
  * They cannot separate "switched off for this shop" from "the AI service is down": both arrive
  * as `aiAvailable: false`. Telemetry distinguishes them server-side; the API does not.
+ *
+ * `lowConfidence` carries the retriever's cross-branch disagreement signal only when more than
+ * one branch ran; when a single branch answered it means what it meant before C21 — nothing was
+ * returned. Either way it is only ever read here alongside an empty result list.
  */
 export interface AssistedSearchResponse {
   /** Results in the order the retriever ranked them. Never re-sorted on the client. */
