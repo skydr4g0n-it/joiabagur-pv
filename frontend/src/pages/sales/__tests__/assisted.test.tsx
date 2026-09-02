@@ -311,8 +311,46 @@ describe('AssistedSalesSearchPage — the four ways of showing nothing', () => {
     expect(screen.getByText(/24 piezas parecidas/)).toBeInTheDocument();
   });
 
+  it('should say the semantic branch did not run when only lexical results came back', async () => {
+    // The failure that looks healthiest of all: the AI service answered 200 with results on
+    // screen, having served its lexical branch because the embedding provider failed. Without
+    // this banner the panel claims a capability that did not run.
+    await searchWith(
+      response({
+        results: [result({ matchReasons: ['lexical'] })],
+        aiAvailable: true,
+        candidatesReturned: 8,
+        survivedHydration: 1,
+      }),
+    );
+
+    expect(await screen.findByText('Coincidencia semántica no disponible')).toBeInTheDocument();
+    expect(screen.queryByText('Búsqueda asistida no disponible')).not.toBeInTheDocument();
+
+    const row = screen.getByTestId('assisted-search-result');
+    expect(within(row).getByText('Búsqueda por texto')).toBeInTheDocument();
+  });
+
+  it('should not warn about the semantic branch when it did run', async () => {
+    await searchWith(response({ results: [result({ matchReasons: ['vector', 'lexical'] })] }));
+
+    expect(await screen.findByTestId('assisted-search-result')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Coincidencia semántica no disponible'),
+    ).not.toBeInTheDocument();
+  });
+
   it('should show legacy results banner when ai is unavailable', async () => {
-    await searchWith(response({ aiAvailable: false, candidatesReturned: 0, survivedHydration: 1 }));
+    // Match reasons are empty on the degraded path: no retriever ran, so there is no
+    // provenance to report. Since C21 the row derives its badge from that, per result.
+    await searchWith(
+      response({
+        results: [result({ matchReasons: [] })],
+        aiAvailable: false,
+        candidatesReturned: 0,
+        survivedHydration: 1,
+      }),
+    );
 
     expect(await screen.findByText('Búsqueda asistida no disponible')).toBeInTheDocument();
     expect(

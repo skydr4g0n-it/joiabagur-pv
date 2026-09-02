@@ -1,6 +1,6 @@
 # Reglas para el contexto de OpenSpec
 
-`openspec/` tiene cuatro piezas con dueños distintos. `update-docs` solo escribe
+`openspec/` tiene cinco piezas con dueños distintos. `update-docs` solo escribe
 en dos de ellas.
 
 | Ruta | Dueño | Rol de update-docs |
@@ -9,6 +9,7 @@ en dos de ellas.
 | `openspec/config.yaml` | esta skill | **Editable** |
 | `openspec/specs/**` | flujo OpenSpec (`opsx:sync`, `opsx:archive`) | Solo señalar desincronización |
 | `openspec/changes/**` | flujo OpenSpec (`opsx:*`) | Solo lectura, como evidencia |
+| `openspec/DEFERRED_TASKS.md` | quien cierre o difiera la tarea | Solo señalar en el plan |
 
 Ambos ficheros editables están en **inglés**. Son contexto que se inyecta en
 cada sesión de agente: cada línea cuesta, así que se actualizan con precisión

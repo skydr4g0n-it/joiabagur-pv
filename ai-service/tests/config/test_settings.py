@@ -383,3 +383,87 @@ def test_canonical_openapi_settings_pin_query_expansion_flag() -> None:
     settings = canonical_openapi_settings()
 
     assert settings.jpv_query_expansion_enabled is True
+
+
+FUSION_ENV = (
+    "JPV_RRF_K",
+    "JPV_RRF_WEIGHT_TYPED",
+    "JPV_RRF_WEIGHT_EXPANDED",
+    "JPV_RRF_WEIGHT_VECTOR",
+    "JPV_BRANCH_DEPTH",
+)
+
+
+def _assert_fusion_defaults(settings) -> None:
+    assert settings.jpv_rrf_k == 60
+    assert settings.jpv_rrf_weight_typed == 0.5
+    assert settings.jpv_rrf_weight_expanded == 0.5
+    assert settings.jpv_rrf_weight_vector == 0.33
+    assert settings.jpv_branch_depth == 60
+
+
+def test_settings_do_not_require_the_fusion_settings_to_boot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _minimal_env(monkeypatch)
+    for name in FUSION_ENV:
+        monkeypatch.delenv(name, raising=False)
+    get_settings.cache_clear()
+
+    _assert_fusion_defaults(get_settings())
+
+
+def test_blank_fusion_settings_are_treated_as_the_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A blank weight read as 0 would silence a branch without anybody asking."""
+    _minimal_env(monkeypatch)
+    for name in FUSION_ENV:
+        monkeypatch.setenv(name, "   ")
+    get_settings.cache_clear()
+
+    _assert_fusion_defaults(get_settings())
+
+
+def test_the_measured_default_weighting_is_preserved(monkeypatch: pytest.MonkeyPatch) -> None:
+    _minimal_env(monkeypatch)
+    for name in FUSION_ENV:
+        monkeypatch.delenv(name, raising=False)
+    get_settings.cache_clear()
+    settings = get_settings()
+
+    assert settings.jpv_rrf_weight_vector < settings.jpv_rrf_weight_typed
+    assert settings.jpv_rrf_weight_vector < settings.jpv_rrf_weight_expanded
+    assert settings.jpv_rrf_weight_typed + settings.jpv_rrf_weight_expanded == 1.0
+    assert 0.5 * settings.jpv_rrf_k <= settings.jpv_branch_depth <= 2 * settings.jpv_rrf_k
+
+
+def test_fusion_settings_can_be_overridden_by_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.setenv("JPV_RRF_K", "20")
+    monkeypatch.setenv("JPV_RRF_WEIGHT_VECTOR", "1.0")
+    monkeypatch.setenv("JPV_BRANCH_DEPTH", "25")
+    get_settings.cache_clear()
+
+    settings = get_settings()
+    assert settings.jpv_rrf_k == 20
+    assert settings.jpv_rrf_weight_vector == 1.0
+    assert settings.jpv_branch_depth == 25
+
+
+def test_settings_reject_a_non_positive_smoothing_constant_or_depth(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _minimal_env(monkeypatch)
+    for name in ("JPV_RRF_K", "JPV_BRANCH_DEPTH"):
+        get_settings.cache_clear()
+        monkeypatch.setenv(name, "0")
+        with pytest.raises(ValidationError):
+            get_settings()
+        monkeypatch.delenv(name, raising=False)
+
+
+def test_canonical_openapi_settings_pin_the_fusion_settings() -> None:
+    _assert_fusion_defaults(canonical_openapi_settings())

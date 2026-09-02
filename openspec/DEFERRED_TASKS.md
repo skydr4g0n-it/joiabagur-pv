@@ -241,12 +241,48 @@ search pays a full cold round trip to the embedding provider. The debt was recor
 was designed and assigned to **C21 or C22**, which already work inside `retrieval/`; the fix is
 roughly three lines in `main.py` making that client a singleton.
 
-**What to do when C21/C22 land.**
+**Step 1 is paid. C21 (`add-hybrid-search-rrf`) made the client a process singleton**, and it
+was not the "three lines in `main.py`" this note assumed. `InMemoryEmbeddingCache` is a `dict`
+with no ceiling and no TTL: harmless per request, since it was born empty and died with the
+response — which is also *why* retrieval never got a hit — and a lifetime leak as a singleton
+keyed by every distinct operator query (~13 KB per vector) inside a container capped at
+512 MiB that already uses 232. `indexing/embeddings.py` stays frozen by C11, so the bound was
+injected through its existing `cache` constructor field: `retrieval/cache.py` holds a bounded
+LRU, `api/main.py` builds the client once, `api/routers/retrieval.py` resolves it from
+`app.state`, and `test_embeddings_module_is_unchanged` pins the freeze by content hash.
 
-1. Make the embedding client a singleton in the AI service.
-2. **Measure again** against the seeded world, both cold and warm.
+**Steps 2 to 4 stay open, and they are a change of their own** — they need a demo deploy, a
+cold and warm re-measurement and a funnel confirmation, which is a different kind of work and
+a different risk from anything C21 touches.
+
+1. ~~Make the embedding client a singleton in the AI service.~~ **Done in C21.**
+2. ~~**Measure again**, both cold and warm.~~ **Done on 2026-09-02**, against the local index
+   of 1.168 documents and the real provider, through the full C21 pipeline (expansion, both
+   lexical lists, embedding, vector branch, fusion, demoting filters), six operator queries:
+
+   | | min | media | max |
+   |---|---:|---:|---:|
+   | **Cold** (first time each text is seen) | 273 ms | 475 ms | **1328 ms** |
+   | **Warm** (the singleton's cache hits) | **74 ms** | **76 ms** | 78 ms |
+
+   **The singleton works, and the figure that matters is 76 ms** — an order of magnitude inside
+   the 800 ms budget, against 170-383 ms warm on the demo host before it existed. The cache
+   removes the provider round trip entirely on a repeated query text.
+
+   **What it does not remove is the first call for each distinct text**: 1328 ms on
+   `criollas de oro`, still well over 800 ms and consistent with the 1707 ms measured on the
+   demo host. So the budget is now comfortable for a shop that searches for similar things all
+   day and still blown by a genuinely new query.
+
+   These figures are a **laptop against a local database**, not the demo environment. They say
+   the singleton was worth paying for; they do not settle the revert, which needs step 3
+   measured where the operator actually is.
 3. Put `RetrievalTimeoutMs` back to **800 ms** in `appsettings.json` **and** in the
-   `AiGatewayOptions` default — the two must not drift apart.
+   `AiGatewayOptions` default — the two must not drift apart. **Decide with the cold tail in
+   hand**: at 800 ms a first-ever query text still degrades to the lexical searcher. That may
+   now be the right trade — C21's own lexical branch is what answers, and it scores 219/240
+   against the vector branch's 157/240 — but it is a decision to take deliberately and to
+   confirm with the funnel, not a consequence of the cache working.
 4. Confirm with the funnel log that `Origin=Assisted` and not `LexicalFallback`.
 
 **Why not leave it at 2500 ms.** A budget that no longer bites stops being a budget. With the

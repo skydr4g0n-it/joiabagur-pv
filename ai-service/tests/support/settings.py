@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from jbg_ai.config.settings import Settings
+from jbg_ai.config.settings import FUSION_DEFAULTS, Settings
 
 # HS256 keys shorter than 32 bytes make PyJWT warn; keep fixtures above the bar.
 TEST_JWT_SECRET = "test-jwt-secret-0123456789abcdefghij"
@@ -47,6 +47,7 @@ def build_settings(**overrides: Any) -> Settings:
         "jpv_index_sync_time_budget_seconds": 180,
         "jpv_retrieval_distance_threshold": 0.65,
         "jpv_query_expansion_enabled": True,
+        **FUSION_DEFAULTS,
     }
     values.update(overrides)
     return Settings(**values)

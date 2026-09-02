@@ -602,7 +602,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 | **C18b** | `add-family-review-ui-and-orphan-alert` | Python + .NET 🗄️ + FE | C18a | 🟢 | **rev. dec. 2**, **partido el 31 ago**, **ficha reescrita el 31 ago**, **aplicado el 1 sep** *(3 migraciones; 62/62 tareas; pendiente de archivar)* |
 | ~~**C19**~~ | ~~`add-demand-signal-service`~~ | .NET 🗄️ | C10 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
 | **C20** | `add-synonym-dictionary` | Python | C14 | 🟢 | **rev. dec. 4** · *tapona a C21: se coge primero* · **ficha reescrita el 1 sep** |
-| **C21** | `add-hybrid-search-rrf` | Python | C14, C20 | 🔴 | — |
+| **C21** | `add-hybrid-search-rrf` | Python | C14, C20 | 🟢 | **archivado el 2 sep** · *tres puntos de la ficha refutados con medición* |
 | **FIX1** | `fix-enrichment-vocabulary-gaps` | Python + FE | C21 | 🟢 | **propuesto el 31 ago** · **ficha el 1 sep** · *fuera de la numeración C: no sale de la descomposición original* |
 | **C22** | `add-pos-projection-soft-prefilter` | Python | C10, C12, C14 | 🔴 | **rev. dec. 11** |
 | **C23** | `add-knowledge-corpus-and-indexer` | Python | C11 | 🟢 | — |
@@ -627,7 +627,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 
 **⛔ Anulados el 2026-08-31 (5):** C19, C29, C33, C35 y C37 — la rama del agente de inventario. Motivo y consecuencias en el §0. Las fichas se conservan como registro y llevan el sello en el sitio.
 
-**Vivos: 37** (36 numerados más `FIX1`). Archivados **21** (C01–C18b y C20). Pendientes **16**: C21, **FIX1**, C22, C23, C24, C25, C26, C27, C28, C30, C31, C32, C34, C36, C38 y C39 — de los cuales C27 y C23 llevan corte pre-autorizado. **C20 se archivó el 2026-09-01 y con él cae el tapón del grafo**: C21 tiene ya sus dos prerrequisitos y es el siguiente a abrir.
+**Vivos: 37** (36 numerados más `FIX1`). Archivados **22** (C01–C18b, C20 y C21). Pendientes **15**: **FIX1**, C22, C23, C24, C25, C26, C27, C28, C30, C31, C32, C34, C36, C38 y C39 — de los cuales C27 y C23 llevan corte pre-autorizado. **C21 se archivó el 2026-09-02**, y con él caen los prerrequisitos de C24 y C30, o sea las dos mitades del proyecto que estaban esperando a la fusión.
 
 ---
 
@@ -957,7 +957,9 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ---
 
-#### C21 · `add-hybrid-search-rrf` 🔴
+#### C21 · `add-hybrid-search-rrf` 🟢
+
+**Hecho (2026-09-02).** Rama léxica sobre `tsv` y **fusión RRF ponderada de tres listas** —la tecleada con `websearch_to_tsquery`, la expandida con `plainto_tsquery` por forma emitida, y la vectorial— a profundidad simétrica acoplada a `k`. **La medición refutó tres puntos de esta ficha**: el *boost* de SKU y nombre exacto no compra nada —un nombre exacto ya encabeza las dos listas léxicas, y ante un SKU la rama vectorial devuelve **cero** candidatos—, `@>` para multi-material es un precipicio de recall —60 documentos frente a 913, con 126 documentos sin materiales extraídos— y la conjunción estricta entre grupos deja **7 de las 10** consultas reales en cero documentos. Los filtros deducidos del texto **degradan y nunca excluyen**; los del body siguen excluyendo. La coordinación sólo cuenta los campos cuya ausencia es evidencia, con lo que una consulta subjetiva queda en manos de la rama vectorial sin un segundo peso que calibrar. `mode` deja de mentir y desaparece `vector_only_until_c21`; `match_reasons` lleva procedencia real por resultado; `score` pasa a RRF normalizado, declarado **no comparable** con lo persistido antes; `low_confidence` es desacuerdo entre ramas **sólo cuando corrieron dos**. Cliente de embeddings **singleton con caché acotado**, sin descongelar `embeddings.py`: baja la latencia en caliente a **76 ms** frente a 273-1328 ms en frío. Medido sobre 24 consultas del índice real (12 curadas + 12 grabadas): vector-only **157/240**, lexical-only **219/240**, **fusión 224/240**. Sin migración, sin tocar `openapi.json` y sin tocar `backend/`. Specs vivas `hybrid-fusion` (**nueva**), `vector-retrieval`, `query-expansion`, `assisted-search-panel` y `ai-service-runtime`. Change [`2026-09-02-add-hybrid-search-rrf`](../../openspec/changes/archive/2026-09-02-add-hybrid-search-rrf/).
 
 **Objetivo.** Rama léxica + fusión RRF + filtros estructurales por reglas, incluido el **filtro por solape de materiales**.
 **Prereq.** C14, C20 · **Zona.** `ai-service/src/jbg_ai/retrieval/`
