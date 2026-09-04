@@ -23,7 +23,7 @@ pip3 install certbot certbot-nginx
 
 # pip installs certbot to /usr/local/bin; cron PATH does not include it — use full path.
 cat > /etc/cron.d/certbot-jpv << 'CRON_EOF'
-0 3,15 * * * root /usr/local/bin/certbot renew -q --deploy-hook "systemctl reload nginx" >> /var/log/certbot-cron.log 2>&1
+0 3,15 * * * root PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /usr/local/bin/certbot renew -q --deploy-hook "systemctl reload nginx" >> /var/log/certbot-cron.log 2>&1
 CRON_EOF
 chmod 644 /etc/cron.d/certbot-jpv
 

@@ -352,10 +352,12 @@ sudo /usr/local/bin/certbot renew --dry-run
 
 Certbot se instala con **pip** en `user_data` → el binario queda en `/usr/local/bin/certbot`. **No** uses `certbot` a secas en cron: el PATH de cron es mínimo y el job falla con `certbot: command not found` (el certificado caduca sin renovarse).
 
-Las instancias nuevas creadas por Terraform ya incluyen `/etc/cron.d/certbot-jpv` con la ruta absoluta. En una instancia **ya existente** (p. ej. tras la migración), créalo o corrígelo a mano:
+Además, el plugin `certbot-nginx` necesita encontrar el binario `nginx` (en `/usr/sbin/nginx`), que tampoco está en el PATH por defecto de cron. El cron debe incluir `PATH=` completo.
+
+Las instancias nuevas creadas por Terraform ya incluyen `/etc/cron.d/certbot-jpv` con la ruta absoluta y el PATH completo. En una instancia **ya existente** (p. ej. tras la migración), créalo o corrígelo a mano:
 
 ```bash
-echo '0 3,15 * * * root /usr/local/bin/certbot renew -q --deploy-hook "systemctl reload nginx" >> /var/log/certbot-cron.log 2>&1' | sudo tee /etc/cron.d/certbot-jpv
+echo '0 3,15 * * * root PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /usr/local/bin/certbot renew -q --deploy-hook "systemctl reload nginx" >> /var/log/certbot-cron.log 2>&1' | sudo tee /etc/cron.d/certbot-jpv
 sudo chmod 644 /etc/cron.d/certbot-jpv
 sudo /usr/local/bin/certbot renew --dry-run
 ```
@@ -540,15 +542,17 @@ dig pv.joiabagur.com +short
 
 ### Certificado SSL caducado o cron no renueva
 
-Síntoma en `/var/log/cron`: `certbot: command not found` en las líneas de `CROND ... CMD (certbot renew ...)`.
+Síntomas en `/var/log/certbot-cron.log`:
+- `certbot: command not found` → falta la ruta absoluta `/usr/local/bin/certbot`
+- `NoInstallationError("Could not find a usable 'nginx' binary")` → falta `PATH=` en el cron
 
 ```bash
 # Renovar ya
 sudo /usr/local/bin/certbot renew --force-renewal
 sudo nginx -t && sudo systemctl reload nginx
 
-# Corregir cron (ruta absoluta + log)
-echo '0 3,15 * * * root /usr/local/bin/certbot renew -q --deploy-hook "systemctl reload nginx" >> /var/log/certbot-cron.log 2>&1' | sudo tee /etc/cron.d/certbot-jpv
+# Corregir cron (ruta absoluta + PATH para plugin nginx + log)
+echo '0 3,15 * * * root PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /usr/local/bin/certbot renew -q --deploy-hook "systemctl reload nginx" >> /var/log/certbot-cron.log 2>&1' | sudo tee /etc/cron.d/certbot-jpv
 sudo chmod 644 /etc/cron.d/certbot-jpv
 sudo /usr/local/bin/certbot renew --dry-run
 ```
