@@ -440,6 +440,53 @@ inalterado, y hay un escenario que lo verifica. Corresponde a otro change.
 
 ---
 
+## FIX1 — lo que la corrida dejó anotado y sin ficha
+
+Archivado el 2026-09-05 como `2026-09-05-fix-enrichment-vocabulary-gaps`. Las tres cosas que su
+informe deja abiertas, y por qué ninguna entró en el change:
+
+### `filigrana` sigue siendo una laguna, y de otro eje
+
+Es la única exclusión del overlay de C20 que queda abierta, y **ahora es el ejemplo al que apunta
+el test guardián** `test_overlay_anchor_absent_from_the_base_is_a_vocabulary_gap`. Alcanza 66
+documentos por sí sola, repartidos por todos los tipos de pieza —es una técnica, no una pieza—, y
+una de las 12 búsquedas registradas de operador es literalmente «anillo de filigrana tradicional
+menorquina».
+
+**Por qué se aplazó:** cerrarla significa añadir un canónico a **`style_tags`**, que es otro eje con
+sus propias puertas de cobertura en el auditor, y no cuesta lo que cuesta una laguna de
+`piece_type`. No tiene change asignado: FIX1 cerró las cuatro de `piece_type` y dejó ésta declarada
+como abierta en su propio motivo, dentro de las `exclusions` del overlay.
+
+**Referencia:** `ai-service/src/jbg_ai/retrieval/query_synonyms.yaml`, sección `exclusions`.
+
+---
+
+### El endpoint que agregue los tipos realmente presentes en el surtido
+
+FIX1 midió lo que cuesta mover el vocabulario cerrado: **cinco ficheros, cuatro tests fijados, dos
+lenguajes y dos specs vivas, para cuatro términos**. Nadie puede hoy responder «qué tipos de pieza
+hay de verdad en el surtido» sin consultar la base a mano.
+
+**Por qué se aplazó:** es una capacidad nueva, no la corrección de una laguna. **Sigue sin ficha
+propia** en el plan de changes.
+
+**Referencia:** `Documentos/Proyecto Final AIEng/informes/fix1-vocabulary-gaps-measurements.md` §8.
+
+---
+
+### `Llavero Cape Nao` Grande y pequeño podrían formar familia
+
+Al ganar `llavero` como tipo, **comparten `piece_type` por primera vez** (SKU416 y SKU417), que es
+la condición que el agrupador de C18a necesita para proponerlos como familia.
+
+**Por qué se aplazó:** correr la sugerencia de C18a estaba explícitamente fuera del alcance de FIX1,
+que no toca `families/`. Es una pasada del agrupador, no un cambio de código.
+
+**Referencia:** `Documentos/Proyecto Final AIEng/informes/fix1-vocabulary-gaps-measurements.md` §8.
+
+---
+
 ## Implementation Guidance
 
 When implementing deferred tasks:
@@ -452,5 +499,5 @@ When implementing deferred tasks:
 
 ---
 
-**Last Updated:** 2026-08-29
+**Last Updated:** 2026-09-05
 **Maintained By:** Development Team
