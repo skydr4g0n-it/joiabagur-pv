@@ -15,6 +15,7 @@ from jbg_ai.enrichment.constants import PROMPT_VERSION
 from jbg_ai.enrichment.llm import LiteLlmEnrichClient
 from jbg_ai.enrichment.pipeline import enrich_products, load_prompt
 from jbg_ai.enrichment.schema import EnrichmentExtraction
+from jbg_ai.enrichment.vocab import load_vocabularies
 from support.fake_enrich_llm import FakeEnrichLlm
 from support.paths import AI_SERVICE_ROOT
 from support.settings import build_settings
@@ -39,16 +40,51 @@ def test_enrich_llm_uses_litellm_not_openai_catalog_client() -> None:
     assert "OpenAICatalogLlm" not in imported
 
 
-def test_prompt_version_is_enrichment_v1() -> None:
-    public = AI_SERVICE_ROOT / "prompts" / "enrichment" / "v1.md"
+def test_prompt_version_matches_the_loaded_prompt_file() -> None:
+    """The version stamped on a profile must name the prompt that produced it.
+
+    `PROMPT_VERSION` and the prompt path were declared independently until FIX1. Bumping
+    one without the other stamps profiles with a version whose text never reached the
+    model — a claim that looks true and cannot be checked afterwards. The path now derives
+    from the constant, and this pins the other half: the file itself says which version it is.
+    """
+    public = AI_SERVICE_ROOT / "prompts" / f"{PROMPT_VERSION}.md"
     prompt = load_prompt()
 
     assert public.is_file()
-    assert PROMPT_VERSION == "enrichment/v1"
     assert prompt == public.read_text(encoding="utf-8")
+    assert prompt.splitlines()[0].strip() == f"# {PROMPT_VERSION}"
     assert "title" in prompt.lower()
     assert "style_tags" in prompt
     assert not (AI_SERVICE_ROOT / "src" / "jbg_ai" / "enrichment" / "prompt_v1.md").exists()
+
+
+def test_superseded_prompt_versions_stay_in_the_repository() -> None:
+    """1.178 profiles still declare `enrichment/v1`; that claim must stay verifiable."""
+    superseded = AI_SERVICE_ROOT / "prompts" / "enrichment" / "v1.md"
+
+    assert superseded.is_file()
+    assert superseded.read_text(encoding="utf-8").splitlines()[0].strip() == "# enrichment/v1"
+
+
+def test_prompt_piece_type_list_matches_the_closed_vocabulary() -> None:
+    """The prompt duplicates the vocabulary as plain text; drift between the two is silent.
+
+    Rendering the block from the YAML at load time was rejected in design D4: `prompt_version`
+    would stop naming a fixed text. This is the cheap half — the duplication stays a frozen
+    artefact, and a term added on one side without the other fails red here.
+    """
+    prompt = load_prompt()
+    terms = load_vocabularies().piece_type.canonical
+
+    line = next(
+        raw for raw in prompt.splitlines() if raw.startswith("**piece_type:**")
+    )
+    written = tuple(
+        part.strip() for part in line.removeprefix("**piece_type:**").strip(" .").split(",")
+    )
+
+    assert written == terms
 
 
 def test_concurrency_setting_caps_in_flight_calls() -> None:

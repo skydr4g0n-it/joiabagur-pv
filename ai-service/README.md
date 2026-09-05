@@ -8,7 +8,7 @@ Python FastAPI microservice for the JoiaBagur Proyecto Final RAG.
 - **C08** (HU-AIENG-008) **renegotiates the enrichment contract** and opens catalog-wide auth. `POST /v1/enrich/products` now returns `source` (`rule` | `inferred`) on every proposed value, plus `piece_type`, `stone_type`, `size_label`, tags split into `color_tags` / `style_tags` / `occasion_tags`, and `prompt_version` on the response. Without per-field provenance the .NET side cannot tell a value a rule produced from one a model inferred, which is the whole of its hybrid review policy. Catalog-wide routes (`/v1/enrich/*`) authenticate through `get_catalog_principal`, which does **not** require `pos_id`; retrieval, assistance and inventory keep requiring it, and a token without it is still rejected there with 401.
 - **C06a** (HU-AIENG-006a) ships the real-catalog corpus **outside this service**: offline scripts in `scripts/catalog/`, JSONL in `data/catalog/real/generated/`. No LLM client, no Alembic `text_provenance`, no writes to `public` from `jbg-ai`.
 - **C06b** (HU-AIENG-006b) adds the **CLI** `python -m jbg_ai.data` (`generate` / `ingest`) under `jbg_ai.data`. `api.main` does not import it. Generate reads `JPV_CATALOG_LLM_API_KEY` from `backend/.env` (host only; not the RAG key). `GET /health` does not need it. See [`src/jbg_ai/data/README.md`](src/jbg_ai/data/README.md).
-- **C09** (HU-AIENG-009) replaces the enrichment stub when `STUB_MODE=false`: closed vocabularies, size regex on `Name` then `Description` (never SKU), LiteLLM at temperature 0 (`JPV_RAG_LLM_*`), confidence by evidence span, `prompt_version = enrichment/v1`. Batch quality gates live in an auditor, not as HTTP 422. Compose and the OpenAPI snapshot stay on `STUB_MODE=true` until a RAG key exists. See [`prompts/enrichment/v1.md`](prompts/enrichment/v1.md).
+- **C09** (HU-AIENG-009) replaces the enrichment stub when `STUB_MODE=false`: closed vocabularies, size regex on `Name` then `Description` (never SKU), LiteLLM at temperature 0 (`JPV_RAG_LLM_*`), confidence by evidence span, `prompt_version = enrichment/v2` since FIX1 (`enrichment/v1` for the 1.178 profiles C09 produced). Batch quality gates live in an auditor, not as HTTP 422. Compose and the OpenAPI snapshot stay on `STUB_MODE=true` until a RAG key exists. See [`prompts/enrichment/v2.md`](prompts/enrichment/v2.md) and the superseded [`v1.md`](prompts/enrichment/v1.md), kept unmodified.
 - **C10** (HU-AIENG-010) adds nested CLI `python -m jbg_ai.data world simulate|ingest` under `jbg_ai.data.world`. Simulate is offline (YAML of 12 POS, no Postgres, no LLM). Ingest uses `JPV_PG*` against local Docker and does not touch `"Products"` / `"Collections"` / schema `ai`. Recipe: [`../data/world/pos-profiles.yaml`](../data/world/pos-profiles.yaml). See [`src/jbg_ai/data/README.md`](src/jbg_ai/data/README.md).
 - **C11** (HU-AIENG-011) adds the library `jbg_ai.indexing`: canonical `source-text/v1` (`build_source_text` / `hash_source_text`) and an injectable LiteLLM embedding client (`aembedding`, 1536-d, in-memory cache, batch 64). `api.main` does not import it. `JPV_EMBEDDING_*` are optional at boot; embedding requires its own key and does not fall back to `JPV_RAG_LLM_API_KEY`.
 - **C13** (HU-AIENG-013) replaces the `/v1/index/*` stub when `STUB_MODE=false`: catalog feed pull (`X-Index-Feed-Key`, keyset `since`/`since_id`), committed `src/jbg_ai/indexing/sku_provenance.json`, skip-embed upsert, tombstones, checkpoint, CLI `python -m jbg_ai.indexing sync [--full]`. Auth is `get_catalog_principal` (no `pos_id`). The POS feed method exists on the client and is **not** called. `indexing/embeddings.py` is not edited. OpenAPI adds `since_id` / `cursor_id`.
@@ -119,6 +119,25 @@ Rules that C03 must rely on:
 With `STUB_MODE=true` (the local and test default) every `/v1` route answers from deterministic fixtures: no LLM, no embeddings, no database, no clock. The same request always returns the same body, so the .NET client can assert its mapping against them.
 
 With `STUB_MODE=false` a route whose real logic does not exist yet answers **501** naming the change that will deliver it (C24 evals, C26 substitutes, C30 assist, C35 inventory). `POST /v1/enrich/products` is C09: the real pipeline, or 503 if `JPV_RAG_LLM_API_KEY` is missing — never 501. `POST /v1/index/sync` and `GET /v1/index/status` are C13: the catalog drain, or 503 if feed/embed settings or `sku_provenance.json` are missing — never 501. `POST /v1/retrieval/products` is C14: the vector retriever, or 503 if `JPV_EMBEDDING_API_KEY`, `DATABASE_URL` or a compatible index is missing — never 501. Substitutes stay 501 until C26. Later changes replace remaining handlers one at a time; the contract frozen here is the one they must respect.
+
+## Enrichment prompt versions
+
+**The catalogue holds more than one.** `PROMPT_VERSION` in `enrichment/constants.py` names the
+prompt in force, and `load_prompt()` derives its path from that constant — `prompts/<version>.md` —
+so the two cannot drift and stamp a profile with a version that never produced it. Superseded
+prompt files stay in the repository unmodified, because the profiles produced by them keep
+declaring their version and that claim has to stay checkable.
+
+Since FIX1 the corpus is mixed: **22 profiles on `enrichment/v2`** (the enumerated cohort of
+`fix-enrichment-vocabulary-gaps`, whose `piece_type` the eight-term vocabulary could not name)
+and **1.178 on `enrichment/v1`**.
+
+**Consequence, and it is not optional: any aggregate metric over extracted attributes must be
+reported per `PromptVersion`.** Coverage of `piece_type`, distribution of `materials`, share of
+empty `style_tags` — an average across both populations is a number without a subject. This is the
+same discipline C24 applies to `data_origin`, and the field exists precisely to make the difference
+visible. Mixing `PromptVersion` is safe and traceable; mixing `embedding_version` is not, because
+that compares two geometric spaces and returns a plausible number with no meaning.
 
 ## OpenAPI snapshot
 
@@ -364,7 +383,7 @@ ai-service/
     indexing/       # C11 source-text/embeddings (frozen) + C13 feed client, repo, orchestrator, sku_provenance.json
     retrieval/      # C14 vector retriever (embed max_attempts=1, <=> HNSW, body filters)
                     # + C20 query expansion: synonyms.py, query_synonyms.yaml, measure.py CLI
-  prompts/          # versioned prompts: catalog-synth/v3 (C06b generate) + enrichment/v1 (C09 extract)
+  prompts/          # versioned prompts: catalog-synth/v3 (C06b generate) + enrichment/v1 and v2 (extract; v2 in force since FIX1)
   evals/results/    # C20 measured reach report; C24 will write its runs beside it
   migrations/
     bootstrap.sql   # one-off: extension, schema, dedicated role, grants

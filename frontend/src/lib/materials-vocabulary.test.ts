@@ -29,7 +29,7 @@ describe('materials vocabulary', () => {
     ]);
   });
 
-  it('should carry the eight canonical piece types when compared with the enrichment vocabulary', () => {
+  it('should carry the twelve canonical piece types when compared with the enrichment vocabulary', () => {
     expect(PIECE_TYPE_OPTIONS.map((option) => option.value)).toEqual([
       'anillo',
       'pendientes',
@@ -39,7 +39,21 @@ describe('materials vocabulary', () => {
       'tobillera',
       'broche',
       'cadena',
+      'diadema',
+      'gemelos',
+      'cinturon',
+      'llavero',
     ]);
+  });
+
+  it('should keep the canonical unaccented and the accent in the label when the two differ', () => {
+    // The value is compared by exact equality against `piece_type` in the index, so an
+    // accented `cinturón` here would silently match nothing. The accent belongs to the label.
+    const belt = PIECE_TYPE_OPTIONS.find((option) => option.label === 'Cinturón');
+    expect(belt?.value).toBe('cinturon');
+    for (const option of PIECE_TYPE_OPTIONS) {
+      expect(option.value).toBe(option.value.normalize('NFD').replace(/[̀-ͯ]/g, ''));
+    }
   });
 
   it('should give every option a label when rendered in the quick filters', () => {

@@ -68,18 +68,29 @@ def test_overlay_never_overrides_a_base_canonical() -> None:
 
 
 def test_overlay_anchor_absent_from_the_base_is_a_vocabulary_gap() -> None:
-    """A piece type the base does not know is not a synonym and must not enter here."""
+    """A term the base does not know is not a synonym and must not enter here.
+
+    The example was `diadema` until FIX1 defined it as a canonical, at which point this
+    stopped raising and failed with `DID NOT RAISE` — the opposite direction to the
+    expected one, which makes deleting the test the tempting move. It is not deletable:
+    it is the guard that keeps a vocabulary gap from being smuggled in as a synonym, and
+    it is what made FIX1 visible in the first place. The example moves to `filigrana`,
+    the gap that is still open and recorded as such in the overlay's exclusions.
+
+    The message names the base vocabulary and not a change: the one it used to name is
+    FIX1 itself, and an error that points at an archived change outlives its own advice.
+    """
     overlay = {
         "classes": [
-            {"field": "piece_type", "canonical": "diadema", "forms": ["tiara"]},
+            {"field": "style_tags", "canonical": "filigrana", "forms": ["filigrana menorquina"]},
         ]
     }
     with pytest.raises(SynonymDictionaryError) as exc_info:
         build_dictionary(load_vocabularies(), overlay)
 
     message = str(exc_info.value)
-    assert "diadema" in message
-    assert "fix-enrichment-vocabulary-gaps" in message
+    assert "filigrana" in message
+    assert "vocabularies.yaml" in message
 
 
 def test_shipped_overlay_anchors_all_exist_in_the_base_vocabulary() -> None:
@@ -103,9 +114,12 @@ def test_shipped_overlay_anchors_all_exist_in_the_base_vocabulary() -> None:
 def test_base_vocabulary_terms_are_pinned() -> None:
     """Mirror of `frontend/src/lib/materials-vocabulary.test.ts`.
 
-    This change must not move the extraction vocabulary. When
-    `fix-enrichment-vocabulary-gaps` adds `diadema`, `gemelos`, `cinturon` and
-    `llavero`, that change updates this list deliberately — which is the point.
+    C20 pinned eight terms so that no change could move the extraction vocabulary by
+    accident. FIX1 moved it on purpose: `diadema`, `gemelos`, `cinturon` and `llavero`
+    name four kinds of piece the eight hypernyms could not, and this test firing is how
+    that act stays deliberate in each of the places the list is replicated. `gemelos` is
+    plural, as `pendientes` is; `cinturon` is unaccented, as `pequeno` is, because the
+    canonical is compared by exact equality when it arrives from the panel as a filter.
     """
     vocabs = load_vocabularies()
     assert vocabs.piece_type.canonical == (
@@ -117,6 +131,10 @@ def test_base_vocabulary_terms_are_pinned() -> None:
         "tobillera",
         "broche",
         "cadena",
+        "diadema",
+        "gemelos",
+        "cinturon",
+        "llavero",
     )
     assert vocabs.materials.canonical == (
         "plata",
@@ -211,6 +229,32 @@ def test_plural_is_resolved_without_a_dedicated_entry() -> None:
         assert canonical in _forms(typed), f"{typed} did not reach {canonical}"
 
 
+def test_plural_canonical_is_reachable_from_its_singular() -> None:
+    """`gemelos` is canonical in the plural, and the reduction only runs singular<-plural.
+
+    `singular_candidates` strips `s`/`es`, so `diademas`, `llaveros` and `cinturones` reach
+    their canonical unaided. It never adds a plural, so a typed `gemelo` cannot reach
+    `gemelos` on its own: that is the one case the overlay has to supply as a surface form.
+    """
+    assert singular_candidates("gemelo") == ()
+
+    overlay = load_overlay_from_path(OVERLAY_PATH)
+    declared = _folded(
+        [str(form) for entry in overlay.get("classes") or () for form in entry.get("forms") or ()]
+    )
+    assert "gemelo" in declared, "the singular must be declared; the reduction cannot reach it"
+    assert "gemelos" in _forms("gemelo")
+
+    # The other three need no entry at all, which is why none was added for them.
+    for typed, canonical in (
+        ("diademas", "diadema"),
+        ("llaveros", "llavero"),
+        ("cinturones", "cinturon"),
+    ):
+        assert typed not in declared, f"{typed} should not need its own overlay entry"
+        assert canonical in _forms(typed), f"{typed} did not reach {canonical}"
+
+
 def test_singularisation_never_invents_a_canonical() -> None:
     """A reduction is only used when the reduced form is already in the dictionary."""
     assert singular_candidates("collares") == ("collar", "collare")
@@ -263,9 +307,17 @@ def test_excluded_false_friend_is_absent() -> None:
 
 
 def test_vocabulary_gaps_are_recorded_as_exclusions_not_smuggled_in() -> None:
+    """The exclusions are the ones still alive, and a closed gap must leave the list.
+
+    `llavero`, `diadema`, `gemelos` and `cinturon` were recorded here as gaps belonging to
+    `fix-enrichment-vocabulary-gaps`. That change defined them as canonicals, so the reason
+    they were listed stopped being true: a section whose job is to warn against what must
+    not enter cannot go on listing four terms of the base it overlays.
+    """
     overlay = load_overlay_from_path(OVERLAY_PATH)
     excluded = {str(item["term"]).casefold() for item in overlay.get("exclusions") or ()}
-    assert {"piel", "llavero", "diadema", "gemelos", "cinturon", "filigrana"} <= excluded
+    assert {"piel", "filigrana"} <= excluded
+    assert not {"llavero", "diadema", "gemelos", "cinturon"} & excluded
     for item in overlay.get("exclusions") or ():
         assert str(item.get("why") or "").strip(), f"exclusion {item['term']} has no reason"
 

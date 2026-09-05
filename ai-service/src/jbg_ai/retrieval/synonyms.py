@@ -146,7 +146,10 @@ def _require_known_class(key: ClassKey, forms: dict[ClassKey, list[str]], where:
         raise SynonymDictionaryError(
             f"{where} anchors '{key[1]}' in field '{key[0]}', which the enrichment "
             "vocabulary does not define. A term the base does not know is a vocabulary "
-            "gap, not a synonym: it belongs to `fix-enrichment-vocabulary-gaps`."
+            "gap, not a synonym: closing it means adding the canonical to "
+            "`enrichment/vocabularies.yaml` in a change of its own, with a prompt "
+            "version bump and a re-enrichment of the affected rows. It does not "
+            "enter here."
         )
 
 
