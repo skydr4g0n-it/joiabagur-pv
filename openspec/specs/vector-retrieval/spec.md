@@ -1,7 +1,7 @@
 # vector-retrieval Specification
 
 ## Purpose
-Vector retriever behind `POST /v1/retrieval/products` when `STUB_MODE` is off: embed query with C11 client (`max_attempts=1`), pgvector cosine `<=>` with SQL distance threshold, over-retrieval after the threshold, body filters that exclude while constraints inferred from the query text only demote, `score` as the normalised fused rank with the cosine distance kept as the vector diagnostic, 200 abstention vs 503 dependency failure, `mode=vector`, `mode=lexical` and fused `mode=hybrid` degrading to the lexical branch when the provider fails, a branch depth distinct from the returned window, stage logs for embed, search, lexical, filters and fuse. Stub C02 remains when `STUB_MODE` is true. Python does not read schema `public`. OpenAPI snapshot is not regenerated.
+Vector retriever behind `POST /v1/retrieval/products` when `STUB_MODE` is off: embed query with C11 client (`max_attempts=1`), pgvector cosine `<=>` with SQL distance threshold, over-retrieval after the threshold, body filters that exclude while constraints inferred from the query text only demote, `score` as the normalised fused rank with the cosine distance kept as the vector diagnostic, 200 abstention vs 503 dependency failure, `mode=vector`, `mode=lexical` and fused `mode=hybrid` degrading to the lexical branch when the provider fails, a branch depth distinct from the returned window, candidates additionally scoped in SQL to the point of sale of the token claim as defined by `pos-projection`, stage logs for embed, search, lexical, filters, projection and fuse. Stub C02 remains when `STUB_MODE` is true. Python does not read schema `public`. The OpenAPI snapshot moved once, for the optional `projection_age_seconds` response field.
 
 ## Requirements
 
@@ -129,6 +129,8 @@ The threshold is a floor and not a discriminator: measured against this corpus i
 
 Each branch MUST be truncated at the configured branch depth **before** fusing, and that depth MUST be a separate parameter from the over-retrieval window even when their defaults coincide. The vector branch's depth MUST be applied as a `LIMIT` on the set already filtered by the distance threshold.
 
+The candidate set of every branch MUST additionally be restricted to the point of sale of the token when the soft-prefilter capability applies its scope, as defined by `pos-projection`. That restriction is the only predicate that removes a candidate on availability grounds: stock never removes one. Filtering by the point of sale MUST NOT be implemented by post-filtering an approximate index scan, because an approximate scan that returns fewer rows than requested does so without any visible error; the scoped subset MUST be established before the distance is ranked so the branch depth is honoured.
+
 #### Scenario: Overfetch is capped after fusion
 - **GIVEN** `STUB_MODE` is disabled and more than 15 candidates survive fusion
 - **WHEN** an authenticated client calls `POST /v1/retrieval/products` with `top_k = 5`
@@ -152,7 +154,13 @@ Each branch MUST be truncated at the configured branch depth **before** fusing, 
 - **GIVEN** `STUB_MODE` is disabled and at least one hit is returned
 - **WHEN** an authenticated client calls with token `pos_id = B` and body `pos_id = A`
 - **THEN** `effective_pos_id` is B
-- **AND** the search SQL does not filter by `pos_id`
+- **AND** the search SQL scopes candidates to point of sale B and never to the body value
+
+#### Scenario: The scoped branch still returns its full depth
+- **GIVEN** `STUB_MODE` is disabled and a point of sale whose assortment is a small fraction of the indexed catalogue
+- **WHEN** a retrieval is served with the point-of-sale scope applied
+- **THEN** the vector branch returns as many candidates as its depth allows within the scoped subset
+- **AND** the count is not silently capped below that depth by an approximate index scan
 
 ### Requirement: Body filters restrict the candidate set
 When the request carries retrieval filters, the search MUST apply them in SQL. Non-empty `filters.materials` MUST require array overlap (`&&`) with `product_document.materials`. A non-null `filters.category` MUST equal `piece_type`. A non-null `filters.family_id` that parses as a UUID MUST equal `product_document.family_id`. A `family_id` that does not parse as a UUID MUST produce HTTP 422 without changing the frozen request schema. Malformed entries in `filters.exclude_product_ids` MUST be ignored (logged at Debug) and MUST NOT fail the request; well-formed UUIDs MUST be excluded from `results`.
