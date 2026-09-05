@@ -518,6 +518,51 @@ def test_no_vector_reaches_the_logs(caplog: pytest.LogCaptureFixture) -> None:
         assert "embedding=[" not in message
 
 
+# ------------------------------------------------------------------- sales, unread
+
+
+def test_the_retrieval_path_cannot_read_the_sales_figures() -> None:
+    """Written by the drain, read by nothing here. Structural, not a promise.
+
+    `sales_30d`, `sales_90d` and `last_sale_at` are persisted so the business-signals
+    ranking that follows has an input, and this capability must not quietly start using
+    them — a weight that appeared here would be uncalibrated by definition, because the
+    golden set that could calibrate it does not exist yet. The cheapest guarantee is that
+    the values never reach the pipeline at all: no hit type carries them, so no ordering
+    rule can read one by accident.
+    """
+    import inspect
+
+    from jbg_ai.retrieval import filters, fusion, orchestrator
+    from jbg_ai.retrieval.ports import LexicalHit, SearchHit
+
+    for hit_type in (SearchHit, LexicalHit):
+        fields = set(hit_type.__dataclass_fields__)
+        assert not any(name.startswith("sales_") for name in fields), hit_type
+        assert "last_sale_at" not in fields
+
+    for module in (orchestrator, filters, fusion):
+        source = inspect.getsource(module)
+        assert "sales_30d" not in source, module.__name__
+        assert "sales_90d" not in source, module.__name__
+        assert "last_sale_at" not in source, module.__name__
+
+
+def test_sales_figures_do_not_change_the_order() -> None:
+    """Two candidates the fusion ranks equally stay in fused order whatever they sold."""
+    search = FakeProductSearch(
+        [row(A, "SOLD-A-LOT", 0.10), row(B, "SOLD-NOTHING", 0.11)],
+        assignments=[
+            FakeAssignment(MINE, A, qty_bucket="3+"),
+            FakeAssignment(MINE, B, qty_bucket="3+"),
+        ],
+    )
+
+    response = serve(search)
+
+    assert skus(response) == ["SOLD-A-LOT", "SOLD-NOTHING"], "distance decides, not rotation"
+
+
 # --------------------------------------------------------------------------- unit
 
 
