@@ -5,6 +5,7 @@ using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Domain.Enums;
 using JoiabagurPV.Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace JoiabagurPV.Application.Services;
 
@@ -18,17 +19,20 @@ public class IndexFeedService : IIndexFeedService
 
     private readonly IIndexFeedRepository _repository;
     private readonly TimeProvider _timeProvider;
+    private readonly IOptions<IndexFeedOptions> _options;
     private readonly ITraceContextAccessor _traceContext;
     private readonly ILogger<IndexFeedService> _logger;
 
     public IndexFeedService(
         IIndexFeedRepository repository,
         TimeProvider timeProvider,
+        IOptions<IndexFeedOptions> options,
         ITraceContextAccessor traceContext,
         ILogger<IndexFeedService> logger)
     {
         _repository = repository;
         _timeProvider = timeProvider;
+        _options = options;
         _traceContext = traceContext;
         _logger = logger;
     }
@@ -69,7 +73,7 @@ public class IndexFeedService : IIndexFeedService
     }
 
     /// <inheritdoc/>
-    public async Task<IndexFeedPageDto> GetPosAvailabilityPageAsync(
+    public async Task<PosAvailabilityPageDto> GetPosAvailabilityPageAsync(
         DateTime? since,
         Guid? sinceId,
         CancellationToken cancellationToken)
@@ -82,29 +86,43 @@ public class IndexFeedService : IIndexFeedService
             ? rows.Take(IndexFeedPageSizes.PosAvailability).ToList()
             : rows.ToList();
 
+        // Resolved once per page and reported on it, so a client can tell what clock produced
+        // the figures without reading this service's configuration. Computed even when the page
+        // carries no upsert: the instant is a property of the reading, not of its contents.
+        var computedAsOf = _options.Value.SalesAsOfUtc ?? _timeProvider.GetUtcNow().UtcDateTime;
+
         var upserts = page.Where(row => row.IsActive).ToList();
-        var salesByPair = await LoadSalesAsync(upserts, cancellationToken);
+        var salesByPair = await LoadSalesAsync(upserts, computedAsOf, cancellationToken);
 
         var items = page.Select(row => MapPosItem(row, salesByPair)).ToList();
         var pairs = await _repository.GetActiveAssignmentPairsAsync(cancellationToken);
         var aggregateHash = IndexFeedAggregateHash.OfPosPairs(
             pairs.Select(pair => (pair.PointOfSaleId, pair.ProductId)));
 
-        var dto = new IndexFeedPageDto
+        var dto = new PosAvailabilityPageDto
         {
             Items = items,
             NextCursor = hasMore ? CursorFrom(page[^1].Watermark, page[^1].InventoryId) : null,
             HasMore = hasMore,
             PageSize = IndexFeedPageSizes.PosAvailability,
-            AggregateHash = aggregateHash
+            AggregateHash = aggregateHash,
+            ComputedAsOf = computedAsOf
         };
 
         LogPage("pos-availability", dto);
         return dto;
     }
 
+    /// <summary>
+    /// Sales aggregates for the page, counted against <paramref name="computedAsOf"/>.
+    /// </summary>
+    /// <remarks>
+    /// The repository has taken the reference instant as a parameter since the feed was built,
+    /// so nothing here needed refactoring: the only change is where the value comes from.
+    /// </remarks>
     private async Task<Dictionary<(Guid PointOfSaleId, Guid ProductId), PosSalesAggregate>> LoadSalesAsync(
         IReadOnlyList<PosFeedRow> upserts,
+        DateTime computedAsOf,
         CancellationToken cancellationToken)
     {
         if (upserts.Count == 0)
@@ -116,8 +134,8 @@ public class IndexFeedService : IIndexFeedService
             .Select(row => new PosAssignmentPair(row.PointOfSaleId, row.ProductId))
             .ToList();
 
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
-        var aggregates = await _repository.GetSalesAggregatesAsync(pairs, now, cancellationToken);
+        var aggregates = await _repository.GetSalesAggregatesAsync(
+            pairs, computedAsOf, cancellationToken);
 
         return aggregates.ToDictionary(row => (row.PointOfSaleId, row.ProductId));
     }

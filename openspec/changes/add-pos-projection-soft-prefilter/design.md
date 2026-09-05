@@ -13,7 +13,7 @@ Six measurements govern the design. Three of them contradict the ficha.
 | 1 | Page arithmetic over 20 probes: **eight of eleven** points of sale have ≥6 of 20 searches below a page of 10. FORNELLS 12/20, worst case **1 survivor**; one MAO-AIR query leaves **zero** | The problem is systemic, not FORNELLS-specific. Motivates the whole change |
 | 2 | Unassigned rows (`Inventory.IsActive = false`) are **6,9 %** at CIU-CENTRE, **8,7 %** at FORNELLS, **8,8 %** at MAO-AIR; 670 of 6.720 overall | Row existence as the hard filter would spend that share of the window on candidates `Carried()` is certain to drop. Decides D1 |
 | 3 | `Carried()` does **not** filter by quantity, and zero-stock assigned rows are **34,4 %** at MAO-AIR, 12,0 % at FORNELLS, 11,7 % at HT-GALDANA | Stock is what must demote without excluding, and the signal is coarse enough to matter. Decides D3 |
-| 4 | HNSW is **never chosen** on the live path: Seq Scan 8,2 ms (canonical) and 10,8 ms (live shape) against **113,7 ms** forced, which returns **40 of 60** rows. Scoped to FORNELLS: **7,3 ms**, 60 rows | Exact KNN over the scoped subset is not an engine change, it is what the planner already does — and it is faster. Decides D2 |
+| 4 | HNSW is **never chosen** on the live path: Seq Scan 8,2 ms (canonical) and 10,8 ms (live shape) against **113,7 ms** forced, which returns **40 of 60** rows. Scoped to FORNELLS: **7,3 ms**, 60 rows — *re-measured after implementation: 14,8-17,3 ms scoped against 18,0-33,1 ms unscoped, see D2* | Exact KNN over the scoped subset is not an engine change, it is what the planner already does. Decides D2 |
 | 5 | `IndexFeedService.MapPosItem` hardcodes `IsAssignedHint = true` on upserts and routes inactive rows to tombstones | The field is a constant today; without a soft delete it is unreachable and the ficha's demotion test is unsatisfiable. Decides D4 |
 | 6 | Against the wall clock, `sales_30d` non-zero pairs fall **16,28 % → 1,32 % (22 Sep) → 0 (26 Sep)**; `sales_90d` survives to 21 Nov | C25 would calibrate on a dead signal. Decides D7 |
 
@@ -58,7 +58,9 @@ The design's promise («a valid product cannot disappear because of a stale proj
 
 S10 warns that approximate indexes do not understand `WHERE`: the index returns its neighbours and the filter discards them afterwards, silently. Measurement 4 shows both halves of that story here — the trap is real (forced HNSW returns 40 of 60 rows) and it is **not on the live path**, because since C14 the planner has chosen a sequential exact scan at 1.168 rows.
 
-So the decision is to make explicit what the database already does: a scope CTE over `ai.pos_projection`, joined to `ai.product_document`, with the distance computed over the scoped subset. Correct by construction, deterministic, and 7,3 ms against 10,8 ms unscoped.
+So the decision is to make explicit what the database already does: a scope CTE over `ai.pos_projection`, joined to `ai.product_document`. Correct by construction, deterministic, and no slower.
+
+**Two corrections from the implementation measurement**, recorded here rather than left to be rediscovered. First, the exploration's figures were optimistic by roughly a factor of two: measured on the populated projection with per-node timing off, the scoped statement runs at **14,8-17,3 ms** against **18,0-33,1 ms** unscoped. The direction holds — scoped is not slower — but 7,3 ms is not a number to cite. Second, and more consequential: the planner filters `ai.product_document` by distance over all 1.168 rows and hash-joins the scope **afterwards**, so the CTE does **not** reduce the number of distance computations. The justification for this shape is therefore not compute saved; it is that the scoped subset is established before the ordering, so the branch depth is honoured by construction rather than by the planner continuing to choose well. Full record in [`c22-implementation-measurements.md`](../../../Documentos/Proyecto%20Final%20AIEng/informes/c22-implementation-measurements.md).
 
 | Alternative | Verdict |
 |---|---|
@@ -136,6 +138,17 @@ The injection point needed no refactor: `IIndexFeedRepository.GetSalesAggregates
 
 The value is a **configured constant**, not `max(SaleDate)`: the latter would be 2026-08-29 today, contaminated by the 7 manual test sales of C16, and would drift every time a sale is recorded in the demo. Absent configuration, behaviour is today's wall clock, so nothing changes for anyone who does not set it.
 
+**And the instant is persisted per row, which costs this change its "no migration" claim.** C05 created `ai.pos_projection` with no column for it, and the ticket's inventory checked that table for *existence* — its `qty_bucket` `CHECK`, its reverse index — not for column adequacy, so five documents came to declare "no migration of any kind" over a fact that does not hold. The claim was an observation that the tables already existed, never a constraint someone accepted a cost for, and it does not survive contact with the schema.
+
+Persisting it matters because the drain is **incremental**: the feed re-emits only pairs whose inventory row moved, so a pair that does not change keeps forever the `sales_30d` the run that wrote it computed. Configure `SalesAsOf` after a first drain and the projection holds wall-clock rows next to horizon rows with nothing to tell them apart — the artefact-recorded-as-finding this change exists to prevent, reappearing inside C25. `refreshed_at` is not a substitute: reconstructing which rows are which from it needs out-of-band knowledge of when the configuration changed, which is exactly what "declared" is supposed to replace.
+
+| Alternative | Verdict |
+|---|---|
+| Do not persist it; leave it in configuration | ❌ Reading the projection cannot tell you which clock produced a figure, and a mixed projection is undetectable |
+| Persist it on `ai.sync_checkpoint` instead | ❌ Same revision, different question: the checkpoint holds the **last** clock while the rows can come from several |
+| Defer the column to C25 | ❌ Same migration one change later, on a projection already contaminated — the follow-up FIX this avoids |
+| **One additive nullable column on the projection** | ✅ Answers the question C25 asks, per row; same hand-written shape as C13's `b8e3c1a4d7f0` |
+
 ### D8 — CLI, not a route and not a scheduler
 
 `ai-service-api-contracts` enumerates the `/v1` endpoints in a MUST, so a new route is a normative contract change this change does not buy. An in-process scheduler adds a background task to a container capped at 512 MiB that already uses 232, competing for a pool of 5 connections. Production will need something; the demo does not.
@@ -169,12 +182,14 @@ Related decision recorded here because C22 forces it: **C24's golden set is labe
 
 ## Migration Plan
 
-No schema migration, Alembic or EF Core. Deployment order:
+One additive Alembic revision (`ai.pos_projection.computed_as_of`, nullable, no default), no EF Core migration. Deployment order:
 
-1. Ship `IndexFeed:SalesAsOf` unset — behaviour identical to today.
-2. Run `python -m jbg_ai.indexing sync-pos --full` once to populate `ai.pos_projection` and create its checkpoint row.
-3. Enable the prefilter (`JPV_POS_PREFILTER_ENABLED`, default on). Before step 2 the guard of D6 answers 503, which is the correct answer for an unsynchronised projection.
-4. Set `IndexFeed:SalesAsOf` and re-run the sync so the stored aggregates are recomputed against the reference instant.
+1. Apply the revision. The table is empty and the column is nullable, so there is no backfill and no table rewrite.
+2. Ship `IndexFeed:SalesAsOf` **already set** to `2026-08-23T23:59:59Z`.
+3. Run `python -m jbg_ai.indexing sync-pos --full` once to populate `ai.pos_projection` and create its checkpoint row.
+4. Enable the prefilter (`JPV_POS_PREFILTER_ENABLED`, default on). Before step 3 the guard of D6 answers 503, which is the correct answer for an unsynchronised projection.
+
+Setting the reference instant **before** the first drain, rather than after it, is the whole point of the ordering. An incremental run recomputes nothing — the feed re-emits only pairs whose inventory row moved — so a clock changed afterwards leaves every unchanged pair on the old one, and recovering costs a full `sync-pos --full`. An earlier draft of this plan had step 4 setting the constant and "re-running the sync so the stored aggregates are recomputed"; that step does not do what it says, and `computed_as_of` is what makes its failure visible rather than silent.
 
 **Rollback:** set `JPV_POS_PREFILTER_ENABLED=false` — retrieval returns to pre-change behaviour with no deploy. `ai.pos_projection` can stay populated; nothing else reads it.
 

@@ -557,11 +557,11 @@ Se miden por *changes* de OpenSpec, no por número de historias: la serie `HU-AI
 | **EP11** | Plataforma del Servicio de IA | C01, C02, C03, C05, C17 | 🔴 completa |
 | **EP12** | Corpus y Enriquecimiento del Catálogo | C06a (hecho), C06b (hecho), C08, C09 (hecho), C10 (hecho), C11 (hecho), C23, **FIX1** | 🔴 parcial |
 | **EP13** | Familias de Producto y Desambiguación | C07 (hecho), C18a (hecho), C18b (hecho), C28 | 🟢 parcial |
-| **EP14** | Búsqueda Semántica Híbrida | C12, C13, C14, C15, C16, C20, C21 (hechos), **C22** (en curso), C25 | 🟠 parcial |
+| **EP14** | Búsqueda Semántica Híbrida | C12, C13, C14, C15, C16, C20, C21, **C22** (hechos), C25 | 🟠 parcial |
 | **EP15** | Venta Asistida, Sustitutos y Agentes | C26, C27, C30, C31, C32, C34, C36 | 🔴 parcial |
 | **EP16** | ~~Inventario Asistido y Señales de Demanda~~ | ~~C19, C29, C33, C35, C37~~ | ⛔ **anulada 31 ago** |
 | **EP17** | Evaluación y Observabilidad de IA | C04, C24, C38, C39 | 🔴 parcial |
-| **TOTAL PF** | | **42 fichas · 37 vivas** (5 anuladas) — **22 archivadas, 1 en curso (C22), 14 pendientes** | |
+| **TOTAL PF** | | **42 fichas · 37 vivas** (5 anuladas) — **22 archivadas, 1 implementada sin archivar (C22), 14 pendientes** | |
 
 > **Recuento actualizado el 2026-09-05.** Las 42 fichas son 41 numeradas —C01–C39 con C06 y C18 partidas en dos— más **`FIX1` (`fix-enrichment-vocabulary-gaps`)**, que hasta ahora no aparecía en esta tabla: nació de un hallazgo de C18a, va deliberadamente **fuera de la numeración C** y pertenece a EP12 por zona (`enrichment/`, prompts y espejo del frontend). Está **detrás de C22 y antes de que C24 etiquete**, porque `preprocessing_id` sigue siendo `source-text/v1` y no delataría el cambio de vocabulario.
 

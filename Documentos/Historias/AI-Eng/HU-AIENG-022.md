@@ -83,7 +83,7 @@ Desde C14 el planificador elige escaneo secuencial exacto, porque a 1.168 filas 
 - **Recalibración del umbral de distancia por cuantil**, que C21 dejó anotada para C25.
 - **Revertir `AiGateway:RetrievalTimeoutMs` a 800 ms**: sigue siendo un change propio, con su medición en el entorno de demostración (`DEFERRED_TASKS.md`).
 - **Índice HNSW parcial por punto de venta** y `hnsw.iterative_scan`: la medición dice que a 1.168 filas no hacen falta. Se declaran como techo de escalado en el README.
-- **Migración de ninguna clase**: ni Alembic ni EF Core. `ai.pos_projection` y `ai.sync_checkpoint` existen desde C05 y C13, y el checkpoint ya tiene `feed` como clave primaria.
+- **Migración que cree, altere o elimine una tabla**: ninguna, ni Alembic ni EF Core. `ai.pos_projection` y `ai.sync_checkpoint` existen desde C05 y C13, y el checkpoint ya tiene `feed` como clave primaria. Sí entra **una revisión de Alembic aditiva** de una sola columna anulable, `ai.pos_projection.computed_as_of`: sin ella el instante de referencia que exige el Escenario 8 no tiene dónde persistirse, y como el drenaje es incremental la proyección puede acabar con filas contadas contra dos relojes distintos e indistinguibles. Corrección hecha durante la implementación; el inventario original comprobó que la tabla existía, no que sus columnas bastaran.
 - **Arreglar los otros tres relojes del repositorio** —informe de movimientos, ventana de devolución y dashboards—. Están inventariados en el informe y el desplazamiento de fechas previo a la grabación del vídeo es una operación de demo, ajena a las métricas.
 
 ### Decisiones de diseño ya acordadas
@@ -207,7 +207,7 @@ Desde C14 el planificador elige escaneo secuencial exacto, porque a 1.168 filas 
 **Y** **no** existe planificador en proceso ni ruta HTTP nueva de sincronización
 **Y** **no** hay índice HNSW parcial ni escaneo iterativo
 **Y** `indexing/embeddings.py`, `enrichment/vocabularies.yaml` y el árbol `frontend/` no tienen diff
-**Y** no hay revisión de Alembic nueva ni migración de EF Core
+**Y** hay exactamente una revisión de Alembic, aditiva y de una sola columna anulable, y ninguna migración de EF Core
 **Y** `AiGateway:RetrievalTimeoutMs` sigue en 2500 ms
 
 ---

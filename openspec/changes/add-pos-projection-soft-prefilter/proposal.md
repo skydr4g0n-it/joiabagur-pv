@@ -20,7 +20,7 @@ And a second clock is running out. The synthetic world of C10 ends on **2026-08-
 - **The sales windows are counted against a declared reference instant** — `IndexFeed:SalesAsOf = 2026-08-23T23:59:59Z`, absent meaning today's wall-clock behaviour — with `computedAsOf` travelling on the feed page and persisted alongside the projection. This is not a workaround for a dataset with an end: C24 requires `test_run_is_reproducible_for_same_config_and_seed` and the delivery checklist requires an ablation table reproducible with one command, so a ranking that reads `now()` **was already irreproducible by design**. The fixed horizon only makes it urgent.
 - **An ablation flag**, default in `Settings` and effective value as a parameter of the orchestration call, in the pattern C20 and C21 established, so C24 can sweep configurations without restarting and without moving the frozen request schema.
 - **BREAKING: `ai-service/openapi.json` is regenerated**, for the first time since C13, by one optional response field. Backward compatible for the .NET deserialiser; the snapshot test exists precisely to force the act to be deliberate.
-- **No migration of any kind**, Alembic or EF Core. `ai.pos_projection` exists since C05 and `ai.sync_checkpoint` already has `feed` as its primary key.
+- **One additive Alembic revision, and no EF Core migration.** `ai.pos_projection` exists since C05 and `ai.sync_checkpoint` already has `feed` as its primary key, so the drain creates no table. But the projection has **no column for the reference instant** its sales figures were counted against, and the drain is incremental: a pair that does not change is never re-emitted, so a row keeps forever the `sales_30d` computed by the run that wrote it. A projection drained before `IndexFeed:SalesAsOf` is configured and topped up afterwards therefore holds **two clocks, mixed and indistinguishable** — the same failure this change exists to prevent, one level down and inside the very consumer it unblocks. `computed_as_of timestamptz NULL` is added by a hand-written revision in the pattern C13's `b8e3c1a4d7f0` already established: additive, nullable, no default, no backfill on an empty table.
 
 ## Capabilities
 
@@ -38,7 +38,7 @@ And a second clock is running out. The synthetic world of C10 ends on **2026-08-
 
 **Contracts.** `ai-service/openapi.json` moves by one optional response field; the POS feed page gains an optional `computedAsOf`. No .NET REST contract changes shape.
 
-**Data.** `ai.pos_projection` goes from empty to populated; `ai.sync_checkpoint` gains its `pos-availability` row. No schema change.
+**Data.** `ai.pos_projection` goes from empty to populated and gains one nullable column, `computed_as_of`; `ai.sync_checkpoint` gains its `pos-availability` row. No EF Core migration and no table created.
 
 **Not touched.** `frontend/`, `terraform/`, `.github/workflows/`, `indexing/embeddings.py` (frozen since C11), `enrichment/vocabularies.yaml`, `AiGateway:RetrievalTimeoutMs` (still 2500 ms), the catalog feed and its checkpoint.
 

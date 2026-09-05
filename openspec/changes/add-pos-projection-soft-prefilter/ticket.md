@@ -108,10 +108,11 @@ En paralelo, el mundo sintético de C10 tiene horizonte fijo (última venta real
 - `IndexFeedService.LoadSalesAsync` pasa `SalesAsOf ?? _timeProvider.GetUtcNow().UtcDateTime` al `now` que `GetSalesAggregatesAsync` **ya recibe como parámetro**. `IndexFeedRepository` no cambia de forma.
 - `computedAsOf` en el DTO de página del feed de disponibilidad, persistido por Python en la proyección.
 - **Sin migración de EF Core.** Sin endpoints nuevos. Sin tocar el feed de catálogo.
+- **Una revisión de Alembic aditiva**, contra lo que decía la redacción original de este ticket: `ai.pos_projection` no tiene columna donde persistir el instante de referencia, y el inventario de arriba comprobó la existencia de la tabla —su `CHECK` y su índice— no la suficiencia de sus columnas. Ver el apartado *Riesgos* y la decisión D7 del `design.md`.
 
 ### Fuera de este ticket
 
-Señales de venta en el ranking (**C25**) · sustitutos (**C26**) y complementarios (**C27**) · corpus de conocimiento (**C23**) · golden set (**C24**) · aviso de frescura en la interfaz (**C34/C36**) · revertir `AiGateway:RetrievalTimeoutMs` a 800 ms · índice HNSW parcial y `hnsw.iterative_scan` · los otros tres relojes del repositorio (informe de movimientos, ventana de devolución, dashboards) · `ai.query_log` · cualquier migración.
+Señales de venta en el ranking (**C25**) · sustitutos (**C26**) y complementarios (**C27**) · corpus de conocimiento (**C23**) · golden set (**C24**) · aviso de frescura en la interfaz (**C34/C36**) · revertir `AiGateway:RetrievalTimeoutMs` a 800 ms · índice HNSW parcial y `hnsw.iterative_scan` · los otros tres relojes del repositorio (informe de movimientos, ventana de devolución, dashboards) · `ai.query_log` · cualquier migración que cree, altere o elimine una tabla.
 
 ---
 
@@ -170,7 +171,7 @@ Los diez escenarios normativos están en [HU-AIENG-022](../../../Documentos/Hist
 - [ ] `dotnet test` sin regresión respecto a la línea base medida con `git stash` (comparar **nombres** de test, nunca el número)
 - [ ] `ai-service/openapi.json` regenerado con la receta del README y snapshot actualizado
 - [ ] `TOKEN_POS_ID` corregido a un UUID y la batería dependiente en verde
-- [ ] **Sin** revisión de Alembic nueva y **sin** migración de EF Core
+- [ ] Exactamente **una** revisión de Alembic, aditiva (`computed_as_of` en `ai.pos_projection`), y **sin** migración de EF Core
 - [ ] `indexing/embeddings.py`, `enrichment/vocabularies.yaml` y el árbol `frontend/` sin diff
 - [ ] Informe de llenado por punto de venta, antes y después, versionado en `Documentos/Proyecto Final AIEng/informes/`
 - [ ] `Documentos/epicas.md` (EP14) enlaza HU-AIENG-022; limitación del instante de referencia declarada para el README
@@ -225,3 +226,4 @@ Las nueve decisiones de diseño se cerraron en la sesión de exploración del 20
 | Fecha | Autor | Cambio |
 |---|---|---|
 | 2026-09-05 | Sergio Valdueza | Creación del ticket a partir de la sesión de exploración de C22 y de sus mediciones. Nueve decisiones cerradas, incluida la incorporación del reloj inyectado (FIX2) dentro de este change |
+| 2026-09-05 | Sergio Valdueza | Corrección durante la implementación: se abre **una** revisión de Alembic aditiva. `ai.pos_projection` no tiene columna para el instante de referencia que la decisión 8 exige persistir, y como el drenaje es incremental, sin ella la proyección puede acabar con filas calculadas contra dos relojes distintos e indistinguibles. Diferirla a C25 no la ahorra: la traslada sobre una proyección ya contaminada |

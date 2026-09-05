@@ -82,6 +82,19 @@ class RetrievalResponse(ScopedResponse):
     results: list[RetrievalResult]
     candidates_returned: int = Field(..., ge=0, description="Candidates the retriever produced")
     low_confidence: bool = False
+    projection_age_seconds: float | None = Field(
+        default=None,
+        ge=0.0,
+        description=(
+            "Seconds since the point-of-sale availability projection was last synchronised. "
+            "Null when the prefilter did not run. Taken from the drain checkpoint and never "
+            "from the projection rows: the feed is incremental, so a row's timestamp records "
+            "when that assignment last changed rather than when the projection was last read, "
+            "and would report months on a projection synchronised seconds ago. Above the "
+            "configured ceiling the point-of-sale scope is not applied for that request and "
+            "this field is how the caller can tell."
+        ),
+    )
 
 
 class SubstitutesResponse(ScopedResponse):

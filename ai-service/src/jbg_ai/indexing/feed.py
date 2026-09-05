@@ -1,4 +1,4 @@
-"""Injectable catalog/POS index-feed client. C13 drains catalog only."""
+"""Injectable catalog/POS index-feed client. C13 drained catalog only; C22 types the POS side."""
 
 from __future__ import annotations
 
@@ -57,13 +57,53 @@ class CatalogFeedPage:
     aggregate_hash: str
 
 
+#: The only quantities the feed ever states. An exact stock figure is deliberately absent
+#: from the wire, so this vocabulary is the whole of what a consumer can know.
+QTY_BUCKETS = frozenset({"0", "1-2", "3+"})
+
+#: The bucket a tombstone leaves behind. Paired with `is_assigned_hint = False` it is the
+#: soft delete: the row survives, out of scope and observably unassigned.
+TOMBSTONE_BUCKET = "0"
+
+POS_UNASSIGNED_REASON = "unassigned"
+
+
+@dataclass(frozen=True)
+class PosUpsertItem:
+    kind: Literal["upsert"]
+    point_of_sale_id: UUID
+    product_id: UUID
+    qty_bucket: str
+    is_assigned_hint: bool
+    sales_30d: int
+    sales_90d: int
+    last_sale_at: datetime | None
+    watermark: datetime
+
+
+@dataclass(frozen=True)
+class PosTombstoneItem:
+    kind: Literal["tombstone"]
+    point_of_sale_id: UUID
+    product_id: UUID
+    reason: str
+    at: datetime
+
+
+PosFeedItem = PosUpsertItem | PosTombstoneItem
+
+
 @dataclass(frozen=True)
 class PosFeedPage:
-    items: list[dict[str, object]]
+    items: list[PosFeedItem]
     next_cursor: FeedCursor | None
     has_more: bool
     page_size: int
     aggregate_hash: str
+    #: The instant the page's sales windows were counted against. Optional because a feed
+    #: older than this field is still a legitimate feed; stored per row when present, since
+    #: the feed is incremental and one projection can hold rows counted against several.
+    computed_as_of: datetime | None = None
 
 
 class IndexFeedClient(Protocol):
@@ -165,15 +205,59 @@ def parse_catalog_page(payload: dict[str, object]) -> CatalogFeedPage:
     )
 
 
+def parse_pos_item(raw: dict[str, object]) -> PosFeedItem:
+    """Map one POS feed item onto its typed form.
+
+    An unknown `qtyBucket` is rejected here rather than left for the database's `CHECK` to
+    catch: the constraint would abort the batch mid-drain with a message about a constraint
+    name, while the vocabulary is a property of the contract and belongs where the contract
+    is read.
+    """
+    kind = str(raw.get("kind") or "upsert")
+    if kind == "tombstone":
+        return PosTombstoneItem(
+            kind="tombstone",
+            point_of_sale_id=UUID(str(raw["pointOfSaleId"])),
+            product_id=UUID(str(raw["productId"])),
+            reason=str(raw.get("reason") or ""),
+            at=_parse_datetime(raw["at"]),
+        )
+    if kind != "upsert":
+        raise ValueError(f"unknown POS feed kind: {kind}")
+
+    bucket = str(raw.get("qtyBucket") or "")
+    if bucket not in QTY_BUCKETS:
+        raise ValueError(f"unknown qtyBucket: {bucket!r}")
+
+    last_sale_at = raw.get("lastSaleAt")
+    return PosUpsertItem(
+        kind="upsert",
+        point_of_sale_id=UUID(str(raw["pointOfSaleId"])),
+        product_id=UUID(str(raw["productId"])),
+        qty_bucket=bucket,
+        is_assigned_hint=bool(raw.get("isAssignedHint", True)),
+        sales_30d=int(raw.get("sales30d") or 0),
+        sales_90d=int(raw.get("sales90d") or 0),
+        last_sale_at=_parse_datetime(last_sale_at) if last_sale_at is not None else None,
+        watermark=_parse_datetime(raw["watermark"]),
+    )
+
+
 def parse_pos_page(payload: dict[str, object]) -> PosFeedPage:
     items_raw = payload.get("items") or []
-    items = [item for item in items_raw if isinstance(item, dict)] if isinstance(items_raw, list) else []
+    if not isinstance(items_raw, list):
+        raise ValueError("POS feed page items must be a list")
+    items = [parse_pos_item(item) for item in items_raw if isinstance(item, dict)]
+    computed_as_of = payload.get("computedAsOf")
     return PosFeedPage(
         items=items,
         next_cursor=_parse_cursor(payload.get("nextCursor")),
         has_more=bool(payload.get("hasMore", False)),
         page_size=int(payload.get("pageSize") or 0),
         aggregate_hash=str(payload.get("aggregateHash") or ""),
+        computed_as_of=(
+            _parse_datetime(computed_as_of) if computed_as_of is not None else None
+        ),
     )
 
 

@@ -1,13 +1,30 @@
-"""In-memory product search port. No sockets, no RDS. Delivered by C14, extended by C21."""
+"""In-memory product search port. No sockets, no RDS. Delivered by C14, extended by C21 and C22."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from uuid import UUID
 
 from jbg_ai.enrichment.vocab import fold
 from jbg_ai.retrieval.lexical import LexicalRequest
 from jbg_ai.retrieval.ports import LexicalHit, SearchFilters, SearchHit
+
+#: What an unspecified projection means here: this point of sale carries the whole indexed
+#: set, in stock. A legitimate world state, and the one that leaves a test about fusion or
+#: about the lexical branch saying what it says without also having to describe an assortment.
+#: A test about the scope passes `assignments` explicitly.
+DEFAULT_BUCKET = "3+"
+
+
+@dataclass
+class FakeAssignment:
+    """One row of `ai.pos_projection`. `is_assigned_hint=False` is the soft delete."""
+
+    pos_id: UUID
+    product_id: UUID
+    qty_bucket: str = DEFAULT_BUCKET
+    is_assigned_hint: bool = True
 
 
 @dataclass
@@ -42,12 +59,42 @@ class FakeProductSearch:
         rows: list[FakeIndexedRow] | None = None,
         *,
         compatible_count: int | None = None,
+        assignments: list[FakeAssignment] | None = None,
+        synced_at: datetime | None = None,
+        never_synchronised: bool = False,
     ) -> None:
         self.rows = list(rows or [])
         self.compatible_count_override = compatible_count
+        #: `None` means "no projection was described", which the helpers below read as the
+        #: whole catalogue being carried. An empty list is a different thing entirely: a
+        #: point of sale that carries nothing, which is the 503 case.
+        self.assignments = None if assignments is None else list(assignments)
+        self.synced_at = (
+            None if never_synchronised else (synced_at or datetime.now(tz=UTC))
+        )
         self.count_calls: list[tuple[str, str]] = []
         self.search_calls: list[dict[str, object]] = []
         self.lexical_calls: list[dict[str, object]] = []
+        self.scope_calls: list[UUID] = []
+        self.synced_at_calls = 0
+
+    def _scope(self, pos_id: UUID) -> dict[UUID, str]:
+        """Product identifier to bucket, for what this point of sale actually carries."""
+        if self.assignments is None:
+            return {row.product_id: DEFAULT_BUCKET for row in self.rows}
+        return {
+            item.product_id: item.qty_bucket
+            for item in self.assignments
+            if item.pos_id == pos_id and item.is_assigned_hint
+        }
+
+    async def count_scope(self, pos_id: UUID) -> int:
+        self.scope_calls.append(pos_id)
+        return len(self._scope(pos_id))
+
+    async def projection_synced_at(self) -> datetime | None:
+        self.synced_at_calls += 1
+        return self.synced_at
 
     async def count_compatible(self, *, model_version_key: str, model_id: str) -> int:
         self.count_calls.append((model_version_key, model_id))
@@ -77,6 +124,7 @@ class FakeProductSearch:
         filters: SearchFilters,
         model_version_key: str,
         model_id: str,
+        pos_id: UUID | None = None,
     ) -> list[SearchHit]:
         self.search_calls.append(
             {
@@ -86,8 +134,10 @@ class FakeProductSearch:
                 "filters": filters,
                 "model_version_key": model_version_key,
                 "model_id": model_id,
+                "pos_id": pos_id,
             }
         )
+        scope = self._scope(pos_id) if pos_id is not None else None
         hits: list[SearchHit] = []
         for row in self.rows:
             if not row.is_active or not row.has_embedding or not row.compatible:
@@ -95,6 +145,8 @@ class FakeProductSearch:
             if row.distance > threshold:
                 continue
             if not self._passes_body_filters(row, filters):
+                continue
+            if scope is not None and row.product_id not in scope:
                 continue
             hits.append(
                 SearchHit(
@@ -106,6 +158,7 @@ class FakeProductSearch:
                     variant_label=row.variant_label,
                     price=row.price,
                     size_label=row.size_label,
+                    qty_bucket=None if scope is None else scope[row.product_id],
                 )
             )
         hits.sort(key=lambda item: item.distance)
@@ -117,18 +170,22 @@ class FakeProductSearch:
         *,
         depth: int,
         filters: SearchFilters,
+        pos_id: UUID | None = None,
     ) -> list[LexicalHit]:
         self.lexical_calls.append(
-            {"request": request, "depth": depth, "filters": filters}
+            {"request": request, "depth": depth, "filters": filters, "pos_id": pos_id}
         )
         groups = request.groups or ((request.text,),)
         counting = request.counting or tuple(True for _ in groups)
+        scope = self._scope(pos_id) if pos_id is not None else None
 
         hits: list[LexicalHit] = []
         for row in self.rows:
             if not row.is_active:
                 continue
             if not self._passes_body_filters(row, filters):
+                continue
+            if scope is not None and row.product_id not in scope:
                 continue
             matched = [self._group_matches(row, group) for group in groups]
             if not any(matched):
@@ -149,6 +206,7 @@ class FakeProductSearch:
                     variant_label=row.variant_label,
                     price=row.price,
                     size_label=row.size_label,
+                    qty_bucket=None if scope is None else scope[row.product_id],
                 )
             )
         hits.sort(key=lambda item: (-item.coordination, -item.ts_rank, item.sku))

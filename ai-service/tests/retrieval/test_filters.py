@@ -187,10 +187,10 @@ def test_body_filters_remain_hard() -> None:
     lexical_sql, _ = compile_lexical_sql(typed_request("anillo"), filters)
 
     for sql in (compile_search_sql(filters), lexical_sql):
-        assert "AND materials && CAST(:materials AS text[])" in sql
-        assert "AND piece_type = :category" in sql
-        assert "AND family_id = :family_id" in sql
-        assert "AND product_id <> ALL(CAST(:exclude_ids AS uuid[]))" in sql
+        assert "AND d.materials && CAST(:materials AS text[])" in sql
+        assert "AND d.piece_type = :category" in sql
+        assert "AND d.family_id = :family_id" in sql
+        assert "AND d.product_id <> ALL(CAST(:exclude_ids AS uuid[]))" in sql
 
 
 def test_material_filter_uses_overlap_by_default() -> None:
@@ -198,7 +198,7 @@ def test_material_filter_uses_overlap_by_default() -> None:
     lexical_sql, _ = compile_lexical_sql(typed_request("anillo"), filters)
 
     for sql in (compile_search_sql(filters), lexical_sql):
-        assert "materials && CAST(:materials AS text[])" in sql
+        assert "d.materials && CAST(:materials AS text[])" in sql
         assert "@>" not in sql, "containment is a recall cliff: 60 documents against 913"
 
 
@@ -232,3 +232,78 @@ def test_neither_branch_carries_a_price_or_stock_predicate() -> None:
         ]
         assert predicates == []
         assert "stock" not in sql
+
+
+# --------------------------------------------------------------------- availability (C22)
+
+
+class _Candidate:
+    """The smallest thing `demotion_rank` can read."""
+
+    def __init__(self, *, price=None, size_label=None, materials=None, qty_bucket=None):
+        self.price = price
+        self.size_label = size_label
+        self.materials = materials or []
+        self.qty_bucket = qty_bucket
+
+
+def test_the_ordering_key_is_one_tuple_with_stock_last() -> None:
+    """One key, not two sorts: priority is readable here instead of emerging from order."""
+    from jbg_ai.retrieval.filters import StructuralFilters, demotion_rank
+
+    key = demotion_rank(_Candidate(qty_bucket="0"), StructuralFilters())
+
+    assert len(key) == 4
+    assert key == (0, 0, 0, 1), "availability is the last component and nothing else fired"
+
+
+def test_an_absent_bucket_is_not_a_zero_bucket() -> None:
+    """`None` means the query ran unscoped. An absent signal must not demote anything."""
+    from jbg_ai.retrieval.filters import StructuralFilters, demotion_rank
+
+    assert demotion_rank(_Candidate(qty_bucket=None), StructuralFilters())[3] == 0
+    assert demotion_rank(_Candidate(qty_bucket="0"), StructuralFilters())[3] == 1
+
+
+def test_the_two_non_zero_buckets_rank_identically() -> None:
+    """Ordering `1-2` before `3+` would be a magic number with no evidence behind it."""
+    from jbg_ai.retrieval.filters import StructuralFilters, demotion_rank
+
+    filters = StructuralFilters()
+
+    assert demotion_rank(_Candidate(qty_bucket="1-2"), filters) == demotion_rank(
+        _Candidate(qty_bucket="3+"), filters
+    )
+
+
+def test_stock_only_decides_between_candidates_the_typed_blocks_rank_equally() -> None:
+    from jbg_ai.retrieval.filters import StructuralFilters, demotion_rank
+
+    filters = StructuralFilters(price_ceiling=80.0)
+    over_but_stocked = _Candidate(price=900.0, qty_bucket="3+")
+    within_but_empty = _Candidate(price=40.0, qty_bucket="0")
+
+    assert demotion_rank(within_but_empty, filters) < demotion_rank(over_but_stocked, filters)
+
+
+def test_demote_reorders_on_stock_alone_when_no_rule_fired() -> None:
+    """The early return is on "nothing to demote by", and stock is now part of that."""
+    from jbg_ai.retrieval.filters import StructuralFilters, demote
+
+    empty = _Candidate(qty_bucket="0")
+    stocked = _Candidate(qty_bucket="3+")
+
+    ordered, demoted = demote([empty, stocked], StructuralFilters())
+
+    assert ordered == (stocked, empty)
+    assert demoted == 1
+
+
+def test_demote_keeps_every_candidate_inside_the_window() -> None:
+    from jbg_ai.retrieval.filters import StructuralFilters, demote
+
+    candidates = [_Candidate(qty_bucket="0"), _Candidate(qty_bucket="3+")]
+
+    ordered, _ = demote(candidates, StructuralFilters())
+
+    assert len(ordered) == len(candidates), "a demotion never removes"

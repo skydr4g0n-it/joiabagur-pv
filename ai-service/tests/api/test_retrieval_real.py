@@ -14,7 +14,7 @@ from jbg_ai.api.schemas.retrieval import RetrievalResponse
 from jbg_ai.indexing.errors import EmbeddingError
 from support.fake_embedding_client import FakeEmbeddingClient
 from support.fake_product_search import FakeIndexedRow, FakeProductSearch
-from support.settings import TOKEN_POS_ID, build_settings
+from support.settings import OTHER_POS_ID, TOKEN_POS_ID, build_settings
 
 A = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 FAMILY = UUID("11111111-1111-1111-1111-111111111111")
@@ -161,16 +161,16 @@ def test_token_without_pos_id_is_401(issue_token: Callable[..., str]) -> None:
 
 def test_body_pos_id_is_ignored(issue_token: Callable[..., str]) -> None:
     app = _real_app()
-    token = issue_token(pos_id="POS-B")
+    token = issue_token(pos_id=TOKEN_POS_ID)
     with TestClient(app) as client:
         response = client.post(
             "/v1/retrieval/products",
-            json={"query": "anillo", "top_k": 1, "pos_id": "POS-A"},
+            json={"query": "anillo", "top_k": 1, "pos_id": OTHER_POS_ID},
             headers={"Authorization": f"Bearer {token}"},
         )
 
     assert response.status_code == 200
-    assert response.json()["effective_pos_id"] == "POS-B"
+    assert response.json()["effective_pos_id"] == TOKEN_POS_ID
 
 
 def test_invalid_family_id_is_422(issue_token: Callable[..., str]) -> None:

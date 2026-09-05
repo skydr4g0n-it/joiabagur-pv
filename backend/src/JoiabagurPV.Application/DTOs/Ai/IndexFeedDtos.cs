@@ -32,7 +32,13 @@ public sealed class IndexFeedCursorDto
 /// One page of an indexing feed. <see cref="AggregateHash"/> is the digest of the global
 /// indexable set, identical on every page of the same reading.
 /// </summary>
-public sealed class IndexFeedPageDto
+/// <remarks>
+/// Not sealed so <see cref="PosAvailabilityPageDto"/> can add the one field only that feed
+/// has. The catalog page keeps this exact shape: serialisation follows the declared type, so
+/// widening the base would have added a permanently null field to a contract that has no use
+/// for it.
+/// </remarks>
+public class IndexFeedPageDto
 {
     public IReadOnlyList<object> Items { get; init; } = [];
 
@@ -43,6 +49,22 @@ public sealed class IndexFeedPageDto
     public int PageSize { get; init; }
 
     public string AggregateHash { get; init; } = string.Empty;
+}
+
+/// <summary>
+/// One page of the POS availability feed. Adds <see cref="ComputedAsOf"/>, the instant the
+/// sales windows on this page were counted against.
+/// </summary>
+/// <remarks>
+/// Always populated, whether the instant came from <c>IndexFeed:SalesAsOf</c> or from the
+/// wall clock: a windowed figure whose clock is not declared cannot be reproduced, and the
+/// point of declaring it is lost if the field is present only when someone remembered to
+/// configure one. The consumer persists it per row, because the feed is incremental and one
+/// projection can end up holding rows counted against different instants.
+/// </remarks>
+public sealed class PosAvailabilityPageDto : IndexFeedPageDto
+{
+    public DateTime ComputedAsOf { get; init; }
 }
 
 /// <summary>

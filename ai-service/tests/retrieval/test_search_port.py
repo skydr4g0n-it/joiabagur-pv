@@ -140,16 +140,16 @@ def test_lexical_sql_uses_the_gin_predicate_and_applies_every_body_filter() -> N
         ALL_FILTERS,
     )
 
-    assert "tsv @@ " in sql
-    assert "ts_rank(tsv," in sql
+    assert "d.tsv @@ " in sql
+    assert "ts_rank(d.tsv," in sql
     assert "ORDER BY coordination DESC, ts_rank DESC" in sql
     assert "ai.product_document" in sql
     assert "public." not in sql
     assert "pos_id" not in sql
-    assert "materials && CAST(:materials AS text[])" in sql
-    assert "piece_type = :category" in sql
-    assert "family_id = :family_id" in sql
-    assert "product_id <> ALL(CAST(:exclude_ids AS uuid[]))" in sql
+    assert "d.materials && CAST(:materials AS text[])" in sql
+    assert "d.piece_type = :category" in sql
+    assert "d.family_id = :family_id" in sql
+    assert "d.product_id <> ALL(CAST(:exclude_ids AS uuid[]))" in sql
     assert sorted(terms.values()) == ["anillo", "plata", "sortija"]
     for term in terms.values():
         assert term not in sql

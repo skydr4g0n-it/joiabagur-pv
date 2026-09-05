@@ -12,6 +12,7 @@ using JoiabagurPV.Tests.TestHelpers;
 using JoiabagurPV.Tests.TestHelpers.Mothers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace JoiabagurPV.Tests.IntegrationTests;
 
@@ -115,6 +116,13 @@ public class AiIndexFeedPosTests : IAsyncLifetime
     {
         var product = await SeedInventoryAsync("SKU-POS-SALES", quantity: 4);
 
+        // Anchored to the instant the feed counts against, not to the wall clock. Seeding
+        // relative to `UtcNow` made this test a function of the day it ran: with a reference
+        // instant configured, a sale "ten days ago" can sit *after* the window's end and score
+        // zero. Reading the anchor from configuration keeps the test true with the option set
+        // or unset, which is the property that actually needs pinning.
+        var asOf = ReferenceInstant();
+
         using (var mother = new TestDataMother(_factory.Services))
         {
             var recent = await mother.Sale()
@@ -123,7 +131,7 @@ public class AiIndexFeedPosTests : IAsyncLifetime
                 .WithPaymentMethod(_payment.Id)
                 .WithUser(_user.Id)
                 .WithQuantity(5)
-                .WithSaleDate(DateTime.UtcNow.AddDays(-10))
+                .WithSaleDate(asOf.AddDays(-10))
                 .CreateAsync();
 
             await mother.Sale()
@@ -132,7 +140,7 @@ public class AiIndexFeedPosTests : IAsyncLifetime
                 .WithPaymentMethod(_payment.Id)
                 .WithUser(_user.Id)
                 .WithQuantity(2)
-                .WithSaleDate(DateTime.UtcNow.AddDays(-40))
+                .WithSaleDate(asOf.AddDays(-40))
                 .CreateAsync();
 
             await mother.Return()
@@ -173,6 +181,27 @@ public class AiIndexFeedPosTests : IAsyncLifetime
         var catalogPage = await catalog.Content.ReadFromJsonAsync<FeedPage>(Json);
         catalogPage!.PageSize.Should().Be(IndexFeedPageSizes.Catalog);
     }
+
+    [Fact]
+    public async Task PosAvailabilityFeed_DeclaresTheClockItCounted_Against()
+    {
+        await SeedInventoryAsync("SKU-POS-ASOF", quantity: 1);
+
+        var response = await _client.GetAsync(PosFeed);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        using var document = await JsonDocument.ParseAsync(stream);
+
+        document.RootElement.TryGetProperty("computedAsOf", out var computedAsOf)
+            .Should().BeTrue("a windowed figure whose clock is not declared cannot be reproduced");
+        computedAsOf.GetDateTime().ToUniversalTime().Should().Be(ReferenceInstant());
+    }
+
+    /// <summary>The instant the windows are counted against: configured, or the wall clock.</summary>
+    private DateTime ReferenceInstant() =>
+        _factory.Services.GetRequiredService<IOptions<IndexFeedOptions>>().Value.SalesAsOfUtc
+        ?? DateTime.UtcNow;
 
     private async Task<FeedPage> GetPosAsync(DateTime? since = null, Guid? sinceId = null)
     {

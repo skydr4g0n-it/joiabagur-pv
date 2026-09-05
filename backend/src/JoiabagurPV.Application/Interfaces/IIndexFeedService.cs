@@ -10,7 +10,11 @@ public interface IIndexFeedService
         Guid? sinceId,
         CancellationToken cancellationToken);
 
-    Task<IndexFeedPageDto> GetPosAvailabilityPageAsync(
+    /// <remarks>
+    /// Returns the derived page type on purpose: System.Text.Json serialises by the declared
+    /// type, so widening this to the base would silently drop <c>computedAsOf</c> from the wire.
+    /// </remarks>
+    Task<PosAvailabilityPageDto> GetPosAvailabilityPageAsync(
         DateTime? since,
         Guid? sinceId,
         CancellationToken cancellationToken);

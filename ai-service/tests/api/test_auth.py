@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from jbg_ai.api.auth import decode_service_token
 from support.sample_requests import V1_REQUESTS
-from support.settings import TEST_JWT_SECRET
+from support.settings import OTHER_POS_ID, TEST_JWT_SECRET, TOKEN_POS_ID
 
 
 def _call(
@@ -79,7 +79,7 @@ def test_token_signed_with_unexpected_algorithm_is_rejected(client: TestClient) 
     import jwt
 
     unsigned = jwt.encode(
-        {"user_id": "u-1", "role": "Admin", "pos_id": "POS-B", "trace_id": "t-1"},
+        {"user_id": "u-1", "role": "Admin", "pos_id": TOKEN_POS_ID, "trace_id": "t-1"},
         key="",
         algorithm="none",
     )
@@ -105,29 +105,29 @@ def test_valid_token_is_accepted(client: TestClient, auth_headers: dict[str, str
 
 def test_decode_service_token_exposes_every_claim(issue_token: Callable[..., str]) -> None:
     """The principal is the seam: user_id and role reach it even if no route reads them yet."""
-    token = issue_token(user_id="u-42", role="Admin", pos_id="POS-Z", trace_id="t-9")
+    token = issue_token(user_id="u-42", role="Admin", pos_id=OTHER_POS_ID, trace_id="t-9")
 
     principal = decode_service_token(token, TEST_JWT_SECRET)
 
     assert principal.user_id == "u-42"
     assert principal.role == "Admin"
-    assert principal.pos_id == "POS-Z"
+    assert principal.pos_id == OTHER_POS_ID
     assert principal.trace_id == "t-9"
 
 
 def test_pos_id_from_token_overrides_body_value(
     client: TestClient, issue_token: Callable[..., str]
 ) -> None:
-    token = issue_token(pos_id="POS-B")
+    token = issue_token(pos_id=TOKEN_POS_ID)
 
     response = client.post(
         "/v1/retrieval/products",
-        json={"query": "anillo", "top_k": 1, "pos_id": "POS-A"},
+        json={"query": "anillo", "top_k": 1, "pos_id": OTHER_POS_ID},
         headers={"Authorization": f"Bearer {token}"},
     )
 
     assert response.status_code == 200
-    assert response.json()["effective_pos_id"] == "POS-B"
+    assert response.json()["effective_pos_id"] == TOKEN_POS_ID
 
 
 def test_role_in_body_is_inert(client: TestClient, auth_headers: dict[str, str]) -> None:

@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: The POS availability feed is drained into ai.pos_projection by a CLI
-The indexing package SHALL expose a typed client over the existing POS feed method that parses `kind` `upsert` | `tombstone` and maps camelCase fields onto `point_of_sale_id`, `product_id`, `qty_bucket`, `is_assigned_hint`, `sales_30d`, `sales_90d`, `last_sale_at`, `computed_as_of` and `watermark`. Draining MUST be reachable as `python -m jbg_ai.indexing sync-pos`, accepting `--full` to ignore the checkpoint. The command MUST load the local environment file exactly as the catalog `sync` command does. Upserts MUST be idempotent on `(pos_id, product_id)` and MUST set `refreshed_at`. This capability MUST NOT add a route under `/v1`, MUST NOT start an in-process scheduler or background task, MUST NOT open an Alembic revision or an EF Core migration, and Python MUST NOT read or write schema `public` by SQL.
+The indexing package SHALL expose a typed client over the existing POS feed method that parses `kind` `upsert` | `tombstone` and maps camelCase fields onto `point_of_sale_id`, `product_id`, `qty_bucket`, `is_assigned_hint`, `sales_30d`, `sales_90d`, `last_sale_at`, `computed_as_of` and `watermark`. Draining MUST be reachable as `python -m jbg_ai.indexing sync-pos`, accepting `--full` to ignore the checkpoint. The command MUST load the local environment file exactly as the catalog `sync` command does. Upserts MUST be idempotent on `(pos_id, product_id)` and MUST set `refreshed_at`. This capability MUST NOT add a route under `/v1`, MUST NOT start an in-process scheduler or background task, MUST NOT open an EF Core migration, and Python MUST NOT read or write schema `public` by SQL. Its only schema change MUST be a single additive Alembic revision adding a nullable `computed_as_of` column to `ai.pos_projection`: no table may be created or dropped and no existing column may be altered.
 
 #### Scenario: Draining the POS feed populates the projection
 - **GIVEN** a POS availability feed with upsert items and `STUB_MODE` disabled
@@ -18,6 +18,13 @@ The indexing package SHALL expose a typed client over the existing POS feed meth
 - **THEN** `qty_bucket` holds that bucket
 - **AND** no column of `ai.pos_projection` holds an exact quantity
 - **AND** a value outside that vocabulary is rejected by the schema constraint
+
+#### Scenario: The only schema change is one additive nullable column
+- **GIVEN** the change is implemented
+- **WHEN** the Alembic history and the .NET migrations are inspected
+- **THEN** exactly one new revision exists and it only adds `computed_as_of` to `ai.pos_projection`
+- **AND** that column is nullable and carries no default
+- **AND** no table is created, altered or dropped, and no EF Core migration exists
 
 ### Requirement: The POS drain keeps its own keyset checkpoint
 The POS drain SHALL persist its cursor in `ai.sync_checkpoint` under `feed` value `pos-availability`, recording `watermark`, `since_id`, `last_incremental_sync_at`, `last_full_sync_at`, `last_aggregate_hash` and `indexed_count`. A run without `--full` MUST resume from that cursor. The catalog checkpoint row MUST NOT be read or written by this drain. Batch failures MUST be recorded in `ai.sync_failure` without aborting the remaining pages.
@@ -153,7 +160,7 @@ The drain and the retrieval MUST emit structured logs carrying `trace_id`. Retri
 - **AND** no embedding vector appears in any log entry
 
 ### Requirement: Sales aggregates are stored by this capability and read by none of it
-The projection SHALL persist `sales_30d`, `sales_90d`, `last_sale_at` and the reference instant reported by the feed. This capability MUST NOT use any of them to order, filter or score candidates; they exist for the business-signals ranking that follows. The reference instant MUST be stored so a later consumer can tell what clock produced the figures.
+The projection SHALL persist `sales_30d`, `sales_90d`, `last_sale_at` and the reference instant reported by the feed. This capability MUST NOT use any of them to order, filter or score candidates; they exist for the business-signals ranking that follows. The reference instant MUST be stored **on each row** so a later consumer can tell what clock produced that row's figures. Storing it once per synchronisation instead is insufficient, because the feed is incremental: a pair the feed does not re-emit keeps the figures the run that wrote it computed, so one projection can hold rows counted against different instants.
 
 #### Scenario: Sales figures are persisted without influencing the ranking
 - **GIVEN** two assigned candidates identical except for their sales figures

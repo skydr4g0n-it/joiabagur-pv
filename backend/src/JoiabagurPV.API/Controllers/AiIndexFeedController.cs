@@ -40,9 +40,9 @@ public class AiIndexFeedController : ControllerBase
     /// <c>(watermark, inventoryId)</c>.
     /// </summary>
     [HttpGet("pos-availability")]
-    [ProducesResponseType(typeof(IndexFeedPageDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PosAvailabilityPageDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<IndexFeedPageDto>> GetPosAvailability(
+    public async Task<ActionResult<PosAvailabilityPageDto>> GetPosAvailability(
         [FromQuery] DateTime? since,
         [FromQuery] Guid? sinceId,
         CancellationToken cancellationToken)
