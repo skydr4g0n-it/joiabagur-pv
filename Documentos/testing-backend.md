@@ -288,6 +288,24 @@ Sobre los dos primeros conviene una precisión que ahorra tests engañosos. Al p
 > ejecuciones del mismo código**. La inestabilidad que la entrada anterior documentaba sigue igual
 > de viva.
 >
+> **Actualización del 2026-09-05, sobre `c22-add-pos-projection-soft-prefilter`.** La suite tiene
+> ahora **984 tests**: C22 añade 11 —cinco de `IndexFeedSalesClockTests`, cinco de
+> `IndexFeedRegistrationTests` y dos de `AiIndexFeedPosTests`, uno de ellos el que fija que
+> `lastSaleAt` no se mueva por una venta posterior al instante de referencia—. La línea base del
+> change dio **52 fallos de 973**; al cierre, **53 de 984**.
+>
+> **Y esa diferencia de un fallo es ruido, medido y no supuesto.** Comparados por nombre aparecen
+> 7 y desaparecen 6, todos `22001: value too long for type character varying(20)` — el teléfono de
+> Bogus que documenta la entrada de más abajo. Para descartar que fuera del change se ejecutaron
+> **dos veces las dos clases que rotan** (`InventoryIntegrationTests`, `ReturnsControllerTests`)
+> sobre el **mismo binario y con `--no-build`**: 11 y 13 fallos, con **10 nombres de diferencia**.
+> Más rotación sin tocar una línea que la que había entre línea base y cierre.
+>
+> **Las clases del feed de indexación están limpias:** cero fallos en `AiIndexFeedCatalogTests`,
+> `AiIndexFeedPosTests`, `AiIndexFeedAuthTests`, `IndexFeedRegistrationTests`,
+> `IndexFeedSalesClockTests`, `IndexFeedAggregateHashTests`, `IndexFeedKeyComparerTests` y
+> `AiContractSnapshotTests` — 68 de 68.
+
 > **Las clases de familia siguen limpias:** cero fallos en `FamilyReviewControllerTests`,
 > `FamilyReviewVerdictSchemaTests`, `ProductFamiliesControllerTests`, `ProductFamilySchemaTests`,
 > `AiCatalogControllerTests`, `FamilySuggestionControllerTests` y `AiGatewayFamilyAuditTests`. Las

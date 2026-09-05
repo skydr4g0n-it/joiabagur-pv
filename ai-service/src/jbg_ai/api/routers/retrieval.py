@@ -20,12 +20,17 @@ from jbg_ai.api.schemas.retrieval import (
 from jbg_ai.config import Settings
 from jbg_ai.db.engine import DatabaseNotConfiguredError
 from jbg_ai.indexing.embeddings import EmbeddingClient
-from jbg_ai.retrieval.errors import InvalidFamilyIdError, RetrievalDependencyError
+from jbg_ai.retrieval.errors import (
+    InvalidFamilyIdError,
+    InvalidPosIdError,
+    RetrievalDependencyError,
+)
 from jbg_ai.retrieval.orchestrator import (
     build_retrieval_embed_client,
     retrieve_products as run_product_retrieval,
 )
 from jbg_ai.retrieval.ports import ProductSearchPort
+from jbg_ai.retrieval.projection import ProjectionFreshness
 from jbg_ai.retrieval.search import SqlAlchemyProductSearch
 from jbg_ai.stubs import retrieval_products_stub, retrieval_substitutes_stub
 
@@ -72,6 +77,23 @@ def _resolve_search(request: Request, settings: Settings) -> ProductSearchPort:
     return SqlAlchemyProductSearch(settings)
 
 
+def _resolve_freshness(request: Request) -> ProjectionFreshness:
+    """One freshness cache per application, not per process.
+
+    Per process looks equivalent and is not: a process can hold more than one application —
+    every test that builds a second one does — and they would then share a cached answer
+    about a checkpoint they do not necessarily share. Per request would be worse still: the
+    cache exists precisely so repeated retrievals stop spending a connection each on a value
+    that changes at cron cadence, and one born with the request can never record a hit.
+    """
+    existing = getattr(request.app.state, "retrieval_freshness", None)
+    if existing is not None:
+        return existing  # type: ignore[no-any-return]
+    freshness = ProjectionFreshness()
+    request.app.state.retrieval_freshness = freshness
+    return freshness
+
+
 @router.post(
     "/products",
     response_model=RetrievalResponse,
@@ -98,8 +120,17 @@ async def retrieve_products(
             settings=settings,
             embed=_resolve_embed(request, settings),
             search=_resolve_search(request, settings),
+            freshness=_resolve_freshness(request),
         )
     except InvalidFamilyIdError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+    except InvalidPosIdError as exc:
+        # 422 and never an unscoped search. A token whose point of sale cannot be read is a
+        # mis-issued token; widening it to the whole catalogue would answer a broken claim
+        # with every other shop's assortment.
         raise HTTPException(
             status_code=422,
             detail=str(exc),

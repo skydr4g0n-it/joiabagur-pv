@@ -41,12 +41,12 @@ parallel taxonomy later.
 | `api/` | C01 (health), C02 (contracts, service auth, stubs, snapshot), C08 (enrichment provenance, catalog-scoped auth), C13 (landed: `/v1/index/*` real), C14 (landed: `/v1/retrieval/products` real), C17 (landed: enriched `/health` — database, index, provider credential, model contrast), C18b (landed: `POST /v1/families/audit` — tenth route, service token, judged pairs travelling in the request) |
 | `config/` | C01, C02 (settings, canonical OpenAPI profile), C13 (feed settings) |
 | `db/` | C05 (engine, bounded pool, boot without a database) |
-| `migrations/` | C05, C13 (landed: `text_provenance`, `sync_checkpoint`), C18b (landed: Alembic logging isolation — `fileConfig` must not disable the service loggers, which is destructive in-process and invisible under the CLI) |
+| `migrations/` | C05, C13 (landed: `text_provenance`, `sync_checkpoint`), C18b (landed: Alembic logging isolation — `fileConfig` must not disable the service loggers, which is destructive in-process and invisible under the CLI), C22 (landed: `pos_projection.computed_as_of` — one additive nullable column, and a test that the revision touches nothing else) |
 | `data/` | C06b (landed: generate/ingest CLI), C10 (landed: `world/`), C23 |
 | `enrichment/` | C09 |
 | `families/` | C18a (landed: root grouping, material fusion, guards, relative veto, `POST /v1/families/suggest`), C18b (landed: audit over persisted families, orphan nomination by relative margin, source guards that the audit writes nothing and calls no provider) |
-| `indexing/` | C11 (landed: source-text/v1 + embeddings), C13 (landed: catalog drain + `sku_provenance.json`), C22, C23 |
-| `retrieval/` | C14, C20 (landed: two-layer synonym dictionary, equivalence-group expansion, directional bridges, the enable flag swept in-process, and the measurement CLI's safe `tsquery` composition), C21 (landed: safe `tsquery` composition with coordination ordering, weighted RRF over three ranked lists, structural filters that demote and never exclude, and the bounded cache of the embedding singleton), C22, C25, C26, C27 |
+| `indexing/` | C11 (landed: source-text/v1 + embeddings), C13 (landed: catalog drain + `sku_provenance.json`), C22 (landed: typed POS feed items, the `ai.pos_projection` repository whose tombstone is a soft delete, and the POS drain with its own `pos-availability` checkpoint and per-page failures), C23 |
+| `retrieval/` | C14, C20 (landed: two-layer synonym dictionary, equivalence-group expansion, directional bridges, the enable flag swept in-process, and the measurement CLI's safe `tsquery` composition), C21 (landed: safe `tsquery` composition with coordination ordering, weighted RRF over three ranked lists, structural filters that demote and never exclude, and the bounded cache of the embedding singleton), C22 (landed: the point-of-sale scope as the only hard filter, availability as the last demotion block, freshness read from the checkpoint and never from the rows, and the 503-on-empty / degrade-on-stale pair), C25, C26, C27 |
 | `assist/` | C30, C31, C32, C33, C35 |
 | `evals/` | C24, C38 |
 
@@ -92,8 +92,12 @@ directory and break the moment subfolders exist. They move to `support/`.
   frontend (`should [behavior] when [condition]`).
 - **Module docstring**: one line saying what the file guards, plus the delivering
   change. Example: `"""Frozen /v1 contract shapes. Delivered by C02."""`
-- **Local fixtures** go in a `conftest.py` inside the folder that needs them (a
-  database fixture belongs to `migrations/conftest.py`, not to the global one).
+- **Local fixtures** go in a `conftest.py` inside the folder that needs them — until a
+  second folder needs the same one. The ephemeral-PostgreSQL fixtures (`postgres_container`,
+  `database_url`, `alembic_config`, `migrated`) lived in `migrations/conftest.py` until C22,
+  when the projection repository needed them from `indexing/`; they moved to the root
+  `conftest.py` and `migrations/conftest.py` kept only what is its own (`database_name`,
+  `run_bootstrap`).
 - **Markers**: everything is a fast in-process unit test by default. Declare the
   exceptions — `@pytest.mark.db` for tests needing PostgreSQL with pgvector,
   `@pytest.mark.slow` for evaluation sweeps — so CI can select them.
@@ -111,7 +115,7 @@ uv run --system-certs pytest
 
 ## Current state
 
-Populated after C14: `api/`, `config/`, `db/`, `migrations/`, `data/` (C06b/C10), `enrichment/` (C09), `indexing/` (C11 + C13), `families/` (C18a + C18b), `retrieval/` (C14 + C20) and `support/`. Remaining folders are reserved names. Two settings in
+Populated after C22: `api/`, `config/`, `db/`, `migrations/` (C05 + C13 + C18b + C22), `data/` (C06b/C10), `enrichment/` (C09), `indexing/` (C11 + C13 + C22), `families/` (C18a + C18b), `retrieval/` (C14 + C20 + C21 + C22) and `support/`. Remaining folders are reserved names. Two settings in
 `pyproject.toml` hold the layout together:
 
 - `pythonpath = ["src", "tests"]` — makes `support/` importable from any subfolder.

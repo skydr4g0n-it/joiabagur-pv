@@ -85,4 +85,74 @@ public class IndexFeedRegistrationTests
         ValidateStartup(provider).Should().Throw<OptionsValidationException>()
             .WithMessage("*ApiKeyPrevious*");
     }
+
+    [Fact]
+    public void AddIndexFeed_WithNoSalesAsOf_LeavesTheWallClockInCharge()
+    {
+        using var provider = BuildProvider(new Dictionary<string, string?>
+        {
+            ["IndexFeed:ApiKey"] = ValidKey
+        });
+
+        ValidateStartup(provider).Should().NotThrow();
+        provider.GetRequiredService<IOptions<IndexFeedOptions>>().Value.SalesAsOfUtc
+            .Should().BeNull("an absent option must not change how anything behaves");
+    }
+
+    /// <summary>
+    /// Binding an ISO-8601 string with a trailing <c>Z</c> yields the instant that was meant.
+    /// </summary>
+    /// <remarks>
+    /// Pinned by test rather than trusted: the configuration binder converts through
+    /// <see cref="DateTime"/>'s type converter, which parses the offset and then returns a
+    /// <see cref="DateTimeKind.Local"/> value. Reading the raw property on a host outside UTC
+    /// would silently shift every sales window, which is why the option is only ever read
+    /// through its normalised form.
+    /// </remarks>
+    [Fact]
+    public void AddIndexFeed_WithUtcSalesAsOf_BindsTheInstantThatWasMeant()
+    {
+        using var provider = BuildProvider(new Dictionary<string, string?>
+        {
+            ["IndexFeed:ApiKey"] = ValidKey,
+            ["IndexFeed:SalesAsOf"] = "2026-08-23T23:59:59Z"
+        });
+
+        ValidateStartup(provider).Should().NotThrow();
+
+        var options = provider.GetRequiredService<IOptions<IndexFeedOptions>>().Value;
+        options.SalesAsOfUtc.Should().Be(new DateTime(2026, 8, 23, 23, 59, 59, DateTimeKind.Utc));
+        options.SalesAsOfUtc!.Value.Kind.Should().Be(DateTimeKind.Utc);
+    }
+
+    [Fact]
+    public void AddIndexFeed_WhenSalesAsOfCarriesNoOffset_FailsOnStart()
+    {
+        using var provider = BuildProvider(new Dictionary<string, string?>
+        {
+            ["IndexFeed:ApiKey"] = ValidKey,
+            ["IndexFeed:SalesAsOf"] = "2026-08-23T23:59:59"
+        });
+
+        ValidateStartup(provider).Should().Throw<OptionsValidationException>()
+            .WithMessage(
+                "*SalesAsOf*",
+                "an ambiguous clock must stop the host, not move the windows by a timezone");
+    }
+
+    [Fact]
+    public void AddIndexFeed_WithConfiguredSalesAsOf_IsIdempotentAcrossReads()
+    {
+        using var provider = BuildProvider(new Dictionary<string, string?>
+        {
+            ["IndexFeed:ApiKey"] = ValidKey,
+            ["IndexFeed:SalesAsOf"] = "2026-08-23T23:59:59Z"
+        });
+
+        var options = provider.GetRequiredService<IOptions<IndexFeedOptions>>().Value;
+
+        options.SalesAsOfUtc.Should().Be(
+            options.SalesAsOfUtc,
+            "normalising twice must not drift the instant");
+    }
 }

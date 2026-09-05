@@ -68,6 +68,8 @@ Boundary rule: *Python computes similarity and writes prose; .NET computes numbe
 | `JPV_RRF_WEIGHT_EXPANDED` | no | `0.5` | C21 weight of the lexical list built from C20's equivalence groups. See `JPV_RRF_WEIGHT_TYPED` for why the two sum to 1.0 |
 | `JPV_RRF_WEIGHT_VECTOR` | no | `0.33` | C21 weight of the vector list, deliberately **below** either lexical weight and the default easiest to undo by accident. Measured over twelve queries, branch parity (`1.0`) is the **worst** fused configuration at 96/120 against 105/120 at 0.33: the threshold passes essentially the whole corpus, so the vector branch returns a full list whether or not it understood the query, and a branch that always fills its list always votes at full strength. Raising it sinks `dije de plata` from 10/10 to 2/10 |
 | `JPV_BRANCH_DEPTH` | no | `60` | C21 depth at which **every** fused list is truncated before fusing; blank → 60. One value shared by all three: an asymmetric 200 lexical / 60 vector costs 6-8 points of 120. Conceptually distinct from the over-retrieval window the endpoint returns, which follows `top_k`, even though both default to 60 |
+| `JPV_POS_PREFILTER_ENABLED` | no | `true` | C22 point-of-sale prefilter. Supplies only the **default**: the effective value travels as a parameter of the orchestration call, so C24 can sweep configurations in one process. Default on because, measured over 20 probes on the live index, **eight of the eleven** points of sale answer fewer than ten products to at least 6 of every 20 searches once .NET has dropped what they do not carry — FORNELLS 12 of 20, worst case **one** surviving product, and one MAO-AIR query with **zero**. Turning it off is the rollback for C22: retrieval returns to pre-change behaviour with no deploy, and `ai.pos_projection` can stay populated because nothing else reads it. Absence does not block `/health` |
+| `JPV_POS_PROJECTION_MAX_AGE_SECONDS` | no | `3600` | C22 staleness ceiling of the projection. Above it the scope is **not** applied for that request, the degradation is logged and `projection_age_seconds` still reports the age: a stale projection may leave the page short, but it must never hide a valid product from the .NET authority that hydrates it. Deliberately generous — the sync cadence is a cron, so an hour degrades only under sustained failure and not under ordinary lateness; degrading eagerly would surrender the whole benefit of the change on any transient. Measured from `ai.sync_checkpoint.last_incremental_sync_at`, **never** from `ai.pos_projection.refreshed_at`, which records when an assignment last changed — the feed is incremental, so that column would report months on a projection synchronised seconds ago |
 | `JPV_FAMILY_VETO_MARGIN` | no | `0.05` | C18a relative-veto margin `[0, 1]`. **Never an absolute similarity cutoff**: a member is flagged for review, never removed, when a product of another proposed family beats its worst sibling by more than this. Absence does not block `/health` |
 | `JPV_FAMILY_ORPHAN_MARGIN` | no | `0.0` | C18b orphan-nomination margin `[0, 1]`. An unassigned product is nominated when it beats the target family's **worst member** by more than this. Deliberately generous at `0.0`: it nominates, a person decides, and measured over the corpus it yields a queue one reviewer works through in a session. **Not a similarity cutoff** — the comparison is always against that family's own cohesion, so the same value behaves differently against a tight family and a broad one. Absence does not block `/health` |
 
@@ -264,6 +266,45 @@ Two details worth knowing before editing anything here:
 
 > **Windows caveat.** psycopg's async mode does not work with `ProactorEventLoop`, Python's default event loop on Windows; it needs `WindowsSelectorEventLoopPolicy`. This does not affect production (Linux container) or the test suite (Alembic is sync), only running the app with uvicorn directly on a Windows host once a route actually touches the database.
 
+## Synchronising the POS availability projection
+
+`ai.pos_projection` is what scopes retrieval to the assortment of one point of sale. It is
+filled by a command, not by a route and not by a background task:
+
+```bash
+uv run --system-certs python -m jbg_ai.indexing sync-pos          # incremental
+uv run --system-certs python -m jbg_ai.indexing sync-pos --full   # ignore the cursor
+```
+
+Like `sync`, it loads `backend/.env` through `run_module` and needs
+`JPV_INDEX_FEED_BASE_URL` and `JPV_INDEX_FEED_API_KEY`. It needs **no** embedding key: it
+embeds nothing. It prints one line of counters — `upserted`, `soft_deleted`, `pages`,
+`failed_pages`, `computed_as_of` — and **exits non-zero when any page failed**, because a
+partially synchronised projection that reports success is exactly the shape of lie the
+freshness guard exists to prevent one layer up.
+
+Its cursor lives in `ai.sync_checkpoint` under `feed = 'pos-availability'`, independent of
+the `catalog` row. A page that fails is recorded in `ai.sync_failure` and the drain carries
+on with the remaining pages; the bookmark stays before the page that failed, so a retry
+starts in front of it rather than past it.
+
+**There is no route and no scheduler**, on purpose. `ai-service-api-contracts` enumerates
+the `/v1` surface in a MUST, and an in-process scheduler would add a background task to a
+container capped at 512 MiB competing for a pool of five connections. Honesty about
+staleness comes from `projection_age_seconds` on the retrieval response, not from a hidden
+cron: if nobody has synchronised, the response says so and the guard acts on it.
+
+Cron recipe, every ten minutes, logging what it did:
+
+```cron
+*/10 * * * * cd /srv/jbg-ai && /usr/local/bin/uv run python -m jbg_ai.indexing sync-pos >> /var/log/jbg-ai/sync-pos.log 2>&1
+```
+
+Run `--full` once after first deploying, and again whenever `IndexFeed:SalesAsOf` changes.
+An incremental run recomputes nothing: the feed re-emits only pairs whose inventory row
+moved, so a clock changed afterwards leaves every unchanged pair on the old one. The stored
+`computed_as_of` is what makes such a mixture visible instead of silent.
+
 ## Tests
 
 ```bash
@@ -294,12 +335,13 @@ These four tests exist to catch failures that produce **no error at all**: an HN
 
 - No real retrieval or agent loops — stubs are replaced route by route in later changes. Enrichment is real when `STUB_MODE=false` (C09). Catalog index sync is real when `STUB_MODE=false` (C13). Product retrieval is real when `STUB_MODE=false` (C14) and **hybrid since C21**: three ranked lists fused by weighted RRF, distance threshold 0.65 (a floor, not a discriminator), no `query_log`, `indexing/embeddings.py` and `openapi.json` unchanged. Substitutes stay stub/501 (C26)
 - No `POST /v1/retrieval/complementary` — later OpenAPI negotiation. `POST /v1/families/suggest` **exists since C18a**, which is the change that first called it; `POST /v1/families/audit` since C18b, for the same reason
-- `ai.product_document` is written by C13 from the catalog feed; `ai.pos_projection` stays empty until C22; `ai.knowledge_*` until C23
+- `ai.product_document` is written by C13 from the catalog feed; `ai.pos_projection` is **written by C22** from the POS availability feed; `ai.knowledge_*` stays empty until C23
 - No `ai.eval_*` tables (C24) and no `ai.query_log` (unassigned; the pipeline logs `stage=expand|embed|search|lexical|filters|fuse` with `trace_id` instead)
 - No SQL access to schema `public`, ever
 - No production deploy, SSM or `CREATE EXTENSION` on RDS. C17 delivered the **enriched health** — `GET /health` reports database reachability, indexed document count, whether the embedding provider credential is configured, and a contrast between the configured embedding model and the one recorded on the index rows, all without ever calling the provider — and deployed it to an **isolated demo account**, not to the shop's production account. The return annotation stays an open mapping, so `openapi.json` is unchanged
 - No production tuning: `halfvec`, `hnsw.iterative_scan`, `CREATE INDEX CONCURRENTLY` and the `VACUUM`/`REINDEX` cycle are deliberate omissions at ~1,500 vectors, not oversights
-- No drain of the POS feed and no edits to `indexing/embeddings.py`
+- No edits to `indexing/embeddings.py`, frozen since C11. The POS feed **is** drained since C22, by `python -m jbg_ai.indexing sync-pos` — a command with a documented cron, not a route and not an in-process scheduler
+- **The rotation figures describe the world at its horizon, not "today".** The synthetic world of C10 ends on **2026-08-23**, and since C22 the sales windows are counted against a declared reference instant (`IndexFeed:SalesAsOf`) rather than the wall clock. Two consequences worth stating plainly. It is what makes the aggregates **reproducible** — the same configuration and seed give the same figures on different days, which a ranking that reads `now()` never could, dataset horizon or not. And it means `sales_30d` describes the thirty days before that instant: peak summer for a world whose seasonality is extreme, so **23,54 %** of assigned pairs are non-zero rather than the 16,28 % a wall-clock reading gave on 2026-09-05. Neither figure is "the truth about today"; the declared one is the one that can be cited twice and mean the same thing. Removing the setting restores wall-clock behaviour, and with it the drift to zero that made the setting necessary
 
 ## Layout
 

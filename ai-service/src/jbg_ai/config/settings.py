@@ -255,6 +255,44 @@ class Settings(BaseSettings):
         ),
     )
 
+    jpv_pos_prefilter_enabled: bool = Field(
+        default=True,
+        description=(
+            "C22 point-of-sale prefilter for POST /v1/retrieval/products "
+            "(JPV_POS_PREFILTER_ENABLED). Optional at boot; default true; blank -> true. "
+            "Supplies only the DEFAULT: the effective value travels as a parameter of the "
+            "retrieval orchestration call, in the same pattern as "
+            "JPV_QUERY_EXPANSION_ENABLED, because C24 sweeps configurations in one process "
+            "and putting it on the request would move the frozen openapi.json. With it off, "
+            "retrieval behaves exactly as it did before the projection existed, which makes "
+            "it the rollback for this change: no deploy, no migration to undo, and "
+            "ai.pos_projection can stay populated because nothing else reads it. Default on "
+            "because, measured over 20 probes on the live index, eight of the eleven points "
+            "of sale answer fewer than ten products to at least 6 of every 20 searches once "
+            "the .NET side has dropped what they do not carry. Not required to boot /health."
+        ),
+    )
+
+    jpv_pos_projection_max_age_seconds: int = Field(
+        default=3600,
+        gt=0,
+        description=(
+            "C22 staleness ceiling of ai.pos_projection "
+            "(JPV_POS_PROJECTION_MAX_AGE_SECONDS). Optional at boot; default 3600; blank -> "
+            "3600. Above it the point-of-sale scope is NOT applied for that request, the "
+            "degradation is logged, and the response still reports the age: a stale "
+            "projection may leave the page short, but it must never hide a valid product "
+            "from the .NET authority. Deliberately generous — the design cadence is 5-10 "
+            "minutes and the real one is a cron, so an hour degrades only under sustained "
+            "failure and not under ordinary lateness. Degrading eagerly would surrender the "
+            "whole benefit of the change on any transient. Measured against "
+            "ai.sync_checkpoint.last_incremental_sync_at, never against "
+            "ai.pos_projection.refreshed_at, which records when an assignment last changed "
+            "and would report months on a projection synchronised seconds ago. Not required "
+            "to boot /health."
+        ),
+    )
+
     jpv_family_veto_margin: float = Field(
         default=0.05,
         ge=0,
@@ -373,6 +411,21 @@ class Settings(BaseSettings):
             return True
         return value
 
+    @field_validator("jpv_pos_prefilter_enabled", mode="before")
+    @classmethod
+    def blank_pos_prefilter_flag_is_default(cls, value: object) -> object:
+        """A blank export means "unset". Read as false it would silently unscope every search."""
+        if isinstance(value, str) and not value.strip():
+            return True
+        return value
+
+    @field_validator("jpv_pos_projection_max_age_seconds", mode="before")
+    @classmethod
+    def blank_projection_max_age_is_default(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return 3600
+        return value
+
     @field_validator(
         "jpv_rrf_k",
         "jpv_rrf_weight_typed",
@@ -431,6 +484,8 @@ def canonical_openapi_settings() -> Settings:
         jpv_index_sync_time_budget_seconds=180,
         jpv_retrieval_distance_threshold=0.65,
         jpv_query_expansion_enabled=True,
+        jpv_pos_prefilter_enabled=True,
+        jpv_pos_projection_max_age_seconds=3600,
         # Pinned like the rest, so a process environment value cannot leak into the
         # committed OpenAPI snapshot through a fusion weight.
         **FUSION_DEFAULTS,

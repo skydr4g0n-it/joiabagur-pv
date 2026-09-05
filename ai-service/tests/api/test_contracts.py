@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from support.sample_requests import RESPONSE_MODELS, V1_REQUESTS
+from support.settings import TOKEN_POS_ID
 
 
 @pytest.mark.parametrize(("method", "path", "body"), V1_REQUESTS)
@@ -210,7 +211,7 @@ def test_scoped_responses_echo_the_token_scope(
     ):
         response = client.post(path, json=body, headers=auth_headers)
 
-        assert response.json()["effective_pos_id"] == "POS-B", path
+        assert response.json()["effective_pos_id"] == TOKEN_POS_ID, path
 
 
 def test_query_expansion_is_not_part_of_the_request_contract() -> None:

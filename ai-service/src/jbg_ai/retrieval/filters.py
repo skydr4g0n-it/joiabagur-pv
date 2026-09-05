@@ -30,6 +30,11 @@ from jbg_ai.retrieval.synonyms import ExpandedQuery
 MATERIALS_FIELD = "materials"
 SIZE_FIELD = "size_label"
 
+#: The bucket that demotes. Binary against everything else on purpose: ordering `1-2` before
+#: `3+` would be a magic number with no evidence behind it, and both tiers are persisted and
+#: unread until the ranking change that can calibrate them against a golden set.
+OUT_OF_STOCK_BUCKET = "0"
+
 #: Ceiling phrases an operator actually types, with the figure captured. Deliberately narrow:
 #: a rule that fires on "80" alone would invent a constraint out of a reference number.
 _PRICE_CEILING = re.compile(
@@ -69,6 +74,8 @@ class Constrained(Protocol):
     price: float | None
     size_label: str | None
     materials: list[str]
+    #: The projection bucket for the point of sale, or `None` when the query ran unscoped.
+    qty_bucket: str | None
 
 
 ConstrainedT = TypeVar("ConstrainedT", bound=Constrained)
@@ -125,12 +132,35 @@ def _material_mismatch(item: Constrained, materials: Sequence[str]) -> bool:
     return not (wanted & held)
 
 
-def demotion_rank(item: Constrained, filters: StructuralFilters) -> tuple[int, int, int]:
-    """The block a candidate falls into. Lower is better; equal blocks keep the fused order."""
+def _out_of_stock(item: Constrained) -> bool:
+    """Zero stock at this point of sale, as the projection reports it.
+
+    `None` is not zero. It means the query ran unscoped, so there is no projection row to
+    read, and an absent signal must not demote anything — the same rule an unknown price
+    already follows two blocks up.
+    """
+    return item.qty_bucket == OUT_OF_STOCK_BUCKET
+
+
+def demotion_rank(
+    item: Constrained, filters: StructuralFilters
+) -> tuple[int, int, int, int]:
+    """The block a candidate falls into. Lower is better; equal blocks keep the fused order.
+
+    Availability is the **last** component, and one sort key rather than a second pass. Last
+    because what the operator typed outranks a signal they did not ask about: a query for a
+    ring under 80 EUR should not be reordered by stock before it is reordered by price. The
+    opposite is defensible at a till counter and is not settled by argument here — it is
+    handed to the ranking change that has a golden set to settle it with.
+
+    One key rather than two sorts because priority should be readable in the tuple instead of
+    emerging from the order in which somebody applied two `sorted` calls.
+    """
     return (
         int(_over_ceiling(item, filters.price_ceiling)),
         int(_size_mismatch(item, filters.size)),
         int(_material_mismatch(item, filters.materials)),
+        int(_out_of_stock(item)),
     )
 
 
@@ -140,9 +170,15 @@ def demote(
     """Stable block sort. Returns the reordered candidates and how many were demoted.
 
     Nothing is removed: `sorted` is stable, so the fused order survives inside each block and
-    every candidate stays inside the over-retrieval window the caller returns.
+    every candidate stays inside the over-retrieval window the caller returns. That is what
+    makes availability a demotion and not a filter — a zero-stock product still reaches the
+    operator, ranked below its in-stock peers, exactly as it does today with `HasStock: false`
+    on the .NET side.
+
+    The early return is on "nothing to demote by", which since availability joined the key
+    means: no typed constraint fired **and** no candidate is out of stock.
     """
-    if filters.is_empty:
+    if filters.is_empty and not any(_out_of_stock(item) for item in candidates):
         return tuple(candidates), 0
     demoted = sum(1 for item in candidates if any(demotion_rank(item, filters)))
     return tuple(sorted(candidates, key=lambda item: demotion_rank(item, filters))), demoted

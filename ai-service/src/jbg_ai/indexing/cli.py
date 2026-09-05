@@ -1,11 +1,18 @@
-"""CLI: `python -m jbg_ai.indexing sync [--full]`. Same drain as POST /v1/index/sync."""
+"""CLI: `python -m jbg_ai.indexing sync|sync-pos [--full]`.
+
+`sync` is the catalog drain, the same one `POST /v1/index/sync` runs. `sync-pos` is the
+POS availability drain, which has **no** route: `ai-service-api-contracts` enumerates the
+`/v1` surface in a MUST, and a synchronisation nobody calls over HTTP does not need one.
+"""
 
 from __future__ import annotations
 
 import argparse
 import asyncio
 import sys
+from collections.abc import Coroutine
 from collections.abc import Sequence
+from typing import Any, TypeVar
 
 import httpx
 
@@ -14,9 +21,34 @@ from jbg_ai.indexing.constants import DEFAULT_EMBEDDING_MODEL
 from jbg_ai.indexing.embeddings import EmbeddingClient, LiteLlmEmbeddingClient
 from jbg_ai.indexing.feed import FEED_TIMEOUT_SECONDS, HttpxIndexFeedClient, IndexFeedClient
 from jbg_ai.indexing.orchestrator import CatalogSyncRequest, CatalogSyncResult, sync_catalog
+from jbg_ai.indexing.pos_orchestrator import (
+    PosSyncRequest,
+    PosSyncResult,
+    describe,
+    sync_pos_availability,
+)
+from jbg_ai.indexing.pos_projection import PosProjectionRepo, SqlAlchemyPosProjectionRepo
 from jbg_ai.indexing.provenance import ProvenanceEntry, load_provenance_map
 from jbg_ai.indexing.repository import ProductDocumentRepo, SqlAlchemyProductDocumentRepo
 from jbg_ai.indexing.sync_errors import IndexFeedConfigError, ProvenanceMapError
+
+T = TypeVar("T")
+
+
+def run_async(coro: Coroutine[Any, Any, T]) -> T:
+    """Run the drain on a loop psycopg can use.
+
+    Python installs the `ProactorEventLoop` on Windows and psycopg's async driver refuses
+    it outright, so `asyncio.run` fails every query on a development machine with an error
+    that names neither the database nor the query. The README already records this trap for
+    running the service under uvicorn; a command whose whole job is to write to PostgreSQL
+    should not make each operator rediscover it. No effect on Linux, where the selector loop
+    is already the default, and none in the container.
+    """
+    if sys.platform == "win32":
+        with asyncio.Runner(loop_factory=asyncio.SelectorEventLoop) as runner:
+            return runner.run(coro)
+    return asyncio.run(coro)
 
 
 async def run_cli_sync(
@@ -67,6 +99,40 @@ async def run_cli_sync(
         )
 
 
+async def run_cli_sync_pos(
+    *,
+    full: bool = False,
+    settings: Settings | None = None,
+    feed: IndexFeedClient | None = None,
+    repo: PosProjectionRepo | None = None,
+) -> PosSyncResult:
+    """Drain the POS availability feed. Needs no embedding key: it embeds nothing."""
+    resolved = settings or get_settings()
+    if feed is not None and repo is not None:
+        return await sync_pos_availability(
+            PosSyncRequest(full=full),
+            feed=feed,
+            repo=repo,
+            time_budget_seconds=resolved.jpv_index_sync_time_budget_seconds,
+        )
+    if not resolved.jpv_index_feed_base_url:
+        raise IndexFeedConfigError("JPV_INDEX_FEED_BASE_URL")
+    if not resolved.jpv_index_feed_api_key:
+        raise IndexFeedConfigError("JPV_INDEX_FEED_API_KEY")
+    async with httpx.AsyncClient(
+        base_url=resolved.jpv_index_feed_base_url.rstrip("/"),
+        timeout=FEED_TIMEOUT_SECONDS,
+    ) as client:
+        live_feed = feed or HttpxIndexFeedClient(client, resolved.jpv_index_feed_api_key)
+        live_repo = repo or SqlAlchemyPosProjectionRepo(resolved)
+        return await sync_pos_availability(
+            PosSyncRequest(full=full),
+            feed=live_feed,
+            repo=live_repo,
+            time_budget_seconds=resolved.jpv_index_sync_time_budget_seconds,
+        )
+
+
 def run_module(argv: Sequence[str] | None = None) -> int:
     """Process entry point for `python -m jbg_ai.indexing`.
 
@@ -96,11 +162,32 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Ignore checkpoint and body cursor; start without query params",
     )
+    pos_parser = sub.add_parser(
+        "sync-pos", help="Drain the POS availability feed into ai.pos_projection"
+    )
+    pos_parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Ignore the pos-availability checkpoint; start without query params",
+    )
     args = parser.parse_args(list(argv) if argv is not None else None)
-    if args.command != "sync":
+    if args.command not in {"sync", "sync-pos"}:
         parser.error("unknown command")
+
+    if args.command == "sync-pos":
+        try:
+            pos_result = run_async(run_cli_sync_pos(full=args.full))
+        except IndexFeedConfigError as exc:
+            sys.stderr.write(f"{exc}\n")
+            return 1
+        sys.stdout.write(describe(pos_result) + "\n")
+        # A page that failed is a page nobody drained. Reporting success would let a
+        # partially synchronised projection look like a complete one, which is the shape
+        # of lie the freshness guard exists to prevent one layer up.
+        return 1 if pos_result.failed_pages else 0
+
     try:
-        result = asyncio.run(run_cli_sync(full=args.full))
+        result = run_async(run_cli_sync(full=args.full))
     except (IndexFeedConfigError, ProvenanceMapError) as exc:
         sys.stderr.write(f"{exc}\n")
         return 1

@@ -155,6 +155,12 @@ public static class ServiceCollectionExtensions
                 o => string.IsNullOrWhiteSpace(o.ApiKeyPrevious)
                      || o.ApiKeyPrevious.Length >= IndexFeedOptions.MinimumSecretLength,
                 $"{IndexFeedOptions.SectionName}:ApiKeyPrevious is set but shorter than {IndexFeedOptions.MinimumSecretLength} characters.")
+            .Validate(
+                o => o.SalesAsOf is not { Kind: DateTimeKind.Unspecified },
+                $"{IndexFeedOptions.SectionName}:SalesAsOf must carry a UTC offset, for example 2026-08-23T23:59:59Z. Without one it binds as an unspecified kind and would be read as the host's local time, which is the ambiguity this setting exists to remove.")
+            .Validate(
+                o => o.SalesAsOf != default(DateTime),
+                $"{IndexFeedOptions.SectionName}:SalesAsOf is set to an empty or unparseable instant. Leave it out entirely to count the sales windows against the wall clock.")
             .ValidateOnStart();
 
         if (services.All(d => d.ServiceType != typeof(TimeProvider)))

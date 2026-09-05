@@ -12,6 +12,7 @@ using JoiabagurPV.Tests.TestHelpers;
 using JoiabagurPV.Tests.TestHelpers.Mothers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace JoiabagurPV.Tests.IntegrationTests;
 
@@ -115,6 +116,13 @@ public class AiIndexFeedPosTests : IAsyncLifetime
     {
         var product = await SeedInventoryAsync("SKU-POS-SALES", quantity: 4);
 
+        // Anchored to the instant the feed counts against, not to the wall clock. Seeding
+        // relative to `UtcNow` made this test a function of the day it ran: with a reference
+        // instant configured, a sale "ten days ago" can sit *after* the window's end and score
+        // zero. Reading the anchor from configuration keeps the test true with the option set
+        // or unset, which is the property that actually needs pinning.
+        var asOf = ReferenceInstant();
+
         using (var mother = new TestDataMother(_factory.Services))
         {
             var recent = await mother.Sale()
@@ -123,7 +131,7 @@ public class AiIndexFeedPosTests : IAsyncLifetime
                 .WithPaymentMethod(_payment.Id)
                 .WithUser(_user.Id)
                 .WithQuantity(5)
-                .WithSaleDate(DateTime.UtcNow.AddDays(-10))
+                .WithSaleDate(asOf.AddDays(-10))
                 .CreateAsync();
 
             await mother.Sale()
@@ -132,7 +140,7 @@ public class AiIndexFeedPosTests : IAsyncLifetime
                 .WithPaymentMethod(_payment.Id)
                 .WithUser(_user.Id)
                 .WithQuantity(2)
-                .WithSaleDate(DateTime.UtcNow.AddDays(-40))
+                .WithSaleDate(asOf.AddDays(-40))
                 .CreateAsync();
 
             await mother.Return()
@@ -173,6 +181,75 @@ public class AiIndexFeedPosTests : IAsyncLifetime
         var catalogPage = await catalog.Content.ReadFromJsonAsync<FeedPage>(Json);
         catalogPage!.PageSize.Should().Be(IndexFeedPageSizes.Catalog);
     }
+
+    /// <summary>
+    /// A sale after the declared horizon must not move <c>lastSaleAt</c>.
+    /// </summary>
+    /// <remarks>
+    /// An integration test and not a unit one on purpose: the bound lives inside a LINQ
+    /// expression EF Core translates to SQL, so only a real database proves that the
+    /// translated <c>MAX(CASE WHEN …)</c> ignores the excluded rows rather than returning
+    /// null for the group. Left unbounded this was the one figure on the page that still
+    /// drifted, which defeats the reproducibility the reference instant exists to give.
+    /// </remarks>
+    [Fact]
+    public async Task PosAvailabilityFeed_SaleAfterTheReferenceInstant_DoesNotMoveLastSaleAt()
+    {
+        var product = await SeedInventoryAsync("SKU-POS-ASOF-SALE", quantity: 3);
+        var asOf = ReferenceInstant();
+        var inside = asOf.AddDays(-5);
+
+        using (var mother = new TestDataMother(_factory.Services))
+        {
+            await mother.Sale()
+                .WithProduct(product.Id)
+                .WithPointOfSale(_pos.Id)
+                .WithPaymentMethod(_payment.Id)
+                .WithUser(_user.Id)
+                .WithQuantity(3)
+                .WithSaleDate(inside)
+                .CreateAsync();
+
+            await mother.Sale()
+                .WithProduct(product.Id)
+                .WithPointOfSale(_pos.Id)
+                .WithPaymentMethod(_payment.Id)
+                .WithUser(_user.Id)
+                .WithQuantity(4)
+                .WithSaleDate(asOf.AddDays(3))
+                .CreateAsync();
+        }
+
+        var page = await GetPosAsync();
+        var item = page.Items.Single(i => i.GetProperty("productId").GetGuid() == product.Id);
+
+        item.GetProperty("lastSaleAt").GetDateTime().ToUniversalTime()
+            .Should().BeCloseTo(inside, TimeSpan.FromSeconds(1),
+                "a sale after the declared horizon has not happened yet, from that clock");
+        item.GetProperty("sales30d").GetInt32().Should().Be(3, "the later sale is outside too");
+        item.GetProperty("sales90d").GetInt32().Should().Be(3);
+    }
+
+    [Fact]
+    public async Task PosAvailabilityFeed_DeclaresTheClockItCounted_Against()
+    {
+        await SeedInventoryAsync("SKU-POS-ASOF", quantity: 1);
+
+        var response = await _client.GetAsync(PosFeed);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        using var document = await JsonDocument.ParseAsync(stream);
+
+        document.RootElement.TryGetProperty("computedAsOf", out var computedAsOf)
+            .Should().BeTrue("a windowed figure whose clock is not declared cannot be reproduced");
+        computedAsOf.GetDateTime().ToUniversalTime().Should().Be(ReferenceInstant());
+    }
+
+    /// <summary>The instant the windows are counted against: configured, or the wall clock.</summary>
+    private DateTime ReferenceInstant() =>
+        _factory.Services.GetRequiredService<IOptions<IndexFeedOptions>>().Value.SalesAsOfUtc
+        ?? DateTime.UtcNow;
 
     private async Task<FeedPage> GetPosAsync(DateTime? since = null, Guid? sinceId = null)
     {

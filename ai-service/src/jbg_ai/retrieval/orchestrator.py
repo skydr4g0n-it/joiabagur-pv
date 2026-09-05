@@ -41,6 +41,13 @@ from jbg_ai.retrieval.filters import StructuralFilters, demote, extract_filters
 from jbg_ai.retrieval.fusion import RankedList, fuse, normalised_scores
 from jbg_ai.retrieval.lexical import EXPANDED_LIST, TYPED_LIST, expanded_request, typed_request
 from jbg_ai.retrieval.ports import LexicalHit, ProductSearchPort, SearchFilters, SearchHit
+from jbg_ai.retrieval.projection import (
+    ProjectionFreshness,
+    ProjectionScope,
+    default_freshness,
+    parse_pos_id,
+    resolve_scope,
+)
 from jbg_ai.retrieval.synonyms import ExpandedQuery, expand_query
 from jbg_ai.stubs.responses import over_retrieval_count
 
@@ -109,6 +116,9 @@ class _Candidate:
     variant_label: str | None
     price: float | None
     size_label: str | None
+    #: Read by the availability block of `demotion_rank` and never emitted. `None` means the
+    #: query ran unscoped, which is not the same as a bucket of zero.
+    qty_bucket: str | None = None
     vector_score: float | None = None
     lexical_score: float | None = None
     reasons: list[str] = field(default_factory=list)
@@ -135,6 +145,9 @@ async def retrieve_products(
     weight_expanded: float | None = None,
     weight_vector: float | None = None,
     branch_depth: int | None = None,
+    pos_prefilter: bool | None = None,
+    projection_max_age_seconds: int | None = None,
+    freshness: ProjectionFreshness | None = None,
 ) -> RetrievalResponse:
     """Every configuration knob overrides the settings default for one call.
 
@@ -156,6 +169,14 @@ async def retrieve_products(
     w_expanded = settings.jpv_rrf_weight_expanded if weight_expanded is None else weight_expanded
     w_vector = settings.jpv_rrf_weight_vector if weight_vector is None else weight_vector
     depth = settings.jpv_branch_depth if branch_depth is None else branch_depth
+    prefilter = (
+        settings.jpv_pos_prefilter_enabled if pos_prefilter is None else pos_prefilter
+    )
+    max_age = (
+        settings.jpv_pos_projection_max_age_seconds
+        if projection_max_age_seconds is None
+        else projection_max_age_seconds
+    )
 
     run_vector = payload.mode is not RetrievalMode.LEXICAL
     run_lexical = payload.mode is not RetrievalMode.VECTOR
@@ -175,6 +196,11 @@ async def retrieve_products(
         extra={"trace_id": principal.trace_id},
     )
 
+    # Parsed even when the prefilter is off: a token whose point of sale cannot be read is
+    # broken whatever this request intends to do with it, and finding that out only when
+    # somebody enables the flag is how a mis-issued token survives to production.
+    pos_id = parse_pos_id(principal.pos_id)
+
     filters = parse_body_filters(payload.filters)
     if run_vector:
         compatible = await search.count_compatible(
@@ -187,6 +213,38 @@ async def retrieve_products(
                 "refusing to abstain over an empty or foreign index"
             )
 
+    scope_started = time.perf_counter()
+    scope = await resolve_scope(
+        pos_id,
+        search=search,
+        enabled=prefilter,
+        max_age_seconds=max_age,
+        freshness=freshness or default_freshness,
+    )
+    logger.info(
+        "stage=projection trace_id=%s latency_ms=%.2f enabled=%s applied=%s stale=%s "
+        "age_seconds=%s scope_size=%s max_age_seconds=%s",
+        principal.trace_id,
+        (time.perf_counter() - scope_started) * 1000,
+        prefilter,
+        scope.applied,
+        scope.stale,
+        None if scope.age_seconds is None else round(scope.age_seconds, 1),
+        scope.size,
+        max_age,
+        extra={"trace_id": principal.trace_id},
+    )
+    if scope.stale:
+        logger.warning(
+            "stage=projection trace_id=%s degraded=unscoped age_seconds=%s max_age_seconds=%s "
+            "reason=%s",
+            principal.trace_id,
+            None if scope.age_seconds is None else round(scope.age_seconds, 1),
+            max_age,
+            "never_synchronised" if scope.age_seconds is None else "stale",
+            extra={"trace_id": principal.trace_id},
+        )
+
     embedded, typed_hits, expanded_hits = await _race_provider_against_text(
         payload,
         principal,
@@ -197,6 +255,7 @@ async def retrieve_products(
         depth=depth,
         run_vector=run_vector,
         run_lexical=run_lexical,
+        pos_id=scope.pos_id,
     )
 
     vector_hits: list[SearchHit] = []
@@ -213,6 +272,7 @@ async def retrieve_products(
             threshold=threshold,
             depth=depth,
             mode=payload.mode,
+            pos_id=scope.pos_id,
         )
     elif embedded is not None and embedded.error is not None:
         if payload.mode is RetrievalMode.VECTOR or not (typed_hits or expanded_hits):
@@ -276,6 +336,7 @@ async def retrieve_products(
         low_confidence=low_confidence,
         trace_id=principal.trace_id,
         effective_pos_id=principal.pos_id or "",
+        projection_age_seconds=scope.reported_age,
     )
 
 
@@ -290,6 +351,7 @@ async def _race_provider_against_text(
     depth: int,
     run_vector: bool,
     run_lexical: bool,
+    pos_id: UUID | None,
 ) -> tuple[_EmbedOutcome | None, list[LexicalHit], list[LexicalHit]]:
     """`gather(embed, lexical A then B)` — one pool connection held at any moment (D10)."""
 
@@ -323,17 +385,18 @@ async def _race_provider_against_text(
         # Sequential on purpose: two concurrent statements would hold two of the five pool
         # connections, and the pair costs single-digit milliseconds behind the provider.
         typed = await search.search_lexical(
-            typed_request(payload.query), depth=depth, filters=filters
+            typed_request(payload.query), depth=depth, filters=filters, pos_id=pos_id
         )
         widened = await search.search_lexical(
-            expanded_request(expanded), depth=depth, filters=filters
+            expanded_request(expanded), depth=depth, filters=filters, pos_id=pos_id
         )
         logger.info(
-            "stage=lexical trace_id=%s latency_ms=%.1f typed=%s expanded=%s",
+            "stage=lexical trace_id=%s latency_ms=%.1f typed=%s expanded=%s scoped=%s",
             principal.trace_id,
             (time.perf_counter() - started) * 1000,
             len(typed),
             len(widened),
+            pos_id is not None,
             extra={"trace_id": principal.trace_id},
         )
         return typed, widened
@@ -353,6 +416,7 @@ async def _vector_branch(
     threshold: float,
     depth: int,
     mode: RetrievalMode,
+    pos_id: UUID | None,
 ) -> list[SearchHit]:
     started = time.perf_counter()
     hits = await search.search(
@@ -362,6 +426,7 @@ async def _vector_branch(
         filters=filters,
         model_version_key=embed.model_version_key,
         model_id=embed.model_id,
+        pos_id=pos_id,
     )
     hits = sorted(hits, key=lambda item: item.distance)[:depth]
     # `vector_empty` and not `low_confidence`: this stage knows only whether **its own**
@@ -372,7 +437,7 @@ async def _vector_branch(
     # field in a single trace, which is the kind of log that gets believed over the code.
     logger.info(
         "stage=search trace_id=%s latency_ms=%.1f distance_min=%s candidates=%s "
-        "vector_empty=%s mode=%s threshold=%s",
+        "vector_empty=%s mode=%s threshold=%s scoped=%s depth=%s truncated=%s",
         principal.trace_id,
         (time.perf_counter() - started) * 1000,
         hits[0].distance if hits else None,
@@ -380,6 +445,9 @@ async def _vector_branch(
         not hits,
         mode.value,
         threshold,
+        pos_id is not None,
+        depth,
+        len(hits) < depth,
         extra={"trace_id": principal.trace_id},
     )
     return hits
@@ -399,28 +467,12 @@ def _fuse_branches(
     candidates: dict[UUID, _Candidate] = {}
 
     for hit in (*typed_hits, *expanded_hits):
-        item = candidates.get(hit.product_id) or _Candidate(
-            product_id=hit.product_id,
-            sku=hit.sku,
-            materials=list(hit.materials),
-            family_id=hit.family_id,
-            variant_label=hit.variant_label,
-            price=hit.price,
-            size_label=hit.size_label,
-        )
+        item = candidates.get(hit.product_id) or _from_hit(hit)
         item.lexical_score = max(item.lexical_score or 0.0, hit.ts_rank)
         candidates[hit.product_id] = item
 
     for hit in vector_hits:
-        item = candidates.get(hit.product_id) or _Candidate(
-            product_id=hit.product_id,
-            sku=hit.sku,
-            materials=list(hit.materials),
-            family_id=hit.family_id,
-            variant_label=hit.variant_label,
-            price=hit.price,
-            size_label=hit.size_label,
-        )
+        item = candidates.get(hit.product_id) or _from_hit(hit)
         item.vector_score = clamp_score(hit.distance)
         candidates[hit.product_id] = item
 
@@ -458,6 +510,20 @@ def _fuse_branches(
         ordered.append(item)
 
     return ordered, cross_branch
+
+
+def _from_hit(hit: LexicalHit | SearchHit) -> _Candidate:
+    """One candidate from whichever branch saw it first. Every branch reports the bucket."""
+    return _Candidate(
+        product_id=hit.product_id,
+        sku=hit.sku,
+        materials=list(hit.materials),
+        family_id=hit.family_id,
+        variant_label=hit.variant_label,
+        price=hit.price,
+        size_label=hit.size_label,
+        qty_bucket=hit.qty_bucket,
+    )
 
 
 def _branches_that_ran(*, run_lexical: bool, vector_ran: bool) -> str:

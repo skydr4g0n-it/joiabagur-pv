@@ -604,7 +604,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 | **C20** | `add-synonym-dictionary` | Python | C14 | 🟢 | **rev. dec. 4** · *tapona a C21: se coge primero* · **ficha reescrita el 1 sep** |
 | **C21** | `add-hybrid-search-rrf` | Python | C14, C20 | 🟢 | **archivado el 2 sep** · *tres puntos de la ficha refutados con medición* |
 | **FIX1** | `fix-enrichment-vocabulary-gaps` | Python + FE | C21 | 🟢 | **propuesto el 31 ago** · **ficha el 1 sep** · *fuera de la numeración C: no sale de la descomposición original* |
-| **C22** | `add-pos-projection-soft-prefilter` | Python | C10, C12, C14 | 🔴 | **rev. dec. 11** |
+| **C22** | `add-pos-projection-soft-prefilter` | Python + .NET | C10, C12, C14 | 🟢 | **archivado el 5 sep** · *tres puntos de la ficha refutados con medición; entra además el reloj inyectado (FIX2)* |
 | **C23** | `add-knowledge-corpus-and-indexer` | Python | C11 | 🟢 | — |
 | **C24** | `add-eval-harness-golden-set-and-baselines` | Python | C14, C21 | 🔴 | rev. dec. 12 · **etiquetado simple desde el 31 ago** |
 | **C25** | `add-business-signals-ranking` | Python | C21, C22, C24 | 🔴 | — |
@@ -987,12 +987,22 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ---
 
-#### C22 · `add-pos-projection-soft-prefilter` 🔴
+#### C22 · `add-pos-projection-soft-prefilter` 🟢 archivado el 5 sep
 
-**Objetivo.** La proyección pondera pero **nunca excluye**. Es la decisión 11 de la revisión y la corrección técnica más importante de esta versión.
-**Prereq.** C10, C12, C14 · **Zona.** `ai-service/src/jbg_ai/retrieval/`, `indexing/`
-**Alcance.** Sincronización de `ai.pos_projection` desde el feed; el único filtro duro es el **`pos_id` del token**; `qty_bucket = 0` y `is_assigned_hint = false` **penalizan el score**, no eliminan; marca de frescura (`projection_age_seconds`) en la respuesta.
-**Tests.** `test_unassigned_product_is_penalised_not_removed`; `test_out_of_stock_product_still_present_in_candidates`; `test_pos_scope_from_token_is_hard_filter`; `test_projection_stores_bucket_not_exact_quantity`; `test_response_reports_projection_age`.
+**Objetivo.** La proyección acota por surtido y **degrada por stock sin excluir**. Es la decisión 11 de la revisión y la corrección técnica más importante de esta versión.
+**Prereq.** C10, C12, C14 · **Zona.** `ai-service/src/jbg_ai/retrieval/`, `indexing/` **y `backend/src/JoiabagurPV.Application`** (el reloj inyectado cruzó de lenguaje)
+**Alcance entregado.** Sincronización de `ai.pos_projection` desde el feed con cursor propio bajo `feed = 'pos-availability'` y CLI `python -m jbg_ai.indexing sync-pos` —sin ruta `/v1` y sin planificador—; el único filtro duro es el **`pos_id` del token**, aplicado en SQL a las tres ramas; `qty_bucket = '0'` **degrada** como último bloque de `demotion_rank`; `projection_age_seconds` sale del checkpoint y **gobierna** (vacía → 503, obsoleta → deja de filtrar y lo declara); y el reloj inyectado `IndexFeed:SalesAsOf = 2026-08-23T23:59:59Z` con `computedAsOf` en la página del feed.
+
+**Tres puntos de la ficha refutados con medición**, y por eso el alcance no es el que este plan preveía:
+
+- El filtro duro correcto es **`is_assigned_hint`, no la existencia de fila**: `Carried()` de .NET excluye exactamente eso, así que un desasignado mantenido gastaría ventana para nada — el 7-9 % en los puntos de venta con operador. Lo que degrada sin eliminar es el **stock**, y MAO-AIR tiene el 34,4 % de su surtido a cero. En consecuencia `test_unassigned_product_is_penalised_not_removed` se renombra a **`test_out_of_stock_product_is_penalised_not_removed`**: protege el principio que está realmente en vigor.
+- La página corta **no era de FORNELLS** sino de **ocho de los once** puntos de venta. Tras el change, ninguno.
+- El índice HNSW **nunca se ha usado en la ruta viva**, así que escopar con CTE no cambia de motor. Lo que justifica esa forma no es la velocidad —medida, 14,8-17,3 ms frente a 18,0-33,1 ms— sino la corrección: el subconjunto existe antes de ordenar.
+
+**Y una desviación declarada:** el change **abre una revisión de Alembic aditiva** (`ai.pos_projection.computed_as_of`), contra el «sin migración de ninguna clase» que declaraban su ficha, su HU y su propuesta. La tabla no tenía dónde persistir el instante de referencia que el propio alcance exige, y como el drenaje es incremental, sin esa columna la proyección puede acabar con filas contadas contra dos relojes distintos e indistinguibles.
+
+**Tests.** `test_out_of_stock_product_is_penalised_not_removed`; `test_pos_scope_from_token_is_hard_filter` (como `test_candidates_come_only_from_the_assortment`); `test_projection_stores_bucket_not_exact_quantity`; `test_response_reports_projection_age`; más los de .NET del reloj inyectado (`SalesAggregates_WithConfiguredAsOf_CountWindowsAgainstIt`, `SalesAggregates_WithoutAsOf_FallBackToWallClock`, `PosAvailabilityPage_DeclaresComputedAsOf`).
+**Informe.** [`c22-implementation-measurements.md`](informes/c22-implementation-measurements.md).
 
 ---
 
