@@ -155,6 +155,24 @@ Rango de un solo valor: la proyección entera se contó contra el mismo reloj. �
 exactamente el estado que la columna existe para poder afirmar — y para poder desmentir el día
 que alguien fije el instante después de un primer drenaje incremental.
 
+**`lastSaleAt` también está acotado por el instante, y no lo estaba al principio.** La
+verificación posterior a la implementación encontró que las dos ventanas usaban el instante
+inyectado pero `MAX(SaleDate)` no, así que **3 filas de la proyección llevaban un
+`last_sale_at` de 2026-08-29 contra un `computed_as_of` de 2026-08-23**: las ventas manuales
+de C16. Era conforme a la letra de la spec —que pedía `MAX(SaleDate)`— y contrario a su
+propósito, porque era la única cifra de la página que seguía derivando cada vez que se
+registra una venta en la demo, y es candidata a alimentar el decaimiento de C25. Acotada y
+redrenado:
+
+| | Antes | Después |
+|---|---:|---:|
+| Filas con `last_sale_at` > `computed_as_of` | 3 | **0** |
+| `last_sale_at` máximo | 2026-08-29 10:13 | 2026-08-23 19:56 |
+| Filas con `last_sale_at` no nulo | 4.021 | 4.021 |
+| `sales_30d` no nulos | 1.424 | 1.424 |
+
+La frase de la spec de `index-feed` se enmendó en el mismo movimiento.
+
 Con el instante aplicado, sobre los 6.050 pares asignados:
 
 | Señal | No nulos | % |

@@ -20,6 +20,10 @@ class _Item:
     price: float | None = None
     size_label: str | None = None
     materials: list[str] | None = None
+    #: Part of `Constrained` since availability joined the ordering key. Declared here rather
+    #: than defended against with `getattr` in production code: a protocol whose fields the
+    #: implementation is afraid to read is not a protocol.
+    qty_bucket: str | None = None
 
     def __post_init__(self) -> None:
         if self.materials is None:

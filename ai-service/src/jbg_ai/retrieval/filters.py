@@ -139,7 +139,7 @@ def _out_of_stock(item: Constrained) -> bool:
     read, and an absent signal must not demote anything — the same rule an unknown price
     already follows two blocks up.
     """
-    return getattr(item, "qty_bucket", None) == OUT_OF_STOCK_BUCKET
+    return item.qty_bucket == OUT_OF_STOCK_BUCKET
 
 
 def demotion_rank(

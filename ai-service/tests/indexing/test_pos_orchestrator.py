@@ -7,6 +7,7 @@ socket, and nothing reads schema `public`.
 from __future__ import annotations
 
 import asyncio
+import logging
 import uuid
 from datetime import UTC, datetime
 
@@ -255,8 +256,8 @@ def test_a_failed_page_is_recorded_and_the_remaining_pages_still_drain() -> None
     assert "simulated batch failure" in failure.error
 
 
-def test_a_failed_page_does_not_advance_the_bookmark_past_itself() -> None:
-    """A retry has to start before the page that failed, never after it."""
+def test_a_page_that_fails_alone_does_not_move_the_bookmark() -> None:
+    """With nothing after it to succeed, the cursor stays where the failed page found it."""
     feed = FakePosFeed([page([upsert(PRODUCT_A, WATERMARK)])])
     repo = FakePosProjectionRepo(fail_on_page=1)
 
@@ -265,6 +266,84 @@ def test_a_failed_page_does_not_advance_the_bookmark_past_itself() -> None:
     checkpoint = repo.checkpoints[POS_FEED]
     assert checkpoint.watermark is None
     assert checkpoint.since_id is None
+
+
+def test_a_later_successful_page_does_move_the_bookmark_past_a_failed_one() -> None:
+    """Deliberate, and worth pinning because it is the opposite of what one assumes.
+
+    A drain that refused to advance past a failed page would let one permanently bad batch
+    block every page after it, for ever. So the bookmark does move on, and the failed page
+    is **not** recovered by the cursor: it is recovered from `ai.sync_failure`, which stores
+    its exact keyset, or by a `--full` run. An earlier version of this file asserted the
+    opposite and passed only because its feed had a single page.
+    """
+    cursor = FeedCursor(since=WATERMARK, since_id=INVENTORY_A)
+    feed = FakePosFeed(
+        [
+            page([upsert(PRODUCT_A, WATERMARK)], next_cursor=cursor),
+            page([upsert(PRODUCT_B, LATER)]),
+        ]
+    )
+    repo = FakePosProjectionRepo(fail_on_page=1)
+
+    result = run(sync_pos_availability(PosSyncRequest(full=True), feed=feed, repo=repo))
+
+    assert result.failed_pages == 1
+    assert repo.checkpoints[POS_FEED].watermark == LATER
+
+    failure = repo.failures[0]
+    assert failure.cursor_since is None and failure.payload["items"] == 1, (
+        "the failed page is replayable from its own recorded keyset, not from the cursor"
+    )
+
+
+def test_every_drain_log_entry_carries_a_trace_id(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A drain has no inbound request, which is not the same as having nothing to correlate.
+
+    One run writes many pages and can fail on any of them, so without an id the entries of
+    two overlapping runs — a cron firing while somebody runs it by hand — cannot be told
+    apart in the log.
+    """
+    feed = FakePosFeed([page([upsert(PRODUCT_A, WATERMARK)])])
+    repo = FakePosProjectionRepo()
+
+    with caplog.at_level(logging.INFO, logger="jbg_ai.indexing.pos_orchestrator"):
+        run(
+            sync_pos_availability(
+                PosSyncRequest(full=True), feed=feed, repo=repo, trace_id="trace-fixed"
+            )
+        )
+
+    entries = [r.getMessage() for r in caplog.records if "stage=pos_sync" in r.getMessage()]
+    assert entries, "the drain must say what it did"
+    assert all("trace_id=trace-fixed" in entry for entry in entries)
+
+
+def test_a_failed_page_is_logged_with_the_same_trace_id(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    feed = FakePosFeed([page([upsert(PRODUCT_A, WATERMARK)])])
+    repo = FakePosProjectionRepo(fail_on_page=1)
+
+    with caplog.at_level(logging.WARNING, logger="jbg_ai.indexing.pos_orchestrator"):
+        run(
+            sync_pos_availability(
+                PosSyncRequest(full=True), feed=feed, repo=repo, trace_id="trace-fixed"
+            )
+        )
+
+    failed = [r.getMessage() for r in caplog.records if "page_failed" in r.getMessage()]
+    assert failed and "trace_id=trace-fixed" in failed[0]
+
+
+def test_a_drain_without_a_given_trace_id_generates_one() -> None:
+    from jbg_ai.indexing.pos_orchestrator import new_trace_id
+
+    first, second = new_trace_id(), new_trace_id()
+
+    assert first.startswith("sync-pos-") and first != second
 
 
 # --------------------------------------------------------------------------- CLI
@@ -316,6 +395,33 @@ def test_no_v1_route_and_no_scheduler_were_added() -> None:
     source = inspect.getsource(pos_orchestrator)
     for forbidden in ("create_task", "BackgroundTasks", "APScheduler", "add_event_handler"):
         assert forbidden not in source, f"{forbidden} would be an in-process scheduler"
+
+
+def test_the_cli_exits_non_zero_when_a_page_failed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A partially synchronised projection that reports success is the lie the guard prevents.
+
+    The README states this exit code, so it needs a guard: a cron that reads 0 would treat a
+    half-drained projection as a good run and never alert anyone.
+    """
+    from jbg_ai.indexing.pos_orchestrator import PosSyncResult
+
+    async def _fake(*, full: bool):
+        return PosSyncResult(upserted=10, pages=3, failed_pages=1)
+
+    monkeypatch.setattr(cli, "run_cli_sync_pos", _fake)
+
+    assert cli.main(["sync-pos"]) == 1
+
+
+def test_the_cli_exits_zero_on_a_clean_drain(monkeypatch: pytest.MonkeyPatch) -> None:
+    from jbg_ai.indexing.pos_orchestrator import PosSyncResult
+
+    async def _fake(*, full: bool):
+        return PosSyncResult(upserted=10, pages=3, failed_pages=0)
+
+    monkeypatch.setattr(cli, "run_cli_sync_pos", _fake)
+
+    assert cli.main(["sync-pos"]) == 0
 
 
 @pytest.mark.parametrize("command", ["sync-pos"])

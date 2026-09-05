@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import time
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Callable
@@ -46,6 +47,18 @@ class PosSyncRequest:
     full: bool = False
     since: datetime | None = None
     since_id: UUID | None = None
+
+
+def new_trace_id() -> str:
+    """A correlation id for one drain.
+
+    The retrieval path takes its `trace_id` from the token; a drain has no inbound request
+    to take one from, and "there is nobody to correlate with" is not the same as "nothing to
+    correlate". One run writes 34 pages and can fail on any of them, so without an id the
+    entries of two overlapping runs — a cron firing while somebody runs it by hand — are
+    indistinguishable in the log.
+    """
+    return f"sync-pos-{uuid.uuid4().hex[:12]}"
 
 
 @dataclass
@@ -120,10 +133,12 @@ async def sync_pos_availability(
     repo: PosProjectionRepo,
     time_budget_seconds: float = 180,
     clock: Clock | None = None,
+    trace_id: str | None = None,
 ) -> PosSyncResult:
     """Drain POS pages until `nextCursor` is null or the time budget elapses."""
     tick = clock or time.monotonic
     started = tick()
+    trace = trace_id or new_trace_id()
 
     checkpoint = await repo.get_checkpoint(POS_FEED)
     start_since, start_since_id = resolve_start_cursor(request, checkpoint)
@@ -156,10 +171,14 @@ async def sync_pos_availability(
                 applied = False
                 result.failed_pages += 1
                 logger.warning(
-                    "stage=pos_sync page_failed since=%s items=%s error=%s",
+                    "stage=pos_sync trace_id=%s page_failed page=%s since=%s items=%s "
+                    "error=%s",
+                    trace,
+                    result.pages,
                     cursor_since,
                     len(page.items),
                     exc,
+                    extra={"trace_id": trace},
                 )
                 await repo.insert_sync_failure(
                     SyncFailureWrite(
@@ -176,8 +195,13 @@ async def sync_pos_availability(
                 result.soft_deleted += soft_deleted
 
         if applied:
-            # Only a page that was actually written moves the bookmark. A failed page keeps
-            # the cursor where it was, so the retry starts before it rather than after.
+            # Only a page that was actually written moves the bookmark — but a *later* page
+            # that succeeds does move it past a failed one, and that is deliberate: a drain
+            # that refused to advance would let one permanently bad page block every page
+            # after it, for ever. The failed page is therefore not recovered by the cursor.
+            # It is recovered from `ai.sync_failure`, which stores its exact keyset, or by a
+            # `--full` run. Saying otherwise here would be a comment that reads like a
+            # guarantee and is not one.
             resume = resume_position(page, resume)
 
         await _persist_checkpoint(
@@ -190,6 +214,17 @@ async def sync_pos_availability(
         result.cursor, result.cursor_id = resume
 
         if page.next_cursor is None:
+            logger.info(
+                "stage=pos_sync trace_id=%s done pages=%s upserted=%s soft_deleted=%s "
+                "failed_pages=%s computed_as_of=%s",
+                trace,
+                result.pages,
+                result.upserted,
+                result.soft_deleted,
+                result.failed_pages,
+                result.computed_as_of.isoformat() if result.computed_as_of else None,
+                extra={"trace_id": trace},
+            )
             return result
 
         cursor_since = page.next_cursor.since
@@ -197,9 +232,11 @@ async def sync_pos_availability(
 
         if tick() - started >= time_budget_seconds:
             logger.warning(
-                "stage=pos_sync budget_exhausted pages=%s upserted=%s",
+                "stage=pos_sync trace_id=%s budget_exhausted pages=%s upserted=%s",
+                trace,
                 result.pages,
                 result.upserted,
+                extra={"trace_id": trace},
             )
             return result
 

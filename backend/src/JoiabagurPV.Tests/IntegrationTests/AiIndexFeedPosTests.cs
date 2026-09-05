@@ -182,6 +182,54 @@ public class AiIndexFeedPosTests : IAsyncLifetime
         catalogPage!.PageSize.Should().Be(IndexFeedPageSizes.Catalog);
     }
 
+    /// <summary>
+    /// A sale after the declared horizon must not move <c>lastSaleAt</c>.
+    /// </summary>
+    /// <remarks>
+    /// An integration test and not a unit one on purpose: the bound lives inside a LINQ
+    /// expression EF Core translates to SQL, so only a real database proves that the
+    /// translated <c>MAX(CASE WHEN …)</c> ignores the excluded rows rather than returning
+    /// null for the group. Left unbounded this was the one figure on the page that still
+    /// drifted, which defeats the reproducibility the reference instant exists to give.
+    /// </remarks>
+    [Fact]
+    public async Task PosAvailabilityFeed_SaleAfterTheReferenceInstant_DoesNotMoveLastSaleAt()
+    {
+        var product = await SeedInventoryAsync("SKU-POS-ASOF-SALE", quantity: 3);
+        var asOf = ReferenceInstant();
+        var inside = asOf.AddDays(-5);
+
+        using (var mother = new TestDataMother(_factory.Services))
+        {
+            await mother.Sale()
+                .WithProduct(product.Id)
+                .WithPointOfSale(_pos.Id)
+                .WithPaymentMethod(_payment.Id)
+                .WithUser(_user.Id)
+                .WithQuantity(3)
+                .WithSaleDate(inside)
+                .CreateAsync();
+
+            await mother.Sale()
+                .WithProduct(product.Id)
+                .WithPointOfSale(_pos.Id)
+                .WithPaymentMethod(_payment.Id)
+                .WithUser(_user.Id)
+                .WithQuantity(4)
+                .WithSaleDate(asOf.AddDays(3))
+                .CreateAsync();
+        }
+
+        var page = await GetPosAsync();
+        var item = page.Items.Single(i => i.GetProperty("productId").GetGuid() == product.Id);
+
+        item.GetProperty("lastSaleAt").GetDateTime().ToUniversalTime()
+            .Should().BeCloseTo(inside, TimeSpan.FromSeconds(1),
+                "a sale after the declared horizon has not happened yet, from that clock");
+        item.GetProperty("sales30d").GetInt32().Should().Be(3, "the later sale is outside too");
+        item.GetProperty("sales90d").GetInt32().Should().Be(3);
+    }
+
     [Fact]
     public async Task PosAvailabilityFeed_DeclaresTheClockItCounted_Against()
     {

@@ -5,6 +5,7 @@
 > **Idioma:** cuerpo en español, identificadores técnicos en inglés, por coherencia con [ticket.md](ticket.md) y con la HU.
 > **Alcance:** **47/47 tareas**. Las de la §9 (medición) se ejecutaron contra el feed real servido por la API .NET local; ver §8.
 > **Desviación de artefactos:** este change **abre una revisión de Alembic** contra lo que declaraban cinco documentos. La decisión, su fundamento y las enmiendas están en §9.1.
+> **Seguimiento verify:** misma fecha. 1 CRITICAL, 2 WARNING y 3 SUGGESTION, **todas cerradas**; ver §13.
 
 ---
 
@@ -33,12 +34,13 @@ La línea base se midió **de verdad**, sobre el árbol limpio en `8dc7f39`, ant
 | `ai-service` al cerrar los grupos 1-8 | **683 passed**, 0 failed |
 | `ai-service` al cerrar la §10 | **689 passed**, 0 failed, 56,6 s |
 | `ai-service` tras cubrir el escenario que faltaba (§3.1) | **691 passed**, 0 failed, 40,2 s |
+| `ai-service` tras cerrar los hallazgos del verify (§13) | **697 passed**, 0 failed, 40,7 s |
 | **Línea base** `dotnet test` (`8dc7f39`) | **52 fallos** de 973 — rojo preexistente documentado en `CLAUDE.md` |
 | `dotnet test` tras la implementación | **53 fallos** de 983 — ver §2 |
 | `openspec validate add-pos-projection-soft-prefilter --strict` | *valid* |
 | `openspec validate --all --strict` | **50 passed, 0 failed** |
 
-**+93 tests** de Python sobre la línea base (598 → 691) y **+10** de .NET (973 → 983).
+**+99 tests** de Python sobre la línea base (598 → 697) y **+11** de .NET (973 → 984).
 
 > El recuento **sí es fiable** en `ai-service`: parte de cero fallos y no llama a proveedores ni a RDS. En `backend/` **no lo es**, y la comparación se hace por nombres en §2.
 
@@ -97,7 +99,7 @@ Diez nombres de diferencia sin cambiar una línea, frente a los siete entre lín
 
 ## 3. Escenarios de las specs, uno a uno
 
-**35 escenarios `#### Scenario:`** en los cuatro deltas: `pos-projection` 22, `index-feed` 5, `vector-retrieval` 5, `product-document-indexer` 3. Todos tienen test nombrado.
+**36 escenarios `#### Scenario:`** en los cuatro deltas: `pos-projection` 22, `index-feed` 6, `vector-retrieval` 5, `product-document-indexer` 3. Todos tienen test nombrado. El sexto de `index-feed` lo añadió el verify (§13.3).
 
 ### `pos-projection` (22)
 
@@ -122,7 +124,7 @@ Diez nombres de diferencia sin cambiar una línea, frente a los siete entre lín
 | Guardias · A stale projection stops filtering instead of hiding products | `test_a_stale_projection_stops_filtering_instead_of_hiding_products` · `test_a_stale_projection_logs_the_degradation` · `test_a_stale_projection_answers_200_with_a_possibly_short_page` · `test_health_stays_200_when_the_projection_is_stale` | ✅ |
 | Flag · Disabling the prefilter restores the previous behaviour | `test_disabling_the_prefilter_restores_the_previous_behaviour` · `test_resolve_scope_skips_every_query_when_disabled` | ✅ |
 | Flag · A sweep overrides the default without restarting | `test_a_sweep_overrides_the_default_without_restarting` · `test_the_flag_is_not_part_of_the_request_contract` | ✅ |
-| Observabilidad · Every scoped retrieval records what the scope admitted | `test_the_projection_stage_reports_what_the_scope_admitted` · `test_the_search_stage_reports_the_scoped_cardinality` · `test_no_vector_reaches_the_logs` | ✅ |
+| Observabilidad · Every scoped retrieval records what the scope admitted | `test_the_projection_stage_reports_what_the_scope_admitted` · `test_the_search_stage_reports_the_scoped_cardinality` · `test_no_vector_reaches_the_logs` · **y el drenaje**: `test_every_drain_log_entry_carries_a_trace_id` (§13.1) | ✅ |
 | Ventas · Sales figures are persisted without influencing the ranking | `test_the_retrieval_path_cannot_read_the_sales_figures` · `test_sales_figures_do_not_change_the_order` · `test_upsert_is_idempotent_and_stores_the_reference_instant` | ✅ (§3.1) |
 | Suite offline · The offline suite makes no external call | Toda `tests/retrieval/` inyecta fakes; los `db` usan PostgreSQL efímero y **saltan** si Docker no responde | ✅ |
 
@@ -135,6 +137,7 @@ Diez nombres de diferencia sin cambiar una línea, frente a los siete entre lín
 | Feed POS · Without configuration the clock is the current time | `SalesAggregates_WithoutAsOf_FallBackToWallClock` · `AddIndexFeed_WithNoSalesAsOf_LeavesTheWallClockInCharge` | ✅ |
 | Feed POS · Unassignment emits a tombstone | `PosAvailabilityFeed_Unassigned_EmitsTombstone` (existente) | ✅ |
 | Feed POS · The POS page cap is 200 and is not copied to UI lists | `PosAvailabilityFeed_PageSize_Is200` (existente) | ✅ |
+| Feed POS · A sale after the reference instant does not move the last-sale timestamp | `PosAvailabilityFeed_SaleAfterTheReferenceInstant_DoesNotMoveLastSaleAt` (§13.3) | ✅ |
 
 `computedAsOf` en la página se fija además con `PosAvailabilityPage_DeclaresComputedAsOf`, `PosAvailabilityPage_DeclaresComputedAsOf_EvenWithNoUpserts` y `PosAvailabilityFeed_DeclaresTheClockItCounted_Against` (extremo a extremo por HTTP).
 
@@ -369,12 +372,79 @@ Con la guardia de proyección delante, `test_empty_compatible_index_raises_depen
 
 ---
 
+## 13. Hallazgos del `/opsx:verify`, cerrados
+
+La pasada de verify no releyó este documento: fue a buscar lo que pudiera contradecirlo. Salieron seis cosas.
+
+### 13.1. CRITICAL — el drenaje no emitía `trace_id`, y la spec lo exige
+
+`specs/pos-projection/spec.md:153` dice «The drain **and** the retrieval MUST emit structured logs carrying `trace_id`». La recuperación lo hacía; **el drenaje no emitía ninguno**. El de catálogo de C13 tampoco, así que no había precedente que copiar — pero el MUST es de esta capacidad, y no es cosmético: una pasada escribe 34 páginas y puede fallar en cualquiera, así que sin id las entradas de dos ejecuciones solapadas —un cron disparando mientras alguien lo lanza a mano— son indistinguibles.
+
+**Cerrado:** `new_trace_id()` genera `sync-pos-<12 hex>`, aceptable por parámetro para que un llamador correlacione, presente en las cuatro líneas del drenaje más una línea `done` de cierre. Tres tests: `test_every_drain_log_entry_carries_a_trace_id`, `test_a_failed_page_is_logged_with_the_same_trace_id`, `test_a_drain_without_a_given_trace_id_generates_one`.
+
+### 13.2. WARNING — un comentario afirmaba una garantía que el código no daba
+
+El comentario decía *«A failed page keeps the cursor where it was, so the retry starts before it rather than after»*, y el test se llamaba `test_a_failed_page_does_not_advance_the_bookmark_past_itself`. **Sólo era cierto si la página fallida era la última**: el test pasaba porque su feed tenía una sola página. Probado con dos:
+
+```
+failed_pages=1  upserted=1
+checkpoint watermark = 2026-08-22 11:00:00+00   ← la página 2, que sí funcionó
+la página que FALLÓ cubría 2026-08-22 10:00:00+00
+>>> el marcador AVANZÓ POR DELANTE de la página fallida
+```
+
+El **comportamiento** es correcto y deliberado —si el marcador se quedara atrás, una página permanentemente mala bloquearía todas las siguientes para siempre— pero el comentario y el nombre del test mentían sobre él.
+
+**Cerrado:** comentario reescrito diciendo lo que pasa y por qué; el test renombrado a `test_a_page_that_fails_alone_does_not_move_the_bookmark`, y añadido `test_a_later_successful_page_does_move_the_bookmark_past_a_failed_one`, que fija la realidad y deja escrito que la página fallida se recupera de `ai.sync_failure` o de un `--full`, **no del cursor**.
+
+### 13.3. WARNING — `lastSaleAt` no estaba anclado al instante de referencia
+
+`GetSalesAggregatesAsync` acotaba las dos ventanas con `SaleDate <= now`, pero `LastSaleAt = MAX(SaleDate)` **no**. Verificado contra la proyección real: **3 filas** llevaban `last_sale_at` de 2026-08-29 contra un `computed_as_of` de 2026-08-23 — las ventas manuales de C16.
+
+Era **conforme a la letra** de la spec, que pedía `MAX(SaleDate)`, y **contrario a su propósito**: era la única cifra de la página que seguía derivando cada vez que se registra una venta en la demo, justo lo que el instante de referencia existe para impedir, y es candidata a alimentar el decaimiento de C25.
+
+No se tocó por iniciativa propia porque cambiaba comportamiento y contradecía una frase viva: **se consultó y se decidió anclarlo**.
+
+**Cerrado:** `MAX(CASE WHEN SaleDate <= now)` en el repositorio, la frase de la spec de `index-feed` enmendada con el porqué, y un **escenario nuevo** en el delta. Test de integración —y no unitario— a propósito: el límite vive dentro de una expresión LINQ que EF Core traduce, así que sólo una base real prueba que el `MAX(CASE WHEN …)` traducido ignora las filas excluidas en vez de devolver null para el grupo. Redrenado y verificado:
+
+| | Antes | Después |
+|---|---:|---:|
+| Filas con `last_sale_at` > `computed_as_of` | 3 | **0** |
+| `last_sale_at` máximo | 2026-08-29 10:13 | 2026-08-23 19:56 |
+| Filas con `last_sale_at` no nulo | 4.021 | 4.021 |
+| `sales_30d` no nulos | 1.424 | 1.424 |
+
+### 13.4. SUGGESTION — el código de salida del CLI no tenía guarda
+
+El README promete «exits non-zero when any page failed» y **nada lo fijaba**: un cron que leyera 0 daría por buena una proyección medio drenada y no avisaría a nadie. **Cerrado** con `test_the_cli_exits_non_zero_when_a_page_failed` y `test_the_cli_exits_zero_on_a_clean_drain`.
+
+### 13.5. SUGGESTION — un `getattr` defensivo contra un campo que el protocolo declara
+
+`_out_of_stock` leía `getattr(item, "qty_bucket", None)` aunque `Constrained` ya declara el campo. Resultó **load-bearing**: el fixture `_Item` de `test_filters.py` no lo tenía, así que quitarlo sin más habría roto seis tests. **Cerrado** dándoselo al fixture y leyendo el atributo directamente: un protocolo cuyos campos la implementación no se atreve a leer no es un protocolo.
+
+### 13.6. SUGGESTION — dos consultas de más, no tocadas
+
+`count_scope` corre por petición sin cachear, y `_persist_checkpoint` hace un `count(*)` por página. Ambas correctas y dentro de presupuesto —la primera es un `count` sobre el prefijo de la PK, la segunda son 34 por drenaje—. Se anotan y se dejan: cachear la primera exigiría invalidarla al drenar, que es más superficie de la que ahorra.
+
+### Lo que el verify comprobó y encontró bien
+
+| Comprobación | Resultado |
+|---|---|
+| Ambas ventanas de venta usan el instante inyectado, acotadas también por arriba | ✅ |
+| Ningún `DateTime.UtcNow` en la ruta del feed | ✅ ninguno |
+| D4 · Ningún `DELETE` en el módulo de proyección | ✅ sólo `INSERT … ON CONFLICT` |
+| D5 · `refreshed_at` nunca leído en `retrieval/` | ✅ sólo en comentarios que explican por qué no |
+| D5/D6 · Constantes 10 s y 3600 s | ✅ |
+| 14/14 requisitos con implementación | ✅ |
+
+---
+
 ## Veredicto
 
-**Sin problemas críticos.** `uv run --system-certs pytest` **691 passed, 0 failed** sobre una línea base medida de **598**, sin abrir un socket a proveedor, LLM ni RDS. `openspec validate --all --strict` **50 passed, 0 failed**. `dotnet test` con **cero fallos en las seis clases que el change toca**, y la rotación de nombres del resto demostrada como ruido del banco reproduciéndola sobre el mismo binario. **35/35 escenarios** con test nombrado, **4/4 nombres** exigidos por `tasks.md`, **47/47 tareas**.
+**Sin problemas críticos abiertos.** El verify encontró uno —un MUST de spec sin implementar— y está cerrado (§13.1). `uv run --system-certs pytest` **697 passed, 0 failed** sobre una línea base medida de **598**, sin abrir un socket a proveedor, LLM ni RDS. `openspec validate --all --strict` **50 passed, 0 failed**. `dotnet test` con **cero fallos en las seis clases que el change toca**, y la rotación de nombres del resto demostrada como ruido del banco reproduciéndola sobre el mismo binario. **36/36 escenarios** con test nombrado, **4/4 nombres** exigidos por `tasks.md`, **47/47 tareas**, y los **6 hallazgos del verify cerrados** con sus guardas.
 
 **Una desviación de artefactos, declarada y consultada:** se abre una revisión de Alembic aditiva de una columna anulable, con las seis piezas de documentación enmendadas (§9.1).
 
-**Tres afirmaciones del diseño corregidas contra medición** en vez de citadas: las latencias de D2, la forma real del plan escopado, y el porcentaje estable de `sales_30d` (§8.4).
+**Tres afirmaciones del diseño corregidas contra medición** en vez de citadas: las latencias de D2, la forma real del plan escopado, y el porcentaje estable de `sales_30d` (§8.4). **Y dos afirmaciones del propio código** que el verify demostró falsas: un comentario sobre el marcador de páginas fallidas (§13.2) y la promesa de reproducibilidad, que `lastSaleAt` incumplía en tres filas reales (§13.3).
 
 **Listo para archivar.** El drenaje real escribe 6.720 filas con deriva 0 contra el `aggregateHash`, las páginas cortas pasan de ocho puntos de venta a ninguno, y la única consecuencia operativa nueva —HT-ARTRUTX, sin surtido, responde 503— queda escrita antes de que aparezca en un log.

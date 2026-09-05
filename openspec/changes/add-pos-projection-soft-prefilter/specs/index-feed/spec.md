@@ -5,7 +5,7 @@
 ### Requirement: POS availability feed is sparse, bucketed and capped at two hundred
 The system SHALL expose `GET /api/ai/index-feed/pos-availability` as a sparse assignment feed. A page MUST contain at most 200 items. The client MUST NOT choose the page size. Active `Inventory` rows in the cursor window MUST be upserts. An inactive assignment whose `greatest(LastUpdatedAt, UpdatedAt)` falls in the cursor window MUST be a tombstone with `reason = unassigned` and body `{ kind, pointOfSaleId, productId, reason, at }`. `qtyBucket` MUST be `0` when `Quantity <= 0`, `1-2` when quantity is 1 or 2, and `3+` when quantity ≥ 3. The JSON MUST NOT include `quantity`. `isAssignedHint` MUST reflect `Inventory.IsActive`.
 
-`sales30d` and `sales90d` MUST be `SUM(Sale.Quantity)` for that `(ProductId, PointOfSaleId)` over the 30 and 90 days preceding a **reference instant**, without subtracting returns. That instant MUST be the configured `IndexFeed:SalesAsOf` when it is set, and the current time otherwise, so an unset configuration preserves the previous behaviour. It MUST be reported on the page as `computedAsOf`, because a windowed figure whose clock is not declared cannot be reproduced: the same configuration and seed must yield the same aggregates on different days. `lastSaleAt` MUST be `MAX(SaleDate)` or null. The cursor MUST be keyset on `(watermark, Inventory.Id)`. `PaginationConstants.MaxPageSize` and the operator product-list cap of 50 MUST NOT be used on this route.
+`sales30d` and `sales90d` MUST be `SUM(Sale.Quantity)` for that `(ProductId, PointOfSaleId)` over the 30 and 90 days preceding a **reference instant**, without subtracting returns. That instant MUST be the configured `IndexFeed:SalesAsOf` when it is set, and the current time otherwise, so an unset configuration preserves the previous behaviour. It MUST be reported on the page as `computedAsOf`, because a windowed figure whose clock is not declared cannot be reproduced: the same configuration and seed must yield the same aggregates on different days. `lastSaleAt` MUST be the greatest `SaleDate` **at or before that same instant**, or null. Leaving it as an unbounded `MAX(SaleDate)` would make it the one figure on the page that still drifts — a sale recorded after the declared horizon moves it — which defeats the reproducibility the reference instant exists to provide, and it is a candidate input for a decay signal that must not move on its own. The cursor MUST be keyset on `(watermark, Inventory.Id)`. `PaginationConstants.MaxPageSize` and the operator product-list cap of 50 MUST NOT be used on this route.
 
 #### Scenario: The feed returns a bucket not an exact quantity
 - **GIVEN** an active inventory whose `Quantity` is 0, 1, 2 or ≥ 3
@@ -21,6 +21,13 @@ The system SHALL expose `GET /api/ai/index-feed/pos-availability` as a sparse as
 - **THEN** `sales30d` counts only the sales inside that window
 - **AND** the same request issued on a later day returns the same aggregates
 - **AND** the page reports that instant as `computedAsOf`
+
+#### Scenario: A sale after the reference instant does not move the last-sale timestamp
+- **GIVEN** `IndexFeed:SalesAsOf` is configured and a sale exists after that instant
+- **WHEN** the POS feed is requested
+- **THEN** `lastSaleAt` reports the most recent sale at or before the instant
+- **AND** it does not report the later sale
+- **AND** `sales30d` and `sales90d` do not count it either
 
 #### Scenario: Without configuration the clock is the current time
 - **GIVEN** `IndexFeed:SalesAsOf` is not configured

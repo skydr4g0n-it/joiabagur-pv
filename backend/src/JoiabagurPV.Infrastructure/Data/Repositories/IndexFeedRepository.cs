@@ -186,7 +186,13 @@ public class IndexFeedRepository : IIndexFeedRepository
                     sale.SaleDate >= since30 && sale.SaleDate <= now ? sale.Quantity : 0),
                 Sales90d = group.Sum(sale =>
                     sale.SaleDate >= since90 && sale.SaleDate <= now ? sale.Quantity : 0),
-                LastSaleAt = group.Max(sale => (DateTime?)sale.SaleDate)
+                // Bounded by the reference instant, exactly like the two windows above.
+                // Left unbounded it was the one figure on this page that still drifted: a
+                // sale recorded after the declared horizon moved it, so the same
+                // configuration and seed stopped yielding the same page on different days —
+                // and it is a candidate input for the decay the ranking change may use.
+                LastSaleAt = group.Max(sale =>
+                    sale.SaleDate <= now ? (DateTime?)sale.SaleDate : null)
             })
             .ToListAsync(cancellationToken);
 
