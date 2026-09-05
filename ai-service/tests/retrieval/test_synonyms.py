@@ -226,6 +226,32 @@ def test_plural_is_resolved_without_a_dedicated_entry() -> None:
         assert canonical in _forms(typed), f"{typed} did not reach {canonical}"
 
 
+def test_plural_canonical_is_reachable_from_its_singular() -> None:
+    """`gemelos` is canonical in the plural, and the reduction only runs singular<-plural.
+
+    `singular_candidates` strips `s`/`es`, so `diademas`, `llaveros` and `cinturones` reach
+    their canonical unaided. It never adds a plural, so a typed `gemelo` cannot reach
+    `gemelos` on its own: that is the one case the overlay has to supply as a surface form.
+    """
+    assert singular_candidates("gemelo") == ()
+
+    overlay = load_overlay_from_path(OVERLAY_PATH)
+    declared = _folded(
+        [str(form) for entry in overlay.get("classes") or () for form in entry.get("forms") or ()]
+    )
+    assert "gemelo" in declared, "the singular must be declared; the reduction cannot reach it"
+    assert "gemelos" in _forms("gemelo")
+
+    # The other three need no entry at all, which is why none was added for them.
+    for typed, canonical in (
+        ("diademas", "diadema"),
+        ("llaveros", "llavero"),
+        ("cinturones", "cinturon"),
+    ):
+        assert typed not in declared, f"{typed} should not need its own overlay entry"
+        assert canonical in _forms(typed), f"{typed} did not reach {canonical}"
+
+
 def test_singularisation_never_invents_a_canonical() -> None:
     """A reduction is only used when the reduced form is already in the dictionary."""
     assert singular_candidates("collares") == ("collar", "collare")
