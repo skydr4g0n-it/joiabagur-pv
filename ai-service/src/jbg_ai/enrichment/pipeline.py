@@ -48,16 +48,22 @@ _GEM_HINTS = (
 )
 
 
-_PROMPT_RELATIVE = Path("prompts") / "enrichment" / "v1.md"
+# Derived from the constant, never named beside it: a version that moved while the path
+# did not would stamp profiles with a prompt that never produced them, and the claim
+# would look true afterwards. `test_prompt_version_matches_the_loaded_prompt_file` pins it.
+_PROMPT_RELATIVE = Path("prompts") / f"{PROMPT_VERSION}.md"
 
 
 def load_prompt() -> str:
-    """Load the C09 extraction prompt (`enrichment/v1`).
+    """Load the extraction prompt declared by `PROMPT_VERSION`.
 
-    Single source of truth: `ai-service/prompts/enrichment/v1.md`. Distinct from
+    Single source of truth: `ai-service/prompts/<PROMPT_VERSION>.md`. Distinct from
     `prompts/catalog-synth/v3.md` (C06b generate). The Docker image copies
     `prompts/` into `/app/prompts/` (see `ai-service/Dockerfile`); there is no
     second authored copy inside the Python package.
+
+    Superseded versions stay in the repository unmodified: profiles produced by them
+    keep declaring their version, and that declaration must stay verifiable.
     """
     here = Path(__file__).resolve()
     candidates = (
@@ -69,7 +75,7 @@ def load_prompt() -> str:
         if path.is_file():
             return path.read_text(encoding="utf-8")
     raise FileNotFoundError(
-        "enrichment/v1.md not found; expected ai-service/prompts/enrichment/v1.md "
+        f"{PROMPT_VERSION}.md not found; expected ai-service/{_PROMPT_RELATIVE.as_posix()} "
         f"(searched: {', '.join(str(p) for p in candidates)})"
     )
 

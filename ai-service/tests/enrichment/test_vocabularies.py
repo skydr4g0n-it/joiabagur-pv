@@ -53,3 +53,28 @@ def test_piece_type_stores_hypernym_not_hyponym() -> None:
     assert "gargantilla" not in vocabs.piece_type.as_set
     assert "brazalete" not in vocabs.style_tags.as_set
     assert "gargantilla" not in vocabs.style_tags.as_set
+
+
+def test_new_piece_types_are_canonical_and_normalised() -> None:
+    """The four terms FIX1 added are canonicals, not synonyms of an older hypernym.
+
+    `gemelos` is canonical in the plural, as `pendientes` is, because the piece is a
+    pair. `cinturon` is canonical without its accent, as `pequeno` is: the value is
+    compared by exact equality when it travels from the panel to the retriever, so the
+    accent lives only in the human-readable label.
+    """
+    vocabs = load_vocabularies()
+
+    for term in ("diadema", "gemelos", "cinturon", "llavero"):
+        assert term in vocabs.piece_type.as_set
+        assert normalize_value(term, vocabs.piece_type) == term
+
+    assert normalize_value("Diadema", vocabs.piece_type) == "diadema"
+    assert normalize_value("Cinturón", vocabs.piece_type) == "cinturon"
+    assert normalize_value("cinturón", vocabs.piece_type) == "cinturon"
+    assert normalize_value("LLAVERO", vocabs.piece_type) == "llavero"
+
+    # No extraction synonym was added for them: the query-side variants belong to the
+    # C20 overlay, which derives its classes from this same file.
+    assert normalize_value("tiara", vocabs.piece_type) is None
+    assert normalize_value("gemelo", vocabs.piece_type) is None

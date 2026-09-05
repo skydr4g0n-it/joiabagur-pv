@@ -12,6 +12,10 @@ piece_type:
     - tobillera
     - broche
     - cadena
+    - diadema
+    - gemelos
+    - cinturon
+    - llavero
   synonyms:
     sortija: anillo
     alianza: anillo

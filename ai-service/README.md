@@ -120,6 +120,25 @@ With `STUB_MODE=true` (the local and test default) every `/v1` route answers fro
 
 With `STUB_MODE=false` a route whose real logic does not exist yet answers **501** naming the change that will deliver it (C24 evals, C26 substitutes, C30 assist, C35 inventory). `POST /v1/enrich/products` is C09: the real pipeline, or 503 if `JPV_RAG_LLM_API_KEY` is missing — never 501. `POST /v1/index/sync` and `GET /v1/index/status` are C13: the catalog drain, or 503 if feed/embed settings or `sku_provenance.json` are missing — never 501. `POST /v1/retrieval/products` is C14: the vector retriever, or 503 if `JPV_EMBEDDING_API_KEY`, `DATABASE_URL` or a compatible index is missing — never 501. Substitutes stay 501 until C26. Later changes replace remaining handlers one at a time; the contract frozen here is the one they must respect.
 
+## Enrichment prompt versions
+
+**The catalogue holds more than one.** `PROMPT_VERSION` in `enrichment/constants.py` names the
+prompt in force, and `load_prompt()` derives its path from that constant — `prompts/<version>.md` —
+so the two cannot drift and stamp a profile with a version that never produced it. Superseded
+prompt files stay in the repository unmodified, because the profiles produced by them keep
+declaring their version and that claim has to stay checkable.
+
+Since FIX1 the corpus is mixed: **22 profiles on `enrichment/v2`** (the enumerated cohort of
+`fix-enrichment-vocabulary-gaps`, whose `piece_type` the eight-term vocabulary could not name)
+and **1.178 on `enrichment/v1`**.
+
+**Consequence, and it is not optional: any aggregate metric over extracted attributes must be
+reported per `PromptVersion`.** Coverage of `piece_type`, distribution of `materials`, share of
+empty `style_tags` — an average across both populations is a number without a subject. This is the
+same discipline C24 applies to `data_origin`, and the field exists precisely to make the difference
+visible. Mixing `PromptVersion` is safe and traceable; mixing `embedding_version` is not, because
+that compares two geometric spaces and returns a plausible number with no meaning.
+
 ## OpenAPI snapshot
 
 `ai-service/openapi.json` is the published contract, and `test_openapi_snapshot_is_stable` fails whenever the live schema drifts from it. `docs_url` stays disabled: the artifact is the snapshot, not a browsable UI.

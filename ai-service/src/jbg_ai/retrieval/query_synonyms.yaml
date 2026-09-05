@@ -65,6 +65,17 @@ classes:
     why: >-
       `alfiler` reaches 2 documents and `prendedor` 0, against 86 for the canonical.
 
+  - field: piece_type
+    canonical: gemelos
+    forms: [gemelo]
+    why: >-
+      EMISSION, like `pequeno` below. The canonical is plural because the piece is a
+      pair, and the plural reduction of `singular_candidates` runs singular<-plural
+      only, so a typed `gemelo` can never reach `gemelos`: 0 documents against 4 for
+      the canonical. `tiara` is deliberately absent — it reaches 0 documents and it is
+      not a regional variant, so it fails the rule that an entry without a number
+      behind it does not go in.
+
   # ----------------------------------------------------------------- materials
   - field: materials
     canonical: baño de oro
@@ -158,24 +169,12 @@ exclusions:
       every leather query. This is the entry that explains why the dictionary is
       curated against the corpus instead of generated.
 
-  - term: llavero
-    why: >-
-      Not a synonym: a `piece_type` gap. Belongs to `fix-enrichment-vocabulary-gaps`,
-      whose own ficha claims it. The loader rejects it structurally, because its
-      canonical does not exist in the base.
-
-  - term: diadema
-    why: Same as `llavero`. 11 documents that no synonym can reach.
-
-  - term: gemelos
-    why: Same as `llavero`. 4 documents.
-
-  - term: cinturon
-    why: Same as `llavero`. 3 documents.
-
   - term: filigrana
     why: >-
       Needs no expansion at all: it reaches 66 documents on its own, spread across
       every piece type — it is a technique, not a piece. It is a `style_tags` gap
       and a real Menorcan domain term; one of the 12 recorded operator searches is
-      literally "anillo de filigrana tradicional menorquina".
+      literally "anillo de filigrana tradicional menorquina". Closing it means adding
+      a canonical to `style_tags`, which is a different axis with its own coverage
+      gates in the auditor, and it is not what `piece_type` gaps cost: it stays open,
+      and it is the example the guard test points at.

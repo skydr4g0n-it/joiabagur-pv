@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-PROMPT_VERSION = "enrichment/v1"
+PROMPT_VERSION = "enrichment/v2"
 DEFAULT_RAG_LLM_MODEL = "openai/gpt-4o"
 DEFAULT_RAG_LLM_CONCURRENCY = 8
 # Provider-call retries for 429 / 5xx. Distinct from the one parse retry.

@@ -172,3 +172,71 @@ def test_mixed_list_uses_least_evidenced_member_confidence() -> None:
     assert profile.materials.value == ["plata", "oro"]
     assert profile.materials.confidence == CONFIDENCE_NO_SPAN
     assert profile.materials.confidence != CONFIDENCE_SPAN
+
+
+def test_a_null_piece_type_is_kept_and_not_defaulted() -> None:
+    """The pipeline carries a null type through; it never fills it with a hypernym.
+
+    Named for what it verifies. With a fake `EnrichLlm` this proves nothing about the
+    *wording* of the prompt — the fake returns whatever it is programmed to return, and the
+    live spec forbids opening sockets to a provider in this suite. The evaluation of the
+    brief is the re-enrichment run and its before/after table in
+    `fix1-vocabulary-gaps-measurements.md`.
+    """
+    profile = _assemble(
+        name="Arreglos oro",
+        description="Servicio de reparación y ajuste de piezas en oro.",
+        extraction=EnrichmentExtraction(piece_type=None, materials=["oro"]),
+    )
+
+    assert profile.piece_type is None
+    assert profile.materials.value == ["oro"]
+
+
+def test_untypeable_jewel_stays_null() -> None:
+    """No evidence of any canonical type is a null, not a failed extraction.
+
+    `Joya del Zodiaco` (SKU845) has an empty description and no term of the closed
+    vocabulary names it. After FIX1 it is the single remaining null in the index, and that
+    is the correct outcome: nothing was discarded, so nothing is warned about.
+    """
+    profile = _assemble(
+        name="Joya del Zodiaco",
+        description=None,
+        extraction=EnrichmentExtraction(piece_type=None),
+        sku="SKU845",
+    )
+
+    assert profile.piece_type is None
+    assert not any("piece_type" in warning for warning in profile.warnings)
+
+
+def test_proper_name_containing_a_piece_type_does_not_beat_the_head_noun() -> None:
+    """Measured false friend, in the idiom of the `piel -> cuero` exclusion of C20.
+
+    `Cinturón de Orión` is the constellation. SKU822 and SKU882 are correctly typed today
+    and are the control group of the FIX1 re-enrichment run: adding `cinturon` to the closed
+    vocabulary is what puts them at risk, and if either moves the brief is overfitted. Here
+    the pipeline half is pinned — the head noun is what is stored — and the vocabulary is
+    checked not to resolve the proper name on its own.
+    """
+    vocabs = load_vocabularies()
+    assert vocabs.piece_type.resolve("Cinturón de Orión") is None
+
+    broche = _assemble(
+        name="Broche Cinturón de Orión",
+        description="Broche inspirado en la constelación de Orión.",
+        extraction=EnrichmentExtraction(piece_type="broche"),
+        sku="SKU822",
+    )
+    anillo = _assemble(
+        name="Anillo Cinturón de Orión",
+        description="Anillo inspirado en la constelación de Orión.",
+        extraction=EnrichmentExtraction(piece_type="anillo"),
+        sku="SKU882",
+    )
+
+    assert broche.piece_type is not None
+    assert broche.piece_type.value == "broche"
+    assert anillo.piece_type is not None
+    assert anillo.piece_type.value == "anillo"

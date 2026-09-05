@@ -38,6 +38,10 @@ export const MATERIAL_OPTIONS: readonly MaterialOption[] = [
 /**
  * Piece categories, mirroring `piece_type.terms` of the same file. The retriever matches this
  * one by equality, so a single value rather than a multi-selection.
+ *
+ * The `value` must be byte-for-byte the canonical of the YAML, because it travels to
+ * `AND d.piece_type = :category` and is compared by exact equality. The accent lives only in
+ * the `label`: `cinturon` is unaccented as a canonical, «Cinturón» is what the operator reads.
  */
 export const PIECE_TYPE_OPTIONS: readonly MaterialOption[] = [
   { value: 'anillo', label: 'Anillo' },
@@ -48,6 +52,10 @@ export const PIECE_TYPE_OPTIONS: readonly MaterialOption[] = [
   { value: 'tobillera', label: 'Tobillera' },
   { value: 'broche', label: 'Broche' },
   { value: 'cadena', label: 'Cadena' },
+  { value: 'diadema', label: 'Diadema' },
+  { value: 'gemelos', label: 'Gemelos' },
+  { value: 'cinturon', label: 'Cinturón' },
+  { value: 'llavero', label: 'Llavero' },
 ] as const;
 
 /** Example queries, so what the system can be asked is expressed by the interface. */
