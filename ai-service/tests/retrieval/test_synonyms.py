@@ -76,6 +76,9 @@ def test_overlay_anchor_absent_from_the_base_is_a_vocabulary_gap() -> None:
     it is the guard that keeps a vocabulary gap from being smuggled in as a synonym, and
     it is what made FIX1 visible in the first place. The example moves to `filigrana`,
     the gap that is still open and recorded as such in the overlay's exclusions.
+
+    The message names the base vocabulary and not a change: the one it used to name is
+    FIX1 itself, and an error that points at an archived change outlives its own advice.
     """
     overlay = {
         "classes": [
@@ -87,7 +90,7 @@ def test_overlay_anchor_absent_from_the_base_is_a_vocabulary_gap() -> None:
 
     message = str(exc_info.value)
     assert "filigrana" in message
-    assert "fix-enrichment-vocabulary-gaps" in message
+    assert "vocabularies.yaml" in message
 
 
 def test_shipped_overlay_anchors_all_exist_in_the_base_vocabulary() -> None:

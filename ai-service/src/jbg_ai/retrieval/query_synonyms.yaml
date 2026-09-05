@@ -3,7 +3,8 @@
 # This file is the SECOND layer of the dictionary. The first is
 # `jbg_ai/enrichment/vocabularies.yaml`, which is read as the base equivalence
 # classes and is NEVER modified from here: touching it forces a prompt version
-# bump and re-enrichment of the corpus, which is `fix-enrichment-vocabulary-gaps`.
+# bump and a re-enrichment of the affected rows, which is a change of its own.
+# FIX1 paid that price for four piece types and measured what it costs.
 #
 # What belongs here, and nothing else:
 #   * terms the Spanish text-search configuration cannot relate to their own
@@ -14,8 +15,8 @@
 #
 # Rules the loader enforces, so they cannot rot:
 #   * every anchor MUST name a canonical that already exists in the base — a term
-#     the base does not know is a VOCABULARY GAP, not a synonym, and belongs to
-#     `fix-enrichment-vocabulary-gaps`;
+#     the base does not know is a VOCABULARY GAP, not a synonym, and is closed
+#     against the base vocabulary, never from here;
 #   * an overlay form MUST NOT already resolve to a different base canonical.
 #
 # Every entry carries the measurement that justifies it, taken on 2026-09-01

@@ -187,7 +187,7 @@ comportamiento correcto y declarado en `design.md` D5, y ya era cierto para `cad
 
 | Suite | Línea base (antes del change) | Después | Veredicto |
 |---|---|---|---|
-| `ai-service` (`uv run pytest`) | **697 pasan, 0 fallan** | **703 pasan, 0 fallan** | conjunto de fallos idéntico: **vacío**. Los 6 nuevos son los tests de este change |
+| `ai-service` (`uv run pytest`) | **697 pasan, 0 fallan** | **704 pasan, 0 fallan** | conjunto de fallos idéntico: **vacío**. Los 7 nuevos son los tests de este change |
 | `frontend` (`npm run test`) | **113 fallan / 455 pasan** (14 ficheros de 47) | **113 fallan / 456 pasan** | **conjunto de nombres de test fallidos idéntico** al de la línea base |
 | `npm run build` | — | limpio, salida 0 | la puerta real del frontend |
 
