@@ -18,7 +18,10 @@ from jbg_ai.knowledge.measure import (
 )
 from support.paths import AI_SERVICE_ROOT
 
-CALIBRATED = 0.81
+#: What the calibration rule yields **against the offline stand-in embedder**, which is the
+#: one this suite can run without a provider. It drives every offline measurement below.
+#: It is deliberately NOT the default in `Settings`: see the test that asserts they differ.
+OFFLINE_OPTIMUM = 0.81
 
 
 def test_the_fixture_holds_one_question_per_document_plus_the_out_of_domain_group(
@@ -69,8 +72,8 @@ def test_the_sidecar_records_how_the_corpus_was_produced(corpus: KnowledgeCorpus
 
 
 def test_the_measurement_runs_offline_and_is_reproducible(corpus: KnowledgeCorpus) -> None:
-    first = measure(threshold=CALIBRATED, hybrid_enabled=True, corpus=corpus)
-    second = measure(threshold=CALIBRATED, hybrid_enabled=True, corpus=corpus)
+    first = measure(threshold=OFFLINE_OPTIMUM, hybrid_enabled=True, corpus=corpus)
+    second = measure(threshold=OFFLINE_OPTIMUM, hybrid_enabled=True, corpus=corpus)
 
     assert first.recall_at_3 == second.recall_at_3
     assert first.mrr == second.mrr
@@ -82,7 +85,7 @@ def test_the_measurement_runs_offline_and_is_reproducible(corpus: KnowledgeCorpu
 def test_out_of_domain_questions_are_scored_as_abstentions(
     corpus: KnowledgeCorpus,
 ) -> None:
-    report = measure(threshold=CALIBRATED, hybrid_enabled=True, corpus=corpus)
+    report = measure(threshold=OFFLINE_OPTIMUM, hybrid_enabled=True, corpus=corpus)
 
     assert report.out_of_domain
     assert report.abstention_rate == 1.0
@@ -91,22 +94,40 @@ def test_out_of_domain_questions_are_scored_as_abstentions(
     )
 
 
-def test_the_calibrated_default_is_the_one_the_settings_carry(
-    corpus: KnowledgeCorpus,
-) -> None:
-    """The default in `Settings` is the measured value, not a number chosen by eye."""
+def test_the_default_is_not_the_offline_optimum(corpus: KnowledgeCorpus) -> None:
+    """The two numbers are not the same number, and tying them together shipped a defect.
+
+    This test used to assert `default == OFFLINE_OPTIMUM`, and it passed, and it was wrong.
+    The offline stand-in scores **lexical overlap**, so its distances live on a scale of
+    their own: its optimum sat at 0.81, and once the corpus was indexed with the production
+    embedder that value cited **four of the five** out-of-domain questions — the exact
+    failure the threshold exists to prevent, shipped green.
+
+    The rule is calibrated offline because that is what runs without a provider. The
+    **number** has to come from a populated index, and this test now guards the distinction
+    rather than the coincidence: it fails if anyone copies the offline optimum back into the
+    default.
+    """
     from jbg_ai.config.settings import Settings
 
-    assert Settings.model_fields["jpv_knowledge_distance_threshold"].default == CALIBRATED
+    default = Settings.model_fields["jpv_knowledge_distance_threshold"].default
+    assert default < OFFLINE_OPTIMUM
+    assert default == 0.51, (
+        "the default is the value the calibration rule yields against the production "
+        "embedder on the live index; re-derive it there, never from the offline sweep"
+    )
 
-    report = measure(threshold=CALIBRATED, hybrid_enabled=True, corpus=corpus)
+
+def test_the_offline_sweep_abstains_at_its_own_optimum(corpus: KnowledgeCorpus) -> None:
+    """And the offline optimum is still the right answer *for the offline embedder*."""
+    report = measure(threshold=OFFLINE_OPTIMUM, hybrid_enabled=True, corpus=corpus)
     assert not report.false_citations
 
 
 def test_the_fused_configuration_beats_vector_only(corpus: KnowledgeCorpus) -> None:
     """D7's question, answered with the number rather than with the intuition."""
-    hybrid = measure(threshold=CALIBRATED, hybrid_enabled=True, corpus=corpus)
-    vector = measure(threshold=CALIBRATED, hybrid_enabled=False, corpus=corpus)
+    hybrid = measure(threshold=OFFLINE_OPTIMUM, hybrid_enabled=True, corpus=corpus)
+    vector = measure(threshold=OFFLINE_OPTIMUM, hybrid_enabled=False, corpus=corpus)
 
     assert hybrid.recall_at_3 > vector.recall_at_3
     assert hybrid.mrr > vector.mrr
@@ -152,14 +173,14 @@ def test_the_calibration_rule_picks_the_strictest_safe_threshold(
     best = calibrated_threshold(reports)
 
     assert best is not None
-    assert best.threshold == CALIBRATED
+    assert best.threshold == OFFLINE_OPTIMUM
     assert not best.false_citations
 
     by_threshold = {report.threshold: report for report in reports}
     # Loosening past the calibrated value buys no recall at all — 0.81 and 0.83 answer the
     # same questions — and past 0.84 it starts citing out-of-domain ones. So the rule's own
     # word does the work: of the thresholds that tie on recall, the **strictest** wins.
-    assert by_threshold[0.83].recall_at_3 == by_threshold[CALIBRATED].recall_at_3
+    assert by_threshold[0.83].recall_at_3 == by_threshold[OFFLINE_OPTIMUM].recall_at_3
     assert not by_threshold[0.83].false_citations
     assert by_threshold[0.85].false_citations
-    assert by_threshold[0.78].recall_at_3 < by_threshold[CALIBRATED].recall_at_3
+    assert by_threshold[0.78].recall_at_3 < by_threshold[OFFLINE_OPTIMUM].recall_at_3

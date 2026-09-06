@@ -16,7 +16,10 @@ from jbg_ai.knowledge.offline import InMemoryKnowledgeIndex, LocalEmbeddingClien
 from jbg_ai.knowledge.search import search_knowledge
 from support.paths import OPENAPI_SNAPSHOT
 
-THRESHOLD = 0.81
+#: The offline stand-in's own scale, not the production default: this suite runs against
+#: `LocalEmbeddingClient`, whose distances sit far higher than the real embedder's. Using
+#: the shipped default here would make every one of these searches abstain.
+OFFLINE_THRESHOLD = 0.81
 
 
 def run(coro):
@@ -34,7 +37,7 @@ def search(corpus: KnowledgeCorpus, question: str, **overrides):
             question,
             embed=embed,
             index=overrides.pop("index", None) or index_for(corpus),
-            distance_threshold=overrides.pop("distance_threshold", THRESHOLD),
+            distance_threshold=overrides.pop("distance_threshold", OFFLINE_THRESHOLD),
             **overrides,
         )
     )

@@ -69,7 +69,12 @@ de ellas **no son fallos de recuperación**:
 
 ---
 
-## 2. El umbral, calibrado: `JPV_KNOWLEDGE_DISTANCE_THRESHOLD = 0,81`
+## 2. El umbral, calibrado *offline*: 0,81
+
+> **Superado por el §8.** Este apartado registra lo que el barrido *offline* dio, que es lo que
+> el change pudo medir sin proveedor. Con el índice real poblado, la misma regla da **0,51**, y
+> ese —y no este— es el valor que `Settings` lleva. Se conservan los dos porque la diferencia
+> entre ellos es el dato.
 
 Sustituye al 0,65 provisional heredado de productos, que se calibró sobre documentos de 40-120
 palabras y no sobre prosa de 130.
@@ -120,6 +125,10 @@ de carácter, 1.536 dimensiones y distancia coseno en `[0, 2]`, el mismo dominio
 es provisional.** El 0,81 hay que volver a medirlo contra el embebedor de producción sobre un
 índice real antes de que C30 lo ponga delante de un cliente. Queda como verificación posterior
 declarada, no como supuesto.
+
+> **Cerrada el 2026-09-06, y el aviso se quedó corto.** El §8 la ejecuta: contra el embebedor
+> real el 0,81 **cita cuatro de las cinco preguntas fuera de dominio**. No era una imprecisión
+> del número, era el mecanismo de abstención inoperante.
 
 Los cuatro fallos genuinos del §1 son, casi con seguridad, artefactos del mismo método: son
 preguntas —*«¿por qué se pone negra la plata?»*, *«¿por qué una pulsera dorada deja la muñeca
@@ -280,9 +289,8 @@ limpieza que resuelve el noventa por ciento de los casos»*, una precisión inve
 
 ## 7. Lo que queda abierto
 
-1. **Re-calibrar `JPV_KNOWLEDGE_DISTANCE_THRESHOLD` contra el embebedor de producción** sobre un
-   índice real, antes de que C30 exponga la tool. La regla está calibrada; el número, no del
-   todo (§3).
+1. ~~Re-calibrar `JPV_KNOWLEDGE_DISTANCE_THRESHOLD` contra el embebedor de producción.~~
+   **Cerrada el 2026-09-06: §8.** El valor pasa de 0,81 a **0,51**.
 2. **Confirmar la tabla de tallas de D16 con el negocio** antes de grabar el vídeo de la demo. Si
    sus tramos son otros, cambia **una** sección de **un** documento, y su marca `establecimiento`
    ya la señala como compromiso de la casa y no como hecho. No bloquea.
@@ -292,3 +300,86 @@ limpieza que resuelve el noventa por ciento de los casos»*, una precisión inve
 4. La composición del corpus —**sintético, con un 15,5 % de secciones ilustrativas y verificación
    de citas estructural y no semántica**— está declarada en `ai-service/README.md` y en
    `data/knowledge/README.md`. No es un riesgo mitigado: es un riesgo declarado.
+
+---
+
+## 8. El índice real, y el umbral recalibrado contra él (2026-09-06, posterior al archivado)
+
+El §7.1 quedaba abierto porque `sync-knowledge` nunca se había ejecutado: poblar el índice son
+161 llamadas de pago y el DoD del change exigía no hacerlas. Ejecutado a petición, **cierra esa
+verificación y corrige el valor que el change dejó por defecto**.
+
+### 8.1. La indexación
+
+```
+documents=32 chunks=161 embedded=161 skipped=0 deleted_chunks=0 deleted_documents=0
+version=openai/text-embedding-3-small:1536:knowledge/v1
+```
+
+20 segundos. Las 161 filas con `embedding` no nulo y con `tsv` poblado —columna generada, así que
+el código no la escribe: `agua`→`agu`, `aclarado`→`aclar`, lematizado en español—. **Segunda
+corrida: `embedded=0 skipped=161`**, idempotencia confirmada contra la base real y sin una sola
+llamada de pago.
+
+### 8.2. El 0,81 no abstenía
+
+Probando la búsqueda de punta a punta, **dos de las tres primeras preguntas fuera de dominio
+devolvieron cita**. Barrido completo del fixture sobre el índice real:
+
+| Umbral | Recall@3 | MRR | Abstención | Citas fuera de dominio |
+|---|---:|---:|---:|---:|
+| 0,48 | 90,6 % | 0,844 | 100 % | 0 |
+| 0,50 | 90,6 % | 0,859 | 100 % | 0 |
+| **0,51** | **93,8 %** | **0,891** | **100 %** | **0** |
+| 0,52 | 93,8 % | 0,891 | 80 % | 1 |
+| 0,65 | 93,8 % | 0,891 | 20 % | 4 |
+| **0,81** *(el que el change dejó)* | 93,8 % | 0,891 | **20 %** | **4** |
+
+**No era una imprecisión del número: era el mecanismo de abstención inoperante.** A 0,81, cuatro
+de cada cinco preguntas que el corpus no cubre reciben una cita bien formada, que es justo lo que
+C30 necesita no tener para no poder inventar una atribución.
+
+### 8.3. Con el embebedor real, la regla de D8 sí se puede cumplir
+
+Distancia al fragmento más cercano, pregunta a pregunta:
+
+| Grupo | mínimo | mediana | máximo |
+|---|---:|---:|---:|
+| **Con respuesta** (32) | 0,2485 | 0,3289 | **0,5062** |
+| **Fuera de dominio** (5) | **0,5145** | — | 0,9135 |
+
+Hay un **hueco limpio** entre 0,5062 y 0,5145, así que la regla —*el valor más estricto que
+mantiene en cero las fuera de dominio sin perder ninguna de las que sí tienen respuesta*— deja de
+ser la conjunción imposible del §2 y se aplica **literalmente**. Da **0,51**.
+
+Fuera de dominio, ordenadas por cercanía: reloj de cuerda 0,5145 · talla de zapato 0,5872 ·
+criptomonedas 0,6342 · horario de la tienda 0,6464 · capital de Australia 0,9135. Que la más
+cercana sea la de relojería es el fixture funcionando: se escribió como trampa de dominio
+contiguo, y es la que fija el margen.
+
+**El margen es estrecho —8 milésimas— y por construcción.** Un fixture más ancho lo moverá. Es
+una razón para re-derivar el umbral cuando cambien el corpus, el troceado o el modelo, no para
+elegir un valor más generoso: a 0,52 ya se cita lo que no se debe.
+
+### 8.4. Dos conclusiones del change que la medición real refina
+
+- **El 78,1 % era un suelo, y se confirma.** Con el embebedor de producción el Recall@3 sube a
+  **93,8 %** (30 de 32) y el MRR a **0,891**. El §3 lo predijo y acertó.
+- **La rama léxica cambia de papel.** Ya no gana recall —93,8 % en las dos configuraciones— pero
+  sigue mejorando el orden: **MRR 0,891 frente a 0,854**, +0,037. Sigue justificada, por
+  **reordenar** y no por recuperar. El +6,2 pp del §1 era un efecto del sustituto léxico, no una
+  propiedad del sistema.
+- **Latencia en caliente ~250 ms** por consulta contra la base local, incluida la llamada de
+  embebido de la pregunta que el §4 excluía. La primera, en frío, 3,9 s.
+
+### 8.5. Lo que se cambió a raíz de esto
+
+`KNOWLEDGE_DEFAULTS["jpv_knowledge_distance_threshold"]` pasa de **0,81 a 0,51**, y con él la
+fila del README. En los tests, la constante se **parte en dos**: `OFFLINE_OPTIMUM` sigue siendo
+0,81 y gobierna las mediciones *offline*, que sin proveedor no pueden usar otra escala; y el
+test que ataba el default a esa constante —y que pasaba en verde mientras el defecto se
+enviaba— ahora **comprueba que son distintos** y explica por qué copiarlos vuelve a romperlo.
+
+Los artefactos archivados del change no se tocan: su `design.md` ya listaba esta re-calibración
+como verificación posterior, así que el registro fechado es coherente con lo que se sabía
+entonces. Lo que se corrige es el valor en vigor y el informe vivo al que apunta el setting.

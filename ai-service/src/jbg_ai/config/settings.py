@@ -31,8 +31,15 @@ FUSION_DEFAULTS: dict[str, Any] = {
 #: one value, and three copies drift. The threshold is the output of a calibration RULE and
 #: not a preference; the rule, and the sweep that last applied it, are recorded in the C23
 #: implementation report rather than here, where nothing would ever re-measure them.
+#:
+#: The threshold is the one the rule yields **against the production embedder on the live
+#: index**, which is not the one the offline sweep yields: the stand-in scores lexical
+#: overlap, so its distances live on another scale entirely and its optimum admits questions
+#: the corpus does not cover. The offline sweep still calibrates the rule — it is what runs
+#: without a provider — but the number has to come from the real index, and the tests keep
+#: the two apart on purpose.
 KNOWLEDGE_DEFAULTS: dict[str, Any] = {
-    "jpv_knowledge_distance_threshold": 0.81,
+    "jpv_knowledge_distance_threshold": 0.51,
     "jpv_knowledge_hybrid_enabled": True,
 }
 
@@ -331,10 +338,14 @@ class Settings(BaseSettings):
             "values that tie the STRICTEST wins, which is the word the rule itself uses. "
             "Re-run the sweep with `python -m jbg_ai.knowledge calibrate`; the figures of "
             "the last one are in the C23 implementation report. That sweep uses the OFFLINE "
-            "stand-in embedder the spec requires, so what is calibrated is the RULE, and the "
-            "value stays provisional until it is re-run against the production embedder on a "
-            "real index. Supplies only the DEFAULT: the effective value travels as a parameter "
-            "of the call. Not required to boot /health."
+            "stand-in embedder the spec requires, so what it calibrates is the RULE. "
+            "This DEFAULT is the value the same rule yields against the PRODUCTION embedder "
+            "on the live index, which is a different number and not a rounding of it: the "
+            "stand-in scores lexical overlap and its distances live on another scale, so its "
+            "own optimum lets through questions the corpus does not cover. Re-derive it "
+            "whenever the corpus, the chunking rules or the embedding model change, and do "
+            "it against a populated index. Supplies only the DEFAULT: the effective value "
+            "travels as a parameter of the call. Not required to boot /health."
         ),
     )
 
