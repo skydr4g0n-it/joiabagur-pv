@@ -605,7 +605,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 | **C21** | `add-hybrid-search-rrf` | Python | C14, C20 | 🟢 | **archivado el 2 sep** · *tres puntos de la ficha refutados con medición* |
 | **FIX1** | `fix-enrichment-vocabulary-gaps` | Python + FE | C21 | 🟢 | **archivado el 5 sep** · *dos puntos de la ficha refutados con medición: la población era de 22 y no de 11, y su criterio de extremo a extremo ya se cumplía antes* · *fuera de la numeración C* |
 | **C22** | `add-pos-projection-soft-prefilter` | Python + .NET | C10, C12, C14 | 🟢 | **archivado el 5 sep** · *tres puntos de la ficha refutados con medición; entra además el reloj inyectado (FIX2)* |
-| **C23** | `add-knowledge-corpus-and-indexer` | Python | C11 | 🟢 | — |
+| **C23** | `add-knowledge-corpus-and-indexer` | Python | C11 | 🟢 | **archivado el 6 sep** · *zona, alcance y conflicto de zona de la ficha refutados por la implementación* |
 | **C24** | `add-eval-harness-golden-set-and-baselines` | Python | C14, C21 | 🔴 | rev. dec. 12 · **etiquetado simple desde el 31 ago** |
 | **C25** | `add-business-signals-ranking` | Python | C21, C22, C24 | 🔴 | — |
 | **C26** | `add-substitutes-retrieval` | Python | C22, C25 | 🟢 | specs v2 §6.3.2 |
@@ -627,7 +627,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 
 **⛔ Anulados el 2026-08-31 (5):** C19, C29, C33, C35 y C37 — la rama del agente de inventario. Motivo y consecuencias en el §0. Las fichas se conservan como registro y llevan el sello en el sitio.
 
-**Vivos: 37** (36 numerados más `FIX1`). Archivados **24** (C01–C18b, C20, C21, C22 y `FIX1`). Pendientes **13**: C23, C24, C25, C26, C27, C28, C30, C31, C32, C34, C36, C38 y C39 — de los cuales C27 y C23 llevan corte pre-autorizado. **C21 se archivó el 2026-09-02**, y con él caen los prerrequisitos de C24 y C30, o sea las dos mitades del proyecto que estaban esperando a la fusión. **C22 y `FIX1` se archivaron el 2026-09-05**, con lo que la ventana que `FIX1` tenía que respetar —entrar antes de que C24 etiquete su línea base— queda cumplida.
+**Vivos: 37** (36 numerados más `FIX1`). Archivados **25** (C01–C18b, C20, C21, C22, C23 y `FIX1`). Pendientes **12**: C24, C25, C26, C27, C28, C30, C31, C32, C34, C36, C38 y C39 — de los cuales C27 lleva corte pre-autorizado. **C23 se archivó el 2026-09-06** y su corte pre-autorizado —bajar a 15 documentos— se refutó por su propia unidad de medida: el diseño fija el tamaño en fragmentos y quince documentos dan la mitad del mínimo, con lo que la abstención dejaba de poder demostrarse. **C21 se archivó el 2026-09-02**, y con él caen los prerrequisitos de C24 y C30, o sea las dos mitades del proyecto que estaban esperando a la fusión. **C22 y `FIX1` se archivaron el 2026-09-05**, con lo que la ventana que `FIX1` tenía que respetar —entrar antes de que C24 etiquete su línea base— queda cumplida.
 
 ---
 
@@ -1006,13 +1006,13 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ---
 
-#### C23 · `add-knowledge-corpus-and-indexer` 🟢
+#### C23 · `add-knowledge-corpus-and-indexer` 🟢 archivado el 6 sep
 
 **Objetivo.** Segundo índice: conocimiento comercial **general, no por producto** — lo que permite citas verificables sin violar la decisión 4.
-**Prereq.** C11 · **Zona.** `ai-service/src/jbg_ai/data/`, `indexing/`
-**Alcance.** 30-45 documentos: **fichas por material** (cuidados, alergias, durabilidad), equivalencias de talla, guiones de venta, política de devoluciones, FAQ; chunking por secciones; indexación en `ai.knowledge_chunk` reutilizando el cliente de C11.
+**Prereq.** C11 · **Zona.** `ai-service/src/jbg_ai/knowledge/` —paquete propio, desviación declarada en D9: la ficha asignaba zona solo de indexación y a la vez pedía un test de búsqueda—, más `data/knowledge/` y un subcomando en `indexing/cli.py`
+**Alcance.** 32 documentos y 161 secciones: **fichas por material** (cuidados, alergias, durabilidad), equivalencias de talla, política de devoluciones, FAQ, piedras, glosario y origen de las colecciones; chunking por secciones; indexación en `ai.knowledge_chunk` reutilizando el cliente de C11. **Cero guiones de venta**, y no por recorte de alcance (D13): un guion es texto imperativo, y un fragmento imperativo recuperado dentro de un prompt es indistinguible de una instrucción, lo que convertiría al propio corpus en superficie de inyección con C31 todavía sin existir. Cada sección declara su `claim_scope`, y esa marca viaja con el fragmento recuperado.
 **Tests.** `test_chunker_preserves_section_titles_in_metadata`; `test_every_chunk_has_traceable_document_id`; `test_material_sheet_is_not_product_scoped`; `test_knowledge_search_returns_chunk_with_citation_id`.
-**Conflicto de zona.** Usa `indexing/knowledge.py`; no toca `indexing/products.py` ni `indexing/embeddings.py` (congelado en C11).
+**Conflicto de zona.** Usa el paquete `knowledge/`; `indexing/knowledge.py` nunca llegó a existir. No toca `indexing/products.py` ni `indexing/embeddings.py` (congelado en C11, y con un test que compara su SHA-256).
 
 ---
 

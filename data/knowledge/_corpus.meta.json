@@ -1,0 +1,26 @@
+{
+  "generator_version": "c23-knowledge/v1",
+  "model": "anthropic/claude-opus-5",
+  "prompt_version": "knowledge/v1",
+  "generated_at": "2026-09-06T00:00:00+00:00",
+  "authorship": "Redactado con asistencia de un LLM contra los ocho prompts de bloque versionados en ai-service/prompts/knowledge/v1/, y revisado a mano bloque a bloque. El corpus es sintético: los textos comerciales de la joyería nunca llegaron. La verificación de citas es estructural, no semántica.",
+  "hand_written_documents": [
+    "material-plata"
+  ],
+  "document_count": 32,
+  "section_count": 161,
+  "counts_by_doc_type": {
+    "faq": 10,
+    "material": 14,
+    "politica": 4,
+    "talla": 4
+  },
+  "counts_by_claim_scope": {
+    "establecimiento": 25,
+    "general": 136
+  },
+  "ratios_by_claim_scope": {
+    "establecimiento": 15.5,
+    "general": 84.5
+  }
+}

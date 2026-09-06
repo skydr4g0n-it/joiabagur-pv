@@ -13,14 +13,27 @@ PRODUCTION_ENV_NAMES = frozenset({"prod", "production"})
 CANONICAL_OPENAPI_SERVICE_VERSION = "0.1.0"
 
 #: C21 fusion defaults, in one place so the field default, the blank-string fallback and
-#: the canonical OpenAPI profile cannot drift apart. Every figure is measured; the reasons
-#: live in the field descriptions and in `retrieval/fusion.py`.
+#: the canonical OpenAPI profile cannot drift apart. Every value is measured, and the
+#: measured figures live in the C21 report rather than in the field descriptions below: a
+#: figure copied into a description is a snapshot that nothing re-measures, so it starts
+#: lying the first time the corpus or the index moves. The reasoning is in
+#: `retrieval/fusion.py`.
 FUSION_DEFAULTS: dict[str, Any] = {
     "jpv_rrf_k": 60,
     "jpv_rrf_weight_typed": 0.5,
     "jpv_rrf_weight_expanded": 0.5,
     "jpv_rrf_weight_vector": 0.33,
     "jpv_branch_depth": 60,
+}
+
+#: C23 knowledge defaults, in one place for the same reason as FUSION_DEFAULTS: the field
+#: default, the blank-string fallback and the canonical OpenAPI profile are three copies of
+#: one value, and three copies drift. The threshold is the output of a calibration RULE and
+#: not a preference; the rule, and the sweep that last applied it, are recorded in the C23
+#: implementation report rather than here, where nothing would ever re-measure them.
+KNOWLEDGE_DEFAULTS: dict[str, Any] = {
+    "jpv_knowledge_distance_threshold": 0.81,
+    "jpv_knowledge_hybrid_enabled": True,
 }
 
 
@@ -67,8 +80,8 @@ class Settings(BaseSettings):
         default=5,
         gt=0,
         description=(
-            "Hard ceiling on simultaneous connections, with no overflow. The "
-            "project budget is 5-10 for the whole system, shared with the .NET API"
+            "Hard ceiling on simultaneous connections, with no overflow. Sized against "
+            "the project-wide connection budget, which is shared with the .NET API"
         ),
     )
     jpv_catalog_llm_api_key: str | None = Field(
@@ -104,7 +117,7 @@ class Settings(BaseSettings):
     jpv_rag_llm_concurrency: int = Field(
         default=8,
         gt=0,
-        description="In-flight enrichment calls per batch. Default 8.",
+        description="In-flight enrichment calls per batch.",
     )
     jpv_embedding_api_key: str | None = Field(
         default=None,
@@ -128,7 +141,7 @@ class Settings(BaseSettings):
     jpv_embedding_batch_size: int = Field(
         default=64,
         gt=0,
-        description="Texts per provider embedding call. Default 64.",
+        description="Texts per provider embedding call.",
     )
     jpv_index_feed_base_url: str | None = Field(
         default=None,
@@ -151,8 +164,8 @@ class Settings(BaseSettings):
         default=180,
         gt=0,
         description=(
-            "Wall-clock budget for one catalog drain (HTTP or CLI). Default 180. "
-            "Checked after each item; exhaustion persists a resume cursor."
+            "Wall-clock budget for one catalog drain (HTTP or CLI). Checked after "
+            "each item; exhaustion persists a resume cursor."
         ),
     )
     jpv_retrieval_distance_threshold: float = Field(
@@ -161,7 +174,7 @@ class Settings(BaseSettings):
         le=2,
         description=(
             "C14 cosine-distance cutoff for POST /v1/retrieval/products "
-            "(JPV_RETRIEVAL_DISTANCE_THRESHOLD). Optional at boot; default 0.65. "
+            "(JPV_RETRIEVAL_DISTANCE_THRESHOLD). Optional at boot. "
             "Domain is pgvector cosine distance (0, 2]. Distinct from "
             "JWT_SECRET, JPV_EMBEDDING_*, JPV_RAG_LLM_*, JPV_INDEX_FEED_* "
             "and JPV_CATALOG_LLM_*. Not required to boot /health."
@@ -177,9 +190,9 @@ class Settings(BaseSettings):
             "the retrieval orchestration call, because C24 sweeps configurations in one "
             "process and an environment-only switch would force a restart per config, "
             "while a request field would move the frozen openapi.json. Default is on "
-            "because measured on the live index the lexical branch answers zero "
-            "documents to `gargantilla dorada` and `collares de plata` without it; the "
-            "flag exists so C24 can ablate, not because the finding is in doubt. Turning "
+            "because, measured on the live index, the lexical branch answers NOTHING AT "
+            "ALL without it for ordinary surface-form variants of catalogue vocabulary; "
+            "the flag exists so C24 can ablate, not because the finding is in doubt. Turning "
             "it off is also the rollback for C20. Distinct from JWT_SECRET, "
             "JPV_EMBEDDING_*, JPV_RAG_LLM_*, JPV_INDEX_FEED_*, JPV_CATALOG_LLM_* and "
             "JPV_RETRIEVAL_DISTANCE_THRESHOLD. Not required to boot /health, which never "
@@ -192,9 +205,10 @@ class Settings(BaseSettings):
         gt=0,
         description=(
             "C21 smoothing constant of the reciprocal rank fusion (JPV_RRF_K). Optional at "
-            "boot; default 60; blank -> 60. It is not independent of JPV_BRANCH_DEPTH: at "
-            "k=60 a rank-200 document still holds 38 % of the leader's vote, so depth and k "
-            "must be swept together. Distinct from JWT_SECRET, JPV_EMBEDDING_*, "
+            "boot; a blank export means unset and falls back to the default. It is not "
+            "independent of JPV_BRANCH_DEPTH: k governs how slowly a document's vote decays "
+            "as its rank grows, so a deeper branch keeps more of its tail voting and the two "
+            "must be swept together, never one at a time. Distinct from JWT_SECRET, JPV_EMBEDDING_*, "
             "JPV_RAG_LLM_*, JPV_INDEX_FEED_*, JPV_CATALOG_LLM_*, "
             "JPV_RETRIEVAL_DISTANCE_THRESHOLD and JPV_QUERY_EXPANSION_ENABLED. Not required "
             "to boot /health."
@@ -206,10 +220,10 @@ class Settings(BaseSettings):
         ge=0,
         description=(
             "C21 fusion weight of the lexical list built from the operator's own text "
-            "(JPV_RRF_WEIGHT_TYPED). Optional at boot; default 0.5; blank -> 0.5. Together "
-            "with JPV_RRF_WEIGHT_EXPANDED it sums to 1.0, so disabling the expansion — which "
-            "makes the two lexical lists identical — degrades to exactly one lexical list at "
-            "full weight. Supplies only the DEFAULT: the effective value travels as a "
+            "(JPV_RRF_WEIGHT_TYPED). Optional at boot; a blank export means unset and falls "
+            "back to the default. Together with JPV_RRF_WEIGHT_EXPANDED it sums to one, so "
+            "disabling the expansion — which makes the two lexical lists identical — degrades "
+            "to exactly one lexical list at full weight. Supplies only the DEFAULT: the effective value travels as a "
             "parameter of the retrieval orchestration call, because C24 sweeps configurations "
             "in one process. Not required to boot /health."
         ),
@@ -220,8 +234,8 @@ class Settings(BaseSettings):
         ge=0,
         description=(
             "C21 fusion weight of the lexical list built from C20's equivalence groups "
-            "(JPV_RRF_WEIGHT_EXPANDED). Optional at boot; default 0.5; blank -> 0.5. See "
-            "JPV_RRF_WEIGHT_TYPED for why the two sum to 1.0. Not required to boot /health."
+            "(JPV_RRF_WEIGHT_EXPANDED). Optional at boot; a blank export means unset and "
+            "falls back to the default. See JPV_RRF_WEIGHT_TYPED for why the two sum to one. Not required to boot /health."
         ),
     )
 
@@ -230,13 +244,14 @@ class Settings(BaseSettings):
         ge=0,
         description=(
             "C21 fusion weight of the vector list (JPV_RRF_WEIGHT_VECTOR). Optional at boot; "
-            "default 0.33; blank -> 0.33. Deliberately BELOW either lexical weight, and this "
-            "is the default easiest to undo by accident: measured over twelve operator "
-            "queries, branch parity (1.0) is the WORST fused configuration at 96/120 against "
-            "105/120 at 0.33, because the distance threshold passes essentially the whole "
+            "a blank export means unset and falls back to the default. Deliberately BELOW "
+            "either lexical weight, and this is the default easiest to undo by accident: "
+            "giving the branches an equal say was measured as the WORST fused configuration "
+            "of those tried, because the distance threshold passes essentially the whole "
             "corpus and the vector branch therefore returns a full list whether or not it "
             "understood the query — a branch that always fills its list always votes at full "
-            "strength. Raising it sinks `dije de plata` from 10/10 to 2/10. Not required to "
+            "strength. Raising it back towards parity measurably sinks queries the lexical "
+            "branch gets right. The swept figures are in the C21 report. Not required to "
             "boot /health."
         ),
     )
@@ -246,11 +261,13 @@ class Settings(BaseSettings):
         gt=0,
         description=(
             "C21 depth at which EVERY fused list is truncated before fusing "
-            "(JPV_BRANCH_DEPTH). Optional at boot; default 60; blank -> 60. One value shared "
-            "by all three lists: an asymmetric 200 lexical / 60 vector costs 6-8 points of "
-            "120. Conceptually distinct from the over-retrieval window the endpoint returns, "
-            "which follows `top_k`, even though both default to 60 — reusing the existing "
-            "OVER_RETRIEVAL_CAP is one fewer arbitrary constant, not the same parameter. Not "
+            "(JPV_BRANCH_DEPTH). Optional at boot; a blank export means unset and falls back "
+            "to the default. One value shared by all three lists, because cutting the lexical "
+            "branches deeper than the vector one was measured to cost accuracy rather than "
+            "buy it. Conceptually distinct from the over-retrieval window the endpoint "
+            "returns, which follows `top_k`, even where the two happen to share a default — "
+            "reusing the existing OVER_RETRIEVAL_CAP is one fewer arbitrary constant, not the "
+            "same parameter. Not "
             "required to boot /health."
         ),
     )
@@ -267,9 +284,10 @@ class Settings(BaseSettings):
             "retrieval behaves exactly as it did before the projection existed, which makes "
             "it the rollback for this change: no deploy, no migration to undo, and "
             "ai.pos_projection can stay populated because nothing else reads it. Default on "
-            "because, measured over 20 probes on the live index, eight of the eleven points "
-            "of sale answer fewer than ten products to at least 6 of every 20 searches once "
-            "the .NET side has dropped what they do not carry. Not required to boot /health."
+            "because, probed against the live index, MOST points of sale were left with a "
+            "very short result page on a large share of ordinary searches once the .NET side "
+            "had dropped what they do not carry — worst case a single surviving product, and "
+            "one query with none. The figures are in the C22 report. Not required to boot /health."
         ),
     )
 
@@ -278,18 +296,65 @@ class Settings(BaseSettings):
         gt=0,
         description=(
             "C22 staleness ceiling of ai.pos_projection "
-            "(JPV_POS_PROJECTION_MAX_AGE_SECONDS). Optional at boot; default 3600; blank -> "
-            "3600. Above it the point-of-sale scope is NOT applied for that request, the "
+            "(JPV_POS_PROJECTION_MAX_AGE_SECONDS). Optional at boot; a blank export means "
+            "unset and falls back to the default. Above it the point-of-sale scope is NOT "
+            "applied for that request, the "
             "degradation is logged, and the response still reports the age: a stale "
             "projection may leave the page short, but it must never hide a valid product "
-            "from the .NET authority. Deliberately generous — the design cadence is 5-10 "
-            "minutes and the real one is a cron, so an hour degrades only under sustained "
-            "failure and not under ordinary lateness. Degrading eagerly would surrender the "
+            "from the .NET authority. Deliberately generous next to the refresh cadence, which "
+            "is a cron: the ceiling must degrade only under sustained failure and not under "
+            "ordinary lateness. Degrading eagerly would surrender the "
             "whole benefit of the change on any transient. Measured against "
             "ai.sync_checkpoint.last_incremental_sync_at, never against "
             "ai.pos_projection.refreshed_at, which records when an assignment last changed "
             "and would report months on a projection synchronised seconds ago. Not required "
             "to boot /health."
+        ),
+    )
+
+    jpv_knowledge_distance_threshold: float = Field(
+        default=KNOWLEDGE_DEFAULTS["jpv_knowledge_distance_threshold"],
+        gt=0,
+        le=2,
+        description=(
+            "C23 cosine-distance cutoff of the knowledge corpus "
+            "(JPV_KNOWLEDGE_DISTANCE_THRESHOLD). Optional at boot; a blank export means unset "
+            "and falls back to the default. Deliberately SEPARATE from "
+            "JPV_RETRIEVAL_DISTANCE_THRESHOLD, which was calibrated over much shorter "
+            "product documents: knowledge chunks are longer prose and their distance "
+            "distribution is another one. Below it the "
+            "search returns NOTHING — for a question the corpus does not cover the correct "
+            "answer is no citation, and C30 depends on that to have nothing with which to "
+            "invent an attribution. Calibrated and not chosen, by a rule that outlives any one "
+            "measurement: zero out-of-domain citations is a CONSTRAINT and not a term to "
+            "trade against recall; inside that band Recall@3 is maximised; and among the "
+            "values that tie the STRICTEST wins, which is the word the rule itself uses. "
+            "Re-run the sweep with `python -m jbg_ai.knowledge calibrate`; the figures of "
+            "the last one are in the C23 implementation report. That sweep uses the OFFLINE "
+            "stand-in embedder the spec requires, so what is calibrated is the RULE, and the "
+            "value stays provisional until it is re-run against the production embedder on a "
+            "real index. Supplies only the DEFAULT: the effective value travels as a parameter "
+            "of the call. Not required to boot /health."
+        ),
+    )
+
+    jpv_knowledge_hybrid_enabled: bool = Field(
+        default=KNOWLEDGE_DEFAULTS["jpv_knowledge_hybrid_enabled"],
+        description=(
+            "C23 lexical branch of the knowledge search (JPV_KNOWLEDGE_HYBRID_ENABLED). "
+            "Optional at boot; a blank export means unset and falls back to the default. "
+            "Default on because it was measured and not assumed: over the fixture the fused "
+            "configuration beats vector-only on BOTH Recall@3 and MRR at no cost in "
+            "abstention, and `python -m jbg_ai.knowledge measure --compare` reprints that "
+            "comparison on demand. "
+            "The branch exists for a reason specific to this corpus — nine material sheets "
+            "are structurally identical and the only thing telling them apart is the "
+            "material's name, a short lexical token drowned in shared prose — and the flag "
+            "is what let that prediction be refuted or confirmed with a number, in the same "
+            "pattern as JPV_QUERY_EXPANSION_ENABLED. Turning it off degrades knowledge "
+            "search to pure vector retrieval and is the rollback for the hybrid half of "
+            "C23. Supplies only the DEFAULT: the effective value travels as a parameter of "
+            "the call. Not required to boot /health."
         ),
     )
 
@@ -304,8 +369,9 @@ class Settings(BaseSettings):
             "than its own worst sibling by more than this much. Never an absolute "
             "similarity cutoff: on this corpus the worst-sibling and "
             "nearest-stranger populations overlap, so no constant separates them. "
-            "Calibrated at 0.05 -> 15 of 486 members across 5 families; 0.02 -> 33 "
-            "across 18; 0.08 -> 9 across 2. Lives here because C24 will revisit it "
+            "Calibrated on the size of the review queue it produces — tightening it "
+            "floods the queue, loosening it empties it — with the swept figures in "
+            "the C18a report. Lives here because C24 will revisit it "
             "with the golden set, and an inlined threshold cannot be swept. "
             "Not required to boot /health."
         ),
@@ -321,12 +387,11 @@ class Settings(BaseSettings):
             "nominated as a candidate for family F when its similarity to F's "
             "members beats F's own worst-sibling similarity by more than this much. "
             "Deliberately NOT neighbourhood purity, which was measured and rejected: "
-            "over 650 orphans, purity nominates 55 synthetic against 19 real, "
-            "because the synthetic corpus was built with deliberate vN near-duplicate "
-            "families it cannot tell from a missing member, whereas this margin "
-            "nominates 21 real against 1 synthetic. Purity travels as a ranking "
-            "signal only. Measured curve: 0 -> 40 candidates, 0.02 -> 22, "
-            "0.05 -> 5, 0.08 -> 3. Starts at 0 on purpose: with verdicts persisted a "
+            "purity nominates mostly SYNTHETIC products, because the synthetic corpus "
+            "was built with deliberate vN near-duplicate families it cannot tell from "
+            "a missing member, whereas this margin nominates mostly real ones. Purity "
+            "travels as a ranking signal only. The swept figures are in the C18b "
+            "report. Starts at 0 on purpose: with verdicts persisted a "
             "dismissal is paid once, while a candidate the margin excluded is never "
             "seen at all. Not required to boot /health."
         ),
@@ -427,6 +492,20 @@ class Settings(BaseSettings):
         return value
 
     @field_validator(
+        "jpv_knowledge_distance_threshold",
+        "jpv_knowledge_hybrid_enabled",
+        mode="before",
+    )
+    @classmethod
+    def blank_knowledge_setting_is_default(
+        cls, value: object, info: ValidationInfo
+    ) -> object:
+        """A blank export means "unset". Read as false it would silently drop the branch."""
+        if isinstance(value, str) and not value.strip():
+            return KNOWLEDGE_DEFAULTS[str(info.field_name)]
+        return value
+
+    @field_validator(
         "jpv_rrf_k",
         "jpv_rrf_weight_typed",
         "jpv_rrf_weight_expanded",
@@ -489,4 +568,11 @@ def canonical_openapi_settings() -> Settings:
         # Pinned like the rest, so a process environment value cannot leak into the
         # committed OpenAPI snapshot through a fusion weight.
         **FUSION_DEFAULTS,
+        # Pinned like the rest even though neither value can reach the contract today:
+        # knowledge search is a callable and has no route, by design. But "it cannot reach
+        # the contract" is a claim about the routes that exist right now, not an invariant
+        # of these settings, and it stops holding the day a route reads one of them. This
+        # profile is worth having precisely because nobody should have to re-derive that
+        # claim per setting every time the surface grows.
+        **KNOWLEDGE_DEFAULTS,
     )

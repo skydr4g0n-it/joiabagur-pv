@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from jbg_ai.config.settings import FUSION_DEFAULTS, Settings
+from jbg_ai.config.settings import FUSION_DEFAULTS, KNOWLEDGE_DEFAULTS, Settings
 
 # HS256 keys shorter than 32 bytes make PyJWT warn; keep fixtures above the bar.
 TEST_JWT_SECRET = "test-jwt-secret-0123456789abcdefghij"
@@ -60,6 +60,7 @@ def build_settings(**overrides: Any) -> Settings:
         "jpv_pos_prefilter_enabled": True,
         "jpv_pos_projection_max_age_seconds": 3600,
         **FUSION_DEFAULTS,
+        **KNOWLEDGE_DEFAULTS,
     }
     values.update(overrides)
     return Settings(**values)

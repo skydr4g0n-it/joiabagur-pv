@@ -1,0 +1,30 @@
+# Preguntas fuera de dominio de la mini-medición de C23.
+#
+# El resultado correcto de cada una es **ninguna cita**. No son preguntas absurdas: son
+# preguntas que un operador podría teclear de verdad en el mismo cuadro de texto y que este
+# corpus no cubre — unas porque pertenecen al índice de catálogo, otras porque pertenecen a
+# otro negocio. Una respuesta con cita para cualquiera de ellas cuenta como fallo, porque para
+# una pregunta que el corpus no cubre la respuesta correcta es no citar: es de lo que C30
+# depende para no tener con qué inventar una atribución.
+#
+# Las ~32 preguntas **con** respuesta no viven aquí: cada documento aporta la suya en su marca
+# `eval_question`, que es la regla 7 de autoría. Tenerlas en el propio documento es lo que
+# impide que el fixture y el corpus se separen.
+
+version: 1
+
+questions:
+  - text: ¿A qué hora abre la tienda los domingos?
+    why: Horario comercial. No es conocimiento de producto ni de servicio documentado.
+  - text: ¿Cuál es la capital de Australia?
+    why: Enciclopedia general. La prueba más simple de que el índice no responde a todo.
+  - text: ¿Puedo pagar con criptomonedas o con transferencia a plazos?
+    why: Medios de pago. Área de negocio real, y deliberadamente ausente del corpus.
+  - text: ¿Qué talla de zapato equivale a un 39 europeo?
+    why: >-
+      Trampa de vocabulario: nombra «talla» y «equivale», el léxico exacto del documento de
+      medidas, sobre un dominio que no es el suyo.
+  - text: ¿Cómo se restaura un reloj de cuerda antiguo?
+    why: >-
+      Trampa de dominio contiguo: relojería comparte vocabulario con la joyería —taller,
+      reparación, mecanismo— y no está en el corpus.

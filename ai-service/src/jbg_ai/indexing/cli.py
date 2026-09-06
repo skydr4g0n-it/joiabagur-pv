@@ -31,6 +31,15 @@ from jbg_ai.indexing.pos_projection import PosProjectionRepo, SqlAlchemyPosProje
 from jbg_ai.indexing.provenance import ProvenanceEntry, load_provenance_map
 from jbg_ai.indexing.repository import ProductDocumentRepo, SqlAlchemyProductDocumentRepo
 from jbg_ai.indexing.sync_errors import IndexFeedConfigError, ProvenanceMapError
+from jbg_ai.knowledge.corpus import validate_corpus
+from jbg_ai.knowledge.errors import KnowledgeError
+from jbg_ai.knowledge.indexer import (
+    KnowledgeRepo,
+    KnowledgeSyncResult,
+    SqlAlchemyKnowledgeRepo,
+    describe as describe_knowledge,
+    sync_knowledge,
+)
 
 T = TypeVar("T")
 
@@ -133,6 +142,38 @@ async def run_cli_sync_pos(
         )
 
 
+async def run_cli_sync_knowledge(
+    *,
+    full: bool = False,
+    settings: Settings | None = None,
+    embed: EmbeddingClient | None = None,
+    repo: KnowledgeRepo | None = None,
+) -> KnowledgeSyncResult:
+    """Index `data/knowledge/` into the two C05 knowledge tables.
+
+    Needs no index feed: the corpus is versioned in git and is the whole truth, so there is
+    no cursor to resume and `--full` means *re-embed everything* rather than *ignore a
+    checkpoint*. It does need an embedding key, unlike `sync-pos`, because it embeds.
+
+    The corpus is validated **before** anything is written: an invalid document must fail
+    the command, not land half-indexed.
+    """
+    resolved = settings or get_settings()
+    corpus = validate_corpus()
+    if embed is not None and repo is not None:
+        return await sync_knowledge(corpus, embed=embed, repo=repo, full=full)
+    if not resolved.jpv_embedding_api_key:
+        raise IndexFeedConfigError("JPV_EMBEDDING_API_KEY")
+    live_embed = embed or LiteLlmEmbeddingClient(
+        api_key=resolved.jpv_embedding_api_key,
+        model=resolved.jpv_embedding_model or DEFAULT_EMBEDDING_MODEL,
+        base_url=resolved.jpv_embedding_base_url,
+        batch_size=resolved.jpv_embedding_batch_size,
+    )
+    live_repo = repo or SqlAlchemyKnowledgeRepo(resolved)
+    return await sync_knowledge(corpus, embed=live_embed, repo=live_repo, full=full)
+
+
 def run_module(argv: Sequence[str] | None = None) -> int:
     """Process entry point for `python -m jbg_ai.indexing`.
 
@@ -170,9 +211,27 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Ignore the pos-availability checkpoint; start without query params",
     )
+    knowledge_parser = sub.add_parser(
+        "sync-knowledge",
+        help="Index data/knowledge/ into ai.knowledge_document and ai.knowledge_chunk",
+    )
+    knowledge_parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Re-embed every chunk, even the ones whose content and version are unchanged",
+    )
     args = parser.parse_args(list(argv) if argv is not None else None)
-    if args.command not in {"sync", "sync-pos"}:
+    if args.command not in {"sync", "sync-pos", "sync-knowledge"}:
         parser.error("unknown command")
+
+    if args.command == "sync-knowledge":
+        try:
+            knowledge_result = run_async(run_cli_sync_knowledge(full=args.full))
+        except (IndexFeedConfigError, KnowledgeError) as exc:
+            sys.stderr.write(f"{exc}\n")
+            return 1
+        sys.stdout.write(describe_knowledge(knowledge_result) + "\n")
+        return 0
 
     if args.command == "sync-pos":
         try:
