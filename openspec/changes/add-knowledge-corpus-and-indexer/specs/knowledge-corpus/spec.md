@@ -166,7 +166,7 @@ The service MUST expose knowledge search as a callable of the service itself, no
 
 #### Scenario: A question about one material does not answer with another
 - **WHEN** a care question naming one canonical material is searched
-- **THEN** the first result comes from the sheet of that material
+- **THEN** the sheet of that material is among the first three results
 
 #### Scenario: An out-of-domain question returns nothing
 - **WHEN** a question the corpus does not cover is searched

@@ -152,11 +152,11 @@ def test_a_care_question_about_one_material_answers_from_that_sheet(
 ) -> None:
     """D7's prediction, as a test: the branch that tells the near-identical sheets apart.
 
-    Asserted over the top three rather than the first position. Against the offline
-    stand-in — which scores lexical overlap and not meaning — the first hit for a care
-    question is often a section of `joyas-playa-piscina-y-deporte` that legitimately
-    answers it too, and pinning position one would be pinning the stand-in rather than
-    the property.
+    The scenario asks for the sheet among the first three and not at position one, and
+    that wording is deliberate. Against the offline stand-in — which scores lexical
+    overlap and not meaning — the first hit for a care question is often a section of
+    `joyas-playa-piscina-y-deporte` that legitimately answers it too, so pinning position
+    one would pin the stand-in rather than the property.
     """
     index = index_for(corpus)
     question = "¿Cómo se cuida y se limpia una pieza de latón?"

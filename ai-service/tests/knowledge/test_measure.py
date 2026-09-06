@@ -45,9 +45,10 @@ def test_out_of_domain_questions_are_versioned_beside_the_corpus() -> None:
 def test_the_sidecar_records_how_the_corpus_was_produced(corpus: KnowledgeCorpus) -> None:
     """Authorship does not vary between documents, so it is recorded once and not per row.
 
-    And the counts it publishes are the ones the README declares, so a corpus that grew
-    without the sidecar being rewritten is a detectable defect rather than a stale sentence
-    somewhere in the documentation.
+    It is also the one place the composition of the corpus is published, which is why the
+    documentation points here and at `knowledge stats` instead of copying the figures into
+    prose: a corpus that grew without the sidecar being rewritten is then a detectable
+    defect rather than a stale sentence somewhere in the documentation.
     """
     payload = json.loads(SIDECAR_PATH.read_text(encoding="utf-8"))
 
@@ -58,8 +59,13 @@ def test_the_sidecar_records_how_the_corpus_was_produced(corpus: KnowledgeCorpus
     assert payload["section_count"] == corpus.section_count
     assert payload["counts_by_doc_type"] == corpus.counts_by_doc_type()
     assert payload["counts_by_claim_scope"] == corpus.counts_by_claim_scope()
-    # The figure the README publishes as the share of illustrative commitments.
-    assert payload["ratios_by_claim_scope"]["establecimiento"] == 15.5
+    # Derived, never pinned: a hard-coded percentage here would fail the day the corpus
+    # legitimately grows, and it would fail for the wrong reason. What must hold is that
+    # the published ratio agrees with the published counts.
+    assert payload["ratios_by_claim_scope"] == {
+        scope: round(count * 100 / corpus.section_count, 1)
+        for scope, count in corpus.counts_by_claim_scope().items()
+    }
 
 
 def test_the_measurement_runs_offline_and_is_reproducible(corpus: KnowledgeCorpus) -> None:

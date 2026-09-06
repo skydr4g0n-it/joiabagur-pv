@@ -19,6 +19,7 @@ import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
+from jbg_ai.config.settings import KNOWLEDGE_DEFAULTS
 from jbg_ai.knowledge.constants import (
     GENERATOR_VERSION,
     PROMPT_VERSION,
@@ -140,7 +141,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     sidecar.add_argument("--generated-at", help="Instante ISO-8601 a sellar (por defecto, ahora)")
 
     measure_parser = sub.add_parser("measure", help="Recall@3, MRR y tasa de abstención")
-    measure_parser.add_argument("--threshold", type=float, default=0.65)
+    # The KNOWLEDGE default, never the product one: measuring this corpus at the cutoff
+    # calibrated for 40-120-word product documents answers a question nobody asked, and a
+    # bare `measure` is exactly how somebody would ask it.
+    measure_parser.add_argument(
+        "--threshold",
+        type=float,
+        default=KNOWLEDGE_DEFAULTS["jpv_knowledge_distance_threshold"],
+    )
     measure_parser.add_argument(
         "--compare", action="store_true", help="Correr también vectorial solo y dar la diferencia"
     )
