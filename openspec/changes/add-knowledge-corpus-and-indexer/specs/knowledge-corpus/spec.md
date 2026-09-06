@@ -3,10 +3,25 @@
 ### Requirement: Commercial knowledge is authored as versioned documents, never scoped to a product
 The service SHALL read its commercial knowledge from Markdown documents versioned in the repository, one file per document. Each document MUST declare a knowledge type drawn from the closed vocabulary the schema already constrains, and MUST NOT be scoped to a product: no section may name a stock keeping unit, an individual product, or a price. Sales scripts MUST NOT be part of the corpus, because retrieved imperative text is indistinguishable from an instruction once it reaches a model context.
 
+A section MUST also remain true when the catalogue changes. It MUST NOT state a count of the assortment nor a proportion of it, because such a claim expires silently the day a product is added or withdrawn while its citation keeps resolving and keeps locating — leaving a falsehood carrying a verified stamp. A proportion that is not about the assortment MUST NOT be rejected on the strength of its notation alone. Measured evidence MAY govern which documents exist and how deep each one goes, and MUST be recorded outside the citable text.
+
 #### Scenario: A section naming a product or a price is rejected
 - **WHEN** the corpus is validated and a section names a stock keeping unit, an individual product or a price
 - **THEN** validation fails naming the file and the section
 - **AND** nothing is indexed
+
+#### Scenario: A section counting the assortment is rejected
+- **WHEN** the corpus is validated and a section states how many products the catalogue holds, or what proportion of it a material or a piece type represents
+- **THEN** validation fails naming the file and the section
+
+#### Scenario: A proportion that is not about the assortment is kept
+- **WHEN** a section states a proportion that belongs to the material world rather than to the catalogue
+- **THEN** validation accepts it
+
+#### Scenario: Adding or withdrawing a product invalidates no document
+- **WHEN** the composition of the catalogue changes
+- **THEN** every section of the corpus is still true
+- **AND** no document has to be rewritten
 
 #### Scenario: The corpus contains no sales scripts
 - **WHEN** the corpus is validated

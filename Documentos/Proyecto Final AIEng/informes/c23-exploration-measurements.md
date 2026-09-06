@@ -36,6 +36,30 @@ la API de embeddings. Las cifras salen de los dos corpus JSONL versionados en `d
 
 ## 2. Mediciones sobre el catálogo (1.200 productos: 436 reales + 764 sintéticos)
 
+> **Re-medido el 2026-09-06 contra `ai.product_document`, con la base levantada.** Las cifras de
+> este apartado son el proxy sobre texto; las reales están en el §5 de
+> [c23-implementation-measurements.md](c23-implementation-measurements.md), y **se conservan las
+> dos** porque la diferencia entre ambas es el dato. En corto, lo que se movió:
+>
+> - **Materiales**: `plata` 630 → **634**, `latón` 77 → **78**, `baño de oro` 36 → **38**,
+>   `resina`/`acero`/`cuero` exactos. `oro` 418 → **343** (el sesgo previsto, menor de lo temido),
+>   `hilo` 63 → **37** (sesgo **no** previsto), y `perla` 8 → **0**: el extractor la clasifica
+>   solo como piedra, nunca como material — la exploración predijo que estaría contada dos veces
+>   y la realidad es que no está en `materials` en absoluto.
+> - **Multi-material**: 12,0 % → **7,8 %**, y el segundo par más frecuente cambia. La conclusión
+>   que sostiene `material-piezas-mixtas` no se mueve.
+> - **Tallas**: `S`/`M`/`L`/`XL`/`XS`, `mini`, `extramini` y `mediano` **idénticos al producto**;
+>   `pequeño` 108 → **71** y `grande` 15 → **14**, el sesgo por prosa previsto. **`XXS` y `XXL`
+>   siguen en cero**, así que D16 sale intacta y gana un dato: más de la mitad del surtido no
+>   lleva ninguna etiqueta de talla.
+> - **Piedras**: el cambio mayor, porque `stone_type` es una columna y no un array. `coral`
+>   102 → **23** y deja de ser la más frecuente; `ónix` 57 → **124**. La agrupación del bloque C
+>   **por régimen de cuidado** sigue siendo la correcta.
+> - **Colecciones**: los topónimos menorquines se confirman al producto.
+>
+> Y provocó una corrección que no es de cifras: **ninguna de estas cifras puede aparecer en el
+> corpus**. Ver el §6 de aquel informe y la decisión D17 del `design.md`.
+
 ### 2.1. Materiales — 9 canónicos, reparto muy desigual
 
 | Canónico | Productos | % | Profundidad de ficha |

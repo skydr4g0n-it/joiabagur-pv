@@ -116,13 +116,35 @@ El argumento técnico es específico de este corpus: las nueve fichas de materia
 
 **Pero se mide antes de darlo por bueno.** C20, C21 y C22 refutaron su propia ficha con medición; aquí se registra la predicción de antemano —*vectorial puro confundirá `plata` con `acero` en preguntas de cuidados*— y si el híbrido no mueve el número, **la rama léxica se retira** y el informe lo dice.
 
+**Medido el 2026-09-06 al umbral calibrado de 0,81: la rama se queda.** Híbrido **Recall@3 78,1 %** (25 de 32) y **MRR 0,729**; vectorial solo **71,9 %** (23 de 32) y **0,688**. Diferencia **+6,2 pp y +0,042**, y la abstención es del 100 % en las dos configuraciones, de modo que la rama léxica gana recall **sin** costar abstención — que es exactamente lo que no se podía dar por supuesto.
+
+Las dos preguntas que el híbrido recupera y el vectorial pierde son `material-cuero` y `material-resina`, dos de las cuatro fichas compactas: las de los materiales con menos surtido, cuyo texto es más corto y comparte esqueleto con las demás. Es la predicción registrada, cumplida en el sitio donde más apretaba.
+
+**El coste es pequeño y está medido**: sobre PostgreSQL con el corpus indexado, la rama léxica añade unos 3 ms a una consulta en caliente (p50 60,7 ms frente a 57,7 ms).
+
 *Alternativa considerada*: filtro duro por el material que la expansión resuelva en la consulta. Rechazada por el principio que la spec viva `query-expansion` ya fija —los filtros por regla *degradan, nunca excluyen*—: «¿puedo llevar plata y acero juntos?» nombra dos.
 
 ### D8. Umbral de abstención propio, calibrado y no elegido
 
 `JPV_KNOWLEDGE_DISTANCE_THRESHOLD`, separado de `JPV_RETRIEVAL_DISTANCE_THRESHOLD` (0,65), que se calibró sobre documentos de producto de 40-120 palabras. Los fragmentos de conocimiento son prosa más larga y su distribución de distancias es otra.
 
-**Regla de calibración**, no número a ojo: el valor **más estricto** que mantiene en cero las preguntas fuera de dominio sin perder ninguna de las que sí tienen respuesta en el corpus. Se fija con la mini-medición de D10 y se escribe aquí antes de mezclar. Hasta entonces el ajuste arranca con el valor de productos **declarado como provisional**, y sustituirlo es requisito de la definición de hecho.
+**Regla de calibración**, no número a ojo: el valor **más estricto** que mantiene en cero las preguntas fuera de dominio sin perder ninguna de las que sí tienen respuesta en el corpus. Se fija con la mini-medición de D10 y se escribe aquí antes de mezclar.
+
+**Calibrado el 2026-09-06: `JPV_KNOWLEDGE_DISTANCE_THRESHOLD = 0,81`.** Sustituye al 0,65 provisional de productos. Barrido sobre las 32 preguntas del fixture más 5 fuera de dominio, con `python -m jbg_ai.knowledge calibrate`:
+
+| Umbral | Recall@3 | MRR | Abstención | Citas fuera de dominio |
+|---|---:|---:|---:|---:|
+| 0,70 | 31,2 % | 0,297 | 100 % | 0 |
+| 0,75 | 59,4 % | 0,578 | 100 % | 0 |
+| 0,78 | 71,9 % | 0,703 | 100 % | 0 |
+| **0,81** | **78,1 %** | **0,729** | **100 %** | **0** |
+| 0,83 | 78,1 % | 0,729 | 100 % | 0 |
+| 0,84 | 78,1 % | 0,729 | 80 % | **1** |
+| 0,90 | 78,1 % | 0,734 | 20 % | 4 |
+
+La regla, tal como está escrita, es una **conjunción que ningún valor satisface**: el recall se agota en el 78 % mucho antes de que se rompa la abstención, así que leída al pie de la letra no calibraría nada. Se aplica por lo que significa: **cero citas fuera de dominio es una restricción**, no un término que se negocie contra el recall; dentro de esa banda se maximiza Recall@3; y **los empates los gana el valor más estricto**, que es la palabra que la propia regla usa. Aflojar de 0,81 a 0,83 no responde ni una pregunta más, y a partir de 0,84 empieza a citar lo que no debe.
+
+**El número es provisional de otra manera, y hay que decirlo.** La especificación exige que la medición corra *offline*, sin llamar a ningún proveedor, así que el barrido usa el embebedor determinista de `knowledge/offline.py`, que puntúa solape léxico y no significado. Lo que queda calibrado es **la regla**; el **número** hay que volver a medirlo contra el embebedor de producción sobre un índice real antes de que C30 lo ponga delante de un cliente. Es una verificación posterior declarada, no un supuesto.
 
 Por debajo del umbral: **cero fragmentos**. Para una pregunta que el corpus no cubre, la respuesta correcta es ninguna cita — y C30 depende de eso para no tener con qué inventar una atribución.
 
@@ -219,6 +241,22 @@ Esto **ata tres documentos entre sí**: la tabla vive en `tallas-anillos`, el l�
 
 *Alternativa considerada*: adoptar la escala británica de letras, que sí es un estándar de anillo. Rechazada porque `A`–`Z` con medias tallas es más fina que `XS`–`XL`, no coincide con las letras que el catálogo usa, e induciría a error a quien conozca el sistema británico de verdad: allí una `M` es 52,5 mm y aquí sería un tramo de 53 a 55.
 
+### D17. El corpus no cuenta el catálogo — la mitad de la regla 5 que apareció al escribirlo
+
+**Descubierta durante el apply, y es una decisión de diseño, no una corrección de estilo.**
+
+Las ocho peticiones de generación llevan la evidencia medida de su bloque —productos por material, pares multi-material, el cruce `piece_type × size_label`, los topónimos— porque es lo que justifica **qué** documentos existen y con **cuánta** profundidad. Los documentos generados hicieron lo natural: citarla. Cuatro secciones acabaron diciendo cosas como *«`pequeño` encabeza con 108 etiquetas»* o *«el 44,6 % del surtido no depende de talla»*.
+
+**Y eso convierte al corpus en una foto del catálogo de hoy.** Entra un producto de oro, se agota el último zafiro, y una sección queda falsa — **en silencio**, que es lo grave: la cita sigue resolviendo y sigue localizando, así que el mecanismo de verificación la sella como comprobada. Es la misma familia de fallo que D3 evita con la identidad determinista y que el §2 del contexto describe: *una cita bien formada sobre algo falso es peor que no citar*. El corpus de conocimiento y el índice de catálogo tienen ritmos de cambio distintos **a propósito**; atarlos por una cifra los sincroniza sin que nadie lo haya decidido.
+
+**Decisión: la regla 5 tiene dos mitades y la ingesta comprueba las dos.** Ni SKU, producto o precio; **ni recuento ni proporción del surtido**. Se rechazan `144 piezas`, `1.168 productos`, `veintiocho colecciones`, `el 24,4 % del catálogo`. Lo que se escribe es la forma duradera del hecho —*la mayoría*, *buena parte*, *a bastante distancia*, *la excepción*—, que es además mejor prosa de mostrador.
+
+**El detector lee el vecindario, no el símbolo.** Prohibir el porcentaje a secas habría borrado mineralogía legítima: *«el ópalo lleva entre un tres y un diez por ciento de agua»* seguirá siendo verdad dentro de veinte años. Un porcentaje solo cae si está a menos de cuarenta caracteres de un sustantivo que cuenta catálogo (`productos`, `piezas`, `fichas`, `colecciones`, `surtido`, `índice`). Y los numerales escritos con letra cuentan **a partir de once**: *«dos piezas de oro que comparten cajón se rayan»* es prosa corriente, *«veintiocho colecciones»* es un censo.
+
+*Alternativa considerada*: dejarlo como regla de estilo en la guía de autoría, sin comprobación. Rechazada por lo mismo que las otras seis: el corpus lo escriben ocho encargos distintos en ocho ventanas distintas, y una regla que solo vive en la prosa del prompt se cumple siete veces de ocho. Las cuatro secciones que la incumplieron habían recibido la evidencia medida **y** la instrucción de no copiarla no existía todavía; ahora existe en los ocho prompts, en la guía de autoría y en el validador.
+
+**Consecuencia sobre la spec**: el requisito de conocimiento general gana la cláusula y tres escenarios, incluido el que enuncia la propiedad de verdad —*añadir o retirar un producto no invalida ningún documento*—. Sin él, la spec viva describiría un corpus que sí se puede romper desde el catálogo.
+
 ## Risks / Trade-offs
 
 - **[La cita bien formada sobre un corpus inventado — el riesgo estructural del change]** → `claim_scope` por sección, sidecar que sella cómo se generó, y limitación explícita en el README: la verificación de citas es estructural y no garantiza la verdad de lo citado. **No desaparece**, se declara.
@@ -229,7 +267,7 @@ Esto **ata tres documentos entre sí**: la tabla vive en `tallas-anillos`, el l�
 - **[Compartir `embedding_version` con el texto de producto]** → D0: espacio de versiones propio, `knowledge/v1`. Sin él, cambiar el troceado dejaría vectores caducados que se declaran al día.
 - **[Que alguien «aproveche» para abrir `/v1/knowledge/search`]** → D1, y la definición de hecho exige `openapi.json` **sin diff**.
 - **[Las cifras del informe son un proxy sobre texto, no los atributos extraídos]** → tarea de re-medición contra `ai.product_document` con la base levantada; afecta a `oro` (absorbe los de baño), `perla` (contada dos veces) y `pequeño`/`grande`/`mediano` (inflados por prosa). Tres documentos citan esas cifras.
-- **[Latencia añadida a la ruta de venta]** → la consulta solo se dispara cuando el agente la pide, y comparte modelo, cliente y caché con la rama de productos (D0). Se **mide y se anota** para que C30 herede el número; el presupuesto de C16 no se toca.
+- **[Latencia añadida a la ruta de venta]** → la consulta solo se dispara cuando el agente la pide, y comparte modelo, cliente y caché con la rama de productos (D0). **Medida** sobre PostgreSQL con los 161 fragmentos indexados, en caliente y sobre cinco preguntas: **p50 60,7 ms y p95 67,0 ms** con las dos ramas, frente a p50 57,7 ms sin la léxica — es decir, la rama léxica cuesta unos **3 ms**. Excluye el embebido de la pregunta, que comparte cliente y caché de proceso con la rama de productos. C30 hereda ese número y el presupuesto de recuperación de C16 (2.500 ms) no se toca.
 
 ## Migration Plan
 
@@ -243,13 +281,14 @@ Las cuatro que el ticket dejó abiertas quedan **resueltas con su opción por de
 
 | # | Pregunta | Resolución |
 |---|---|---|
-| 1 | Valor de `JPV_KNOWLEDGE_DISTANCE_THRESHOLD` | **Se calibra, no se elige** (D8): el valor más estricto que mantiene en cero las preguntas fuera de dominio sin perder ninguna con respuesta. Arranca con el de productos, marcado provisional; sustituirlo es requisito del DoD |
-| 2 | ¿Se queda la rama léxica? | **Sí por defecto, y se mide** (D7). Si el híbrido no mueve el número, se retira y el informe lo declara |
+| 1 | Valor de `JPV_KNOWLEDGE_DISTANCE_THRESHOLD` | **Calibrado el 2026-09-06 en 0,81** (D8). Recall@3 78,1 %, MRR 0,729, abstención 100 %; las citas fuera de dominio empiezan en 0,84 y aflojar de 0,81 a 0,83 no responde ni una pregunta más. Medido con el embebedor *offline* que la spec exige, así que la **regla** queda calibrada y el **número** hay que revisarlo contra el proveedor real |
+| 2 | ¿Se queda la rama léxica? | **Se queda, y por medición** (D7): **+6,2 pp de Recall@3** y **+0,042 de MRR** frente a vectorial solo, con la misma abstención del 100 % y unos 3 ms de coste. Recupera precisamente las dos fichas compactas que el vectorial pierde |
 | 3 | Tope de tamaño de sección | **1.200 caracteres** (D14), revisable con el corpus real delante |
 | 4 | ¿`ai-vector-schema` necesita delta? | **No** (D0). Leídos sus quince requisitos: seis tocan el corpus y este change los **consume** sin alterar columna, índice ni restricción. Si durante el apply apareciera una frase que queda falsa, se emite el delta antes de archivar — una spec viva bien formada y mentirosa es el fallo de agosto |
 
 La quinta —**qué convención de talla de anillo usa la joyería**— era la única genuinamente abierta y **queda cerrada en D16** el 2026-09-06, con criterio de oficio sobre la evidencia del catálogo: la letra mide la pieza en todo el surtido, el anillo es el único tipo con tabla de equivalencia, y esa tabla son **tres tallas españolas enteras por letra, sin solape**, con `XXS` y `XXL` reservadas para encargo porque son los dos peldaños del vocabulario que el catálogo no usa. La aritmética (`circunferencia = talla + 40`) es `general` y la asignación de letras a tramos es `establecimiento`.
 
-No queda ninguna pregunta que bloquee. Queda **una verificación posterior**, que no es lo mismo:
+No queda ninguna pregunta que bloquee. Quedan **dos verificaciones posteriores**, que no es lo mismo — ninguna de las dos impide archivar:
 
-- **Confirmar la tabla con el negocio antes del vídeo de la demo.** Si la joyería usa otros tramos, cambia **una** sección de **un** documento y su marca ya la señala como compromiso de la casa. Si además aportara sus textos comerciales, el eje «quién lo escribió» dejaría de ser constante y ganaría su campo, de forma aditiva y sin migración (D4).
+- **Confirmar la tabla de tallas con el negocio antes del vídeo de la demo.** Si la joyería usa otros tramos, cambia **una** sección de **un** documento —`tallas-anillos#nuestra-escala-de-letras-que-talla-es-cada-una`— y su marca `establecimiento` ya la señala como compromiso de la casa y no como hecho. El test de coherencia aritmética seguirá comprobando los tramos nuevos igual que los de hoy. Si además aportara sus textos comerciales, el eje «quién lo escribió» dejaría de ser constante y ganaría su campo, de forma aditiva y sin migración (D4).
+- **Re-calibrar `JPV_KNOWLEDGE_DISTANCE_THRESHOLD` contra el embebedor de producción** sobre un índice real, antes de que C30 exponga la tool. La spec obliga a que la medición corra sin proveedor, así que el 0,81 sale del embebedor determinista de `knowledge/offline.py`, que puntúa solape léxico y no significado: lo que queda calibrado es **la regla**, y el **número** hay que confirmarlo. Es un ajuste de entorno, sin cambio de código y sin reindexar.

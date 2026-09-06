@@ -25,6 +25,8 @@ Python FastAPI microservice for the JoiaBagur Proyecto Final RAG.
 1. **`score` changes scale.** It is no longer `clamp(1 − cosine_distance)` but the fused RRF score normalised so the first result is 1.0 — still inside `[0, 1]` and still monotone with the order, which is what the frozen contract promises. The mapped cosine distance moves to `debug.vector_score`, and `debug.lexical_score` now carries `ts_rank`. C04's telemetry persists `score`, so **figures recorded before and after C21 are not comparable** and comparing them means nothing. Keeping the raw RRF score was rejected: values of 0,0001-0,03 persisted without meaning would look like a broken field.
 2. **The distance threshold does not discriminate between plausible queries.** Measured, `<= 0.65` passes **1.168 of 1.168** documents on an ordinary query and 0 on a nonsense control, so it is a floor and the branch depth is what actually bounds the vector list. C21 does not fix it: cutting for real needs a per-query quantile rather than a constant, which is what C25's ficha already claims. It is declared here so nobody reads the threshold as an abstention mechanism.
 
+- **C23** (HU-AIENG-023) builds **the second index**. `ai.product_document` answers «enséñame anillos de plata» and cannot answer «¿este anillo se puede mojar?», because that answer lives in no product. C05 created `ai.knowledge_document` and `ai.knowledge_chunk` with their final shape and **nothing had ever written to them**; this change adds the content and the round trip to it. A corpus of **32 Markdown documents and 161 sections** in [`../data/knowledge/`](../data/knowledge/), one material sheet per canonical term of the enrichment vocabulary — a **derived, testable** invariant, so adding `titanio` to the vocabulary without its sheet fails a test. Every section declares its **`claim_scope`**, `general` (verifiable outside the jewellery) or `establecimiento` (a commitment of the house, **today illustrative**), and that mark travels with the retrieved fragment: **25 of 161 sections, 15,5 %**, are commitments, and the whole service block is one. **Zero `guion_venta` documents**, of the five the schema admits, and that is not a scope cut: an imperative fragment retrieved into a prompt is indistinguishable from an instruction, so the corpus would become an injection surface — the corpus keeps **facts to cite**, the prompt keeps **instructions to obey**. Chunking is one `##` section per chunk, no overlap, with both titles inside the indexed content, which is what tells nine structurally identical material sheets apart and comes free because `tsv` is a column generated over `content`. Identity is `uuid5` over the slugs and **never `(document_id, chunk_index)`**: inserting a section in the middle would shift every later index and silently repoint every later citation. The `citation_id` — `material-plata#cuidados-y-limpieza-en-casa` — resolves, **locates and opens the file and the heading in git**. Indexing is idempotent, skips embedding when the content hash and the version match, deletes what a run no longer produces, reuses the frozen `indexing/embeddings.py` untouched and writes a **version namespace of its own**, `knowledge/v1`: sharing `source-text/v1` would mean a change to the chunking rules invalidated nothing and left vectors declaring themselves current over text that no longer exists. Search is a **callable, not a route** — vector plus lexical fused by RRF through C21's module, with C20's expansion groups feeding the lexical branch — and the vector branch decides **whether there is an answer at all**: below `JPV_KNOWLEDGE_DISTANCE_THRESHOLD` it returns **nothing**, so C30 has nothing with which to invent an attribution. Both decisions were measured, not assumed: over 32 fixture questions plus 5 out-of-domain ones the fused configuration beats vector-only by **+6,2 pp of Recall@3 and +0,042 of MRR**, and the threshold is calibrated at **0,81** — out-of-domain citations start at 0,84, and loosening past 0,81 buys no recall, so the strictest of the tied values wins. `python -m jbg_ai.indexing sync-knowledge`. **No migration, no route, `openapi.json` byte-identical.**
+
 Boundary rule: *Python computes similarity and writes prose; .NET computes numbers and decides.* The service never emits a price or stock figure and never touches schema `public`.
 
 ## Requirements
@@ -70,6 +72,8 @@ Boundary rule: *Python computes similarity and writes prose; .NET computes numbe
 | `JPV_BRANCH_DEPTH` | no | `60` | C21 depth at which **every** fused list is truncated before fusing; blank → 60. One value shared by all three: an asymmetric 200 lexical / 60 vector costs 6-8 points of 120. Conceptually distinct from the over-retrieval window the endpoint returns, which follows `top_k`, even though both default to 60 |
 | `JPV_POS_PREFILTER_ENABLED` | no | `true` | C22 point-of-sale prefilter. Supplies only the **default**: the effective value travels as a parameter of the orchestration call, so C24 can sweep configurations in one process. Default on because, measured over 20 probes on the live index, **eight of the eleven** points of sale answer fewer than ten products to at least 6 of every 20 searches once .NET has dropped what they do not carry — FORNELLS 12 of 20, worst case **one** surviving product, and one MAO-AIR query with **zero**. Turning it off is the rollback for C22: retrieval returns to pre-change behaviour with no deploy, and `ai.pos_projection` can stay populated because nothing else reads it. Absence does not block `/health` |
 | `JPV_POS_PROJECTION_MAX_AGE_SECONDS` | no | `3600` | C22 staleness ceiling of the projection. Above it the scope is **not** applied for that request, the degradation is logged and `projection_age_seconds` still reports the age: a stale projection may leave the page short, but it must never hide a valid product from the .NET authority that hydrates it. Deliberately generous — the sync cadence is a cron, so an hour degrades only under sustained failure and not under ordinary lateness; degrading eagerly would surrender the whole benefit of the change on any transient. Measured from `ai.sync_checkpoint.last_incremental_sync_at`, **never** from `ai.pos_projection.refreshed_at`, which records when an assignment last changed — the feed is incremental, so that column would report months on a projection synchronised seconds ago |
+| `JPV_KNOWLEDGE_DISTANCE_THRESHOLD` | no | `0.81` | C23 cosine-distance cutoff of the knowledge corpus `(0, 2]`; blank → 0.81. **Separate from `JPV_RETRIEVAL_DISTANCE_THRESHOLD` on purpose**: that one was calibrated over product documents of 40-120 words, and knowledge chunks are longer prose with another distance distribution. Below it the search returns **nothing** — for a question the corpus does not cover the correct answer is no citation, and C30 depends on that to have nothing with which to invent an attribution. **Calibrated, not chosen**: over the 32 fixture questions plus 5 out-of-domain ones, Recall@3 reaches 78,1 % (MRR 0.729) at 0.81 and buys nothing more up to 0.83, while out-of-domain citations start at 0.84. Of the thresholds that tie on recall the **strictest** wins, which is the word the calibration rule itself uses — being generous "to be safe" buys no recall at all and costs abstention. The measurement runs against the **offline stand-in embedder** the specification requires, so the **rule** is calibrated and the **number** is provisional until it is re-run against the production embedder on a real index. Supplies only the **default**: the effective value travels as a parameter of the call |
+| `JPV_KNOWLEDGE_HYBRID_ENABLED` | no | `true` | C23 lexical branch of the knowledge search; blank → true. Default on because it was **measured and not assumed**: over the same fixture the fused configuration beats vector-only by **+6,2 pp of Recall@3** (78,1 % against 71,9 %) and **+0,042 of MRR**. The branch exists for a reason specific to this corpus — nine material sheets are structurally identical, same skeleton, same register, same vocabulary, and the only thing telling them apart is the material's name, a short lexical token drowned in shared prose, so cosine collapses by homogeneity. The flag is what let that prediction be confirmed with a number instead of asserted, in the same pattern as `JPV_QUERY_EXPANSION_ENABLED`; turning it off degrades knowledge search to pure vector retrieval and is the rollback for the hybrid half of C23. Supplies only the **default**: the effective value travels as a parameter of the call |
 | `JPV_FAMILY_VETO_MARGIN` | no | `0.05` | C18a relative-veto margin `[0, 1]`. **Never an absolute similarity cutoff**: a member is flagged for review, never removed, when a product of another proposed family beats its worst sibling by more than this. Absence does not block `/health` |
 | `JPV_FAMILY_ORPHAN_MARGIN` | no | `0.0` | C18b orphan-nomination margin `[0, 1]`. An unassigned product is nominated when it beats the target family's **worst member** by more than this. Deliberately generous at `0.0`: it nominates, a person decides, and measured over the corpus it yields a queue one reviewer works through in a session. **Not a similarity cutoff** — the comparison is always against that family's own cohesion, so the same value behaves differently against a tight family and a broad one. Absence does not block `/health` |
 
@@ -324,6 +328,68 @@ An incremental run recomputes nothing: the feed re-emits only pairs whose invent
 moved, so a clock changed afterwards leaves every unchanged pair on the old one. The stored
 `computed_as_of` is what makes such a mixture visible instead of silent.
 
+
+## The knowledge corpus and its index (C23)
+
+The second index. `ai.knowledge_document` and `ai.knowledge_chunk` had existed since C05
+with their final shape and **nothing had ever written to them**; the content lives in
+[`../data/knowledge/`](../data/knowledge/), versioned in git, and
+[its README](../data/knowledge/README.md) carries the seven authoring rules.
+
+Three commands need neither a database nor a provider:
+
+```bash
+uv run --system-certs python -m jbg_ai.knowledge validate   # the seven rules + coverage
+uv run --system-certs python -m jbg_ai.knowledge stats      # doc_type and claim_scope counts
+uv run --system-certs python -m jbg_ai.knowledge measure --threshold 0.81 --compare
+```
+
+Indexing does need both, and it lives beside the other two drains:
+
+```bash
+uv run --system-certs python -m jbg_ai.indexing sync-knowledge          # idempotent
+uv run --system-certs python -m jbg_ai.indexing sync-knowledge --full   # re-embed everything
+```
+
+Like `sync` and `sync-pos` it loads `backend/.env` through `run_module`. It needs
+`JPV_EMBEDDING_API_KEY` and `DATABASE_URL`; it needs **no** index feed, because the corpus
+in git is the whole truth. **There is no cursor**, so `--full` does not mean "ignore a
+checkpoint" — it means **re-embed every chunk**, which is what a change of embedding model
+calls for. The corpus is validated *before* anything is written: an invalid document fails
+the command rather than landing half-indexed. It prints one line of counters —
+`documents`, `chunks`, `embedded`, `skipped`, `deleted_chunks`, `deleted_documents`,
+`version`.
+
+**There is no route**, and that is a decision rather than an omission:
+`ai-service-api-contracts` freezes the `/v1` surface in a MUST that enumerates ten routes,
+and the only consumer of knowledge search is C30, **in this same Python process**. Adding a
+route would mean regenerating the committed `openapi.json` and agreeing it with the .NET
+side in order to connect two modules of one process. `search_knowledge()` is a callable,
+shaped as a tool so C30 can hand it to the sales agent as `consultar_conocimiento`.
+
+### What this corpus is, and what it is not
+
+Stated here because a citation that is well formed and wrong is worse than no citation:
+
+- **It is synthetic.** An assistant wrote it against the eight versioned block prompts in
+  [`prompts/knowledge/v1/`](prompts/knowledge/v1/), reviewed block by block; the commercial
+  texts the design listed as *«to ask the business for»* never arrived, exactly as the
+  photographs never did. `_corpus.meta.json` seals the model, the prompt version and the
+  instant.
+- **Citation verification is structural, not semantic.** It confirms that the cited source
+  existed and was retrieved, **not that it tells the truth**. An invented corpus can pass
+  the check at 100 % while citing something false *with a verified stamp*.
+- **25 of the 161 sections — 15,5 % — are `establecimiento`**: commitments of the house that
+  are **today illustrative**. The whole service block is one, which is what demonstrates the
+  marking mechanism from the first document. That mark travels with every retrieved
+  fragment and C30 is obliged to propagate it: a commitment read aloud as if it were a fact
+  of the world is the failure the mechanism exists to prevent.
+- **The ring size table is a convention of the house.** Its arithmetic —
+  `circunferencia = talla + 40`, and the diameter derived from it — is ordinary Spanish
+  practice and is scoped `general`; that `M` is sizes 13-15 is a decision and is scoped
+  `establecimiento`. Confirming those ranges with the business is a pending, non-blocking
+  verification: if they differ, it changes **one section of one document**, and its mark
+  already flags it.
 ## Tests
 
 ```bash
@@ -354,7 +420,7 @@ These four tests exist to catch failures that produce **no error at all**: an HN
 
 - No real retrieval or agent loops — stubs are replaced route by route in later changes. Enrichment is real when `STUB_MODE=false` (C09). Catalog index sync is real when `STUB_MODE=false` (C13). Product retrieval is real when `STUB_MODE=false` (C14) and **hybrid since C21**: three ranked lists fused by weighted RRF, distance threshold 0.65 (a floor, not a discriminator), no `query_log`, `indexing/embeddings.py` and `openapi.json` unchanged. Substitutes stay stub/501 (C26)
 - No `POST /v1/retrieval/complementary` — later OpenAPI negotiation. `POST /v1/families/suggest` **exists since C18a**, which is the change that first called it; `POST /v1/families/audit` since C18b, for the same reason
-- `ai.product_document` is written by C13 from the catalog feed; `ai.pos_projection` is **written by C22** from the POS availability feed; `ai.knowledge_*` stays empty until C23
+- `ai.product_document` is written by C13 from the catalog feed; `ai.pos_projection` is **written by C22** from the POS availability feed; `ai.knowledge_document` and `ai.knowledge_chunk` are **written by C23**, by `python -m jbg_ai.indexing sync-knowledge`, from the corpus in `data/knowledge/`
 - No `ai.eval_*` tables (C24) and no `ai.query_log` (unassigned; the pipeline logs `stage=expand|embed|search|lexical|filters|fuse` with `trace_id` instead)
 - No SQL access to schema `public`, ever
 - No production deploy, SSM or `CREATE EXTENSION` on RDS. C17 delivered the **enriched health** — `GET /health` reports database reachability, indexed document count, whether the embedding provider credential is configured, and a contrast between the configured embedding model and the one recorded on the index rows, all without ever calling the provider — and deployed it to an **isolated demo account**, not to the shop's production account. The return annotation stays an open mapping, so `openapi.json` is unchanged
@@ -383,7 +449,11 @@ ai-service/
     indexing/       # C11 source-text/embeddings (frozen) + C13 feed client, repo, orchestrator, sku_provenance.json
     retrieval/      # C14 vector retriever (embed max_attempts=1, <=> HNSW, body filters)
                     # + C20 query expansion: synonyms.py, query_synonyms.yaml, measure.py CLI
+    knowledge/      # C23 second index: corpus.py (seven authoring rules), chunking.py (pure),
+                    # indexer.py (uuid5 identity, idempotent), search.py (callable, no route),
+                    # sizing.py (D16 ring table), offline.py + measure.py (fixture, no provider)
   prompts/          # versioned prompts: catalog-synth/v3 (C06b generate) + enrichment/v1 and v2 (extract; v2 in force since FIX1)
+                    # + knowledge/v1: eight block prompts, one per generation block of the corpus
   evals/results/    # C20 measured reach report; C24 will write its runs beside it
   migrations/
     bootstrap.sql   # one-off: extension, schema, dedicated role, grants
@@ -394,6 +464,8 @@ ai-service/
     config/         # settings and fail-fast validation
     data/           # C06b catalog CLI + C10 world/ (no provider sockets)
     families/       # C18a grouping and C18b audit (fakes; no provider sockets)
+    indexing/       # C11 embeddings, C13 catalog drain, C22 POS drain (marked `db` where SQL)
+    knowledge/      # C23 corpus rules, chunking, sizing, indexer, search, measurement
     migrations/     # schema, indexes, reversibility (marked `db`)
     retrieval/      # C14 vector retriever + C20 expansion (fakes; no provider sockets)
     support/        # shared helpers and injectable fakes

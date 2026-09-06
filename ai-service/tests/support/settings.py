@@ -59,6 +59,8 @@ def build_settings(**overrides: Any) -> Settings:
         "jpv_query_expansion_enabled": True,
         "jpv_pos_prefilter_enabled": True,
         "jpv_pos_projection_max_age_seconds": 3600,
+        "jpv_knowledge_distance_threshold": 0.81,
+        "jpv_knowledge_hybrid_enabled": True,
         **FUSION_DEFAULTS,
     }
     values.update(overrides)

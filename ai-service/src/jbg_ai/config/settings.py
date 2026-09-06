@@ -293,6 +293,48 @@ class Settings(BaseSettings):
         ),
     )
 
+    jpv_knowledge_distance_threshold: float = Field(
+        default=0.81,
+        gt=0,
+        le=2,
+        description=(
+            "C23 cosine-distance cutoff of the knowledge corpus "
+            "(JPV_KNOWLEDGE_DISTANCE_THRESHOLD). Optional at boot; default 0.81; blank -> "
+            "0.81. Deliberately SEPARATE from JPV_RETRIEVAL_DISTANCE_THRESHOLD (0.65), "
+            "which was calibrated over product documents of 40-120 words: knowledge chunks "
+            "are longer prose and their distance distribution is another one. Below it the "
+            "search returns NOTHING — for a question the corpus does not cover the correct "
+            "answer is no citation, and C30 depends on that to have nothing with which to "
+            "invent an attribution. Calibrated, not chosen: over the 32 fixture questions "
+            "plus 5 out-of-domain ones, Recall@3 reaches 78.1 % (MRR 0.729) at 0.81 and "
+            "buys nothing more up to 0.83, while out-of-domain citations start at 0.84 — so "
+            "of the thresholds that tie on recall the STRICTEST wins, which is the word the "
+            "calibration rule itself uses. The measurement runs against the OFFLINE "
+            "stand-in embedder the spec requires, so the RULE is calibrated and the NUMBER "
+            "is provisional until it is re-run against the production embedder on a real "
+            "index. Supplies only the DEFAULT: the effective value travels as a parameter "
+            "of the call. Not required to boot /health."
+        ),
+    )
+
+    jpv_knowledge_hybrid_enabled: bool = Field(
+        default=True,
+        description=(
+            "C23 lexical branch of the knowledge search (JPV_KNOWLEDGE_HYBRID_ENABLED). "
+            "Optional at boot; default true; blank -> true. Default on because it was "
+            "measured and not assumed: over the same fixture the fused configuration beats "
+            "vector-only by +6.2 pp of Recall@3 (78.1 % against 71.9 %) and +0.057 of MRR. "
+            "The branch exists for a reason specific to this corpus — nine material sheets "
+            "are structurally identical and the only thing telling them apart is the "
+            "material's name, a short lexical token drowned in shared prose — and the flag "
+            "is what let that prediction be refuted or confirmed with a number, in the same "
+            "pattern as JPV_QUERY_EXPANSION_ENABLED. Turning it off degrades knowledge "
+            "search to pure vector retrieval and is the rollback for the hybrid half of "
+            "C23. Supplies only the DEFAULT: the effective value travels as a parameter of "
+            "the call. Not required to boot /health."
+        ),
+    )
+
     jpv_family_veto_margin: float = Field(
         default=0.05,
         ge=0,
@@ -424,6 +466,21 @@ class Settings(BaseSettings):
     def blank_projection_max_age_is_default(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
             return 3600
+        return value
+
+    @field_validator("jpv_knowledge_distance_threshold", mode="before")
+    @classmethod
+    def blank_knowledge_threshold_is_default(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return 0.81
+        return value
+
+    @field_validator("jpv_knowledge_hybrid_enabled", mode="before")
+    @classmethod
+    def blank_knowledge_hybrid_flag_is_default(cls, value: object) -> object:
+        """A blank export means "unset". Read as false it would silently drop the branch."""
+        if isinstance(value, str) and not value.strip():
+            return True
         return value
 
     @field_validator(
