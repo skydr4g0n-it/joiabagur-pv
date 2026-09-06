@@ -39,7 +39,10 @@ context: |
   Caddy proxy publishes ports, secrets read from the parameter store into the deploying
   process environment and never to disk, and post-deployment verification executed inside
   the host because the AI service is private by design. Runbook: deploy/demo/README.md.
-  Vector index lives in schema `ai` (pgvector) of the same PostgreSQL database.
+  Two vector indexes live in schema `ai` (pgvector) of the same PostgreSQL database:
+  ai.product_document for products (C13) and ai.knowledge_chunk for the commercial
+  knowledge corpus (C23). They are never fused: a product is ranked and hydrated,
+  a knowledge fragment is cited, and their scores are not comparable.
 
   Infra: Docker Compose (dev), AWS EC2 + Docker + nginx (TLS via Let's Encrypt),
   RDS PostgreSQL, S3 prod-jpv-files, ECR, SSM Parameter Store /jpv/prod/*,

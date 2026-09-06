@@ -293,6 +293,12 @@
       "reason": "Tests de jbg-ai: guia de la suite (carpetas, markers, helpers de support/) y seccion Tests del README del servicio."
     },
     {
+      "name": "knowledge-corpus",
+      "globs": ["data/knowledge/**", "ai-service/prompts/knowledge/**"],
+      "docs": ["readme-ai-service", "doc-epicas", "doc-pf-plan", "openspec-project", "openspec-config"],
+      "reason": "Corpus de conocimiento C23 y sus prompts de bloque: README del servicio, EP12, plan de changes, project.md y el contexto condensado de config.yaml, que declara los dos indices vectoriales."
+    },
+    {
       "name": "ai-service",
       "globs": ["ai-service/**"],
       "docs": ["readme-ai-service", "doc-pf-especificaciones", "readme-ai-service-tests"],
