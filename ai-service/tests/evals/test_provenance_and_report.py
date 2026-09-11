@@ -20,10 +20,13 @@ from jbg_ai.evals.report import write
 from jbg_ai.evals.runner import ConfigReport, Report
 from jbg_ai.evals.sweep import (
     CATEGORY_TOLERANCE,
+    DECIDING_READING,
+    DIAGNOSTIC_READING,
     MATERIAL_DELTA,
-    WEIGHT_VECTOR_GRID,
+    RHO_GRID,
     SweepPoint,
     decide,
+    weights_for,
 )
 from jbg_ai.evals.vectors import FrozenEmbeddingClient, FrozenVector, load_vectors, write_vectors
 
@@ -208,17 +211,19 @@ def _config_report(config_id: str, ndcg: dict[str, float], categories: dict[str,
     )
 
 
-def _point(weight: float, ndcg: dict[str, float], categories: dict[str, float]) -> SweepPoint:
+def _point(rho: float, ndcg: dict[str, float], categories: dict[str, float]) -> SweepPoint:
     return SweepPoint(
-        weight_vector=weight,
+        rho=rho,
+        rrf_k=60,
         branch_depth=60,
-        report=_config_report(f"w{weight}", ndcg, categories),
+        report=_config_report(f"rho{rho}", ndcg, categories),
     )
 
 
-def test_a_small_improvement_does_not_move_a_default() -> None:
-    baseline = _point(0.33, {"global": 0.60, "tuning": 0.60, "new": 0.60}, {"piedra": 0.5})
-    better = _point(1.0, {"global": 0.64, "tuning": 0.64, "new": 0.64}, {"piedra": 0.5})
+def test_a_weight_that_costs_more_than_the_margin_is_rejected() -> None:
+    """Below the margin the set cannot resolve the difference, so nothing moves."""
+    baseline = _point(1.0, {"global": 0.60, "tuning": 0.60, "new": 0.60}, {"piedra": 0.5})
+    better = _point(1.05, {"global": 0.64, "tuning": 0.64, "new": 0.64}, {"piedra": 0.5})
 
     verdict = decide(baseline, [better])
 
@@ -226,19 +231,41 @@ def test_a_small_improvement_does_not_move_a_default() -> None:
     assert str(MATERIAL_DELTA) in verdict.reason
 
 
-def test_a_result_that_only_holds_on_the_tuning_subset_is_not_a_confirmation() -> None:
-    baseline = _point(0.33, {"global": 0.60, "tuning": 0.60, "new": 0.60}, {"piedra": 0.5})
-    fitted = _point(1.0, {"global": 0.70, "tuning": 0.95, "new": 0.55}, {"piedra": 0.5})
+def test_a_contaminated_reading_does_not_block_a_change() -> None:
+    """The reformulation of D14, and the reason this change was possible at all.
+
+    Under C24's rule a configuration had to improve on all three readings, which vetoed
+    raising the vector weight using the eight queries chosen to calibrate the lexical branch -
+    6 of them already at the ceiling of the deciding metric. A saturated, contaminated
+    partition is evidence of the incumbent's overfitting, not a control group.
+    """
+    baseline = _point(1.0, {"global": 0.60, "tuning": 0.94, "new": 0.55}, {"piedra": 0.5})
+    better = _point(1.05, {"global": 0.66, "tuning": 0.93, "new": 0.64}, {"piedra": 0.5})
+
+    verdict = decide(baseline, [better])
+
+    assert verdict.moved is True, "a saturated reading must not veto"
+    assert verdict.deltas[DIAGNOSTIC_READING] < 0, "the premise: tuning does not follow"
+    assert verdict.deltas[DECIDING_READING] > MATERIAL_DELTA
+    # And the disagreement is published rather than hidden.
+    assert DIAGNOSTIC_READING in verdict.reason
+    assert any(DIAGNOSTIC_READING in line for line in verdict.as_lines())
+
+
+def test_a_result_that_holds_on_neither_reading_is_not_a_confirmation() -> None:
+    """`tuning` cannot veto, but it cannot rescue either: the deciding reading is `new`."""
+    baseline = _point(1.0, {"global": 0.60, "tuning": 0.60, "new": 0.60}, {"piedra": 0.5})
+    fitted = _point(1.05, {"global": 0.70, "tuning": 0.95, "new": 0.55}, {"piedra": 0.5})
 
     verdict = decide(baseline, [fitted])
 
     assert verdict.moved is False
-    assert "'new'" in verdict.reason or "new" in verdict.reason
+    assert DECIDING_READING in verdict.reason
 
 
 def test_a_category_paying_for_the_average_blocks_the_change() -> None:
-    baseline = _point(0.33, {"global": 0.60, "tuning": 0.60, "new": 0.60}, {"piedra": 0.80})
-    lopsided = _point(1.0, {"global": 0.70, "tuning": 0.70, "new": 0.70}, {"piedra": 0.60})
+    baseline = _point(1.0, {"global": 0.60, "tuning": 0.60, "new": 0.60}, {"piedra": 0.80})
+    lopsided = _point(1.05, {"global": 0.70, "tuning": 0.70, "new": 0.70}, {"piedra": 0.60})
 
     verdict = decide(baseline, [lopsided])
 
@@ -247,19 +274,39 @@ def test_a_category_paying_for_the_average_blocks_the_change() -> None:
     assert str(CATEGORY_TOLERANCE) in verdict.reason
 
 
-def test_a_material_improvement_in_every_reading_moves_the_default() -> None:
-    baseline = _point(0.33, {"global": 0.60, "tuning": 0.60, "new": 0.60}, {"piedra": 0.50})
-    better = _point(1.0, {"global": 0.70, "tuning": 0.68, "new": 0.71}, {"piedra": 0.49})
+def test_a_material_improvement_in_the_deciding_reading_moves_the_default() -> None:
+    baseline = _point(1.0, {"global": 0.60, "tuning": 0.60, "new": 0.60}, {"piedra": 0.50})
+    better = _point(1.05, {"global": 0.70, "tuning": 0.68, "new": 0.71}, {"piedra": 0.49})
 
     verdict = decide(baseline, [better])
 
     assert verdict.moved is True
-    assert verdict.best.weight_vector == 1.0
+    assert verdict.best.rho == 1.05
 
 
-def test_the_sweep_is_directional_and_never_looks_below_the_value_in_force() -> None:
-    """The rubric that fixed the live weight is the lexical branch's own objective function."""
-    assert min(WEIGHT_VECTOR_GRID) == FUSION_DEFAULTS["jpv_rrf_weight_vector"]
+def test_the_grid_covers_the_band_the_exploration_measured() -> None:
+    """Four points inside [0,9 ; 1,1], where the previous grid had exactly one.
+
+    The band is narrow because the fusion has a crossover: the position at which the vector
+    branch's best hit lands against a lexical list of sixty moves from 61 to 1 across it.
+    """
+    inside = [value for value in RHO_GRID if 0.9 <= value <= 1.1]
+    assert len(inside) >= 4, f"the useful band is under-sampled: {inside}"
+    assert min(RHO_GRID) < 0.9 < max(RHO_GRID), "the grid must bracket the band"
+    # Only the ratio decides, and the pair is renormalised so two points differ in one number.
+    for rho in RHO_GRID:
+        w_lex, w_vec = weights_for(rho)
+        assert w_lex + w_vec == pytest.approx(1.0)
+        assert w_vec / w_lex == pytest.approx(rho)
+
+
+def test_the_live_default_is_a_point_of_the_grid() -> None:
+    """Otherwise the sweep compares its candidates against something it never measured."""
+    live = (
+        FUSION_DEFAULTS["jpv_branch_weight_vector"]
+        / FUSION_DEFAULTS["jpv_branch_weight_lexical"]
+    )
+    assert live in RHO_GRID
 
 
 def test_the_sweep_grid_and_the_production_default_are_separate_constants() -> None:
@@ -275,7 +322,8 @@ def test_the_sweep_grid_and_the_production_default_are_separate_constants() -> N
 
     source = inspect.getsource(module)
     assert "FUSION_DEFAULTS" in source
-    assert "jpv_rrf_weight_vector = " not in source
+    assert "jpv_branch_weight_vector = " not in source
+    assert "jpv_branch_weight_lexical = " not in source
 
 
 # --------------------------------------------------------------------------- artifact-first

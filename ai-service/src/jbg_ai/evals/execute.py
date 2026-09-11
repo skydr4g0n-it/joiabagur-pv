@@ -68,8 +68,14 @@ class QueryRun:
     low_confidence: bool
 
 
-def harness_settings(**overrides: object) -> Settings:
-    """The measurement profile: serving fields pinned, retrieval knobs at their live defaults."""
+def harness_settings(*, requires_database: bool = True, **overrides: object) -> Settings:
+    """The measurement profile: serving fields pinned, retrieval knobs at their live defaults.
+
+    `requires_database=False` is for the RE-SCORE phase of C25's sweep and for nothing else.
+    That phase reads persisted windows and must not open a pool — the guarantee is its whole
+    point — so demanding a URL it will never use would make the offline phase impossible to
+    run offline, which is the opposite of the property being claimed.
+    """
     values: dict[str, object] = {
         "app_env": HARNESS_APP_ENV,
         "service_version": HARNESS_SERVICE_VERSION,
@@ -90,7 +96,7 @@ def harness_settings(**overrides: object) -> Settings:
         **FUSION_DEFAULTS,
     }
     values.update(overrides)
-    if not values["database_url"]:
+    if requires_database and not values["database_url"]:
         raise EvaluationUnavailable(
             "DATABASE_URL is not set. The pool cannot be built from a file: the harness has to "
             "run the configurations against the real index to know what each one returns"

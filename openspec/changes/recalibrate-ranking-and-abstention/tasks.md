@@ -71,15 +71,15 @@
 
 ## 8. Barrido en dos fases
 
-- [ ] 8.1 `evals/sweep.py` — rejilla de `ρ` de **una dimensión** en `{0,6 · 0,8 · 0,9 · 0,95 · 1,0 · 1,05 · 1,1 · 1,25}`, con `k` y `depth` barridos juntos
-- [ ] 8.2 `evals/sweep.py` — fase `capture`: una recuperación por consulta, persistiendo la ventana de 60 con `qty_bucket`, `sales_30d`, `family_id`, score fusionado, ramas **y la configuración de fusión con la que se capturó**
-- [ ] 8.3 `evals/sweep.py` — fase `rescore`: re-puntuado en memoria, que **rechaza** ventanas cuya fusión no coincide con la calibrada
-- [ ] 8.4 `evals/sweep.py` — regla de decisión reformulada de D14, leyendo la regla registrada en 1.3
-- [ ] 8.5 `evals/cli.py` — subcomandos de las dos fases, documentados en `ai-service/README.md`
-- [ ] 8.6 Test `test_rescore_phase_reaches_no_provider_and_no_database`
-- [ ] 8.7 Test `test_calibration_sweep_is_reproducible` — ahora estructural
-- [ ] 8.8 Test `test_window_captured_under_a_different_fusion_is_refused`
-- [ ] 8.9 Test `test_a_weight_that_costs_more_than_the_margin_is_rejected` y `test_a_contaminated_reading_does_not_block_a_change`
+- [x] 8.1 `evals/sweep.py` — rejilla de `ρ` de **una dimensión** en `{0,6 · 0,8 · 0,9 · 0,95 · 1,0 · 1,05 · 1,1 · 1,25}`, con `k` y `depth` barridos juntos
+- [x] 8.2 `evals/sweep.py` — fase `capture`: una recuperación por consulta, persistiendo la ventana de 60 con `qty_bucket`, `sales_30d`, `family_id`, score fusionado, ramas **y la configuración de fusión con la que se capturó**
+- [x] 8.3 `evals/sweep.py` — fase `rescore`: re-puntuado en memoria, que **rechaza** ventanas cuya fusión no coincide con la calibrada
+- [x] 8.4 `evals/sweep.py` — regla de decisión reformulada de D14, leyendo la regla registrada en 1.3
+- [x] 8.5 `evals/cli.py` — subcomandos de las dos fases, documentados en `ai-service/README.md`
+- [x] 8.6 Test `test_rescore_phase_reaches_no_provider_and_no_database`
+- [x] 8.7 Test `test_calibration_sweep_is_reproducible` — ahora estructural
+- [x] 8.8 Test `test_window_captured_under_a_different_fusion_is_refused`
+- [x] 8.9 Test `test_a_weight_that_costs_more_than_the_margin_is_rejected` y `test_a_contaminated_reading_does_not_block_a_change`
 
 ## 9. Fase A — fijar la fusión
 

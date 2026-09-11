@@ -183,6 +183,9 @@ async def _sweep(args: argparse.Namespace) -> int:
         prices=load_prices(),
         provenance=provenance,
         repeat=1,
+        coverage_rules=tuple(
+            item.strip() for item in args.coverage_rules.split(",") if item.strip()
+        ),
     )
     verdict = decide(baseline, candidates)
 
@@ -287,10 +290,31 @@ def build_parser() -> argparse.ArgumentParser:
     cag.add_argument("--out", default=None, help="Directory for the JSON summary")
     cag.add_argument("--dry-run", action="store_true", help="Size and cost only, no model call")
 
-    sweep_cmd = sub.add_parser("sweep", help="Directional sweep of the fusion knobs (D13)")
-    sweep_cmd.add_argument("--config", default="v2-hibrido")
+    sweep_cmd = sub.add_parser("sweep", help="Sweep of the branch-weight ratio (C25 phase A)")
+    sweep_cmd.add_argument("--config", default="v2b-fusion")
     sweep_cmd.add_argument("--out", default=None)
     sweep_cmd.add_argument("--name", default=None)
+    sweep_cmd.add_argument(
+        "--coverage-rules",
+        default="continuous",
+        help="Comma-separated coverage rules to sweep as candidate rows (continuous,binary)",
+    )
+
+    capture_cmd = sub.add_parser(
+        "capture",
+        help="Phase B: retrieve each query once under the frozen fusion and persist its window",
+    )
+    capture_cmd.add_argument("--config", default="v3-senales")
+    capture_cmd.add_argument("--out", default=None, help="Where to write the capture file")
+
+    rescore_cmd = sub.add_parser(
+        "rescore",
+        help="Phase C: explore the business-weight grid over persisted windows. No provider, no DB",
+    )
+    rescore_cmd.add_argument("--config", default="v3-senales")
+    rescore_cmd.add_argument("--capture", default=None, help="The capture file to re-score")
+    rescore_cmd.add_argument("--out", default=None)
+    rescore_cmd.add_argument("--name", default=None)
 
     provider = sub.add_parser(
         "provider-latency", help="Time the embedding provider itself, cold and warm"
@@ -320,12 +344,129 @@ def main(argv: Sequence[str] | None = None) -> int:
             return asyncio.run(_freeze(args))
         if args.command == "sweep":
             return asyncio.run(_sweep(args))
+        if args.command == "capture":
+            return asyncio.run(_capture(args))
+        if args.command == "rescore":
+            return _rescore(args)
         if args.command == "provider-latency":
             return asyncio.run(_provider_latency(args))
         return asyncio.run(_run(args))
     except EvalError as exc:
         sys.stderr.write(f"{type(exc).__name__}: {exc}\n")
         return 1
+
+
+DEFAULT_CAPTURE_NAME = "c25-capture.json"
+
+
+async def _capture(args: argparse.Namespace) -> int:
+    """Phase B. One retrieval per query under the frozen fusion, persisted with its signals."""
+    from jbg_ai.db.engine import dispose_engine
+    from jbg_ai.evals.execute import build_search, harness_settings
+    from jbg_ai.evals.sweep import capture
+    from jbg_ai.evals.vectors import FrozenEmbeddingClient
+
+    golden = load_golden_set()
+    config = load_config(args.config)
+    settings = harness_settings()
+    search = build_search(settings)
+    embed = FrozenEmbeddingClient.from_file(settings.jpv_embedding_model or "")
+    try:
+        result = await capture(
+            config, golden, settings=settings, search=search, embed=embed
+        )
+    finally:
+        await dispose_engine()
+
+    from jbg_ai.evals.cag_run import RESULTS_DIR
+
+    path = (Path(args.out) if args.out else RESULTS_DIR) / DEFAULT_CAPTURE_NAME
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(result.to_json(), encoding="utf-8")
+    sys.stdout.write(
+        f"captured {len(result.windows)} windows under fusion "
+        f"{result.fusion.mode} rho="
+        f"{result.fusion.branch_weight_vector / result.fusion.branch_weight_lexical:.3f} "
+        f"-> {path}\n"
+    )
+    return 0
+
+
+def _rescore(args: argparse.Namespace) -> int:
+    """Phase C. Pure: it opens no session and calls no provider, and that is the point."""
+    from jbg_ai.evals.cag_run import RESULTS_DIR
+    from jbg_ai.evals.execute import harness_settings
+    from jbg_ai.evals.sweep import (
+        DECIDING_READING,
+        DECISION_METRIC,
+        FusionFingerprint,
+        business_grid,
+        check_fusion_matches,
+        load_capture,
+        rescore,
+    )
+
+    golden = load_golden_set()
+    config = load_config(args.config)
+    # No database is required here, and asking for one would contradict the guarantee this
+    # phase exists to provide. The fusion knobs it reads are the same defaults either way.
+    settings = harness_settings(requires_database=False)
+
+    path = Path(args.capture) if args.capture else RESULTS_DIR / DEFAULT_CAPTURE_NAME
+    captured = load_capture(path)
+    check_fusion_matches(captured, FusionFingerprint.of(config, settings))
+    if captured.golden_set_version != golden.version:
+        raise EvaluationUnavailable(
+            f"the windows were captured against golden set {captured.golden_set_version!r} "
+            f"and the set on disk is {golden.version!r}: re-capture rather than compare "
+            "figures that no longer share a provenance"
+        )
+
+    grid = business_grid(
+        availability=(0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0),
+        rotation=(0.0, 0.1, 0.25, 0.5),
+    )
+    rows: list[tuple[float, float, dict]] = []
+    for weights in grid:
+        readings = rescore(
+            captured,
+            golden,
+            weights,
+            buckets=captured.buckets or None,
+            depth=config.max_results,
+        )
+        rows.append((weights.availability, weights.rotation, readings))
+
+    lines = [
+        "# C25 — barrido de los pesos de negocio por re-puntuado (fase C)",
+        "",
+        f"Ventanas: **{len(captured.windows)}**, capturadas bajo la fusión congelada "
+        f"`{captured.fusion.mode}` con `k={captured.fusion.rrf_k}` y profundidad "
+        f"`{captured.fusion.branch_depth}`. Golden set `{captured.golden_set_version}`.",
+        "",
+        "El re-puntuado **no llama al proveedor ni abre la base**: las señales viajan en la "
+        "ventana persistida. Dos corridas sobre las mismas ventanas dan lo mismo, y eso es "
+        "una propiedad **estructural** y no una promesa sobre semillas.",
+        "",
+        f"| w disponibilidad | w rotación | {DECISION_METRIC} ({DECIDING_READING}) "
+        "| operativo | global |",
+        "|---:|---:|---:|---:|---:|",
+    ]
+    for availability, rotation, readings in rows:
+        deciding = readings[DECIDING_READING].values[DECISION_METRIC]
+        operational = readings["global"].values.get("ndcg_at_5_operational")
+        lines.append(
+            f"| {availability} | {rotation} | {deciding:.3f} | "
+            f"{'—' if operational is None else f'{operational:.3f}'} | "
+            f"{readings['global'].values[DECISION_METRIC]:.3f} |"
+        )
+
+    name = args.name or "c25-rescore.md"
+    out = (Path(args.out) if args.out else RESULTS_DIR) / name
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    sys.stdout.write(f"wrote {out}\n")
+    return 0
 
 
 def run_module(argv: Sequence[str] | None = None) -> int:

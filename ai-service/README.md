@@ -415,10 +415,35 @@ uv run evals validate                                  # the set alone: no datab
 uv run evals freeze-vectors                            # once, against the real provider
 uv run evals run --all --repeat 3 [--persist]          # the ablation table
 uv run evals run --config v2-hibrido                   # one row
-uv run evals sweep                                     # the directional sweep and its verdict
+uv run evals sweep                                     # phase A: the branch-weight ratio
+uv run evals capture                                   # phase B: persist one window per query
+uv run evals rescore                                   # phase C: the weight grid, offline
 uv run evals cag [--dry-run]                           # the context-only measurement, dated
 uv run evals provider-latency                          # the provider round trip, cold and warm
 ```
+
+**The calibration runs in two phases, and their order is a constraint rather than a
+preference.** The fusion decides WHICH candidates a query produces; the business signals only
+reorder them — `demote` is a stable sort that removes nothing. So:
+
+```
+  phase A  ·  sweep     fix the fusion          provider + database · the window MOVES
+                ↓ frozen
+  phase B  ·  capture   one retrieval per query, window persisted with its signals
+                ↓ window FIXED
+  phase C  ·  rescore   the business-weight grid    no provider · no database · seconds
+```
+
+Inverting them is a **silent** failure: phase C would run, print numbers, and they would
+describe a fusion that is no longer the one being calibrated. So each capture records the
+fusion fingerprint it was taken under and `rescore` **refuses** a window that does not match,
+naming what differs. `rescore` also needs no `DATABASE_URL` at all, which is the guarantee
+rather than a convenience — the signals and the assortment's buckets travel inside the capture
+file.
+
+`sweep` explores `rho = w_vec / w_lex` over a **one-dimensional** grid, because only the ratio
+changes the order: scaling both weights preserves it, measured by running `fuse`. `k` and the
+branch depth move together, by C21's rule that a deeper branch keeps more of its tail voting.
 
 `--persist` is the only thing that writes `ai.eval_run` / `ai.eval_case` / `ai.eval_result`; the
 report and the per-query detail land in [`evals/results/`](evals/results/) either way. The

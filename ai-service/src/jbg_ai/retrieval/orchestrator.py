@@ -19,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from uuid import UUID
 
@@ -182,6 +182,7 @@ async def retrieve_products(
     signal_pos_id: UUID | None = None,
     business_weight_availability: float | None = None,
     business_weight_rotation: float | None = None,
+    on_fused_candidates: Callable[[Sequence[object]], None] | None = None,
     projection_max_age_seconds: int | None = None,
     freshness: ProjectionFreshness | None = None,
 ) -> RetrievalResponse:
@@ -382,6 +383,15 @@ async def retrieve_products(
         branch_weights=(w_lex_effective, w_vec_branch),
         internal_weights=(w_typed, w_expanded),
     )
+
+    # An observability seam for the EVALUATION, and nothing else calls it. The capture phase
+    # of the sweep needs the fused window with the fields the ordering reads — price, size,
+    # materials, bucket, sales window — and the response carries none of them by design. The
+    # alternative was a harness that rebuilt the pipeline, which would measure the copy.
+    # It receives the window BEFORE `demote`, so what is persisted is the fusion's own output
+    # and the re-score applies the whole ordering key from scratch.
+    if on_fused_candidates is not None:
+        on_fused_candidates(candidates)
 
     before = [item.product_id for item in candidates]
     ordered, demoted = demote(candidates, structural, weights)
