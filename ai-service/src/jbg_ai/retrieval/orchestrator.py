@@ -32,13 +32,18 @@ from jbg_ai.api.schemas.retrieval import (
     RetrievalResponse,
     RetrievalResult,
 )
-from jbg_ai.config.settings import Settings
+from jbg_ai.config.settings import (
+    FUSION_MODE_BRANCH,
+    FUSION_MODE_FLAT,
+    FUSION_MODES,
+    Settings,
+)
 from jbg_ai.indexing.constants import DEFAULT_EMBEDDING_MODEL
 from jbg_ai.indexing.embeddings import EmbeddingClient, EmbedResult, LiteLlmEmbeddingClient
 from jbg_ai.indexing.errors import EmbeddingError
 from jbg_ai.retrieval.errors import InvalidFamilyIdError, RetrievalDependencyError
 from jbg_ai.retrieval.filters import StructuralFilters, demote, extract_filters
-from jbg_ai.retrieval.fusion import RankedList, fuse, normalised_scores
+from jbg_ai.retrieval.fusion import FusedCandidate, RankedList, fuse, normalised_scores
 from jbg_ai.retrieval.lexical import EXPANDED_LIST, TYPED_LIST, expanded_request, typed_request
 from jbg_ai.retrieval.ports import LexicalHit, ProductSearchPort, SearchFilters, SearchHit
 from jbg_ai.retrieval.projection import (
@@ -54,6 +59,10 @@ from jbg_ai.stubs.responses import over_retrieval_count
 logger = logging.getLogger(__name__)
 
 VECTOR_LIST = "vector"
+#: Name the lexical branch presents to the inter-branch stage. It is a BRANCH and not a list:
+#: whatever the two lexical lists did among themselves, stage 2 sees one ranked opinion holding
+#: one weight. That is what makes `len(ranks) > 1` in stage 2 mean cross-branch consensus.
+LEXICAL_BRANCH_LIST = "lexical"
 LEXICAL_REASON = "lexical"
 VECTOR_REASON = "vector"
 
@@ -144,6 +153,9 @@ async def retrieve_products(
     weight_typed: float | None = None,
     weight_expanded: float | None = None,
     weight_vector: float | None = None,
+    fusion: str | None = None,
+    branch_weight_lexical: float | None = None,
+    branch_weight_vector: float | None = None,
     branch_depth: int | None = None,
     pos_prefilter: bool | None = None,
     projection_max_age_seconds: int | None = None,
@@ -168,6 +180,19 @@ async def retrieve_products(
     w_typed = settings.jpv_rrf_weight_typed if weight_typed is None else weight_typed
     w_expanded = settings.jpv_rrf_weight_expanded if weight_expanded is None else weight_expanded
     w_vector = settings.jpv_rrf_weight_vector if weight_vector is None else weight_vector
+    fusion_mode = settings.jpv_fusion_mode if fusion is None else fusion
+    if fusion_mode not in FUSION_MODES:
+        raise ValueError(f"unknown fusion mode {fusion_mode!r}, expected one of {FUSION_MODES}")
+    w_lex_branch = (
+        settings.jpv_branch_weight_lexical
+        if branch_weight_lexical is None
+        else branch_weight_lexical
+    )
+    w_vec_branch = (
+        settings.jpv_branch_weight_vector
+        if branch_weight_vector is None
+        else branch_weight_vector
+    )
     depth = settings.jpv_branch_depth if branch_depth is None else branch_depth
     prefilter = (
         settings.jpv_pos_prefilter_enabled if pos_prefilter is None else pos_prefilter
@@ -294,7 +319,10 @@ async def retrieve_products(
         vector_hits,
         k=k,
         depth=depth,
-        weights=(w_typed, w_expanded, w_vector),
+        mode=fusion_mode,
+        flat_weights=(w_typed, w_expanded, w_vector),
+        branch_weights=(w_lex_branch, w_vec_branch),
+        internal_weights=(w_typed, w_expanded),
     )
 
     ordered, demoted = demote(candidates, structural)
@@ -313,9 +341,10 @@ async def retrieve_products(
     low_confidence = _low_confidence(shown, fused=fused)
 
     logger.info(
-        "stage=fuse trace_id=%s typed=%s expanded=%s vector=%s fused=%s branches=%s "
-        "cross_branch=%s returned=%s low_confidence=%s k=%s depth=%s",
+        "stage=fuse trace_id=%s mode=%s typed=%s expanded=%s vector=%s fused=%s branches=%s "
+        "cross_branch=%s returned=%s low_confidence=%s k=%s depth=%s weights=%s",
         principal.trace_id,
+        fusion_mode,
         len(typed_hits),
         len(expanded_hits),
         len(vector_hits),
@@ -326,6 +355,11 @@ async def retrieve_products(
         low_confidence,
         k,
         depth,
+        (
+            f"w_lex={w_lex_branch} w_vec={w_vec_branch}"
+            if fusion_mode == FUSION_MODE_BRANCH
+            else f"typed={w_typed} expanded={w_expanded} vector={w_vector}"
+        ),
         extra={"trace_id": principal.trace_id},
     )
 
@@ -460,10 +494,19 @@ def _fuse_branches(
     *,
     k: int,
     depth: int,
-    weights: tuple[float, float, float],
+    mode: str,
+    flat_weights: tuple[float, float, float],
+    branch_weights: tuple[float, float],
+    internal_weights: tuple[float, float],
 ) -> tuple[list[_Candidate], int]:
-    """Fuse the three lists and rebuild the candidates with their real provenance."""
-    w_typed, w_expanded, w_vector = weights
+    """Fuse the lists and rebuild the candidates with their real provenance.
+
+    Two modes, and the difference is not a weight but an ARITY. `flat` fuses all three lists
+    at once, which is what C21 shipped and what the published baseline was measured under.
+    `branch` fuses the two lexical lists into one ranked list and then fuses THAT against the
+    vector list, so a branch's total vote is exactly its declared weight however many of its
+    own lists happened to match.
+    """
     candidates: dict[UUID, _Candidate] = {}
 
     for hit in (*typed_hits, *expanded_hits):
@@ -476,15 +519,34 @@ def _fuse_branches(
         item.vector_score = clamp_score(hit.distance)
         candidates[hit.product_id] = item
 
-    fused = fuse(
-        [
-            RankedList(TYPED_LIST, w_typed, [hit.product_id for hit in typed_hits]),
-            RankedList(EXPANDED_LIST, w_expanded, [hit.product_id for hit in expanded_hits]),
-            RankedList(VECTOR_LIST, w_vector, [hit.product_id for hit in vector_hits]),
-        ],
-        k=k,
-        depth=depth,
-    )
+    typed_ids = [hit.product_id for hit in typed_hits]
+    expanded_ids = [hit.product_id for hit in expanded_hits]
+    vector_ids = [hit.product_id for hit in vector_hits]
+
+    if mode == FUSION_MODE_FLAT:
+        w_typed, w_expanded, w_vector = flat_weights
+        fused = fuse(
+            [
+                RankedList(TYPED_LIST, w_typed, typed_ids),
+                RankedList(EXPANDED_LIST, w_expanded, expanded_ids),
+                RankedList(VECTOR_LIST, w_vector, vector_ids),
+            ],
+            k=k,
+            depth=depth,
+        )
+        lexical_names = (TYPED_LIST, EXPANDED_LIST)
+    else:
+        fused = _fuse_two_stage(
+            typed_ids,
+            expanded_ids,
+            vector_ids,
+            k=k,
+            depth=depth,
+            branch_weights=branch_weights,
+            internal_weights=internal_weights,
+        )
+        lexical_names = (LEXICAL_BRANCH_LIST,)
+
     scores = normalised_scores(fused)
 
     ordered: list[_Candidate] = []
@@ -495,11 +557,13 @@ def _fuse_branches(
         reasons: list[str] = []
         if VECTOR_LIST in entry.ranks:
             reasons.append(VECTOR_REASON)
-        if TYPED_LIST in entry.ranks or EXPANDED_LIST in entry.ranks:
+        if any(name in entry.ranks for name in lexical_names):
             reasons.append(LEXICAL_REASON)
         item.reasons = reasons
         # A candidate seen by both lexical lists is not cross-branch: with the expansion
-        # disabled the two lists are identical, and every lexical hit would qualify.
+        # disabled the two lists are identical, and every lexical hit would qualify. In
+        # `branch` mode the point is moot — stage 2 has one entry per branch — which is the
+        # collapse D5(c) predicted and the reason `low_confidence` needs no exception there.
         if len(reasons) > 1:
             cross_branch += 1
         # A diagnostic is absent rather than invented for a branch that did not see it.
@@ -510,6 +574,51 @@ def _fuse_branches(
         ordered.append(item)
 
     return ordered, cross_branch
+
+
+def _fuse_two_stage(
+    typed_ids: Sequence[UUID],
+    expanded_ids: Sequence[UUID],
+    vector_ids: Sequence[UUID],
+    *,
+    k: int,
+    depth: int,
+    branch_weights: tuple[float, float],
+    internal_weights: tuple[float, float],
+) -> tuple[FusedCandidate, ...]:
+    """Stage 1 inside the lexical branch, stage 2 between the branches. C25.
+
+    The formula is untouched: this composes `fuse` with itself, feeding stage 1's ORDER back
+    in as a ranked list. Only the order survives stage 1 — the magnitude of the intra-lexical
+    consensus is flattened — which is the declared cost of the change, and the defence is that
+    flattening magnitude into rank is what RRF does at every level of every one of its stages.
+
+    **Stage 1's output is truncated at `depth` too.** Without that the lexical branch could
+    present up to `2 * depth` distinct candidates to stage 2 against the vector branch's
+    `depth`, which is a second and independent way of over-weighting it: twice the slots on
+    top of the larger vote.
+    """
+    w_typed, w_expanded = internal_weights
+    w_lex, w_vec = branch_weights
+
+    lexical = fuse(
+        [
+            RankedList(TYPED_LIST, w_typed, typed_ids),
+            RankedList(EXPANDED_LIST, w_expanded, expanded_ids),
+        ],
+        k=k,
+        depth=depth,
+    )
+    lexical_ids = [item.key for item in lexical][:depth]
+
+    return fuse(
+        [
+            RankedList(LEXICAL_BRANCH_LIST, w_lex, lexical_ids),
+            RankedList(VECTOR_LIST, w_vec, vector_ids),
+        ],
+        k=k,
+        depth=depth,
+    )
 
 
 def _from_hit(hit: LexicalHit | SearchHit) -> _Candidate:

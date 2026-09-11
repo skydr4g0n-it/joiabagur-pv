@@ -68,6 +68,12 @@ class EvalConfig:
     weight_typed: float | None = None
     weight_expanded: float | None = None
     weight_vector: float | None = None
+    #: C25. `fusion` selects the composition: 'branch' (two stages, the live default) or
+    #: 'flat' (C21's single stage). The baseline row pins 'flat' explicitly, because a row
+    #: that silently followed the default would stop being the row it was measured as.
+    fusion: str | None = None
+    branch_weight_lexical: float | None = None
+    branch_weight_vector: float | None = None
     branch_depth: int | None = None
     pos_prefilter: bool = False
     max_results: int = 60

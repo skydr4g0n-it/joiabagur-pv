@@ -431,19 +431,24 @@ def test_retrieval_embed_client_uses_max_attempts_one_and_a_bounded_cache() -> N
 
 
 def test_two_weight_configurations_run_in_one_process() -> None:
-    """C24 sweeps in-process: an environment-only knob would force a restart per config."""
+    """C24 sweeps in-process: an environment-only knob would force a restart per config.
+
+    The knobs swept are the per-BRANCH weights, which are the effective ones under the live
+    two-stage fusion. C21's three flat weights remain reachable through `fusion="flat"`, and
+    `test_flat_fusion_mode_reproduces_the_published_baseline` is what exercises them.
+    """
     settings = build_settings()
     rows = [_row(A, "both", 0.1), _blind_row(B, "vector-only", 0.05)]
 
-    lexical_heavy = _serve(FakeProductSearch(rows), settings=settings, weight_vector=0.0)
+    lexical_heavy = _serve(
+        FakeProductSearch(rows), settings=settings, branch_weight_vector=0.0
+    )
     vector_heavy = _serve(
-        FakeProductSearch(rows),
-        settings=settings,
-        weight_typed=0.0,
-        weight_expanded=0.0,
+        FakeProductSearch(rows), settings=settings, branch_weight_lexical=0.0
     )
 
-    assert settings.jpv_rrf_weight_vector == 0.33, "the settings object is not mutated"
+    assert settings.jpv_branch_weight_lexical == 0.5, "the settings object is not mutated"
+    assert settings.jpv_branch_weight_vector == 0.5, "the settings object is not mutated"
     assert lexical_heavy.results[0].sku == "both"
     assert vector_heavy.results[0].sku == "vector-only"
 
@@ -707,3 +712,181 @@ def test_the_search_stage_does_not_borrow_the_response_confidence_field(
     assert "low_confidence=True" in fuse_entry, "no candidate came from both branches"
     assert response.low_confidence is True
     assert len(response.results) == 2, "a signal, not a suppression"
+
+
+# --------------------------------------------------------------------------------------
+# C25 — fusion in two stages, with the flat mode conserved.
+# --------------------------------------------------------------------------------------
+
+#: The three queries of `descripcion-sin-anclaje` where the grade-2 document the vector branch
+#: ranks FIRST lands at position 33 of the live hybrid. Measured on run `d9222333`.
+BURIED_QUERIES = (
+    ("la campanita que se cuelga a los bebes para protegerlos", "campanita"),
+    ("follaje seco que cae en septiembre", "follaje"),
+    ("una bicicleta antigua", "bicicleta"),
+)
+
+
+def _buried_corpus(decoy_word: str, *, decoys: int = 60):
+    """A lexical list of `decoys` documents that the vector branch cannot see, plus one
+    document only the vector branch sees and ranks first.
+
+    The decoys sit above the distance threshold on purpose, so the two branches are disjoint.
+    That is the regime the exploration modelled and the one the live queries are in: the
+    grade-2 document is not somewhere in the lexical list, it is absent from it.
+    """
+    rows = [
+        _row(
+            UUID(f"00000000-0000-0000-0000-{index:012d}"),
+            f"decoy-{index:02d}",
+            0.9,  # above the 0.65 threshold: invisible to the vector branch
+            doc_text=f"Tipo: {decoy_word} numero {index} de plata.",
+        )
+        for index in range(1, decoys + 1)
+    ]
+    target = _row(
+        UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
+        "vector-top-hit",
+        0.05,
+        doc_text="Tipo: broche. Materiales: laton.",
+    )
+    return [*rows, target]
+
+
+@pytest.mark.parametrize(("query", "decoy_word"), BURIED_QUERIES)
+def test_vector_top_hit_reaches_the_top_five_without_lexical_consensus(
+    query: str, decoy_word: str
+) -> None:
+    """The correction, stated as the property the baseline fails. C25 D5.
+
+    Under the flat fusion the sixty lexical documents outscore the vector branch's best hit
+    every time, so the document lands behind all of them. Under the two-stage fusion each
+    branch holds one vote and the best hit of each takes one of the first two places.
+    """
+    payload = _request(query=query, top_k=5)
+
+    branch = _serve(FakeProductSearch(_buried_corpus(decoy_word)), payload=payload)
+    flat = _serve(
+        FakeProductSearch(_buried_corpus(decoy_word)),
+        payload=payload,
+        fusion="flat",
+        weight_typed=0.5,
+        weight_expanded=0.5,
+        weight_vector=0.33,
+    )
+
+    top_five = [item.sku for item in branch.results[:5]]
+    assert "vector-top-hit" in top_five, f"buried under the two-stage fusion: {top_five}"
+    assert "vector-top-hit" not in [item.sku for item in flat.results[:5]], (
+        "the flat mode is supposed to bury it — if it no longer does, the baseline row "
+        "has changed and the comparison this change rests on is gone"
+    )
+
+
+def test_branch_vote_is_independent_of_how_many_of_its_lists_matched() -> None:
+    """The crossover stops being a property of the query nobody declared. C25 D5(a).
+
+    Live, the vector branch needs wC > 0,469 when only the expanded list matched and
+    wC > 0,938 when both did. Under the two-stage fusion the lexical branch votes `w_lex`
+    in both regimes, so the position the vector branch's best candidate can reach is the same.
+    """
+    from jbg_ai.retrieval.orchestrator import _fuse_two_stage
+
+    lexical_ids = [UUID(f"00000000-0000-0000-0000-{i:012d}") for i in range(1, 61)]
+    target = UUID("ffffffff-ffff-ffff-ffff-ffffffffffff")
+
+    both_lists = _fuse_two_stage(
+        lexical_ids,
+        lexical_ids,
+        [target],
+        k=60,
+        depth=60,
+        branch_weights=(0.5, 0.5),
+        internal_weights=(0.5, 0.5),
+    )
+    one_list_only = _fuse_two_stage(
+        [],
+        lexical_ids,
+        [target],
+        k=60,
+        depth=60,
+        branch_weights=(0.5, 0.5),
+        internal_weights=(0.5, 0.5),
+    )
+
+    def position_of(fused) -> int:
+        return [item.key for item in fused].index(target) + 1
+
+    assert position_of(both_lists) == position_of(one_list_only)
+    # And the branch leader holds exactly its declared weight in both regimes.
+    for fused in (both_lists, one_list_only):
+        by_key = {item.key: item.score for item in fused}
+        assert by_key[lexical_ids[0]] == pytest.approx(0.5 / 61)
+        assert by_key[target] == pytest.approx(0.5 / 61)
+
+
+def test_multi_list_branch_contributes_no_more_candidates_than_a_single_list_one() -> None:
+    """Sixty per branch, not a hundred and twenty. C25 D5(b).
+
+    The second, independent over-weighting the exploration found: `typed` and `expanded` are
+    truncated separately, so the lexical branch could present twice the slots of the vector
+    branch. Stage 1's output is truncated at `depth` too, which closes it.
+    """
+    from jbg_ai.retrieval.orchestrator import LEXICAL_BRANCH_LIST, VECTOR_LIST, _fuse_two_stage
+
+    typed_ids = [UUID(f"00000000-0000-0000-0000-{i:012d}") for i in range(1, 61)]
+    expanded_ids = [UUID(f"11111111-0000-0000-0000-{i:012d}") for i in range(1, 61)]
+    vector_ids = [UUID(f"22222222-0000-0000-0000-{i:012d}") for i in range(1, 61)]
+    assert not (set(typed_ids) & set(expanded_ids)), "the two lexical lists must be disjoint"
+
+    fused = _fuse_two_stage(
+        typed_ids,
+        expanded_ids,
+        vector_ids,
+        k=60,
+        depth=60,
+        branch_weights=(0.5, 0.5),
+        internal_weights=(0.5, 0.5),
+    )
+
+    from_lexical = [item for item in fused if LEXICAL_BRANCH_LIST in item.ranks]
+    from_vector = [item for item in fused if VECTOR_LIST in item.ranks]
+
+    assert len(from_lexical) == 60, f"the lexical branch contributed {len(from_lexical)}"
+    assert len(from_lexical) == len(from_vector) == 60
+
+
+def test_low_confidence_means_the_same_under_both_fusion_modes() -> None:
+    """Stage 2 has exactly two lists, and they are exactly the two branches. C25 D5(c).
+
+    Under the flat fusion, `len(reasons) > 1` needed a written nuance: a candidate seen by
+    both LEXICAL lists is not cross-branch, because with the expansion disabled the two lists
+    are identical and every lexical hit would qualify. Under the two-stage fusion the nuance
+    is structural rather than explained — the lexical branch presents ONE list — so the
+    signal cannot drift back to meaning "two lists agreed".
+
+    The requirement is unchanged, so the behaviour must be unchanged too.
+    """
+    agreeing = [_row(A, "both", 0.1)]
+    disagreeing = [_blind_row(B, "vector-only", 0.1), _row(C, "lexical-only", 0.9)]
+    flat = dict(fusion="flat", weight_typed=0.5, weight_expanded=0.5, weight_vector=0.33)
+
+    for rows, expected in ((agreeing, False), (disagreeing, True)):
+        branch_mode = _serve(FakeProductSearch(list(rows)))
+        flat_mode = _serve(FakeProductSearch(list(rows)), **flat)
+        assert branch_mode.low_confidence is expected
+        assert flat_mode.low_confidence is expected, "the signal changed meaning with the mode"
+
+
+def test_a_candidate_seen_by_both_lexical_lists_alone_is_not_cross_branch() -> None:
+    """The nuance that justified the rule, now witnessed under the live fusion.
+
+    `both-lexical-lists` matches the operator's literal text AND the equivalence groups, and
+    the vector branch cannot see it. It must NOT count as consensus, in either mode.
+    """
+    rows = [_row(A, "both-lexical-lists", 0.9)]  # above threshold: the vector branch is blind
+
+    for kwargs in ({}, dict(fusion="flat", weight_typed=0.5, weight_expanded=0.5, weight_vector=0.33)):
+        response = _serve(FakeProductSearch(list(rows)), **kwargs)
+        assert response.low_confidence is True, "two lexical lists are not two branches"
+        assert [item.sku for item in response.results] == ["both-lexical-lists"]

@@ -13,6 +13,11 @@ rationale: >-
 uses_provider: true
 mode: hybrid
 expand_synonyms: true
+# `fusion: flat` is pinned EXPLICITLY and is the point of this row after C25. The live
+# default is the two-stage fusion; this row is the published baseline and must keep being
+# measured under the single-stage one it was measured under. Following the default here
+# would silently turn the reference row into a second copy of `v2b-fusion`.
+fusion: flat
 rrf_k: 60
 weight_typed: 0.5
 weight_expanded: 0.5

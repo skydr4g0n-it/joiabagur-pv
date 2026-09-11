@@ -17,14 +17,14 @@
 
 ## 3. Fusión en dos etapas, con la plana conservada
 
-- [ ] 3.1 Verificar que `retrieval/fusion.py` soporta la composición en dos etapas **sin modificar la fórmula**; añadir su test de composición
-- [ ] 3.2 `config/settings.py` — reformular `FUSION_DEFAULTS` a pesos **por rama** (`w_lex`, `w_vec`) más el reparto interno léxico fijo, conservando los valores de C21 bajo el modo plano
-- [ ] 3.3 `retrieval/orchestrator.py` — etapa 1 (fusión de las dos listas léxicas) y etapa 2 (fusión entre ramas), con `fusion` como perilla y **modo plano seleccionable**
-- [ ] 3.4 Test `test_flat_fusion_mode_reproduces_the_published_baseline`: el modo plano con los pesos de C21 reproduce las cifras del informe de C24 sobre la misma versión del golden set
-- [ ] 3.5 Test `test_vector_top_hit_reaches_the_top_five_without_lexical_consensus`, con `q06`, `q08` y `q10` como casos
-- [ ] 3.6 Test `test_branch_vote_is_independent_of_how_many_of_its_lists_matched`
-- [ ] 3.7 Test `test_multi_list_branch_contributes_no_more_candidates_than_a_single_list_one` (los 60 por rama, no 120)
-- [ ] 3.8 Verificar que `low_confidence` sigue comportándose como su requisito exige, ahora que la etapa 2 tiene exactamente dos listas
+- [x] 3.1 Verificar que `retrieval/fusion.py` soporta la composición en dos etapas **sin modificar la fórmula**; añadir su test de composición
+- [x] 3.2 `config/settings.py` — reformular `FUSION_DEFAULTS` a pesos **por rama** (`w_lex`, `w_vec`) más el reparto interno léxico fijo, conservando los valores de C21 bajo el modo plano
+- [x] 3.3 `retrieval/orchestrator.py` — etapa 1 (fusión de las dos listas léxicas) y etapa 2 (fusión entre ramas), con `fusion` como perilla y **modo plano seleccionable**
+- [x] 3.4 Test `test_flat_fusion_mode_reproduces_the_published_baseline`: el modo plano con los pesos de C21 reproduce las cifras del informe de C24 sobre la misma versión del golden set
+- [x] 3.5 Test `test_vector_top_hit_reaches_the_top_five_without_lexical_consensus`, con `q06`, `q08` y `q10` como casos
+- [x] 3.6 Test `test_branch_vote_is_independent_of_how_many_of_its_lists_matched`
+- [x] 3.7 Test `test_multi_list_branch_contributes_no_more_candidates_than_a_single_list_one` (los 60 por rama, no 120)
+- [x] 3.8 Verificar que `low_confidence` sigue comportándose como su requisito exige, ahora que la etapa 2 tiene exactamente dos listas
 
 ## 4. Regla adaptativa por cobertura
 

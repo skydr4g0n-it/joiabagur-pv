@@ -191,6 +191,9 @@ async def execute(
                 weight_typed=config.weight_typed,
                 weight_expanded=config.weight_expanded,
                 weight_vector=config.weight_vector,
+                fusion=config.fusion,
+                branch_weight_lexical=config.branch_weight_lexical,
+                branch_weight_vector=config.branch_weight_vector,
                 branch_depth=config.branch_depth,
                 pos_prefilter=config.pos_prefilter,
             )
