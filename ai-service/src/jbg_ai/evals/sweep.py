@@ -80,6 +80,21 @@ CATEGORY_TOLERANCE = 0.05
 
 DECISION_METRIC = "ndcg_at_5"
 
+#: The one declared parameter of the BINARY coverage rule: "did the best lexical candidate
+#: cover every expressible group? if not, keep this fraction of the branch weight". Half is
+#: the value with a sentence behind it — a branch that missed part of what the query could
+#: express holds half a vote — and it is declared rather than swept, because sweeping the
+#: parameter of a candidate row would be fitting the alternative harder than the incumbent.
+#:
+#: The continuous rule is the adopted one precisely because it has NO such constant; this row
+#: exists to make that choice falsifiable rather than assumed.
+COVERAGE_BINARY_ALPHA = 0.5
+
+#: Named rather than inlined for the same reason the readings are: the incumbent is the
+#: continuous rule, and which row counts as the incumbent must not depend on a string literal
+#: somebody can change inside an expression.
+COVERAGE_CONTINUOUS_RULE = "continuous"
+
 #: The reading that decides, and the one reported beside it. Named here because the rule is
 #: the point of this module: putting the string inline would let somebody change which
 #: partition arbitrates a default by editing an expression.
@@ -105,13 +120,14 @@ class SweepPoint:
     rrf_k: int
     branch_depth: int
     report: ConfigReport
+    coverage_rule: str = "continuous"
 
     @property
     def label(self) -> str:
         w_lex, w_vec = weights_for(self.rho)
         return (
             f"rho={self.rho} (w_lex={w_lex:.3f} w_vec={w_vec:.3f}) "
-            f"k={self.rrf_k} depth={self.branch_depth}"
+            f"k={self.rrf_k} depth={self.branch_depth} cobertura={self.coverage_rule}"
         )
 
     def score(self, reading: str = DECIDING_READING) -> float:
@@ -255,6 +271,7 @@ async def sweep(
             rrf_k=rrf_k,
             branch_depth=depth,
             coverage_rule=rule,
+            coverage_alpha=COVERAGE_BINARY_ALPHA if rule == "binary" else None,
         )
         report = await run_config(
             variant,
@@ -267,7 +284,13 @@ async def sweep(
             repeat=repeat,
         )
         points.append(
-            SweepPoint(rho=rho, rrf_k=rrf_k, branch_depth=depth, report=report)
+            SweepPoint(
+                rho=rho,
+                rrf_k=rrf_k,
+                branch_depth=depth,
+                report=report,
+                coverage_rule=rule,
+            )
         )
 
     live = (
@@ -281,6 +304,7 @@ async def sweep(
             point
             for point in points
             if (point.rho, point.rrf_k, point.branch_depth) == live
+            and point.coverage_rule == COVERAGE_CONTINUOUS_RULE
         ),
         points[0],
     )

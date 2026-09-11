@@ -261,6 +261,65 @@ la ausencia de gancho en la rúbrica, de que D10 la declare en vez de calibrarla
 
 ---
 
+## Fase A · El barrido de la fusión, y lo que decide (tareas 9.1 y 9.2)
+
+32 puntos: 8 valores de `rho` x 2 pares `(k, profundidad)` x 2 reglas de cobertura. Tabla
+completa en [`c25-sweep-fase-a.md`](../../../ai-service/evals/results/c25-sweep-fase-a.md).
+
+### El veredicto: el default NO se mueve
+
+| | `rho` | k/prof. | cobertura | global | ajuste | **nuevas (decide)** |
+|---|---:|---:|---|---:|---:|---:|
+| **vigente** | 1,0 | 60/60 | continua | 0,663 | 0,936 | **0,608** |
+| mejor del barrido | 0,6 | 40/40 | continua | 0,669 | 0,932 | **0,616** |
+
+**+0,008 en la lectura que decide, muy por debajo del margen de 0,05.** Con un intervalo de
+±0,13 sobre la porción real, esa diferencia no se distingue del ruido de anotación. El arranque
+`rho = 1,0` —valor **de principio**, no ajustado: *cada rama tiene un voto*— se conserva.
+
+**Ojo con no leer mal este «no se mueve».** Es sobre mover el default **dentro** de la rejilla de
+`v2b`. Contra la línea base publicada, que es lo que el change tiene que batir, la fusión por rama
+gana **+0,073** en `nuevas` (0,608 contra 0,535 de `v2-hibrido`), muy por encima del margen.
+
+### La superficie es plana, y eso también es un resultado
+
+Las 32 lecturas de `nuevas` caen entre **0,605 y 0,616**: once milésimas de recorrido en toda la
+rejilla. La explicación está en la regla adaptativa: con cobertura parcial ya reduce `w_lex` por
+su cuenta, así que el cociente **efectivo** se despega del nominal y el valor global de `rho`
+decide poco. La banda estrecha que la exploración predijo sigue siendo real —gobierna el caso de
+cobertura 1,00— pero deja de gobernar el agregado.
+
+### La variante binaria no es distinguible, y eso NO es una confirmación
+
+Las 16 filas `binary` salen **idénticas** a las 16 `continuous`, hasta el último decimal. No es
+que la perilla no llegue: el log lo desmiente —`coverage=0,250` da `w_lex_effective` **0,1250**
+con la continua y **0,2500** con la binaria—. Son dos razones independientes:
+
+1. **`α = 0,5` coincide con la cobertura parcial más frecuente.** Medidas sobre el golden set, las
+   coberturas son casi todas **1,00 o 0,50**, y en 0,50 la binaria da `w_lex x 0,5`, que es
+   **exactamente** lo que da la continua. La elección de `α` fue desafortunada por construcción.
+2. **Donde sí difieren, las dos saturan.** En `q08` la continua deja el cociente efectivo en 4,0 y
+   la binaria en 2,0; el orden de la fusión satura por encima de ~1,1, así que el top-5 es el
+   mismo. Comprobado además con `α = 0,1`, que da cociente 10,0 y el mismo top-5.
+
+**Consecuencia honesta:** la segunda fila candidata **no puede falsar** la elección en este
+conjunto. La regla continua se adopta por su propio mérito —**cero parámetros**, la propiedad que
+D7 invocó— y no por haber ganado una comparación que la medición no puede resolver. El intento de
+falsación queda registrado como **no concluyente**, que es distinto de un aval.
+
+## Fase A · El umbral NO se re-fija aquí (tarea 9.3)
+
+Registrado explícitamente porque su ausencia sería indistinguible de un olvido. **M1 asignó el
+trabajo del umbral a la fase D**, así que la fase A no toca `JPV_RETRIEVAL_DISTANCE_THRESHOLD` y
+**el conjunto de candidatos no se altera por ningún cambio de umbral**.
+
+Lo que sí mueve la ventana en esta fase es la fusión: `rho`, `k` y la profundidad deciden qué
+entra. Por eso la captura de la fase B se toma **después** de congelar la fusión, y no antes.
+
+Si M1 hubiera salido al revés —un escalar que separase las dos poblaciones— este apartado
+registraría el umbral nuevo y la advertencia de que invalida cualquier ventana capturada. No es
+el caso: el umbral sigue en **0,65**, exactamente donde C14 lo dejó.
+
 ## M5 · La rotación, retirada del orden por medición
 
 **Medición no planificada**, ejecutada durante el apply cuando el barrido de la fase C mostró que

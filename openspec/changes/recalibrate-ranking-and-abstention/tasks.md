@@ -83,9 +83,9 @@
 
 ## 9. Fase A — fijar la fusión
 
-- [ ] 9.1 Ejecutar el barrido de fusión sobre la rejilla de 8.1, con las variantes adaptativa **continua** y **binaria**
-- [ ] 9.2 Aplicar la regla de 1.3 y documentar el veredicto **se mueva o no** el default
-- [ ] 9.3 Si M1 situó el umbral aquí, re-fijarlo y registrar que **altera el conjunto de candidatos**
+- [x] 9.1 Ejecutar el barrido de fusión sobre la rejilla de 8.1, con las variantes adaptativa **continua** y **binaria**
+- [x] 9.2 Aplicar la regla de 1.3 y documentar el veredicto **se mueva o no** el default
+- [x] 9.3 Si M1 situó el umbral aquí, re-fijarlo y registrar que **altera el conjunto de candidatos**
 - [ ] 9.4 **Congelar `v2b-fusion`** y registrar su configuración
 
 ## 10. Fase B y C — capturar y fijar las señales

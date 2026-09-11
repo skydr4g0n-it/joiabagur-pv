@@ -190,24 +190,35 @@ async def _sweep(args: argparse.Namespace) -> int:
     verdict = decide(baseline, candidates)
 
     lines = [
-        "# C24 — barrido direccional del peso de la rama vectorial y de la profundidad",
+        "# C25 — barrido de la fusión por rama (fase A)",
         "",
-        "La regla que decide se escribió **antes** de medir; ver `evals/sweep.py`. El barrido "
-        "es direccional: la rúbrica que fijó los pesos vigentes es la función objetivo de la "
-        "rama léxica, así que infravalora la vectorial por construcción y el óptimo verdadero "
-        "no puede estar por debajo del valor en vigor.",
+        "La regla que decide se escribió **antes** de medir y está fechada en D14 del "
+        "`design.md`; el código la aplica en `evals/sweep.py`. La lectura que **decide** es "
+        "`nuevas` —las 40 consultas que ninguna calibración ha visto—; `ajuste` se publica "
+        "como **diagnóstico de contaminación** y no veta.",
         "",
-        "| wC | profundidad | nDCG@5 global | sólo ajuste | sólo nuevas |",
-        "|---:|---:|---:|---:|---:|",
+        "La rejilla es **de una dimensión**, sobre `rho = w_vec / w_lex`, porque sólo el "
+        "cociente cambia el orden: escalar los dos pesos lo preserva. `k` y la profundidad se "
+        "mueven juntos, por la regla de C21 de que una rama más profunda mantiene más cola "
+        "votando. La banda útil es estrecha —`rho ∈ [0,9 ; 1,1]`— y la rejilla de C24 tenía "
+        "**un solo punto** dentro, que es por qué su óptimo parecía un filo de cuchillo.",
+        "",
+        "La columna `cobertura` es la segunda fila candidata: la regla **continua** no tiene "
+        "parámetro y es la adoptada; la **binaria** lleva una `α` declarada y entra para que "
+        "esa elección sea falsable en vez de supuesta.",
+        "",
+        "| rho | k / profundidad | cobertura | nDCG@5 global | sólo ajuste | **nuevas (decide)** |",
+        "|---:|---:|---|---:|---:|---:|",
     ]
     for point in sorted(
-        [baseline, *candidates], key=lambda item: (item.weight_vector, item.branch_depth)
+        [baseline, *candidates],
+        key=lambda item: (item.coverage_rule, item.rho, item.branch_depth),
     ):
         mark = " **(vigente)**" if point is baseline else ""
         lines.append(
-            f"| {point.weight_vector}{mark} | {point.branch_depth} | "
-            f"{point.score('global'):.3f} | {point.score('tuning'):.3f} | "
-            f"{point.score('new'):.3f} |"
+            f"| {point.rho}{mark} | {point.rrf_k}/{point.branch_depth} | "
+            f"{point.coverage_rule} | {point.score('global'):.3f} | "
+            f"{point.score('tuning'):.3f} | **{point.score('new'):.3f}** |"
         )
     lines += ["", "## Veredicto de la regla", "", *verdict.as_lines(), ""]
 
