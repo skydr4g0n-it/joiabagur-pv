@@ -289,6 +289,66 @@ su cuenta, así que el cociente **efectivo** se despega del nominal y el valor g
 decide poco. La banda estrecha que la exploración predijo sigue siendo real —gobierna el caso de
 cobertura 1,00— pero deja de gobernar el agregado.
 
+### M7 · El brazo de control: ¿aporta algo la regla adaptativa?
+
+El barrido de 9.1 comparaba **dos formas de la misma idea** y no podía decir si la idea vale.
+Faltaba el **control**: la fusión por rama con la regla **apagada**. Añadido y medido.
+
+**Por categoría, con `rho = 1,0`:**
+
+| categoría | n | **control** (sin regla) | con adaptativa | delta |
+|---|---:|---:|---:|---:|
+| `descripcion-sin-anclaje` | 12 | 0,289 | **0,417** | **+0,128** |
+| `subjetiva` | 5 | 0,682 | 0,682 | **+0,000** |
+| `piedra` | 4 | 0,747 | 0,747 | **+0,000** |
+| `variante-talla` | 7 | 0,830 | 0,830 | **+0,000** |
+| `materiales` | 5 | 0,959 | 0,959 | **+0,000** |
+| `sinonimos` | 6 | 0,969 | 0,969 | **+0,000** |
+| `lexico-exacto` | 4 | 1,000 | 1,000 | **+0,000** |
+| `fuera-de-dominio` | 5 | 0,000 | 0,000 | +0,000 |
+| **`new` (decide)** | 40 | 0,571 | **0,608** | **+0,037** |
+
+**La predicción falsable de D7 se cumple exactamente, y de punta a punta sobre el índice vivo.**
+La regla aporta **+0,128** donde fue diseñada para aportar y **cero exacto** en las otras siete
+categorías. No es que el daño sea pequeño: es **cero**, en las cinco de cobertura 1,00 y también
+en las dos que no lo son. El gate de la tarea 4.4 lo afirmaba estructuralmente sobre un doble;
+esto lo confirma contra la base.
+
+### M8 · Por qué la superficie es plana: la regla absorbe el filo del cuchillo
+
+La misma rejilla de `rho`, con la regla apagada y encendida, en la lectura que decide:
+
+| `rho` | **control** (sin regla) | con adaptativa |
+|---:|---:|---:|
+| 0,6 | 0,540 | **0,613** |
+| 0,8 | 0,536 | 0,609 |
+| 0,9 | 0,536 | 0,608 |
+| 0,95 | 0,554 | 0,608 |
+| 1,0 | 0,571 | 0,608 |
+| 1,05 | 0,603 | 0,608 |
+| 1,1 | **0,606** | 0,606 |
+| 1,25 | 0,605 | 0,605 |
+| **recorrido** | **0,070** | **0,007** |
+
+**Sin la regla, `rho` es un acantilado**; con ella, una meseta. El control reproduce exactamente
+el cruce que la exploración predijo: por debajo de 0,95 la rama vectorial no alcanza el top-5, por
+encima de 1,05 sí, y entre medias hay **siete centésimas** de caída. Es el «filo de cuchillo» que
+C24 describió, medido.
+
+Y hay más: **la adaptativa está por encima del máximo del control en casi todo el recorrido**. Lo
+mejor que consigue afinar `rho` a mano es **0,606**; la adaptativa da 0,608 en el arranque de
+principio y 0,613 en su mejor punto. **No es equivalente a ajustar `rho`: es mejor, y llega sin
+ajustar nada.**
+
+La razón es que `rho` es una constante **global** y la cobertura es **por consulta**. Subir `rho`
+ayuda a las consultas sin anclaje y paga en las ancladas —lo que C24 midió como `sinonimos`
+−0,039 y `materiales` −0,010—; la adaptativa sube el cociente **efectivo** sólo donde hace falta.
+La tabla por categoría de M7 es esa frase convertida en cifra.
+
+**Consecuencia de ingeniería, y es la que más vale:** un default que se apoya en un acantilado
+está a un `ANALYZE` de distancia de ser el equivocado. La regla adaptativa convierte `rho` en una
+elección robusta, y ésa es una propiedad que ninguna cifra de nDCG agregada deja ver.
+
 ### La variante binaria no es distinguible, y eso NO es una confirmación
 
 Las 16 filas `binary` salen **idénticas** a las 16 `continuous`, hasta el último decimal. No es

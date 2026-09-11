@@ -89,11 +89,9 @@ class EvalConfig:
     fusion: str | None = None
     branch_weight_lexical: float | None = None
     branch_weight_vector: float | None = None
-    #: C25 coverage rule. The continuous form is the adopted one and carries no parameter;
-    #: the binary form is the sweep's second candidate row and its `alpha` lives here rather
-    #: than in `Settings`, because the live system has no knob governing the scaling strength.
+    #: C25 coverage rule: `continuous` (adopted) or `none` (the control arm, and the rollback).
+    #: Neither is a strength parameter - the scaling IS the proportion.
     coverage_rule: str | None = None
-    coverage_alpha: float | None = None
     #: C25 reading scope: the point of sale whose availability and rotation are READ, without
     #: restricting the candidate set. Distinct from `pos_prefilter`, which restricts it. The
     #: two are separate keys because they answer separate questions, and a single flag doing

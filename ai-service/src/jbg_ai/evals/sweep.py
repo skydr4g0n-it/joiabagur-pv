@@ -80,16 +80,6 @@ CATEGORY_TOLERANCE = 0.05
 
 DECISION_METRIC = "ndcg_at_5"
 
-#: The one declared parameter of the BINARY coverage rule: "did the best lexical candidate
-#: cover every expressible group? if not, keep this fraction of the branch weight". Half is
-#: the value with a sentence behind it — a branch that missed part of what the query could
-#: express holds half a vote — and it is declared rather than swept, because sweeping the
-#: parameter of a candidate row would be fitting the alternative harder than the incumbent.
-#:
-#: The continuous rule is the adopted one precisely because it has NO such constant; this row
-#: exists to make that choice falsifiable rather than assumed.
-COVERAGE_BINARY_ALPHA = 0.5
-
 #: Named rather than inlined for the same reason the readings are: the incumbent is the
 #: continuous rule, and which row counts as the incumbent must not depend on a string literal
 #: somebody can change inside an expression.
@@ -257,9 +247,9 @@ async def sweep(
 ) -> tuple[SweepPoint, list[SweepPoint]]:
     """Run the grid in series and return the point in force plus every candidate.
 
-    `coverage_rules` is how the binary variant enters as a SECOND CANDIDATE ROW rather than as
-    a replacement: the continuous form is adopted for carrying no parameter, and it only loses
-    its place if it fails to hold up under the rule above.
+    `coverage_rules` is how the CONTROL arm enters: sweeping `("continuous", "none")` measures
+    whether the adaptive rule is worth having at all, which a sweep over two forms of the same
+    idea cannot answer. That comparison is what retired the binary form and kept this one.
     """
     points: list[SweepPoint] = []
     for rho, (rrf_k, depth), rule in product(RHO_GRID, K_DEPTH_GRID, coverage_rules):
@@ -271,7 +261,6 @@ async def sweep(
             rrf_k=rrf_k,
             branch_depth=depth,
             coverage_rule=rule,
-            coverage_alpha=COVERAGE_BINARY_ALPHA if rule == "binary" else None,
         )
         report = await run_config(
             variant,
@@ -315,7 +304,10 @@ async def sweep(
 # Phase B and phase C: capture once, re-score many times.
 # --------------------------------------------------------------------------------------
 
-CAPTURE_VERSION = 1
+#: Bumped to 2 when the binary coverage rule was withdrawn: `coverage_alpha` left the fusion
+#: fingerprint, so a file written before that carries a field this version does not know. The
+#: version check turns that into a legible refusal instead of a type error.
+CAPTURE_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -340,7 +332,6 @@ class FusionFingerprint:
     weight_expanded: float | None
     weight_vector: float | None
     coverage_rule: str
-    coverage_alpha: float | None
     expand_synonyms: bool | None
     signal_pos_id: str | None
     retrieval_mode: str | None
@@ -369,8 +360,7 @@ class FusionFingerprint:
             weight_typed=config.weight_typed,
             weight_expanded=config.weight_expanded,
             weight_vector=config.weight_vector,
-            coverage_rule=config.coverage_rule or "continuous",
-            coverage_alpha=config.coverage_alpha,
+            coverage_rule=config.coverage_rule or COVERAGE_CONTINUOUS_RULE,
             expand_synonyms=config.expand_synonyms,
             signal_pos_id=config.signal_pos_id,
             retrieval_mode=config.mode,
@@ -651,8 +641,7 @@ async def capture(
             fusion=config.fusion,
             branch_weight_lexical=config.branch_weight_lexical,
             branch_weight_vector=config.branch_weight_vector,
-            coverage_rule=config.coverage_rule or "continuous",
-            coverage_alpha=config.coverage_alpha,
+            coverage_rule=config.coverage_rule or COVERAGE_CONTINUOUS_RULE,
             branch_depth=config.branch_depth,
             pos_prefilter=config.pos_prefilter,
             signal_pos_id=UUID(config.signal_pos_id) if config.signal_pos_id else None,

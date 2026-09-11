@@ -225,9 +225,40 @@ documentos que siguen ganando todos.
 predicho cero** en las categorías de cobertura 1,00.
 
 **Se adopta la forma continua** (pregunta abierta 4, opción por defecto) por tener cero
-parámetros. La forma binaria —«¿cubrió todos los grupos expresables? si no, `α`»— entra como
-**segunda fila candidata del barrido**, no como sustituto: sólo gana si la continua no se sostiene
-en las lecturas que decide D14.
+parámetros.
+
+> **Cerrado por medición el 2026-09-11, durante el apply.** La forma binaria se implementó, se
+> midió y **se retiró**; y el barrido que la comparaba resultó estar mal planteado.
+>
+> **(a) La binaria es indistinguible de la continua** en los 16 puntos de la rejilla, hasta el
+> último decimal. No por un fallo de cableado —el log da `w_lex_effective` 0,1250 con la continua
+> y 0,2500 con la binaria para la misma cobertura de 0,250— sino por dos razones: `α = 0,5`
+> coincide con la cobertura parcial **más frecuente** del conjunto, que es 0,50, donde las dos
+> calculan lo mismo; y donde sí difieren, ambas dejan el cociente efectivo **por encima del punto
+> de saturación** de la fusión. Comprobado con `α = 0,1`: mismo top-5. Pierde por **coste**, no
+> por resultado, y con ella desaparece el último número que parecía ajustado del change.
+>
+> **(b) Faltaba el brazo de control.** Comparar dos formas de la misma idea no dice si la idea
+> sirve. Añadido `coverage_rule: none` —la misma fusión con la regla apagada— la respuesta es
+> inequívoca:
+>
+> | | control | adaptativa | delta |
+> |---|---:|---:|---:|
+> | `descripcion-sin-anclaje` (n=12) | 0,289 | **0,417** | **+0,128** |
+> | las otras **siete** categorías | — | — | **+0,000 exacto** |
+> | `new` (decide) | 0,571 | **0,608** | **+0,037** |
+>
+> **(c) Y la regla hace algo que el nDCG agregado no deja ver: convierte `rho` de acantilado en
+> meseta.** El recorrido del barrido sobre `rho` en la lectura que decide pasa de **0,070 sin la
+> regla a 0,007 con ella**. El control reproduce exactamente el cruce que predijo la exploración
+> —0,536 en `rho = 0,9` contra 0,606 en `rho = 1,1`—, que es el «filo de cuchillo» de C24 medido.
+> Más aún: **la adaptativa bate al mejor `rho` afinado a mano** (0,608 en el arranque de principio
+> contra 0,606 del mejor control), y llega sin ajustar nada. La razón es que `rho` es global y la
+> cobertura es por consulta: subir `rho` ayuda a las consultas sin anclaje y **paga** en las
+> ancladas, mientras que la adaptativa sube el cociente efectivo **sólo donde hace falta**.
+>
+> Quedan **dos** valores de `coverage_rule` y ninguno es un parámetro de fuerza: `continuous`
+> (adoptada) y `none` (control y marcha atrás).
 
 ### D8 · El denominador excluye los grupos de `tsquery` vacía
 
@@ -503,6 +534,10 @@ del navegador, y el `pos_id` sigue saliendo del token.
 
 ## Risks / Trade-offs
 
+- **La regla adaptativa podía no aportar nada** → Medido con un brazo de control que el barrido
+  original no tenía: aporta **+0,128** donde fue diseñada y **cero exacto** en las otras siete
+  categorías, y además hace robusta la elección de `rho` (recorrido 0,070 → 0,007). El riesgo
+  queda cerrado con cifra en lugar de con argumento.
 - **El denominador de la cobertura es el riesgo número uno** → Con el ingenuo, la regla degrada
   las categorías que existe para proteger **y lo hace pareciendo que funciona**, porque el
   agregado global podría subir igual. Mitigación: **M2 antes de implementar**, y el test
@@ -564,6 +599,6 @@ decisión. Lo que queda abierto es lo que sólo una medición puede cerrar:
 | 1 | Forma de la regla de abstención: escalar o relativa por consulta | **M1**, primera tarea. Las dos ramas y el criterio están fijados en D11 antes de mirar |
 | 2 | Tamaño del *pooling* incremental | Al congelar `v2b` (fin de la fase A) |
 | 3 | ¿Qué lectura queda sin contaminar para C26 y C38? | Al cerrar la fase E. **Corregido el 2026-09-11:** la pregunta original —*«cuánto crece la partición de ajuste»*— estaba mal planteada, porque `in_tuning_set` registra un **hecho histórico** (qué consultas calibraron qué) y no una elección, así que no se «hace crecer» sin falsear el conjunto. El problema real es el simétrico y lo **crea este change**: su barrido corre sobre las 48, de modo que al fijar `ρ` las 40 hoy limpias dejan de serlo aguas abajo. Las consultas nuevas de la tarea 12.1 no entran en ningún barrido de este change, así que nacen limpias y se conservan como esa lectura |
-| 4 | Adaptativa continua o binaria con `α` | La continua se adopta por defecto (D7); la binaria se mide como segunda fila y sólo gana en las lecturas de D14 |
+| 4 | Adaptativa continua o binaria con `α` | **Cerrada el 2026-09-11 por medición.** La binaria resultó **indistinguible** de la continua en los 16 puntos, así que pierde por coste —un parámetro más para el mismo efecto— y se retira. La pregunta además estaba mal planteada: comparaba dos formas de la misma idea sin preguntar si la idea sirve. El **brazo de control** que faltaba la contesta: **+0,128** en `descripcion-sin-anclaje`, **cero** en las otras siete, y el recorrido del barrido sobre `rho` cae de 0,070 a 0,007 (D7) |
 | 5 | ¿Se mueve `ρ` del arranque 0,5/0,5? | Barrido de la fase A bajo la regla de D14 |
 | 6 | ¿Se mueve el reparto interno léxico? | **No en este change** (D5). Queda anotado como candidato a barrido futuro, con hipótesis previa |

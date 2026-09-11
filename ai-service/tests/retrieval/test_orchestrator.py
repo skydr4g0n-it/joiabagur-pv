@@ -988,12 +988,9 @@ def test_full_coverage_leaves_the_lexical_weight_untouched(category: str, query:
     )
 
     with_rule = _serve(FakeProductSearch(list(corpus)), payload=payload)
-    # `alpha=1.0` under the binary rule is the rule switched off: full weight either way.
+    # The control arm: the same fusion with the rule switched off.
     without_rule = _serve(
-        FakeProductSearch(list(corpus)),
-        payload=payload,
-        coverage_rule="binary",
-        coverage_alpha=1.0,
+        FakeProductSearch(list(corpus)), payload=payload, coverage_rule="none"
     )
 
     assert [item.sku for item in with_rule.results] == [
@@ -1049,9 +1046,7 @@ def test_partial_coverage_lowers_the_lexical_weight() -> None:
     assert hits[0].coverage_denominator == 2, "`una` must not be in the denominator"
     coverage = _lexical_coverage(hits)
     assert coverage == pytest.approx(0.5)
-    assert _scaled_lexical_weight(
-        0.5, coverage, rule="continuous", alpha=None
-    ) == pytest.approx(0.25)
+    assert _scaled_lexical_weight(0.5, coverage, rule="continuous") == pytest.approx(0.25)
 
 
 def test_empty_typed_list_does_not_by_itself_lower_the_weight() -> None:
@@ -1094,19 +1089,30 @@ def test_coverage_introduces_no_configured_parameter() -> None:
     assert not any("coverage" in key or "alpha" in key for key in FUSION_DEFAULTS)
 
 
-def test_the_binary_coverage_rule_is_available_as_a_sweep_alternative() -> None:
-    """Second candidate row, never the default: it carries one declared parameter."""
-    from jbg_ai.retrieval.orchestrator import _scaled_lexical_weight
+def test_the_control_arm_switches_the_rule_off_without_a_parameter() -> None:
+    """`none` is the control and the rollback, and there is no strength knob anywhere.
 
-    assert _scaled_lexical_weight(0.5, 1.0, rule="binary", alpha=0.4) == pytest.approx(0.5)
-    assert _scaled_lexical_weight(0.5, 0.99, rule="binary", alpha=0.4) == pytest.approx(0.2)
-    assert _scaled_lexical_weight(0.5, 0.25, rule="binary", alpha=0.4) == pytest.approx(0.2)
-    # The continuous rule, for contrast: the proportion itself, with no alpha at all.
-    assert _scaled_lexical_weight(0.5, 0.25, rule="continuous", alpha=None) == pytest.approx(
-        0.125
-    )
-    with pytest.raises(ValueError, match="explicit alpha"):
-        _scaled_lexical_weight(0.5, 0.5, rule="binary", alpha=None)
+    The arm that measured whether the adaptive rule is worth having at all. Against it, the
+    continuous rule buys +0,128 on `descripcion-sin-anclaje` and exactly zero on the other
+    seven categories, and flattens the branch-ratio sweep from a range of 0,070 into 0,007.
+
+    A third form - binary, with a declared alpha - was implemented and withdrawn: it produced
+    results identical to the continuous rule at every point of the sweep, so it lost on cost
+    rather than on result. Only two rules remain, and neither takes a number.
+    """
+    from jbg_ai.retrieval.orchestrator import COVERAGE_RULES, _scaled_lexical_weight
+
+    assert COVERAGE_RULES == ("continuous", "none"), "no third form, and no strength parameter"
+
+    # The rule on: the scaling IS the proportion.
+    assert _scaled_lexical_weight(0.5, 0.25, rule="continuous") == pytest.approx(0.125)
+    assert _scaled_lexical_weight(0.5, 1.0, rule="continuous") == pytest.approx(0.5)
+    # The rule off: the declared weight, whatever the branch matched.
+    for coverage in (0.0, 0.25, 0.5, 1.0):
+        assert _scaled_lexical_weight(0.5, coverage, rule="none") == 0.5
+
+    with pytest.raises(ValueError, match="unknown coverage rule"):
+        _scaled_lexical_weight(0.5, 0.5, rule="binary")
 
 
 def test_absent_or_unanswerable_coverage_does_not_scale_the_weight() -> None:
@@ -1114,4 +1120,4 @@ def test_absent_or_unanswerable_coverage_does_not_scale_the_weight() -> None:
     from jbg_ai.retrieval.orchestrator import _lexical_coverage, _scaled_lexical_weight
 
     assert _lexical_coverage([]) is None, "no lexical hits: the weight decides nothing"
-    assert _scaled_lexical_weight(0.5, None, rule="continuous", alpha=None) == 0.5
+    assert _scaled_lexical_weight(0.5, None, rule="continuous") == 0.5

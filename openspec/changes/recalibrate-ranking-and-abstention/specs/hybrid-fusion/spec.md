@@ -175,6 +175,14 @@ The scaling MUST NOT be derived from whether the branch's typed list is empty, b
 - **WHEN** the settings are inspected
 - **THEN** no parameter governs the strength of the coverage scaling
 - **AND** the scaling is the proportion itself
+- **AND** switching the rule off is available as a control and a rollback, which is not a strength
+
+#### Scenario: The scaling is measured against the rule switched off
+
+- **WHEN** the adaptive scaling is adopted
+- **THEN** the report compares it against the same fusion with the rule off
+- **AND** states the per-category effect of the difference
+- **AND** a comparison between two forms of the scaling is not accepted in place of that control
 
 #### Scenario: An empty typed list does not by itself lower the weight
 

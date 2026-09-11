@@ -35,7 +35,7 @@
 - [x] 4.5 Test `test_stopword_group_does_not_lower_coverage`, con `sortija de plata` y `anillo de plata y oro`
 - [x] 4.6 Test `test_partial_coverage_lowers_the_lexical_weight`, con `una bicicleta antigua`
 - [x] 4.7 Test `test_empty_typed_list_does_not_by_itself_lower_the_weight`, con `bano de oro`
-- [x] 4.8 Implementar la variante **binaria con `α`** como configuración alternativa, para que entre como segunda fila del barrido
+- [x] 4.8 ~~Implementar la variante **binaria con `α`** como segunda fila del barrido~~ → **implementada, medida y retirada.** Dio resultados idénticos a la continua en los 16 puntos, así que perdió por coste y no por resultado. En su lugar entra el **brazo de control** (`coverage_rule: none`), que es lo que de verdad falta para saber si la regla aporta: mide **+0,128** en `descripcion-sin-anclaje` y **cero exacto** en las otras siete categorías
 
 ## 5. Señal de punto de venta separada del alcance
 
@@ -86,7 +86,7 @@
 - [x] 9.1 Ejecutar el barrido de fusión sobre la rejilla de 8.1, con las variantes adaptativa **continua** y **binaria**
 - [x] 9.2 Aplicar la regla de 1.3 y documentar el veredicto **se mueva o no** el default
 - [x] 9.3 Si M1 situó el umbral aquí, re-fijarlo y registrar que **altera el conjunto de candidatos**
-- [ ] 9.4 **Congelar `v2b-fusion`** y registrar su configuración
+- [x] 9.4 **Congelar `v2b-fusion`** y registrar su configuración → `fusion: branch`, `rho = 1,0` (`0,5 / 0,5`), `k` y profundidad 60, cobertura **continua**, sin señales. El barrido no movió ninguna línea del fichero; la constancia queda en su cabecera
 
 ## 10. Fase B y C — capturar y fijar las señales
 

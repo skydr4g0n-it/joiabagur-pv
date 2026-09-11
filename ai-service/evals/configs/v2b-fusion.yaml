@@ -16,6 +16,16 @@ rationale: >-
   de negocio. La fusión plana de v2 no fusiona sino que concatena — con los pesos de C21 los
   sesenta documentos léxicos ganan siempre al mejor acierto vectorial — y ésta es la fila que
   mide cuánto vale corregirlo.
+#
+# CONGELADA el 2026-09-11 al cerrar la fase A (tarea 9.4). El barrido de 32 puntos no movio
+# una sola linea de este fichero: el mejor punto mejora +0,008 en la lectura que decide, muy
+# por debajo del margen de 0,05, asi que la regla de D14 dice no moverse. `rho = 1,0` sigue
+# siendo el valor de principio con el que arranco — cada rama tiene un voto — y ahora ademas
+# esta medido como robusto: con la regla adaptativa el recorrido del barrido sobre `rho` cae
+# de 0,070 a 0,007, de acantilado a meseta.
+#
+# Contra la linea base publicada, que es lo que hay que batir, esta fila gana +0,073 en
+# `nuevas` (0,608 contra 0,535) — por encima del margen, con `ajuste` a -0,006 sin vetar.
 uses_provider: true
 mode: hybrid
 expand_synonyms: true

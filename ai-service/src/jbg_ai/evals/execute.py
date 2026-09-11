@@ -201,7 +201,6 @@ async def execute(
                 branch_weight_lexical=config.branch_weight_lexical,
                 branch_weight_vector=config.branch_weight_vector,
                 coverage_rule=config.coverage_rule or COVERAGE_CONTINUOUS,
-                coverage_alpha=config.coverage_alpha,
                 branch_depth=config.branch_depth,
                 pos_prefilter=config.pos_prefilter,
                 signal_pos_id=UUID(config.signal_pos_id) if config.signal_pos_id else None,

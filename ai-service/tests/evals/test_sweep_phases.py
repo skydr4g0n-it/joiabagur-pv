@@ -43,7 +43,6 @@ def _fingerprint(**overrides) -> FusionFingerprint:
         weight_expanded=None,
         weight_vector=None,
         coverage_rule="continuous",
-        coverage_alpha=None,
         expand_synonyms=True,
         signal_pos_id=None,
         retrieval_mode="hybrid",
@@ -188,7 +187,7 @@ def test_window_captured_under_a_different_fusion_is_refused() -> None:
         ("rrf_k", 40),
         ("branch_depth", 40),
         ("branch_weight_vector", 0.4),
-        ("coverage_rule", "binary"),
+        ("coverage_rule", "none"),
         ("expand_synonyms", False),
     ):
         with pytest.raises(ConfigurationError) as excinfo:

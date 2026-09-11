@@ -70,15 +70,22 @@ VECTOR_LIST = "vector"
 #: one weight. That is what makes `len(ranks) > 1` in stage 2 mean cross-branch consensus.
 LEXICAL_BRANCH_LIST = "lexical"
 
-#: The adopted coverage rule and its sweep alternative. `continuous` is the live one and it is
-#: chosen for having ZERO parameters: the scaling IS the proportion. `binary` — "did the best
-#: candidate cover every expressible group? if not, alpha" — carries one declared parameter and
-#: exists only as a second candidate row of the calibration sweep. That is why alpha is a
-#: parameter of the orchestration call and NOT a setting: a knob in `Settings` would be a knob
-#: of the live system, and the live system has none governing the strength of this scaling.
+#: Two values, and neither is a strength parameter: the scaling IS the proportion, so the
+#: live system carries no number governing how hard it pulls.
+#:
+#: `continuous` is the adopted rule. `none` switches it off and is the CONTROL — the arm that
+#: measured whether the idea is worth having at all, and the rollback if it ever misbehaves.
+#:
+#: A third form was implemented and **withdrawn after measuring**: "did the best candidate
+#: cover every expressible group? if not, keep a declared fraction alpha". It produced results
+#: identical to the continuous rule at every point of the sweep, for two independent reasons —
+#: the natural alpha of 0,5 coincides with the most frequent partial coverage on this set, and
+#: where the two do differ both push the effective branch ratio past the point where the fused
+#: order saturates. Indistinguishable in effect and carrying one parameter more, it lost on
+#: cost rather than on result. The figures are in the C25 implementation report.
 COVERAGE_CONTINUOUS = "continuous"
-COVERAGE_BINARY = "binary"
-COVERAGE_RULES = (COVERAGE_CONTINUOUS, COVERAGE_BINARY)
+COVERAGE_NONE = "none"
+COVERAGE_RULES = (COVERAGE_CONTINUOUS, COVERAGE_NONE)
 LEXICAL_REASON = "lexical"
 VECTOR_REASON = "vector"
 
@@ -176,7 +183,6 @@ async def retrieve_products(
     branch_weight_lexical: float | None = None,
     branch_weight_vector: float | None = None,
     coverage_rule: str = COVERAGE_CONTINUOUS,
-    coverage_alpha: float | None = None,
     branch_depth: int | None = None,
     pos_prefilter: bool | None = None,
     signal_pos_id: UUID | None = None,
@@ -352,9 +358,7 @@ async def retrieve_products(
     # by nobody. C21 expected an adaptive weighting to EMERGE from `ts_rank` and it does not —
     # `ts_rank` keeps ordering sixty documents that keep winning all of them.
     coverage = _lexical_coverage(expanded_hits)
-    w_lex_effective = _scaled_lexical_weight(
-        w_lex_branch, coverage, rule=coverage_rule, alpha=coverage_alpha
-    )
+    w_lex_effective = _scaled_lexical_weight(w_lex_branch, coverage, rule=coverage_rule)
     if fusion_mode == FUSION_MODE_BRANCH:
         logger.info(
             "stage=coverage trace_id=%s rule=%s coverage=%s w_lex=%s w_lex_effective=%s",
@@ -701,30 +705,24 @@ def _lexical_coverage(expanded_hits: Sequence[LexicalHit]) -> float | None:
     return min(best.coordination / best.coverage_denominator, 1.0)
 
 
-def _scaled_lexical_weight(
-    weight: float,
-    coverage: float | None,
-    *,
-    rule: str,
-    alpha: float | None,
-) -> float:
+def _scaled_lexical_weight(weight: float, coverage: float | None, *, rule: str) -> float:
     """`w_lex x coverage`, and nothing else. C25 D7.
 
-    The continuous rule is adopted for introducing no parameter of its own: a branch whose
-    best candidate matched everything the query can express keeps its full declared weight,
-    and one that matched a fraction keeps that fraction. Its prediction is falsifiable and is
-    the gate of this change — the five categories measured at coverage 1,00 (`materiales`,
-    `sinonimos`, `lexico-exacto`, `piedra` and `variante-talla`) must move by exactly zero.
+    A branch whose best candidate matched everything the query can express keeps its full
+    declared weight; one that matched a fraction keeps that fraction. **No parameter of its
+    own**, which is the property the rule was adopted for and the one that survived the
+    comparison against a form that had one.
 
-    The binary rule is the sweep's second candidate row, never the live default, and `alpha`
-    reaches it as a call parameter so that no setting governs the strength of the scaling.
+    Measured against the control arm — the same fusion with the rule off — it buys **+0,128**
+    on `descripcion-sin-anclaje` and **exactly zero** on all seven other categories, which is
+    D7's falsifiable prediction confirmed against the live index. It also flattens the branch
+    ratio from a cliff into a plateau: the sweep's range over `rho` falls from 0,070 without
+    the rule to 0,007 with it, so the default stops sitting on a discontinuity.
+
+    `none` is the control and the rollback. It is an on/off switch, not a strength.
     """
-    if coverage is None:
+    if coverage is None or rule == COVERAGE_NONE:
         return weight
-    if rule == COVERAGE_BINARY:
-        if alpha is None:
-            raise ValueError("the binary coverage rule needs an explicit alpha")
-        return weight if coverage >= 1.0 else weight * alpha
     if rule != COVERAGE_CONTINUOUS:
         raise ValueError(f"unknown coverage rule {rule!r}, expected one of {COVERAGE_RULES}")
     return weight * coverage

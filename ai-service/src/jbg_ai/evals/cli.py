@@ -308,7 +308,10 @@ def build_parser() -> argparse.ArgumentParser:
     sweep_cmd.add_argument(
         "--coverage-rules",
         default="continuous",
-        help="Comma-separated coverage rules to sweep as candidate rows (continuous,binary)",
+        help=(
+            "Comma-separated coverage rules to sweep (continuous,none). Include `none` to "
+            "measure the CONTROL arm: whether the adaptive rule is worth having at all"
+        ),
     )
 
     capture_cmd = sub.add_parser(
