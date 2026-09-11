@@ -92,7 +92,8 @@ async def _run(args: argparse.Namespace) -> int:
 
     target = report_module.write(
         result,
-        title=args.title or "C24 — líneas base de recuperación con relevancia graduada",
+        title=args.title
+        or "C25 — líneas base de recuperación con relevancia graduada, señal y abstención",
         name=_report_name(args.name),
         out_dir=Path(args.out) if args.out else None,
     )

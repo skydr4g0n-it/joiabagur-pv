@@ -70,16 +70,25 @@ BUSINESS_DEFAULTS: dict[str, Any] = {
 #: separate them — and the relative rule reads the SHAPE of the distance profile instead: an
 #: out-of-domain query is flat, because nothing in the catalogue stands out for it.
 #:
-#: **It ships disabled.** Its two parameters cannot be fixed against five out-of-domain
-#: queries, and fitting two numbers to five points is what this change refused to do
-#: everywhere else. They are fixed once the category grows to 15-20, which needs no
-#: per-document labelling. The values below are the best operating point measured on the five
-#: — three of five caught at a cost of four answerable queries, four times cheaper than the
-#: scalar — and they are a STARTING POINT for that calibration, not a decision.
+#: **Fixed against the category once it grew to 20**, never against the five it had: two
+#: parameters fitted to five points are fitted to five points, which is what this change
+#: refused to do everywhere else. Measured over 20 out-of-domain and 43 answerable queries,
+#: this point abstains on **2 of the 20 and on none of the 43** — the only operating points
+#: that silence no answerable query are this one and two that catch less.
+#:
+#: The rate it buys is **10 %**, far from the 0,80 the ticket asked for, and the gap is
+#: declared rather than closed: reaching 0,80 costs silencing **21 of the 43** answerable
+#: queries, half the set. The asymmetry decides the point — silencing a query the shop CAN
+#: answer is a visible failure at the counter, while failing to abstain on an impossible one
+#: merely shows five pieces that do not fit and the operator can see that.
+#:
+#: It is on because the alternative signal does not do this job: `low_confidence` fires on 1
+#: of the 20 out-of-domain queries and on 10 of the 43 answerable ones, which is
+#: anti-correlated with what abstention needs.
 ABSTENTION_DEFAULTS: dict[str, Any] = {
-    "jpv_abstention_enabled": False,
-    "jpv_abstention_band_alpha": 0.05,
-    "jpv_abstention_band_min_candidates": 10,
+    "jpv_abstention_enabled": True,
+    "jpv_abstention_band_alpha": 0.03,
+    "jpv_abstention_band_min_candidates": 15,
 }
 
 
@@ -400,11 +409,10 @@ class Settings(BaseSettings):
         default=ABSTENTION_DEFAULTS["jpv_abstention_enabled"],
         description=(
             "C25 relative abstention rule (JPV_ABSTENTION_ENABLED). Optional at boot; blank "
-            "means unset. Default FALSE: the rule is implemented, measured and published, and "
-            "it decides nothing until its parameters are fixed against a category of 15-20 "
-            "out-of-domain queries rather than the five it has today. Enabling it can only "
-            "make the service answer LESS, so the default that changes nothing is the safe "
-            "one. Not required to boot /health."
+            "means unset. Default TRUE, fixed against 20 out-of-domain and 43 answerable "
+            "queries: at the configured band it abstains on 2 of the 20 and on NONE of the "
+            "43. Setting it false is the rollback and restores the behaviour of answering "
+            "every query. Not required to boot /health."
         ),
     )
 

@@ -727,6 +727,131 @@ miles de ceros que no dicen nada.
 12.6 y 12.7 existen para arreglar: las seis filas se re-corren bajo la versión nueva y los
 ganadores de 9.4 y 10.4 se re-confirman contra el titular.
 
+## M12 · La lectura que decide estaba diluida por lastre
+
+Ampliar `fuera-de-dominio` de 5 a 20 **comprimió todas las diferencias de relevancia**, y por
+aritmética y no por mérito. Una consulta de fuera de dominio tiene el ideal vacío, así que su
+nDCG es **0 para todas** las configuraciones por construcción: promediarla suma el mismo cero a
+cada numerador y un uno a cada denominador.
+
+| | con las 20 dentro | sólo contestables |
+|---|---:|---:|
+| `v2b` contra `v2` en `new` | **+0,053** | **+0,084** |
+| `v3` contra `v2b` en `new` | −0,010 | −0,015 |
+
+**El margen es 0,05, así que una mejora real se quedó a tres milésimas de ser vetada por la
+composición del conjunto.** Y empeoraría: si la categoría crece —y el diseño quiere que crezca—
+la próxima corrección de fusión legítima quedaría vetada del todo.
+
+**Decisión: las lecturas de relevancia se promedian sobre las consultas contestables.** Una
+métrica se promedia sobre las consultas que puede medir. `fuera-de-dominio` se informa por la
+métrica que sí la mide —la tasa de abstención— y su fila por categoría sigue publicándose, así
+que no se pierde nada. El cambio se aplica en las tres lecturas y también en el re-puntuado de la
+fase C, para que las dos rutas midan lo mismo.
+
+## M13 · La abstención, fijada contra las 20 (tarea 12.6b)
+
+Con la categoría ampliada, el intercambio completo:
+
+| α | N | calla de 20 | **silencia contestables** | tasa |
+|---:|---:|---:|---:|---:|
+| 0,03 | 20 | 1 | **0** | 5 % |
+| **0,03** | **15** | **2** | **0** | **10 %** |
+| 0,03 | 10 | 4 | 3 | 20 % |
+| 0,05 | 15 | 5 | 4 | 25 % |
+| 0,05 | 10 | 9 | 4 | 45 % |
+| 0,08 | 20 | 10 | 5 | 50 % |
+| 0,08 | 15 | 11 | 6 | 55 % |
+| 0,08 | 10 | 12 | 9 | 60 % |
+| 0,08 | 5 | 16 | **21** | 80 % |
+| 0,10 | 5 | 20 | 22 | 100 % |
+
+**La regla no es redundante con lo que ya existe.** `low_confidence` marca **1 de las 20** de
+fuera de dominio y **10 de las 43** contestables: está *anticorrelada* con lo que la abstención
+necesita, porque mide consenso entre ramas y no si el catálogo puede contestar.
+
+**Decisión: activada en `α = 0,03`, `N = 15`.** Es el punto que más caza **sin silenciar ni una
+sola contestable** — sólo hay otros dos con coste cero y cazan menos. La asimetría del daño lo
+justifica: silenciar una consulta que la tienda **sí** puede contestar es un fallo visible en el
+mostrador, mientras que no abstenerse en una imposible sólo enseña cinco piezas que no encajan y
+el operador lo ve.
+
+**La brecha contra el objetivo de 0,80 de la ficha se declara, no se cierra.** Alcanzarlo cuesta
+silenciar **21 de las 43** contestables, la mitad del conjunto. Es la tercera limitación de la
+misma familia que el `Recall@5 ≥ 0,85` del §11.2: un listón fijado antes de que existiera el
+instrumento que lo mediría.
+
+**Reparo honesto:** «0 de 43» tiene un intervalo de confianza ancho. No se puede afirmar que en
+producción el coste sea exactamente cero, sólo que este conjunto no lo detecta. Apagar la regla
+es la marcha atrás y no requiere despliegue.
+
+## La tabla final, y la re-confirmación (tareas 12.6 a 12.9)
+
+Bajo golden set **`1:198c4af44506`**, una sola procedencia para las seis filas, `v0-cag`
+incluida. Informe completo en
+[`c25-baselines-2026-09-11.md`](../../../ai-service/evals/results/c25-baselines-2026-09-11.md).
+
+| configuración | nDCG@5 | bin | **oper** | Recall@5 | P@3 | MRR | abstención |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `v0-nombre` | 0,092 | 0,086 | — | 0,079 | 0,039 | 0,116 | 1,000 |
+| `v0-fts` | 0,507 | 0,579 | — | 0,558 | 0,550 | 0,661 | 0,050 |
+| `v1-vectorial` | 0,612 | 0,648 | — | 0,637 | 0,628 | 0,720 | 0,100 |
+| `v2-hibrido` | 0,673 | 0,708 | — | 0,698 | 0,667 | 0,770 | 0,050 |
+| **`v2b-fusion`** | **0,740** | 0,770 | — | 0,758 | 0,713 | 0,834 | **0,150** |
+| `v3-senales` | 0,729 | 0,755 | **0,732** | 0,744 | 0,698 | 0,824 | 0,150 |
+
+La fila de línea base lleva `fusion: flat` **y** `abstain: false`, porque reproduce la
+configuración publicada **antes** de este change; sin lo segundo marcaría una tasa de abstención
+que C24 nunca midió. El salto de 0,050 a 0,150 es **de la regla de abstención y no de la fusión**.
+
+### 12.7 · Re-confirmación contra el titular, en la versión nueva
+
+| decisión | lectura | delta | ¿supera 0,05? |
+|---|---|---:|---|
+| **9.4** `v2b` contra `v2` | `new` | **+0,083** | **sí — confirmada** |
+| **10.4** `v3` contra `v2b` | operativa | **+0,030** | no |
+| **10.4** `v3` contra `v2b` | pura (`new`) | −0,015 | no |
+
+`v2b` **se re-confirma con holgura**: +0,083 contra los +0,073 de la versión anterior. La regla
+de adopción de `v3` sigue cumpliéndose entera —objetivo +0,030, guardarraíl −0,015, peor
+categoría `piedra` −0,039— y el criterio relativo de D2 sigue sin alcanzarse. Se re-confirmó un
+punto de rejilla, no la rejilla, que es lo que la disciplina de C24 exige.
+
+### La contención se sostiene con 20, no era un artefacto de n=5
+
+| población | n | mín | mediana | máx |
+|---|---:|---:|---:|---:|
+| contestables | 43 | 0,2071 | 0,3983 | **0,7118** |
+| fuera de dominio | **20** | **0,4469** | 0,5320 | 0,6271 |
+
+Cuadruplicar la categoría **no cambia la conclusión de M1**: el rango entero de las imposibles
+sigue cayendo dentro del de las contestables. La elección de forma que hizo el criterio
+pre-registrado se sostiene sobre cuatro veces más evidencia de la que tuvo al hacerse.
+
+### Y la saturación, publicada como exige D14
+
+`v2-hibrido`, `v2b-fusion` y `v3-senales` tienen **6 de 8** consultas de ajuste en el techo del
+nDCG@5 — la cifra que la exploración citó, ahora impresa por el arnés en cada corrida. Un lector
+que vea `tuning` discrepar de `new` puede comprobar en el mismo informe cuánto margen tenía.
+
+### 12.9 · El criterio relativo, aplicado, y las **tres** brechas declaradas
+
+| | qué pedía | qué se midió | veredicto |
+|---|---|---|---|
+| **§11.2** `Recall@5 ≥ 0,85` | absoluto | **0,758** en `v2b` | **no alcanzado** — declarado |
+| **D2** `v2b` bate a `v2` | relativo, margen 0,05 | **+0,083** | **cumplido** |
+| **D2** `v3` bate a `v2b` | relativo, margen 0,05 | +0,030 operativo | **no alcanzado** — declarado |
+| **ficha** abstención ≥ 0,80 | absoluto | **0,150** | **no alcanzado** — declarado |
+
+**Una de las cuatro se cumple, y las tres que no se declaran en vez de cerrarse.** Las tres son de
+la misma familia: listones fijados **antes de que existiera el instrumento** que los mediría. El
+`Recall@5` de 0,85 y la abstención de 0,80 se escribieron antes de que hubiera golden set; el
+margen de D2 se escribió sabiendo lo que este conjunto resuelve, y `v3` no lo alcanza porque la
+rúbrica es ciega a la disponibilidad, no porque la señal no funcione.
+
+Ninguna se ha cerrado moviendo el listón después de medir, y ninguna etiqueta se ha reescrito
+para alcanzarlo.
+
 ## Qué queda decidido al cerrar la fase 0
 
 1. **La abstención es una regla relativa por consulta y vive en la fase D.** No mueve la ventana.

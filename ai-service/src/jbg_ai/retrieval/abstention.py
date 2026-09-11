@@ -26,11 +26,21 @@ queries and 0,963 for out-of-domain ones.
 At the same out-of-domain capture, this costs **four times less** than the scalar: catching
 three of the five costs 4 answerable queries instead of 17.
 
-**It ships disabled, and that is not caution.** Its two parameters cannot be fixed credibly
-against **five** out-of-domain queries — fitting two numbers to five points is what this change
-has refused to do everywhere else — so they are fixed once the category grows to 15-20, which
-costs no per-document labelling because every document is grade zero there by the annotation
-criterion. Until then the rule is implemented, measured and published, and it decides nothing.
+**Its parameters were fixed against the category once it grew to 20, never against the five it
+had**: two numbers fitted to five points are fitted to five points, which is what this change
+refused to do everywhere else. At the configured band the rule abstains on **2 of the 20
+out-of-domain queries and on none of the 43 answerable ones**.
+
+The rate that buys is **10 %**, far from the 0,80 the ticket asked for, and the gap is declared
+rather than closed: reaching 0,80 costs silencing **21 of the 43** answerable queries. The
+asymmetry decides the point — silencing a query the shop CAN answer is a visible failure at the
+counter, while failing to abstain on an impossible one shows five pieces that do not fit and the
+operator can see that.
+
+It is not redundant with the signal that already exists: `low_confidence` fires on 1 of the 20
+out-of-domain queries and on 10 of the 43 answerable ones, which is anti-correlated with what
+abstention needs, because it measures cross-branch consensus and not whether the catalogue can
+answer.
 """
 
 from __future__ import annotations
@@ -49,11 +59,15 @@ STAGE = "abstain"
 class AbstentionRule:
     """The relative rule and its two parameters. Disabled is a value, not a missing one."""
 
+    #: `False` here and `True` in the settings, deliberately: the live policy belongs to
+    #: configuration, and a rule constructed by hand must not silence anything by accident.
     enabled: bool = False
     #: Half-width of the band around the best distance, as a fraction of it.
-    band_alpha: float = 0.05
+    band_alpha: float = 0.03
     #: How many candidates must fall inside that band before the profile counts as flat.
-    min_candidates: int = 10
+    #: Fixed against 20 out-of-domain and 43 answerable queries: at this point the rule
+    #: abstains on 2 of the 20 and on none of the 43.
+    min_candidates: int = 15
 
     def describe(self) -> str:
         if not self.enabled:

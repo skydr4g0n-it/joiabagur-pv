@@ -162,7 +162,7 @@ def render_markdown(report: Report, *, title: str) -> str:
         "Dos ejecuciones cuya procedencia no coincida **no son comparables**, y el arnés lo "
         "dice en lugar de compararlas igualmente.",
         "",
-        "## Tabla de ablations v0 → v2",
+        "## Tabla de ablations v0 → v3",
         "",
         *_ablation_table(report),
         "",
@@ -197,6 +197,21 @@ def render_markdown(report: Report, *, title: str) -> str:
     ]
     for item in report.configs:
         lines += _readings_table(item)
+
+    saturated = [item for item in report.configs if item.tuning_at_ceiling]
+    if saturated:
+        lines += [
+            "> **Saturación de la partición de ajuste.** "
+            + ", ".join(
+                f"`{item.config_id}` {item.tuning_at_ceiling}/{item.readings['tuning'].queries}"
+                for item in saturated
+            )
+            + " consultas ya están **en el techo** del nDCG@5. Una lectura saturada no puede "
+            "registrar una mejora: sólo empatar o caer. Por eso `tuning` se publica como "
+            "**diagnóstico de contaminación** y no veta una decisión — la lectura que decide "
+            "es `new`, y el lector puede ver aquí cuánto margen tenía la otra.",
+            "",
+        ]
 
     lines += [
         "## Desglose por origen del dato",
@@ -320,6 +335,38 @@ def render_markdown(report: Report, *, title: str) -> str:
                 if gap <= 0
                 else "Las dos poblaciones **son separables por un valor único**, que es la "
                 "forma que tenía la respuesta en el corpus de conocimiento."
+            ),
+        ]
+
+    best = report.best_hit_distances
+    if best.get("answerable") and best.get("out_of_domain"):
+        si, no = best["answerable"], best["out_of_domain"]
+        hueco = min(no) - max(si)
+        lines += [
+            "",
+            "## Distribución del mejor acierto **por consulta**",
+            "",
+            "La distribución de arriba es **por documento** y contesta otra pregunta. Lo que "
+            "decide la abstención es el **mejor acierto de cada consulta**: un solape total "
+            "entre las distancias de documentos relevantes e irrelevantes no implica que el "
+            "mejor acierto de una consulta contestable no pueda separarse del de una "
+            "imposible. Son preguntas distintas, y la regla sale de ésta.",
+            "",
+            "| población | n | mín | mediana | máx |",
+            "|---|---:|---:|---:|---:|",
+            f"| contestables | {len(si)} | {si[0]:.4f} | {si[len(si) // 2]:.4f} | {si[-1]:.4f} |",
+            f"| fuera de dominio | {len(no)} | {no[0]:.4f} | {no[len(no) // 2]:.4f} | "
+            f"{no[-1]:.4f} |",
+            "",
+            (
+                f"**Un solo valor las separa**, con un hueco de {hueco:+.4f}."
+                if hueco > 0
+                else "**Ningún valor las separa.** El máximo de las contestables es "
+                f"{max(si):.4f} y el mínimo de las de fuera de dominio {min(no):.4f}, de modo "
+                f"que el rango entero de éstas cae **dentro** del de aquéllas (hueco "
+                f"{hueco:+.4f}). Por eso la regla adoptada es **relativa por consulta** y no "
+                "un umbral escalar, y por eso corre **después** de la fusión sin alterar el "
+                "conjunto de candidatos."
             ),
         ]
 

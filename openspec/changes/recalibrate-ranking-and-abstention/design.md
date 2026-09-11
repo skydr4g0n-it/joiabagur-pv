@@ -78,6 +78,15 @@ antes de saber que `relevant_total` puede valer 144 para una consulta.
 *Alternativa descartada:* medir contra el 0,85 y declarar el fallo. No distingue «no mejoró» de
 «el listón estaba mal puesto».
 
+> **Corrección del denominador, 2026-09-11.** Las lecturas de relevancia se promedian sobre las
+> consultas **contestables**, no sobre todas. Una de `fuera-de-dominio` tiene el ideal vacío, así
+> que puntúa 0 para toda configuración por construcción: promediarla no informa del orden y
+> **comprime toda diferencia**. Medido al ampliar la categoría de 5 a 20, la mejora de la fusión
+> por rama leyó **+0,053** con ellas dentro y **+0,084** fuera — con un margen de 0,05, una mejora
+> real se quedó a tres milésimas de ser vetada por la composición del conjunto en vez de por su
+> mérito, y crecer más la categoría la vetaría del todo. Una métrica se promedia sobre las
+> consultas que puede medir; `fuera-de-dominio` se informa por la tasa de abstención.
+>
 > **Resultado medido el 2026-09-11, al cerrar la fase C.** El criterio se cumple para una de las
 > dos filas y **no** para la otra, y las dos cosas se declaran:
 >
@@ -435,6 +444,20 @@ el diseño fija las dos ramas y el criterio de elección **antes** de mirarla:
 `fuera-de-dominio` pasa de **5 a 15-20** consultas: por la rúbrica todo es grado 0 ahí, así que no
 hay etiquetado documento a documento, y con n=5 la única cifra de aceptación alcanzable no es
 creíble. El lado difícil es subir la abstención **sin** empezar a callar en las contestables.
+
+> **Resuelto el 2026-09-11, midiendo sobre las 20.** La forma la eligió M1 —contención total, así
+> que un escalar no separa— y M9 la afinó: lo que discrimina no es el nivel sino la **forma del
+> perfil**, porque una consulta imposible es **plana**. La regla queda
+> `abstenerse si |{d ≤ d_min·(1+α)}| ≥ N`, con **`α = 0,03`, `N = 15`**, fijados contra la
+> categoría **ya ampliada** y nunca contra las cinco originales.
+>
+> **Caza 2 de las 20 y no silencia ninguna de las 43 contestables.** Sólo hay otros dos puntos
+> con coste cero y cazan menos. El objetivo de **0,80** de la ficha cuesta silenciar **21 de las
+> 43** — la mitad del conjunto— y se declara como brecha, igual que la del §11.2.
+>
+> La regla **no es redundante**: `low_confidence` marca 1 de 20 imposibles y 10 de 43
+> contestables, o sea que está anticorrelada con lo que la abstención necesita. Y se puede
+> apagar sin desplegar.
 
 ### D12 · La medición M1 gobierna la secuencia, no sólo la forma
 

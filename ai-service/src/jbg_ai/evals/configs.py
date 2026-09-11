@@ -98,6 +98,10 @@ class EvalConfig:
     #: both is exactly why the demotion C22 shipped never fired in the published run.
     signal_pos_id: str | None = None
     business_weight_availability: float | None = None
+    #: C25 abstention. `None` follows the live default (on); the baseline row pins it OFF, the
+    #: same way it pins the flat fusion, because it exists to reproduce the configuration that
+    #: was published BEFORE this change and the rule did not exist then.
+    abstain: bool | None = None
     branch_depth: int | None = None
     pos_prefilter: bool = False
     max_results: int = 60

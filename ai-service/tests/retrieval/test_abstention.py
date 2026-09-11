@@ -37,10 +37,16 @@ PRINCIPAL = ServicePrincipal(
 )
 DOC = "Tipo: anillo de plata. Materiales: plata."
 
-#: The measured operating point on the five out-of-domain queries: three of five caught at a
-#: cost of four answerable ones, four times cheaper than the scalar. A STARTING POINT for the
-#: calibration that follows the category growing to 15-20, not a fixed figure.
-LIVE = AbstentionRule(enabled=True, band_alpha=0.05, min_candidates=10)
+#: The point fixed against the category once it grew to 20: it abstains on 2 of those 20 and
+#: on none of the 43 answerable queries. The only operating points that silence no answerable
+#: query are this one and two that catch less.
+LIVE = AbstentionRule(enabled=True, band_alpha=0.03, min_candidates=15)
+
+#: A flat profile needs at least `min_candidates` entries to be flat, so the fixtures carry
+#: twenty: ten could never trip a rule that asks for fifteen, and a test that passed on that
+#: technicality would witness nothing.
+FLAT = [0.500 + 0.0005 * index for index in range(20)]
+PEAKED = [0.21] + [0.44 + 0.01 * index for index in range(19)]
 
 
 def _run(coro):
@@ -79,14 +85,11 @@ def _serve(search, **kwargs):
 
 def test_a_flat_distance_profile_is_what_the_rule_reads() -> None:
     """Flat means nothing stands out, which is the shape of a query the catalogue cannot answer."""
-    flat = [0.50, 0.505, 0.51, 0.512, 0.515, 0.518, 0.52, 0.521, 0.522, 0.523]
-    peaked = [0.21, 0.44, 0.47, 0.49, 0.51, 0.52, 0.53, 0.54, 0.55, 0.56]
+    assert candidates_in_band(FLAT, 0.03) == 20, "everything sits inside the band"
+    assert candidates_in_band(PEAKED, 0.03) == 1, "only the peak does"
 
-    assert candidates_in_band(flat, 0.05) == 10, "everything sits inside the band"
-    assert candidates_in_band(peaked, 0.05) == 1, "only the peak does"
-
-    assert should_abstain(flat, LIVE) is True
-    assert should_abstain(peaked, LIVE) is False
+    assert should_abstain(FLAT, LIVE) is True
+    assert should_abstain(PEAKED, LIVE) is False
 
 
 def test_the_rule_reads_the_shape_and_not_the_level() -> None:
@@ -95,8 +98,8 @@ def test_the_rule_reads_the_shape_and_not_the_level() -> None:
     These two profiles have the SAME best distance. A bound on that number would treat them
     identically; the relative rule separates them, because one has a peak and one does not.
     """
-    same_best_flat = [0.45, 0.455, 0.46, 0.462, 0.465, 0.467, 0.469, 0.47, 0.471, 0.472]
-    same_best_peaked = [0.45, 0.62, 0.64, 0.65, 0.66, 0.67, 0.68, 0.69, 0.70, 0.71]
+    same_best_flat = [0.45 + 0.0005 * index for index in range(20)]
+    same_best_peaked = [0.45] + [0.62 + 0.005 * index for index in range(19)]
 
     assert min(same_best_flat) == min(same_best_peaked)
     assert should_abstain(same_best_flat, LIVE) is True
@@ -105,25 +108,32 @@ def test_the_rule_reads_the_shape_and_not_the_level() -> None:
 
 def test_an_empty_distance_list_is_not_a_flat_profile() -> None:
     """Absence is not flatness, and conflating them lets an abstention stand in for a failure."""
-    assert candidates_in_band([], 0.05) == 0
+    assert candidates_in_band([], 0.03) == 0
     assert should_abstain([], LIVE) is False
 
 
-def test_the_rule_is_disabled_by_default() -> None:
-    """Two parameters cannot be fixed against five out-of-domain queries.
+def test_the_live_rule_is_the_one_the_measurement_fixed() -> None:
+    """Enabled, at the band fixed against 20 out-of-domain and 43 answerable queries.
 
-    Enabling it can only make the service answer LESS, so the default that changes nothing is
-    the safe one. It is implemented, measured and published, and it decides nothing until the
-    category grows to 15-20 - which costs no per-document labelling, because every document is
-    grade zero there by the annotation criterion.
+    The only operating points that silence no answerable query are this one and two that catch
+    less, so it is the most the rule can do for free. The 0,80 the ticket asked for costs
+    silencing 21 of the 43, and that gap is declared rather than closed.
     """
+    from jbg_ai.config.settings import ABSTENTION_DEFAULTS
+
     settings = build_settings()
-    assert settings.jpv_abstention_enabled is False
+    assert settings.jpv_abstention_enabled is True
+    assert settings.jpv_abstention_band_alpha == 0.03
+    assert settings.jpv_abstention_band_min_candidates == 15
+    assert ABSTENTION_DEFAULTS["jpv_abstention_enabled"] is True
+
+    # The dataclass stays disabled, so a rule built by hand silences nothing by accident.
     assert AbstentionRule().enabled is False
     assert AbstentionRule().describe() == "disabled"
+    assert should_abstain([0.50] * 20, AbstentionRule()) is False
 
-    flat = [0.50] * 20
-    assert should_abstain(flat, AbstentionRule()) is False, "disabled decides nothing"
+    # And turning it off is the rollback: every query is answered again.
+    assert should_abstain(FLAT, AbstentionRule(enabled=False)) is False
 
 
 # ------------------------------------------------------------------ what it must never do
@@ -178,12 +188,13 @@ def test_an_abstention_is_a_decision_about_the_query_not_a_filter() -> None:
     An abstention built by removing candidates one at a time would be indistinguishable from a
     retrieval that merely found little, and the two ask different things of the operator.
     """
-    flat = _rows([0.50, 0.505, 0.51, 0.512, 0.515, 0.518, 0.52, 0.521, 0.522, 0.523])
+    flat = _rows(FLAT)
 
-    answered = _serve(FakeProductSearch(list(flat)))
+    answered = _serve(FakeProductSearch(list(flat)), abstain=False)
     abstained = _serve(FakeProductSearch(list(flat)), abstain=True)
 
     assert answered.results, "the premise: with the rule off this query is answered"
+    assert len(answered.results) > 0
     assert answered.low_confidence is False
 
     assert abstained.results == [], "no candidate is returned"
@@ -197,11 +208,11 @@ def test_the_rule_does_not_alter_the_candidate_set() -> None:
     A rule expressed as a distance bound inside the retrieval statement changes which
     candidates exist; this one runs after the fusion and changes only whether they are served.
     """
-    flat = _rows([0.50, 0.505, 0.51, 0.512, 0.515, 0.518, 0.52, 0.521, 0.522, 0.523])
+    flat = _rows(FLAT)
     search_off = FakeProductSearch(list(flat))
     search_on = FakeProductSearch(list(flat))
 
-    _serve(search_off)
+    _serve(search_off, abstain=False)
     _serve(search_on, abstain=True)
 
     assert search_off.search_calls[0]["threshold"] == search_on.search_calls[0]["threshold"]
@@ -213,14 +224,12 @@ def test_the_rule_does_not_alter_the_candidate_set() -> None:
 
 
 def test_the_abstention_decision_is_logged_with_its_inputs(caplog) -> None:
-    flat = _rows([0.50, 0.505, 0.51, 0.512, 0.515, 0.518, 0.52, 0.521, 0.522, 0.523])
-
     with caplog.at_level(logging.INFO, logger="jbg_ai.retrieval.abstention"):
-        _serve(FakeProductSearch(flat), abstain=True)
+        _serve(FakeProductSearch(_rows(FLAT)), abstain=True)
 
     entry = next(message for message in caplog.messages if "stage=abstain" in message)
     assert TOKEN_TRACE_ID in entry
-    assert "rule=band(alpha=0.05,n>=10)" in entry
+    assert "rule=band(alpha=0.03,n>=15)" in entry
     assert "best_distance=0.5000" in entry
     assert "decision=abstain" in entry
 
@@ -275,7 +284,7 @@ def test_the_decision_is_logged_even_when_it_answers(caplog) -> None:
 
 def test_the_rule_describes_itself_with_its_parameters() -> None:
     """The report cites the rule in force, so it has to be renderable in one string."""
-    assert LIVE.describe() == "band(alpha=0.05,n>=10)"
+    assert LIVE.describe() == "band(alpha=0.03,n>=15)"
     assert AbstentionRule(enabled=False).describe() == "disabled"
 
 

@@ -48,7 +48,7 @@ from uuid import UUID
 from jbg_ai.config.settings import FUSION_DEFAULTS, Settings
 from jbg_ai.evals.configs import EvalConfig
 from jbg_ai.evals.errors import ConfigurationError
-from jbg_ai.evals.golden import GoldenSet
+from jbg_ai.evals.golden import OUT_OF_DOMAIN, GoldenSet
 from jbg_ai.evals.metrics import Aggregate, aggregate, score_case
 from jbg_ai.evals.pricing import PriceList
 from jbg_ai.evals.provenance import Provenance
@@ -540,7 +540,16 @@ def rescore(
             )
         )
 
-    readings = {"global": aggregate(cases)}
+    # Averaged over the ANSWERABLE queries, for the reason `split_readings` records: an
+    # out-of-domain query scores zero for every configuration, so including it compresses
+    # every difference without carrying any information about ranking.
+    answerable = {
+        query.id
+        for query in golden.judged_queries
+        if query.category != OUT_OF_DOMAIN
+    }
+    scored = [case for case in cases if case.query_id in answerable]
+    readings = {"global": aggregate(scored)}
     for name, wanted in (
         (DIAGNOSTIC_READING, True),
         (DECIDING_READING, False),
@@ -551,7 +560,7 @@ def rescore(
             if bool(query.in_tuning_set) is wanted
         }
         readings[name] = aggregate(
-            [case for case in cases if case.query_id in members]
+            [case for case in scored if case.query_id in members]
         )
     for category in sorted({query.category for query in golden.judged_queries}):
         members = {
