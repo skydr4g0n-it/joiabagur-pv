@@ -549,9 +549,17 @@ ai-service/
     knowledge/      # C23 second index: corpus.py (seven authoring rules), chunking.py (pure),
                     # indexer.py (uuid5 identity, idempotent), search.py (callable, no route),
                     # sizing.py (D16 ring table), offline.py + measure.py (fixture, no provider)
+    evals/          # C24 harness: golden.py (load + the composition validation that fails the
+                    # load), pooling.py (adaptive depth), metrics.py (graded and binary),
+                    # configs.py + baselines.py (the two v0 replicas), cag.py (context-only),
+                    # sweep.py (the directional sweep and its written rule), runner.py,
+                    # report.py, repository.py (opt-in sink, imported by nobody upstream),
+                    # cli.py (`uv run evals`)
   prompts/          # versioned prompts: catalog-synth/v3 (C06b generate) + enrichment/v1 and v2 (extract; v2 in force since FIX1)
                     # + knowledge/v1: eight block prompts, one per generation block of the corpus
-  evals/results/    # C20 measured reach report; C24 will write its runs beside it
+  evals/            # the yardstick, versioned: golden/ (queries, judgements, frozen query vectors,
+                    # criterion.md, pricing.yaml), configs/ (the five baseline configurations) and
+                    # results/ (C20 reach report, C21 arm comparison, C24 baselines + runs/<run_id>.jsonl)
   migrations/
     bootstrap.sql   # one-off: extension, schema, dedicated role, grants
     env.py          # version table in `ai`; provisions before revisions run

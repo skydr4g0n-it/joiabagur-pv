@@ -417,7 +417,7 @@ joiabagur-pv/
 │   ├── src/                             # pages, components, services, hooks, providers, routing, types
 │   ├── e2e/                             # Playwright
 │   └── package.json
-├── ai-service/                          # Microservicio de IA (C01–C14)
+├── ai-service/                          # Microservicio de IA (C01–C24)
 │   ├── src/jbg_ai/
 │   │   ├── api/                         # main.py (create_app), auth.py, deps.py, middleware.py, routers/, schemas/
 │   │   ├── config/                      # settings.py (pydantic-settings)
@@ -429,6 +429,12 @@ joiabagur-pv/
 │   │   │                                # + C20 expansión de consulta: diccionario en dos capas y CLI de medición
 │   │   │                                # + C21 rama léxica (lexical), fusión RRF (fusion), filtros que
 │   │   │                                #   degradan (filters) y caché acotado del singleton (cache)
+│   │   │                                # + C22 alcance por punto de venta (projection)
+│   │   │                                # + C24 desempate determinista en las dos sentencias
+│   │   ├── families/                    # C18a agrupador + C18b auditoría de familias persistidas; offline
+│   │   ├── knowledge/                   # C23 segundo índice: corpus, troceado, indexador y búsqueda con citas
+│   │   ├── evals/                       # C24 arnés de evaluación: golden set, pooling, métricas, líneas
+│   │   │                                #   base, barrido, informe y sumidero opcional (CLI `uv run evals`)
 │   │   └── stubs/                       # respuestas deterministas bajo STUB_MODE
 │   ├── prompts/                         # catalog-synth/v3 (C06b) + enrichment/v1 (C09)
 │   ├── openapi.json                     # snapshot versionado del contrato
