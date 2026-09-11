@@ -144,6 +144,12 @@ class FakeProductSearch:
         self.scope_calls.append(pos_id)
         return len(self._scope(pos_id))
 
+    async def scope_buckets(self, pos_id: UUID) -> dict[str, str]:
+        return {
+            str(product_id): item.qty_bucket
+            for product_id, item in self._scope(pos_id).items()
+        }
+
     async def projection_synced_at(self) -> datetime | None:
         self.synced_at_calls += 1
         return self.synced_at

@@ -1,0 +1,34 @@
+# `v2b` plus the business signals: availability and rotation.
+#
+# The reading scope is MAO-AIR, and it is declared here rather than inferred. It is the point
+# of sale where the signal is richest — 34,4 % of its assortment at zero stock, 143 of 416 —
+# because calibrating where the signal barely appears is calibrating on noise. FORNELLS
+# (12,0 %) and HT-GALDANA (11,7 %) are the validation points and are NOT this row.
+# HT-ARTRUTX is excluded everywhere: it carries nothing at all.
+#
+# `pos_prefilter` stays FALSE. The scope that restricts and the scope that reads are two
+# different parameters, and this row reads without restricting: otherwise it would measure
+# the reordering and the recall cost of the prefilter as one number, which is the confusion
+# C22 declined to introduce.
+id: v3-senales
+kind: pipeline
+label: "Señales de negocio sobre la fusión por rama"
+rationale: >-
+  v2b más disponibilidad y rotación, leídas de la proyección de MAO-AIR sin restringir el
+  conjunto de candidatos. El peso de disponibilidad se calibra contra la métrica operativa con
+  la relevancia pura como guardarraíl; el de rotación se declara y no se barre, porque no
+  existe instrumento que pueda aprobarlo. Es la única fila con lectura operativa.
+uses_provider: true
+mode: hybrid
+expand_synonyms: true
+fusion: branch
+rrf_k: 60
+branch_weight_lexical: 0.5
+branch_weight_vector: 0.5
+coverage_rule: continuous
+branch_depth: 60
+pos_prefilter: false
+signal_pos_id: "43da2f6a-cb64-4067-b5c2-cd67f5a8f6b3"
+business_weight_availability: 1.0
+business_weight_rotation: 0.25
+max_results: 60

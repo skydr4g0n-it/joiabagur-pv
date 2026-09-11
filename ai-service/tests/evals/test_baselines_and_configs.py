@@ -92,11 +92,21 @@ def test_terms_are_joined_so_that_matching_any_of_them_is_enough() -> None:
     assert websearch_terms("") == ""
 
 
-def test_the_five_configurations_load_and_the_table_is_in_order() -> None:
+def test_every_configuration_loads_and_the_table_is_in_order() -> None:
+    """Seven rows after C25, and the order is the reading order of the table.
+
+    `v2b-fusion` and `v3-senales` are the two the change adds, and they sit AFTER the
+    baseline they are read against. Without `v2b` an improvement in `v3` could belong to the
+    fusion or to the signals and nobody could attribute it.
+    """
     configs = load_all()
 
     assert [item.id for item in configs] == list(ABLATION_ORDER)
     assert {item.id for item in configs if item.pooled} == set(POOLED)
+    assert "v2b-fusion" in ABLATION_ORDER and "v3-senales" in ABLATION_ORDER
+    assert ABLATION_ORDER.index("v2b-fusion") < ABLATION_ORDER.index("v3-senales")
+    # `v0-cag` answers in prose over a context window, so it has no ranked list to pool.
+    assert "v0-cag" not in POOLED
 
 
 def test_the_zero_cost_baselines_record_zero_and_not_an_absent_value() -> None:

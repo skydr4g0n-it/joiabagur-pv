@@ -1040,3 +1040,40 @@ def test_the_signals_stage_logs_its_weights_without_quantities_or_vectors(caplog
     # No exact quantity and no vector.
     assert "sales_30d=5" not in entry
     assert "0.11" not in entry and "[" not in entry
+
+
+def test_an_absent_signal_never_ranks_below_a_read_one() -> None:
+    """The rule the first implementation broke, and the measurement caught. C25.
+
+    A bonus for having sold ranks a candidate whose projection row was never read BELOW one
+    that sold, which is exactly "treating absence as zero sales". Measured on a reading scope
+    covering 416 of 1.168 products, that form cost 0,244 of pure relevance: it sorted the
+    assortment above everything outside it instead of sorting the exhausted below the
+    available. Both terms subtract, so absence is neutral by construction.
+    """
+    absent = _Candidate(qty_bucket=None, sales_30d=None)
+    carried_and_sold = _Candidate(qty_bucket="3+", sales_30d=9)
+    carried_unsold = _Candidate(qty_bucket="3+", sales_30d=0)
+    exhausted = _Candidate(qty_bucket="0", sales_30d=9)
+
+    # Absence is never worse than the best news a read row can carry.
+    assert business_score(absent, LIVE_WEIGHTS) >= business_score(
+        carried_and_sold, LIVE_WEIGHTS
+    )
+    # And no score is ever positive: only bad news moves a candidate.
+    for item in (absent, carried_and_sold, carried_unsold, exhausted):
+        assert business_score(item, LIVE_WEIGHTS) <= 0.0
+
+    ordered, _ = demote(
+        [exhausted, carried_unsold, absent, carried_and_sold],
+        StructuralFilters(),
+        LIVE_WEIGHTS,
+    )
+    # Absent and carried-and-sold tie at the top and keep their fused order; then the one
+    # that was read and did not sell; then the exhausted one.
+    assert ordered[:2] == (absent, carried_and_sold) or ordered[:2] == (
+        carried_and_sold,
+        absent,
+    )
+    assert ordered[2] is carried_unsold
+    assert ordered[3] is exhausted

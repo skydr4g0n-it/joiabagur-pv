@@ -7,6 +7,9 @@ from collections.abc import Callable
 from pathlib import Path
 from uuid import UUID
 
+import pytest
+
+from jbg_ai.evals.configs import load_config
 from jbg_ai.evals.golden import load_golden_set
 from jbg_ai.evals.metrics import (
     aggregate,
@@ -245,3 +248,199 @@ def test_the_binarisation_rule_is_declared_once_and_not_per_configuration() -> N
     assert RELEVANT_FROM == 1
     assert binary_gain(0) == 0.0
     assert binary_gain(1) == binary_gain(2) == 1.0
+
+
+# --------------------------------------------------------------------------------------
+# C25 - the operational reading, declared before the measurement and never applied to the file.
+# --------------------------------------------------------------------------------------
+
+
+def test_operational_gain_is_a_declared_function_of_grade_and_availability() -> None:
+    """The function of D3, pre-registered on 2026-09-11 before any metric was computed.
+
+        g_efectivo = grade               if bucket != '0'
+                     max(grade - 1, 0)   if bucket == '0'
+
+    It reuses the rubric's own scale instead of inventing a constant: grade 1 is already
+    "a plausible substitute the operator would offer second", and a piece that cannot be put
+    on the cloth is exactly that.
+    """
+    from jbg_ai.evals.metrics import effective_grade, graded_gain, operational_gain
+
+    # In stock: the grade is untouched, whichever non-zero bucket it is.
+    for bucket in ("1-2", "3+"):
+        for grade in (0, 1, 2):
+            assert effective_grade(grade, bucket) == grade
+            assert operational_gain(grade, bucket) == graded_gain(grade)
+
+    # Exhausted: one rung down, with a floor at zero.
+    assert effective_grade(2, "0") == 1
+    assert effective_grade(1, "0") == 0
+    assert effective_grade(0, "0") == 0, "grade 0 cannot fall further"
+
+    # Absent is NOT exhausted: no reading scope, or this point of sale does not carry it.
+    for grade in (0, 1, 2):
+        assert effective_grade(grade, None) == grade, "absence is not evidence of zero stock"
+
+    # The two non-zero buckets are indistinguishable under this function, which is why no
+    # objective function can order them and why the distinction stays binary.
+    assert operational_gain(2, "1-2") == operational_gain(2, "3+")
+
+
+def test_operational_metric_does_not_modify_the_judgements(tmp_path) -> None:
+    """A third READING of the same annotation. The file on disk is never touched."""
+    import hashlib
+
+    from jbg_ai.data.paths import AI_SERVICE_ROOT
+
+    path = AI_SERVICE_ROOT / "evals" / "golden" / "judgements.jsonl"
+    before = hashlib.sha256(path.read_bytes()).hexdigest()
+
+    golden = load_golden_set()
+    query = golden.judged_queries[0]
+    judged = golden.judgements_for(query.id)
+    ranked = [UUID(item.product_id) for item in judged[:10]]
+    # Every judged document reported as exhausted: the most aggressive reading there is.
+    buckets = {item.product_id: "0" for item in judged}
+
+    with_signal = score_case(golden, query.id, ranked, abstained=False, buckets=buckets)
+    without = score_case(golden, query.id, ranked, abstained=False)
+
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == before, "the file changed"
+    # The recorded grade is still the recorded grade.
+    assert [item.grade for item in golden.judgements_for(query.id)] == [
+        item.grade for item in judged
+    ]
+    # And the graded reading is unaffected by the availability signal.
+    assert with_signal.ndcg_at_5 == without.ndcg_at_5
+    assert without.ndcg_at_5_operational is None, "no signal read, no operational reading"
+    assert with_signal.ndcg_at_5_operational is not None
+
+
+def test_the_operational_reading_is_absent_rather_than_zero_when_no_signal_is_read() -> None:
+    """Printing a zero would rank a configuration last on a metric it never competed in."""
+    from jbg_ai.evals.metrics import aggregate
+
+    golden = load_golden_set()
+    query = golden.judged_queries[0]
+    ranked = [UUID(item.product_id) for item in golden.judgements_for(query.id)[:5]]
+
+    case = score_case(golden, query.id, ranked, abstained=False)
+    assert case.ndcg_at_5_operational is None
+    assert "ndcg_at_5_operational" not in aggregate([case]).values
+
+    with_signal = score_case(
+        golden,
+        query.id,
+        ranked,
+        abstained=False,
+        buckets={item.product_id: "3+" for item in golden.judgements_for(query.id)},
+    )
+    assert "ndcg_at_5_operational" in aggregate([with_signal]).values
+
+
+def test_an_exhausted_top_hit_costs_the_operational_reading_and_not_the_graded_one() -> None:
+    """The metric has to be able to move, or calibrating against it is theatre."""
+    golden = load_golden_set()
+    query = next(
+        item
+        for item in golden.judged_queries
+        if sum(1 for j in golden.judgements_for(item.id) if j.grade == 2) >= 2
+    )
+    judged = golden.judgements_for(query.id)
+    best = [item for item in judged if item.grade == 2][:2]
+    ranked = [UUID(item.product_id) for item in best]
+
+    stocked = score_case(
+        golden, query.id, ranked, abstained=False,
+        buckets={item.product_id: "3+" for item in judged},
+    )
+    exhausted = score_case(
+        golden, query.id, ranked, abstained=False,
+        buckets={item.product_id: "0" for item in judged},
+    )
+
+    assert stocked.ndcg_at_5 == exhausted.ndcg_at_5, "pure relevance must not notice"
+    # Both readings normalise against an ideal built with the same gain, so a run where
+    # EVERYTHING is exhausted is not penalised as a whole - what moves the metric is showing
+    # exhausted pieces ahead of available ones, which is the next assertion.
+    mixed = score_case(
+        golden, query.id, ranked, abstained=False,
+        buckets={
+            best[0].product_id: "0",
+            **{item.product_id: "3+" for item in judged if item.product_id != best[0].product_id},
+        },
+    )
+    assert mixed.ndcg_at_5_operational < stocked.ndcg_at_5_operational, (
+        "leading with an exhausted grade-2 must cost the operational reading"
+    )
+    assert mixed.ndcg_at_5 == stocked.ndcg_at_5, "and must not cost the graded one"
+
+
+def test_baseline_row_is_still_selectable_and_reproducible() -> None:
+    """The published baseline keeps its configuration after C25 moved the default.
+
+    `v2-hibrido` pins `fusion: flat` explicitly. If it followed the new default instead, the
+    table would lose the row every other row is read against and would silently gain a second
+    copy of `v2b-fusion`.
+    """
+    baseline = load_config("v2-hibrido")
+
+    assert baseline.fusion == "flat", "the baseline must pin the fusion it was measured under"
+    assert baseline.weight_typed == 0.5
+    assert baseline.weight_expanded == 0.5
+    assert baseline.weight_vector == 0.33, "C21's vector weight, unchanged"
+    assert baseline.rrf_k == 60 and baseline.branch_depth == 60
+    # It reads no business signal, so it cannot be quietly reordered by one.
+    assert baseline.signal_pos_id is None
+    assert baseline.business_weight_availability is None
+    assert baseline.business_weight_rotation is None
+
+    # And the row that isolates the fusion differs from it in the composition alone.
+    fusion_row = load_config("v2b-fusion")
+    assert fusion_row.fusion == "branch"
+    assert fusion_row.pos_prefilter == baseline.pos_prefilter
+    assert fusion_row.branch_depth == baseline.branch_depth
+    assert fusion_row.rrf_k == baseline.rrf_k
+    assert fusion_row.signal_pos_id is None, "v2b isolates the fusion, with no signals"
+
+
+def test_the_signals_row_declares_its_reading_scope_and_its_weights() -> None:
+    """Declared in the file, not inferred: a row nobody can read is a row nobody can check."""
+    signals = load_config("v3-senales")
+
+    assert signals.signal_pos_id, "the reading scope must be declared"
+    assert signals.pos_prefilter is False, (
+        "reading must not restrict: otherwise the row measures the reordering and the recall "
+        "cost of the prefilter as one number"
+    )
+    assert signals.business_weight_availability is not None
+    assert signals.business_weight_rotation is not None
+    assert signals.business_weight_rotation < signals.business_weight_availability, (
+        "rotation is a tiebreak and must not be able to overturn availability"
+    )
+    # It is built on v2b, so the fusion must be the same one.
+    fusion_row = load_config("v2b-fusion")
+    assert signals.fusion == fusion_row.fusion
+    assert signals.branch_weight_lexical == fusion_row.branch_weight_lexical
+    assert signals.branch_weight_vector == fusion_row.branch_weight_vector
+    assert signals.coverage_rule == fusion_row.coverage_rule
+
+
+def test_an_unknown_knob_is_still_refused() -> None:
+    """The validation C24 built, unchanged: a misspelt knob would measure something else."""
+    from jbg_ai.evals.configs import EvalConfig
+    from jbg_ai.evals.errors import ConfigurationError
+
+    with pytest.raises(ConfigurationError, match="unknown keys"):
+        EvalConfig.from_mapping(
+            {
+                "id": "x",
+                "kind": "pipeline",
+                "label": "x",
+                "rationale": "x",
+                "uses_provider": False,
+                "signal_pos_ids": "typo",
+            },
+            where="test",
+        )

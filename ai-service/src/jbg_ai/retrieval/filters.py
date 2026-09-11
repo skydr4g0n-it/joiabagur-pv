@@ -174,21 +174,28 @@ def business_score(item: Constrained, weights: BusinessWeights) -> float:
     * **availability** costs its weight when the projection reports `qty_bucket` of zero.
       An ABSENT row costs nothing — no reading scope, or a product this point of sale does
       not carry — because absence is not evidence of zero stock.
-    * **rotation** pays its weight when the window records a sale. It is binary, not
-      proportional to the count, because the sentence that justifies it is about a tiebreak:
-      "between two pieces the retriever and the stock rank equally, show the one that sells".
-      No sentence justifies a piece that sold forty outranking one that sold four, and a
-      weight with no hypothesis behind it fits the noise of 48 queries.
+    * **rotation** costs its weight when a row that WAS read records no sale. It is binary,
+      not proportional to the count, because the sentence that justifies it is about a
+      tiebreak: "between two pieces the retriever and the stock rank equally, show the one
+      that sells". No sentence justifies a piece that sold forty outranking one that sold
+      four, and a weight with no hypothesis behind it fits the noise of 48 queries.
 
-    Rotation cannot overturn availability, and that is structural rather than hoped for: the
-    settings refuse a rotation weight that is not strictly below the availability one, so the
-    most rotation can ever add is less than what zero stock costs.
+    **Both terms only ever subtract, and that is the requirement rather than a preference.**
+    A bonus for having sold would rank a candidate whose row was never read BELOW one that
+    sold — which is precisely "treating absence as zero sales", the thing the projection
+    capability forbids. Measured, the bonus form cost 0,244 of pure relevance on a reading
+    scope covering 416 of 1.168 products, because it sorted the assortment above everything
+    outside it rather than sorting the exhausted below the available. Only bad news moves a
+    candidate, so an absent signal is neutral by construction and not by care.
+
+    Rotation cannot overturn availability, and that too is structural: the settings refuse a
+    rotation weight that is not strictly below the availability one.
     """
     score = 0.0
     if _out_of_stock(item):
         score -= weights.availability
-    if item.sales_30d is not None and item.sales_30d > 0:
-        score += weights.rotation
+    if item.sales_30d is not None and item.sales_30d <= 0:
+        score -= weights.rotation
     return score
 
 

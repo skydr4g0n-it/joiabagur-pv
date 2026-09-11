@@ -53,6 +53,17 @@ WHERE pos_id = :pos_id
   AND is_assigned_hint IS TRUE
 """
 
+# The availability of a whole assortment in one statement. Read by the EVALUATION and never
+# by the request path: the operational metric needs the bucket of every judged document, and
+# the response deliberately carries no quantity, so the harness reads the projection itself.
+# One round trip per run rather than one per query, over a table of 6.720 rows.
+SCOPE_BUCKETS_SQL = """
+SELECT product_id, qty_bucket
+FROM ai.pos_projection
+WHERE pos_id = :pos_id
+  AND is_assigned_hint IS TRUE
+"""
+
 # Freshness is *when we last looked*, and the checkpoint is the only column that records it.
 # `max(refreshed_at)` measures when an assignment last changed, and the feed is incremental —
 # a pair that never changes is never re-emitted — so it would report months of staleness on a
@@ -293,6 +304,17 @@ class SqlAlchemyProductSearch:
         except SQLAlchemyError as exc:
             raise RetrievalDependencyError(f"database query failed: {exc}") from exc
         return int(value or 0)
+
+    async def scope_buckets(self, pos_id: UUID) -> dict[str, str]:
+        """Product identifier to availability bucket, for one point of sale's assortment."""
+        try:
+            async with session_scope(self._settings) as session:
+                rows = (
+                    await session.execute(text(SCOPE_BUCKETS_SQL), {"pos_id": pos_id})
+                ).mappings().all()
+        except SQLAlchemyError as exc:
+            raise RetrievalDependencyError(f"database query failed: {exc}") from exc
+        return {str(row["product_id"]): str(row["qty_bucket"]) for row in rows}
 
     async def projection_synced_at(self) -> datetime | None:
         try:

@@ -47,18 +47,43 @@ def not_comparable(item: ConfigReport) -> bool:
 
 def _ablation_table(report: Report) -> list[str]:
     lines = [
-        "| configuración | nDCG@5 | nDCG@5 bin | Recall@5 | P@3 | MRR | no juzgado@5 | coste/consulta |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|",
+        "| configuración | nDCG@5 | nDCG@5 bin | nDCG@5 oper | Recall@5 | P@3 | MRR "
+        "| no juzgado@5 | coste/consulta |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for item in report.configs:
         values = item.readings["global"].values
         mark = " ⚠ **no comparable**" if not_comparable(item) else ""
+        # An em dash and not a zero: a configuration that reorders by no business signal has
+        # no operational reading, and printing 0,000 would rank it last on a metric it never
+        # competed in.
+        operational = (
+            _fmt(values["ndcg_at_5_operational"])
+            if "ndcg_at_5_operational" in values
+            else "—"
+        )
         lines.append(
             f"| `{item.config_id}`{mark} | {_fmt(values['ndcg_at_5'])} | "
-            f"{_fmt(values['ndcg_at_5_binary'])} | {_fmt(values['recall_at_5_capped'])} | "
+            f"{_fmt(values['ndcg_at_5_binary'])} | {operational} | "
+            f"{_fmt(values['recall_at_5_capped'])} | "
             f"{_fmt(values['precision_at_3'])} | {_fmt(values['mrr'])} | "
             f"{_fmt(values['unjudged_at_5'])} | ${item.cost_per_query_usd:.7f} |"
         )
+    if any("ndcg_at_5_operational" in item.readings["global"].values for item in report.configs):
+        lines += [
+            "",
+            "> **La lectura operativa** aplica `g_efectivo = grado` si `qty_bucket ≠ '0'` y "
+            "`máx(grado − 1, 0)` si es `'0'`, declarada el **2026-09-11 antes de calcular "
+            "ninguna métrica**. No inventa una constante: reutiliza la escala de "
+            "`criterion.md`, donde el grado 1 ya es *«sustituto plausible que el operador "
+            "ofrecería como segunda opción»* y una pieza que no se puede poner sobre el paño "
+            "es exactamente eso. Una fila con proyección **ausente conserva su grado**, porque "
+            "la ausencia no es evidencia de stock cero. `judgements.jsonl` no se modifica: es "
+            "una tercera lectura de la misma anotación, y la relevancia pura es su "
+            "**guardarraíl** — una configuración que mejore la operativa y degrade la pura "
+            "más de 0,05 no se adopta. Un guion significa que esa fila no reordena por "
+            "ninguna señal de negocio, no que puntúe cero.",
+        ]
     flagged = [item.config_id for item in report.configs if not_comparable(item)]
     if flagged:
         lines += [

@@ -95,6 +95,15 @@ class ProductSearchPort(Protocol):
         """When the POS drain last ran, from the checkpoint — never from `refreshed_at`."""
         ...
 
+    async def scope_buckets(self, pos_id: UUID) -> dict[str, str]:
+        """Availability bucket per product for one assortment. Read by the evaluation only.
+
+        The operational metric needs the bucket of every JUDGED document, not only of the
+        ones a configuration retrieved, and the response carries no quantity by design — so
+        the harness reads the projection rather than inferring it from what came back.
+        """
+        ...
+
     async def search(
         self,
         query_vec: list[float],

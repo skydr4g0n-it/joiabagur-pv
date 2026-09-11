@@ -42,13 +42,28 @@ KIND_CONTEXT_ONLY = "context-only"
 KINDS = (KIND_NAME_SUBSTRING, KIND_FULL_TEXT, KIND_PIPELINE, KIND_CONTEXT_ONLY)
 
 #: The order the ablation table is read in, from what existed before to what ships today.
-ABLATION_ORDER = ("v0-nombre", "v0-fts", "v0-cag", "v1-vectorial", "v2-hibrido")
+ABLATION_ORDER = (
+    "v0-nombre",
+    "v0-fts",
+    "v0-cag",
+    "v1-vectorial",
+    "v2-hibrido",
+    "v2b-fusion",
+    "v3-senales",
+)
 
 #: Configurations that produce a ranked list over the index, and therefore contribute to the
 #: judgement pool. `v0-cag` does not: it answers in prose over a context window, so there is no
 #: list of its own to pool, and pooling from it would put documents in the set that no
 #: retriever ever ranked.
-POOLED = ("v0-nombre", "v0-fts", "v1-vectorial", "v2-hibrido")
+POOLED = (
+    "v0-nombre",
+    "v0-fts",
+    "v1-vectorial",
+    "v2-hibrido",
+    "v2b-fusion",
+    "v3-senales",
+)
 
 
 @dataclass(frozen=True)
@@ -74,6 +89,18 @@ class EvalConfig:
     fusion: str | None = None
     branch_weight_lexical: float | None = None
     branch_weight_vector: float | None = None
+    #: C25 coverage rule. The continuous form is the adopted one and carries no parameter;
+    #: the binary form is the sweep's second candidate row and its `alpha` lives here rather
+    #: than in `Settings`, because the live system has no knob governing the scaling strength.
+    coverage_rule: str | None = None
+    coverage_alpha: float | None = None
+    #: C25 reading scope: the point of sale whose availability and rotation are READ, without
+    #: restricting the candidate set. Distinct from `pos_prefilter`, which restricts it. The
+    #: two are separate keys because they answer separate questions, and a single flag doing
+    #: both is exactly why the demotion C22 shipped never fired in the published run.
+    signal_pos_id: str | None = None
+    business_weight_availability: float | None = None
+    business_weight_rotation: float | None = None
     branch_depth: int | None = None
     pos_prefilter: bool = False
     max_results: int = 60

@@ -187,6 +187,15 @@ async def run_config(
 ) -> ConfigReport:
     """Evaluate one configuration over the whole judged set."""
     queries = list(golden.judged_queries)
+    # The operational reading needs the bucket of every JUDGED document, not only of the ones
+    # this configuration retrieved, because the ideal ordering is built from the same gain
+    # function. One statement per run, and `None` for a configuration that reads no signal —
+    # which is what makes the third reading absent rather than equal to the graded one.
+    buckets = (
+        await search.scope_buckets(UUID(config.signal_pos_id))
+        if config.signal_pos_id
+        else None
+    )
     ranked: dict[str, tuple[str, ...]] = {}
     abstained: dict[str, bool] = {}
     cold: list[Sample] = []
@@ -217,6 +226,7 @@ async def run_config(
             query.id,
             [UUID(value) for value in ranked[query.id]],
             abstained=abstained[query.id],
+            buckets=buckets,
         )
         for query in queries
     ]

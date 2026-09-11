@@ -61,13 +61,13 @@
 
 ## 7. Métrica operativa y configuraciones
 
-- [ ] 7.1 `evals/metrics.py` — `nDCG@5 operativo` con la ganancia efectiva de D3, publicado junto a la graduada y la binaria
-- [ ] 7.2 Test `test_operational_gain_is_a_declared_function_of_grade_and_availability`
-- [ ] 7.3 Test `test_operational_metric_does_not_modify_the_judgements`
-- [ ] 7.4 `evals/configs.py` — perillas `fusion`, `signal_pos_id` y los pesos de negocio; validación de claves desconocidas conservada
-- [ ] 7.5 `evals/configs/v2b-fusion.yaml` — la fusión por rama con adaptativa, **sin** señales de negocio, con su comentario de propósito
-- [ ] 7.6 `evals/configs/v3-senales.yaml` — `v2b` más disponibilidad y rotación, con el punto de venta de referencia declarado
-- [ ] 7.7 Test `test_baseline_row_is_still_selectable_and_reproducible`
+- [x] 7.1 `evals/metrics.py` — `nDCG@5 operativo` con la ganancia efectiva de D3, publicado junto a la graduada y la binaria
+- [x] 7.2 Test `test_operational_gain_is_a_declared_function_of_grade_and_availability`
+- [x] 7.3 Test `test_operational_metric_does_not_modify_the_judgements`
+- [x] 7.4 `evals/configs.py` — perillas `fusion`, `signal_pos_id` y los pesos de negocio; validación de claves desconocidas conservada
+- [x] 7.5 `evals/configs/v2b-fusion.yaml` — la fusión por rama con adaptativa, **sin** señales de negocio, con su comentario de propósito
+- [x] 7.6 `evals/configs/v3-senales.yaml` — `v2b` más disponibilidad y rotación, con el punto de venta de referencia declarado
+- [x] 7.7 Test `test_baseline_row_is_still_selectable_and_reproducible`
 
 ## 8. Barrido en dos fases
 

@@ -35,7 +35,7 @@ from jbg_ai.evals.errors import EvaluationUnavailable
 from jbg_ai.evals.latency import PROVIDER_STAGE, Sample, StageCollector
 from jbg_ai.indexing.constants import DEFAULT_EMBEDDING_MODEL
 from jbg_ai.indexing.embeddings import EmbeddingClient
-from jbg_ai.retrieval.orchestrator import retrieve_products
+from jbg_ai.retrieval.orchestrator import COVERAGE_CONTINUOUS, retrieve_products
 from jbg_ai.retrieval.ports import ProductSearchPort
 from jbg_ai.retrieval.search import SqlAlchemyProductSearch
 
@@ -194,8 +194,13 @@ async def execute(
                 fusion=config.fusion,
                 branch_weight_lexical=config.branch_weight_lexical,
                 branch_weight_vector=config.branch_weight_vector,
+                coverage_rule=config.coverage_rule or COVERAGE_CONTINUOUS,
+                coverage_alpha=config.coverage_alpha,
                 branch_depth=config.branch_depth,
                 pos_prefilter=config.pos_prefilter,
+                signal_pos_id=UUID(config.signal_pos_id) if config.signal_pos_id else None,
+                business_weight_availability=config.business_weight_availability,
+                business_weight_rotation=config.business_weight_rotation,
             )
             hits = tuple(
                 RankedHit(UUID(item.product_id), item.sku, item.score)
