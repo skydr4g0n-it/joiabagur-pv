@@ -86,6 +86,26 @@ g_efectivo(doc) =  grado                si qty_bucket ≠ '0'
 Objetivo: `nDCG@5 operativo`. **Guardarraíl:** `nDCG@5` de relevancia pura no cae más de 0,05.
 Las dos se publican, y `judgements.jsonl` no se modifica.
 
+> **Pre-registro, escrito el 2026-09-11 antes de calcular ninguna métrica** (tarea 1.5). La
+> función de ganancia operativa queda fijada arriba y **no se retoca después de ver un
+> resultado**: `g_efectivo = grado` cuando `qty_bucket ≠ '0'`, y `máx(grado − 1, 0)` cuando
+> `qty_bucket = '0'`. Un candidato **sin fila de proyección** —porque la consulta corrió sin
+> alcance de lectura, o porque ese punto de venta no lo lleva— **conserva su grado**: la ausencia
+> de señal no es evidencia de stock cero, y tratarla como `'0'` convertiría la cobertura de
+> surtido en una penalización de relevancia.
+>
+> **Justificación desde la escala de `criterion.md`, no desde una constante nueva.** La rúbrica
+> define el grado 1 como *«sustituto plausible que el operador ofrecería como segunda opción»*, y
+> una pieza que no se puede poner sobre el paño es exactamente eso: bajar un peldaño por
+> agotamiento **aplica** la rúbrica en lugar de torcerla. El grado 0 no puede bajar más, de ahí
+> el `máx(·, 0)`. Por eso la transformación no introduce ningún número mágico —no hay
+> multiplicador, no hay `+0,3 si hay stock`— y `criterion.md`, `judgements.jsonl` y
+> `golden_set_version` quedan **intactos**.
+>
+> **Guardarraíl y su umbral, fijados aquí:** una configuración que mejore el operativo y degrade
+> la relevancia pura más de **0,05** —en agregado o en cualquier categoría medida— **no se
+> adopta**, y el informe registra la diferencia medida y la decisión de no actuar.
+
 *Razón:* `criterion.md` no menciona stock ni rotación, así que un barrido que maximice nDCG@5
 converge a **peso 0** en todas las señales — la instrucción de la ficha, tomada al pie de la
 letra, es una máquina para demostrar que la funcionalidad no debe existir. Y la transformación
@@ -281,6 +301,27 @@ exactamente esa cantidad: 0,5062 contra 0,5145, ocho milésimas.
 **Se adopta la opción por defecto de la pregunta abierta 1: la forma la dicta la medición M1**, y
 el diseño fija las dos ramas y el criterio de elección **antes** de mirarla:
 
+> **Pre-registro, escrito el 2026-09-11 antes de mirar la distribución de M1** (tarea 1.4). El
+> criterio que elige la forma de la regla es **la separabilidad de las dos poblaciones por un
+> solo valor**, evaluada así y no de otra manera:
+>
+> Sea `A` el conjunto de los `min(distancia)` de las **43 contestables** y `F` el de las **5 de
+> fuera de dominio**. Se adopta la forma **escalar (fase A)** si y sólo si
+> **`máx(A) < mín(F)`** — es decir, si existe un valor que las separa **sin cortar ni una sola
+> contestable**. En cualquier otro caso se adopta la **regla relativa por consulta (fase D)**.
+>
+> **El empate se resuelve hacia la relativa**: `máx(A) = mín(F)` **no** separa, porque el umbral
+> tendría que caer exactamente sobre una contestable. Y un solape de una sola consulta ya manda
+> a la fase D: la asimetría es deliberada y su razón está en D12 —asignar mal la fase es un
+> **fallo silencioso**, y el error de mandar a la fase D algo que cabía en la A sólo cuesta
+> trabajo, mientras que el inverso invalida todas las ventanas capturadas sin avisar.
+>
+> **Ninguna otra cantidad decide la forma.** Ni el tamaño del hueco, ni la distribución por
+> documento de C24, ni el resultado de ninguna configuración: si la regla se eligiera por lo
+> bien que sale, sería un ajuste *post hoc* con otro nombre. El margen de C23 —ocho milésimas—
+> se cita como precedente de que la forma escalar **puede** salir limpia, nunca como umbral
+> mínimo de hueco exigido.
+
 | Resultado de M1 | Forma adoptada | Fase |
 |---|---|---|
 | Existe un valor que separa las contestables de las de fuera de dominio | **Escalar** sobre `min(distancia)`, como C23 | **A** — está en el `WHERE`, **mueve la ventana** |
@@ -314,10 +355,35 @@ estructural**. **El orden es una restricción, no una preferencia.**
 
 ### D14 · La regla de decisión se reformula, con argumento y fecha, antes de re-medir
 
-> **Escrito el 2026-09-11, antes de ejecutar ningún barrido.** La lectura que decide es **`new`**
-> (40 consultas, nunca vistas por ninguna calibración). `tuning` se reporta como **diagnóstico de
-> contaminación** y no veta. El margen sigue en 0,05 y ninguna categoría medida puede caer más.
-> La partición de ajuste **crece** en la sesión de etiquetado.
+> **Escrito el 2026-09-11, antes de ejecutar ningún barrido** (tarea 1.3). La lectura que decide
+> es **`new`** (40 consultas, nunca vistas por ninguna calibración). `tuning` se reporta como
+> **diagnóstico de contaminación** y no veta. El margen sigue en 0,05 y ninguna categoría medida
+> puede caer más.
+>
+> **Procedimiento, fijado aquí y aplicado sin excepciones.** Un candidato desplaza al titular si
+> y sólo si cumple las dos condiciones:
+>
+> 1. **Mejora material en la lectura que decide.** `nDCG@5(candidato, new) − nDCG@5(titular, new)
+>    > 0,05`. Estrictamente mayor: un empate en el margen no mueve un default.
+> 2. **Ninguna categoría paga más que el margen.** Para **toda** categoría medida con `n ≥ 1` en
+>    la lectura `new`, `ΔnDCG@5 ≥ −0,05`. Una sola categoría por debajo de **−0,05** veta la
+>    adopción, y el informe **nombra la categoría que pagó**.
+>
+> `tuning` (8 consultas) se publica siempre junto a las otras dos lecturas, con su **recuento de
+> saturación** —cuántas están en el techo de la métrica que decide—, y **no entra en ninguna de
+> las dos condiciones**. Cuando `tuning` discrepa de `new`, el informe lo declara como
+> desacuerdo y lo nombra contaminación, en lugar de resolverlo a favor de `tuning`.
+>
+> **Lo que esta regla no puede hacer.** No se re-pondera, no se exime ninguna categoría *ad hoc*,
+> y **no se retoca después de ver un resultado**. Si el barrido produce un ganador que esta regla
+> veta, el veto se publica con sus cifras y el default **no se mueve**.
+>
+> **Corrección del 2026-09-11, antes de medir:** una redacción anterior de este bloque añadía que
+> «la partición de ajuste **crece** en la sesión de etiquetado». **Se retira**, por la misma razón
+> que cierra la pregunta abierta 3: `in_tuning_set` registra un **hecho histórico** —qué consultas
+> calibraron qué— y no una elección, así que no se «hace crecer» sin falsear el conjunto. Lo que
+> sí ocurre, y está en la tarea 12.2, es lo simétrico: el barrido de este change corre sobre las
+> 48, de modo que al fijar `ρ` las 40 hoy limpias dejan de serlo **aguas abajo**.
 
 *Razón, y es la que la separa de un ajuste posterior.* Dos propiedades de la partición, ambas
 visibles **sin mirar el resultado del barrido**: **6 de 8** consultas están en el techo del

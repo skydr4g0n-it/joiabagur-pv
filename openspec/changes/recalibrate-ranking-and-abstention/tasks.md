@@ -1,10 +1,10 @@
 ## 1. Entorno y regla escrita antes de medir
 
-- [ ] 1.1 Verificar el entorno y **parar si falla**: base en el 5433 con los 1.168 documentos vivos, `ai.pos_projection` con los 11 puntos de venta drenados, clave de *embeddings* operativa y `SSL_CERT_FILE` configurado
-- [ ] 1.2 Confirmar que `HT-ARTRUTX` sigue con surtido cero y excluirlo de la lista de puntos de venta de validación
-- [ ] 1.3 Registrar en `design.md` la **regla de decisión reformulada** (D14) con su fecha, antes de ejecutar cualquier barrido: lectura que decide `new`, `tuning` como diagnóstico, margen 0,05, ninguna categoría por debajo de −0,05
-- [ ] 1.4 Registrar el **criterio de selección de la forma de la regla de abstención** (D11) con su fecha, antes de mirar la distribución de M1
-- [ ] 1.5 Registrar la **función de ganancia operativa** (D3) y su justificación desde la escala de `criterion.md`, antes de calcular ninguna métrica
+- [x] 1.1 Verificar el entorno y **parar si falla**: base en el 5433 con los 1.168 documentos vivos, `ai.pos_projection` con los 11 puntos de venta drenados, clave de *embeddings* operativa y `SSL_CERT_FILE` configurado
+- [x] 1.2 Confirmar que `HT-ARTRUTX` sigue con surtido cero y excluirlo de la lista de puntos de venta de validación
+- [x] 1.3 Registrar en `design.md` la **regla de decisión reformulada** (D14) con su fecha, antes de ejecutar cualquier barrido: lectura que decide `new`, `tuning` como diagnóstico, margen 0,05, ninguna categoría por debajo de −0,05
+- [x] 1.4 Registrar el **criterio de selección de la forma de la regla de abstención** (D11) con su fecha, antes de mirar la distribución de M1
+- [x] 1.5 Registrar la **función de ganancia operativa** (D3) y su justificación desde la escala de `criterion.md`, antes de calcular ninguna métrica
 
 ## 2. Fase 0 — las cuatro mediciones, sin tocar código de ranking
 
