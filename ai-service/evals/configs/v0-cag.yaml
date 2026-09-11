@@ -1,0 +1,31 @@
+# The catalogue in the context window, with no retrieval at all.
+#
+# Not a quality row: the MEASURED PROOF OF WHY RETRIEVAL EXISTS. CAG has zero lines in this
+# system and the project has to describe the progression from a context-only prototype to a
+# retrieval system, so without this row that section of the README would explain what CAG is in
+# general instead of what it costs here.
+#
+# It produces three things and nothing more: the token size and cost of the compacted
+# catalogue, recall over the twelve unanchored queries — where having the whole catalogue in
+# front of it is as favourable to CAG as this corpus gets — and the scale curve up to the point
+# where the catalogue no longer fits.
+#
+# NO PRICE goes into the context. `RetrievalResult` does not emit price and the boundary rule is
+# that .NET owns it; putting it in a prompt would open, ahead of time, exactly the surface the
+# anti-hallucination validator of a later change exists to close. If a query needs a price to be
+# answered, CAG fails it and that is a result rather than a defect.
+#
+# It calls a language model, so it is not reproducible bit for bit even at temperature zero. It
+# is a dated measurement with its model recorded, not a row that re-runs on every evaluation.
+id: v0-cag
+kind: context-only
+label: "Catálogo completo en contexto, sin recuperación"
+rationale: >-
+  Mide tokens, coste y curva de escala del catálogo compactado, más Recall@5 sobre las doce
+  consultas sin anclaje léxico. Contexto `sku · nombre · tipo · materiales`, una línea por
+  producto y sin precio.
+uses_provider: true
+context_budget_tokens: 100000
+context_model: openai/gpt-4o-mini
+subset_category: descripcion-sin-anclaje
+max_results: 5

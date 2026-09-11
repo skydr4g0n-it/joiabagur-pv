@@ -95,8 +95,14 @@ WHERE d.embedding IS NOT NULL
   AND d.embedding <=> CAST(:q AS vector) <= :threshold
 """
 
+# `d.product_id` last is a TIEBREAK, never a ranking signal: it only decides between rows the
+# preceding key has already declared equal. Without it the ordering is not a total order and
+# `LIMIT` cuts inside a tie, so which rows survive is whatever the plan happened to produce —
+# undefined in PostgreSQL, and enough to make two identical runs disagree. That is fatal to an
+# evaluation harness, whose whole job is to attribute a moved metric to a change rather than to
+# chance, and it is why C24 touches the live path at all.
 _SEARCH_ORDER_LIMIT = """
-ORDER BY d.embedding <=> CAST(:q AS vector) ASC
+ORDER BY d.embedding <=> CAST(:q AS vector) ASC, d.product_id ASC
 LIMIT :depth
 """
 
@@ -120,8 +126,13 @@ WHERE d.is_active IS TRUE
   AND d.tsv @@ {match}
 """
 
+# Same tiebreak, and the branch that needs it most: `coordination` takes a handful of values by
+# construction and `ts_rank` repeats across documents matching the same fields, so ties here are
+# the norm rather than the exception. The fusion consumes rank POSITIONS, so an undefined order
+# inside a tie does not stay local — it propagates into the fused list and from there into every
+# metric taken over it.
 _LEXICAL_ORDER_LIMIT = """
-ORDER BY coordination DESC, ts_rank DESC
+ORDER BY coordination DESC, ts_rank DESC, d.product_id ASC
 LIMIT :depth
 """
 

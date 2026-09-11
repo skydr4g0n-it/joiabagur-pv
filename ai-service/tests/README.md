@@ -31,7 +31,7 @@ tests/
 └── evals/            # harness, metrics, baselines, scenario replays
 ```
 
-Folders are created **on demand**, not up front. `api/`, `config/`, `support/`, `db/`, `migrations/`, `data/`, `enrichment/`, `families/`, `indexing/`, `retrieval/` and `knowledge/` are populated; the rest are reserved names so nobody invents a
+Folders are created **on demand**, not up front. `api/`, `config/`, `support/`, `db/`, `migrations/`, `data/`, `enrichment/`, `families/`, `indexing/`, `retrieval/`, `knowledge/` and `evals/` are populated; the rest are reserved names so nobody invents a
 parallel taxonomy later.
 
 ## Which folder for which change
@@ -41,15 +41,15 @@ parallel taxonomy later.
 | `api/` | C01 (health), C02 (contracts, service auth, stubs, snapshot), C08 (enrichment provenance, catalog-scoped auth), C13 (landed: `/v1/index/*` real), C14 (landed: `/v1/retrieval/products` real), C17 (landed: enriched `/health` — database, index, provider credential, model contrast), C18b (landed: `POST /v1/families/audit` — tenth route, service token, judged pairs travelling in the request) |
 | `config/` | C01, C02 (settings, canonical OpenAPI profile), C13 (feed settings) |
 | `db/` | C05 (engine, bounded pool, boot without a database) |
-| `migrations/` | C05, C13 (landed: `text_provenance`, `sync_checkpoint`), C18b (landed: Alembic logging isolation — `fileConfig` must not disable the service loggers, which is destructive in-process and invisible under the CLI), C22 (landed: `pos_projection.computed_as_of` — one additive nullable column, and a test that the revision touches nothing else) |
+| `migrations/` | C05, C13 (landed: `text_provenance`, `sync_checkpoint`), C18b (landed: Alembic logging isolation — `fileConfig` must not disable the service loggers, which is destructive in-process and invisible under the CLI), C22 (landed: `pos_projection.computed_as_of` — one additive nullable column, and a test that the revision touches nothing else), C24 (landed: `ai.eval_run` / `ai.eval_case` / `ai.eval_result` — the provenance tuple a run is compared by, the CHECK that keeps a result unjudged exactly when it carries no grade, and a downgrade that leaves no trace) |
 | `data/` | C06b (landed: generate/ingest CLI), C10 (landed: `world/`) |
 | `enrichment/` | C09, FIX1 (landed: the four widened `piece_type` canonicals and their folding, the prompt whose heading must match `PROMPT_VERSION`, the prompt list pinned against the YAML, and the null that is an outcome and not a rejected extraction) |
 | `families/` | C18a (landed: root grouping, material fusion, guards, relative veto, `POST /v1/families/suggest`), C18b (landed: audit over persisted families, orphan nomination by relative margin, source guards that the audit writes nothing and calls no provider) |
 | `indexing/` | C11 (landed: source-text/v1 + embeddings), C13 (landed: catalog drain + `sku_provenance.json`), C22 (landed: typed POS feed items, the `ai.pos_projection` repository whose tombstone is a soft delete, and the POS drain with its own `pos-availability` checkpoint and per-page failures), C23 (landed: the `sync-knowledge` subcommand only — everything it drives is tested in `knowledge/`) |
-| `retrieval/` | C14, C20 (landed: two-layer synonym dictionary, equivalence-group expansion, directional bridges, the enable flag swept in-process, and the measurement CLI's safe `tsquery` composition), C21 (landed: safe `tsquery` composition with coordination ordering, weighted RRF over three ranked lists, structural filters that demote and never exclude, and the bounded cache of the embedding singleton), C22 (landed: the point-of-sale scope as the only hard filter, availability as the last demotion block, freshness read from the checkpoint and never from the rows, and the 503-on-empty / degrade-on-stale pair), FIX1 (landed: the four closed gaps gone from the exclusions, the guard test re-aimed at `filigrana`, and the plural canonical reached from its singular), C25, C26, C27 |
+| `retrieval/` | C14, C20 (landed: two-layer synonym dictionary, equivalence-group expansion, directional bridges, the enable flag swept in-process, and the measurement CLI's safe `tsquery` composition), C21 (landed: safe `tsquery` composition with coordination ordering, weighted RRF over three ranked lists, structural filters that demote and never exclude, and the bounded cache of the embedding singleton), C22 (landed: the point-of-sale scope as the only hard filter, availability as the last demotion block, freshness read from the checkpoint and never from the rows, and the 503-on-empty / degrade-on-stale pair), FIX1 (landed: the four closed gaps gone from the exclusions, the guard test re-aimed at `filigrana`, and the plural canonical reached from its singular), C24 (landed: the deterministic tiebreak both statements needed — the compiled `ORDER BY` asserted key by key so removing it from the SQL breaks the test, and truncation proved stable where distance ties and where `coordination` and `ts_rank` tie together), C25, C26, C27 |
 | `knowledge/` | C23 (landed: the seven authoring rules and the coverage invariant derived from the enrichment vocabulary, pure section chunking, deterministic `uuid5` identity whose citations resolve to a file and a heading of `data/knowledge/`, idempotent indexing that re-embeds nothing unchanged, the callable search with its own abstention threshold, the D16 ring-size table, and the offline fixture measurement) |
 | `assist/` | C30, C31, C32, C33, C35 |
-| `evals/` | C24, C38 |
+| `evals/` | C24 (landed: the golden set validation that **fails the load** when the composition stops being able to arbitrate what the set exists for, adaptive-depth pooling with appendable judgements, nDCG against a hand-computed fixture with the binary reading beside it, the two `v0` baselines and the guard that breaks when the canonical renderer drifts, deterministic truncation of the context-only catalogue with the omitted count recorded, provenance-gated comparability over frozen query vectors, and the default-change rule exercised in all four of its outcomes), C38 |
 
 Changes with no Python zone (C03, C04, C07, C08, C12, C15, C16, C19, C28, C29,
 C34, C36, C37) are tested on the .NET or frontend side. C17 also ships a post-deploy smoke
@@ -116,7 +116,7 @@ uv run --system-certs pytest
 
 ## Current state
 
-Populated after C23: `api/`, `config/`, `db/`, `migrations/` (C05 + C13 + C18b + C22), `data/` (C06b/C10), `enrichment/` (C09 + FIX1), `indexing/` (C11 + C13 + C22), `families/` (C18a + C18b), `retrieval/` (C14 + C20 + C21 + C22 + FIX1), `knowledge/` (C23) and `support/`. Remaining folders are reserved names. Two settings in
+Populated after C24: `api/`, `config/`, `db/`, `migrations/` (C05 + C13 + C18b + C22 + C24), `data/` (C06b/C10), `enrichment/` (C09 + FIX1), `indexing/` (C11 + C13 + C22), `families/` (C18a + C18b), `retrieval/` (C14 + C20 + C21 + C22 + FIX1 + C24), `knowledge/` (C23), `evals/` (C24) and `support/`. Remaining folders are reserved names. Two settings in
 `pyproject.toml` hold the layout together:
 
 - `pythonpath = ["src", "tests"]` — makes `support/` importable from any subfolder.

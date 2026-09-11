@@ -606,7 +606,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 | **FIX1** | `fix-enrichment-vocabulary-gaps` | Python + FE | C21 | 🟢 | **archivado el 5 sep** · *dos puntos de la ficha refutados con medición: la población era de 22 y no de 11, y su criterio de extremo a extremo ya se cumplía antes* · *fuera de la numeración C* |
 | **C22** | `add-pos-projection-soft-prefilter` | Python + .NET | C10, C12, C14 | 🟢 | **archivado el 5 sep** · *tres puntos de la ficha refutados con medición; entra además el reloj inyectado (FIX2)* |
 | **C23** | `add-knowledge-corpus-and-indexer` | Python | C11 | 🟢 | **archivado el 6 sep** · *zona, alcance y conflicto de zona de la ficha refutados por la implementación* |
-| **C24** | `add-eval-harness-golden-set-and-baselines` | Python | C14, C21 | 🔴 | rev. dec. 12 · **etiquetado simple desde el 31 ago** |
+| **C24** | `add-eval-harness-golden-set-and-baselines` | Python | C14, C21 | ✅ | **archivado el 2026-09-11** · dec. 12 respondida: la vectorial bate a la léxica · etiquetado simple |
 | **C25** | `add-business-signals-ranking` | Python | C21, C22, C24 | 🔴 | — |
 | **C26** | `add-substitutes-retrieval` | Python | C22, C25 | 🟢 | specs v2 §6.3.2 |
 | **C27** | `add-complementary-recommendations` | Python + .NET 🗄️ | C10, C25 | 🟢 | **rev. dec. 8** · **corte nº 1 pre-autorizado** |
@@ -627,7 +627,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 
 **⛔ Anulados el 2026-08-31 (5):** C19, C29, C33, C35 y C37 — la rama del agente de inventario. Motivo y consecuencias en el §0. Las fichas se conservan como registro y llevan el sello en el sitio.
 
-**Vivos: 37** (36 numerados más `FIX1`). Archivados **25** (C01–C18b, C20, C21, C22, C23 y `FIX1`). Pendientes **12**: C24, C25, C26, C27, C28, C30, C31, C32, C34, C36, C38 y C39 — de los cuales C27 lleva corte pre-autorizado. **C23 se archivó el 2026-09-06** y su corte pre-autorizado —bajar a 15 documentos— se refutó por su propia unidad de medida: el diseño fija el tamaño en fragmentos y quince documentos dan la mitad del mínimo, con lo que la abstención dejaba de poder demostrarse. **C21 se archivó el 2026-09-02**, y con él caen los prerrequisitos de C24 y C30, o sea las dos mitades del proyecto que estaban esperando a la fusión. **C22 y `FIX1` se archivaron el 2026-09-05**, con lo que la ventana que `FIX1` tenía que respetar —entrar antes de que C24 etiquete su línea base— queda cumplida.
+**Vivos: 37** (36 numerados más `FIX1`). Archivados **26** (C01–C18b, C20, C21, C22, C23, C24 y `FIX1`). Pendientes **11**: C25, C26, C27, C28, C30, C31, C32, C34, C36, C38 y C39 — de los cuales C27 lleva corte pre-autorizado. **C23 se archivó el 2026-09-06** y su corte pre-autorizado —bajar a 15 documentos— se refutó por su propia unidad de medida: el diseño fija el tamaño en fragmentos y quince documentos dan la mitad del mínimo, con lo que la abstención dejaba de poder demostrarse. **C21 se archivó el 2026-09-02**, y con él caen los prerrequisitos de C24 y C30, o sea las dos mitades del proyecto que estaban esperando a la fusión. **C22 y `FIX1` se archivaron el 2026-09-05**, con lo que la ventana que `FIX1` tenía que respetar —entrar antes de que C24 etiquete su línea base— queda cumplida.
 
 ---
 
@@ -1016,7 +1016,7 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ---
 
-#### C24 · `add-eval-harness-golden-set-and-baselines` 🔴
+#### C24 · `add-eval-harness-golden-set-and-baselines` ✅ *(archivado el 2026-09-11)*
 
 > **El doble etiquetado no existe** *(corregido el 31 ago)*. La ficha lo daba por hecho entre dos personas y el §6 lo declaraba irrenunciable; con un solo anotador, el sustituto no es fingirlo. Se etiqueta **una vez**, se conserva el *pooling* sobre la unión de configuraciones, se añade **relectura diferida** de las consultas etiquetadas con dudas, y el README declara la **ausencia de acuerdo entre anotadores** como limitación del golden set en lugar de reclamar una mitigación que no se aplicó.
 
@@ -1253,7 +1253,7 @@ flowchart LR
 | C28 | nada — pero lo pide el checklist §16 del diseño | hoja obligatoria |
 | C18b | nada — pero es la única evidencia posible del checklist §16 sobre familias | hoja, ya no gratis de recortar |
 
-**Cadena crítica que queda:** `C21 → C24 → C25 → C26 → C34 → C36` *(C20 archivado el 1 sep)*, con **`FIX1`** intercalado entre C21 y C24 sin estar en la cadena —no la alarga, pero su plazo duro es esa ventana—, con `C22` y `C23` entrando por los lados, y `C30 → C31 → C32 → C38 → C39` cerrando.
+**Cadena crítica que queda:** `C25 → C26 → C34 → C36` *(C20 archivado el 1 sep; **C24 el 11 sep**, y con él cae el eslabón que bloqueaba a C25 y a C38)*, con `C22` y `C23` ya entrados por los lados, y `C30 → C31 → C32 → C38 → C39` cerrando.
 
 ---
 
