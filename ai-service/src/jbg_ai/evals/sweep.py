@@ -646,7 +646,6 @@ async def capture(
             pos_prefilter=config.pos_prefilter,
             signal_pos_id=UUID(config.signal_pos_id) if config.signal_pos_id else None,
             business_weight_availability=0.0,
-            business_weight_rotation=0.0,
             on_fused_candidates=sink,
         )
         windows.append(

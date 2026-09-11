@@ -291,3 +291,68 @@ def test_the_business_grid_has_one_dimension_and_two_outcomes() -> None:
     assert rescore_window(window, BusinessWeights()) != orders.pop(), (
         "and zero must restore the captured order"
     )
+
+
+def test_the_capture_phase_runs_end_to_end_against_the_ports() -> None:
+    """Exercises `capture` itself, which nothing did until it broke in production.
+
+    It was calling `retrieve_products` with a keyword the orchestration no longer takes, and
+    no test noticed because every other test in this file builds its windows by hand. A phase
+    whose only exercise is running it against a real database is a phase that fails on the day
+    somebody needs it.
+    """
+    import asyncio
+    from uuid import UUID
+
+    from jbg_ai.evals.sweep import capture
+
+    from support.fake_embedding_client import FakeEmbeddingClient
+    from support.fake_product_search import FakeAssignment, FakeIndexedRow, FakeProductSearch
+    from support.settings import TOKEN_POS_ID, build_settings
+
+    pos = UUID(TOKEN_POS_ID)
+    product = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    search = FakeProductSearch(
+        [
+            FakeIndexedRow(
+                product_id=product,
+                sku="RING-1",
+                distance=0.2,
+                materials=["plata"],
+                piece_type="anillo",
+                doc_text="Tipo: anillo de plata. Materiales: plata.",
+            )
+        ],
+        assignments=[FakeAssignment(pos_id=pos, product_id=product, qty_bucket="0", sales_30d=3)],
+    )
+    config = replace(load_config("v3-senales"), signal_pos_id=str(pos))
+
+    result = asyncio.run(
+        capture(
+            config,
+            load_golden_set(),
+            settings=build_settings(),
+            search=search,
+            embed=FakeEmbeddingClient(),
+        )
+    )
+
+    assert result.version == CAPTURE_VERSION
+    assert len(result.windows) == 48, "one window per judged query"
+    assert result.fusion.signal_pos_id == str(pos)
+    assert result.buckets, "the assortment's buckets must be persisted for the operational metric"
+
+    # The signals really travelled, which is the whole point of persisting the window.
+    carried = [
+        item
+        for window in result.windows
+        for item in window.candidates
+        if item.qty_bucket is not None
+    ]
+    assert carried, "no candidate carried a signal"
+    assert carried[0].qty_bucket == "0"
+    assert carried[0].sales_30d == 3
+
+    # And the window is the FUSION's output: captured with the business weights pinned to zero,
+    # so a re-score applies the whole ordering key from scratch.
+    assert not any("business" in name for name in result.fusion.__dataclass_fields__)

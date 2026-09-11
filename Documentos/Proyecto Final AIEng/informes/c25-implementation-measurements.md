@@ -452,6 +452,84 @@ decide **encender o apagar**, y `1,0` es una **unidad declarada**.
 Publicarlo así importa: un «peso calibrado» que no calibra nada afirma una evidencia que nunca se
 produjo. La spec recoge ahora la obligación de declararlo.
 
+## Fases B y C · La señal de disponibilidad, medida (tareas 10.1 a 10.3)
+
+Captura bajo la fusión congelada de 9.4: **48 ventanas, 3.774 candidatos**, de los que 1.122
+llevan señal y **411 están agotados**. El re-puntuado de la rejilla corre en **2,4 segundos sin
+`DATABASE_URL` en el entorno**.
+
+### El barrido del único peso: dos resultados, no siete
+
+| w disponibilidad | `new` (pura) | **operativo (objetivo)** | global |
+|---:|---:|---:|---:|
+| 0,0 (apagada) | 0,608 | 0,629 | 0,663 |
+| 0,25 · 0,5 · 0,75 · 1,0 · 1,5 · 2,0 | 0,595 | **0,656** | 0,653 |
+
+Seis valores positivos, **cifras idénticas**. Es M6 confirmado sobre la captura real: la
+calibración decide **encender o apagar**, y `1,0` es unidad declarada.
+
+### La regla de adopción, condición a condición
+
+| condición (D3 y la spec de `business-signals-ranking`) | resultado | |
+|---|---:|---|
+| mejora la métrica **operativa** | **+0,027** | ✓ |
+| la relevancia pura no cae más de 0,05 | **−0,014** | ✓ |
+| ninguna categoría cae más de 0,05 | peor `piedra` **−0,039** | ✓ |
+
+| categoría | n | apagada | encendida | delta |
+|---|---:|---:|---:|---:|
+| `piedra` | 4 | 0,747 | 0,708 | **−0,039** |
+| `subjetiva` | 5 | 0,682 | 0,648 | −0,034 |
+| `descripcion-sin-anclaje` | 12 | 0,417 | 0,407 | −0,011 |
+| `sinonimos` | 6 | 0,969 | 0,965 | −0,004 |
+| `lexico-exacto` · `materiales` · `variante-talla` | 16 | — | — | **+0,000** |
+
+`piedra` pasa, pero **roza el veto**. Queda anotado: es la categoría a vigilar cuando el golden
+set crezca.
+
+### La validación en los tres puntos de venta (tarea 10.3)
+
+| punto de venta | % surtido a cero | **operativo** | relevancia pura (`new`) | peor categoría |
+|---|---:|---:|---:|---|
+| **MAO-AIR** (se decide aquí) | 34,4 % | **+0,027** | −0,014 | `piedra` −0,039 |
+| **FORNELLS** (valida) | 12,0 % | **+0,004** | +0,000 | ninguna |
+| **HT-GALDANA** (valida) | 11,7 % | **+0,013** | **+0,004** | ninguna |
+
+**El signo se mantiene en los tres y la magnitud escala con la densidad de la señal.** Tres
+lecturas independientes que coinciden en signo dicen más que una que supera un umbral, y es
+exactamente la disciplina que D4 prescribió: decidir en la rica, validar en las típicas. El coste
+de relevancia sólo aparece en el punto extremo, y aun allí dentro del margen.
+
+### Lo que la señal hace, en términos de mostrador
+
+| punto de venta | consultas cuyo top-5 enseñaba una pieza agotada | piezas agotadas en los top-5 | retiradas |
+|---|---:|---:|---:|
+| MAO-AIR | 13 de 48 | 22 → **2** | **91 %** |
+| FORNELLS | 5 de 48 | 7 → 2 | 71 % |
+| HT-GALDANA | 6 de 48 | 6 → **1** | 83 % |
+
+Y es **quirúrgica**: sólo cambian el top-5 las consultas afectadas —13 de 48 en MAO-AIR, 5 en las
+otras—. Las 35 restantes salen idénticas.
+
+### La tensión que esto abre con D2, y que no se resuelve sola
+
+D2 fija el criterio de aceptación relativo: *«`v2b` bate a `v2` y **`v3` bate a `v2b`**, en las
+lecturas que decide D14 y **por encima del margen de 0,05**»*.
+
+| | lectura | delta | ¿supera 0,05? |
+|---|---|---:|---|
+| `v2b` contra `v2` | `new` | **+0,073** | **sí** |
+| `v3` contra `v2b` | operativa | +0,027 | **no** |
+| `v3` contra `v2b` | pura (`new`) | −0,014 | no |
+
+**`v3` no cumple el criterio relativo de D2 en ninguna lectura.** Cumple su propia regla de
+adopción —mejora el objetivo, el guardarraíl aguanta, ninguna categoría veta— pero la mejora está
+por debajo del margen que este golden set puede resolver.
+
+No es una contradicción entre dos reglas: son dos preguntas distintas. La regla de adopción
+pregunta *¿es seguro encender esta señal?* y la respuesta es sí. D2 pregunta *¿ha demostrado esta
+fila que merece existir?* y la respuesta honesta es **no con este instrumento**.
+
 ## Qué queda decidido al cerrar la fase 0
 
 1. **La abstención es una regla relativa por consulta y vive en la fase D.** No mueve la ventana.

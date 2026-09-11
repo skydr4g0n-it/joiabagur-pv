@@ -90,9 +90,9 @@
 
 ## 10. Fase B y C — capturar y fijar las señales
 
-- [ ] 10.1 Ejecutar la fase `capture` con la fusión de 9.4 congelada
-- [ ] 10.2 Ejecutar la fase `rescore` sobre la rejilla del **único** peso de negocio, con el objetivo operativo y el guardarraíl de relevancia pura; publicar que el orden es **invariante al valor** del peso y que lo decidido es su signo
-- [ ] 10.3 Validar el peso ganador en **FORNELLS** y **HT-GALDANA**, además de decidirlo en **MAO-AIR**
+- [x] 10.1 Ejecutar la fase `capture` con la fusión de 9.4 congelada
+- [x] 10.2 Ejecutar la fase `rescore` sobre la rejilla del **único** peso de negocio, con el objetivo operativo y el guardarraíl de relevancia pura; publicar que el orden es **invariante al valor** del peso y que lo decidido es su signo
+- [x] 10.3 Validar el peso ganador en **FORNELLS** y **HT-GALDANA**, además de decidirlo en **MAO-AIR**
 - [ ] 10.4 **Congelar `v3-senales`** y registrar su configuración
 
 ## 11. Fase D — abstención
