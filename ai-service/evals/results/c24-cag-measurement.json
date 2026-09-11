@@ -22,6 +22,7 @@
       "fits": true
     }
   ],
+  "breaks_at_documents": 6643,
   "queries": 12,
   "cost_per_query_usd": 0.00267345,
   "price_verified": true,

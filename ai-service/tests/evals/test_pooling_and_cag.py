@@ -9,6 +9,7 @@ from jbg_ai.evals.cag import (
     LINE,
     SCALE_POINTS,
     answered_skus,
+    breaking_point,
     build_context,
     build_prompt,
     compact_line,
@@ -169,6 +170,30 @@ def test_the_scale_projection_says_where_the_catalogue_stops_fitting() -> None:
     assert [point["documents"] for point in projected] == list(SCALE_POINTS)
     assert projected[0]["tokens"] < projected[-1]["tokens"]
     assert projected[-1]["fits"] is False, "5.000 products at 10 tokens each exceed the budget"
+
+
+def test_the_wall_is_named_even_when_every_sampled_size_still_fits() -> None:
+    """The real catalogue's curve is three «sí» and no wall, which is how C24 shipped without it.
+
+    `SCALE_POINTS` are samples: a budget nothing in them exceeds hides the ceiling rather than
+    proving there is none. The requirement asks for the size at which the catalogue no longer
+    fits, so it is computed and not sampled.
+    """
+    context = build_context(_rows(100), budget_tokens=10_000, count_tokens=lambda _text: 10)
+
+    assert all(point["fits"] for point in scale_projection(context, budget_tokens=100_000))
+    assert breaking_point(context, budget_tokens=100_000) == 10_001
+
+
+def test_the_wall_agrees_with_the_curve_about_the_last_size_that_fits() -> None:
+    """The two must never disagree: the curve rounds, so the wall rounds the same way."""
+    context = build_context(_rows(100), budget_tokens=10_000, count_tokens=lambda _text: 10)
+    budget = 25_004
+
+    wall = breaking_point(context, budget_tokens=budget)
+
+    assert round(context.tokens / len(context.lines) * wall) > budget
+    assert round(context.tokens / len(context.lines) * (wall - 1)) <= budget
 
 
 def test_the_answer_is_read_back_as_the_codes_it_cited() -> None:

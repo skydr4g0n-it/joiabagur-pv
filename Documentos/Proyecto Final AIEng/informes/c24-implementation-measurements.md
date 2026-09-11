@@ -239,7 +239,7 @@ Curva de escala, lineal porque el contexto lo es —una línea por producto—:
 | 1.168 | 17.583 | sí |
 | 2.500 | 37.635 | sí |
 | 5.000 | 75.270 | sí, apurado |
-| ~6.600 | ~100.000 | **no** |
+| 6.643 | 100.003 | **no** |
 
 Y la comparación que da sentido a la columna de coste, sobre **el subconjunto que más favorece a
 CAG** —las doce consultas donde tener el catálogo entero delante debería ser una ventaja

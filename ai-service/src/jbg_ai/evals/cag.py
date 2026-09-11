@@ -107,6 +107,26 @@ def build_context(
     )
 
 
+def breaking_point(catalogue: CompactCatalogue, *, budget_tokens: int) -> int:
+    """The smallest catalogue size whose context no longer fits the budget.
+
+    The curve below is three SAMPLED points, and today all three fit: the wall is real and the
+    table cannot show it. Publishing the number is what keeps "up to the point where it no
+    longer fits" from being a division the reader is expected to do — and it is the one figure
+    that does not move when somebody widens `SCALE_POINTS`.
+
+    Same rounding rule as the curve, so the two can never disagree about whether a sampled size
+    fits: the search starts at the analytic crossing and steps until `round` agrees.
+    """
+    per_document = catalogue.tokens / max(len(catalogue.lines), 1)
+    if per_document <= 0:
+        return 0
+    size = max(int(budget_tokens / per_document), 0)
+    while round(per_document * size) <= budget_tokens:
+        size += 1
+    return size
+
+
 def scale_projection(catalogue: CompactCatalogue, *, budget_tokens: int) -> list[dict]:
     """Tokens against catalogue size, and where it stops fitting.
 
@@ -168,6 +188,7 @@ def as_json(catalogue: CompactCatalogue, *, budget_tokens: int) -> str:
             "tokens": catalogue.tokens,
             "budget_tokens": budget_tokens,
             "scale": scale_projection(catalogue, budget_tokens=budget_tokens),
+            "breaks_at_documents": breaking_point(catalogue, budget_tokens=budget_tokens),
         },
         ensure_ascii=False,
     )

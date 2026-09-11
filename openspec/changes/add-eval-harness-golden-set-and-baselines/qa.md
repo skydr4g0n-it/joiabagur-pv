@@ -102,6 +102,10 @@ No es una afirmación de proceso: son las marcas de tiempo del sistema de ficher
 
 **Treinta y un minutos** entre el criterio y el primer juicio. Es lo que exige el escenario *«The criterion exists before the first judgement»*, y es lo único de ese escenario que un test no puede comprobar: que el fichero exista sí se comprueba; que sea anterior, sólo el reloj lo sabe.
 
+**Y hay un desfase aparente que conviene dejar explicado aquí, porque leído sólo sobre el golden set parece lo contrario de lo que es.** Los 3.926 juicios llevan `judged_at: 2026-09-06` y el criterio se declara escrito el 2026-09-07, de modo que sobre el dato desnudo *todos* los juicios preceden al criterio. Lo que ocurre es que las dos fechas no miden lo mismo: `judged_at` registra **la sesión de etiquetado**, que es la del 6, y el criterio lleva **la hora del reloj** del fichero, 00:22:40 — la sesión entró en la madrugada del 7. Las marcas de arriba son la prueba y ordenan los dos hechos como deben ir.
+
+No se corrige el dato, y la razón es de procedencia y no de pereza. El digest que produce `golden_set_version` cubre `criterion.md`, `queries.jsonl` y `judgements.jsonl` ([`content_version`](../../../ai-service/src/jbg_ai/evals/golden.py)), así que tocar cualquiera de los dos ficheros mueve la versión a `1:908ffd55add0` — y el informe, que dice haber corrido contra `1:1474bfc3aa3a`, pasaría a afirmar una procedencia bajo la que nunca corrió. Eso es peor defecto que el desfase de un día en un campo que **ningún cálculo lee**: `judged_at` se parsea al cargar y se reescribe al añadir juicios, y ni una métrica ni una validación lo consultan. **La corrección sale gratis en C25**, que vuelve a correr el arnés contra este mismo conjunto: ese día el `sed` no cuesta procedencia, porque la corrida nueva ya se hace contra la versión corregida.
+
 ### 2.3. El etiquetado
 
 | | Valor |
@@ -391,7 +395,7 @@ Relevantes hasta **0,8008**, irrelevantes desde **0,3268**: **hueco de −0,4739
 
 ### 8.5. `v0-cag` (tareas 7.1-7.6)
 
-17.583 tokens, $0,00267 por consulta, 0 documentos omitidos, curva de escala que deja de caber hacia los ~6.600 productos. Recall@5 sobre las 12 consultas sin anclaje: **0,133**, contra **0,483** de la rama vectorial sola — y respondió literalmente `NINGUNO` en **10 de 12**. Cuatro órdenes de magnitud más caro para un tercio del acierto, en el terreno que más le favorece.
+17.583 tokens, $0,00267 por consulta, 0 documentos omitidos, curva de escala que deja de caber en 6.643 productos. Recall@5 sobre las 12 consultas sin anclaje: **0,133**, contra **0,483** de la rama vectorial sola — y respondió literalmente `NINGUNO` en **10 de 12**. Cuatro órdenes de magnitud más caro para un tercio del acierto, en el terreno que más le favorece.
 
 ### 8.6. El número que hace decidible el reranking (tarea 13.6)
 

@@ -338,7 +338,17 @@ def render_markdown(report: Report, *, title: str) -> str:
                 f"| {point['documents']} | {point['tokens']} | "
                 f"{'sí' if point['fits'] else '**no**'} |"
             )
-        lines.append("")
+        # The curve is three sampled sizes and they can all fit, so the wall has to be named
+        # rather than left implicit in a column of «sí». It is the figure the requirement asks
+        # for — «up to the point where it no longer fits» — and the one that makes the row an
+        # argument about scale instead of a snapshot of today's catalogue.
+        lines += [
+            "",
+            f"El contexto **deja de caber en {cag['breaks_at_documents']} productos** con el "
+            f"presupuesto de {cag['budget_tokens']} tokens. La recuperación no tiene ese techo: "
+            "su coste por consulta no se mueve con el tamaño del catálogo.",
+            "",
+        ]
 
     if report.notes:
         lines += ["## Notas", "", *(f"- {note}" for note in report.notes), ""]

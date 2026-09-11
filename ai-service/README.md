@@ -460,7 +460,8 @@ full-text baseline scores 0,035 and the vector branch 0,431.
 $0,00267 a query — four orders of magnitude more than embedding a query — and on the subset that
 most favours it, it recalls 0,133 against the vector branch's 0,483, answering literally
 `NINGUNO` on ten of twelve. Retrieval also has no catalogue ceiling: the same context stops
-fitting a 100.000-token budget at about 6.600 products.
+fitting a 100.000-token budget at **6.643 products** — a figure the harness computes and prints
+under the scale curve, rather than leaving it as a division for the reader.
 
 Latency is reported as **two figures**, always. `p95` of retrieval, which excludes the provider
 round trip, is **128,6 ms** against the 500 ms the design fixes; end to end with a cold provider

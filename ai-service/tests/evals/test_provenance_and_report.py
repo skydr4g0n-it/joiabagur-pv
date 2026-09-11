@@ -349,6 +349,30 @@ def test_the_report_publishes_both_readings_and_the_three_splits(tmp_path: Path)
     assert "no son comparables" in body
 
 
+def test_the_report_names_the_size_at_which_the_catalogue_stops_fitting(tmp_path: Path) -> None:
+    """The scale table can be three «sí» and still owe the reader the ceiling."""
+    report = replace(
+        _report(tmp_path),
+        cag={
+            "model": "openai/gpt-4o-mini",
+            "measured_at": "2026-09-06",
+            "documents_total": 1168,
+            "documents_omitted": 0,
+            "tokens": 17583,
+            "budget_tokens": 100000,
+            "scale": [{"documents": 5000, "tokens": 75270, "fits": True}],
+            "breaks_at_documents": 6643,
+            "queries": 12,
+            "cost_per_query_usd": 0.00267345,
+            "recall_at_5_capped": 0.133,
+        },
+    )
+
+    body = write(report, title="t", name="r.md", out_dir=tmp_path).read_text(encoding="utf-8")
+
+    assert "deja de caber en 6643 productos" in body
+
+
 def test_the_report_marks_the_abstention_figures_provisional(tmp_path: Path) -> None:
     body = write(_report(tmp_path), title="t", name="r.md", out_dir=tmp_path).read_text(
         encoding="utf-8"

@@ -19,7 +19,13 @@ from sqlalchemy import text
 
 from jbg_ai.data.paths import AI_SERVICE_ROOT
 from jbg_ai.db.engine import dispose_engine, session_scope
-from jbg_ai.evals.cag import build_context, build_prompt, answered_skus, scale_projection
+from jbg_ai.evals.cag import (
+    answered_skus,
+    breaking_point,
+    build_context,
+    build_prompt,
+    scale_projection,
+)
 from jbg_ai.evals.configs import load_config
 from jbg_ai.evals.errors import EvaluationUnavailable
 from jbg_ai.evals.execute import harness_settings
@@ -82,6 +88,7 @@ async def measure(args: argparse.Namespace) -> int:
         "tokens": catalogue.tokens,
         "budget_tokens": budget,
         "scale": scale_projection(catalogue, budget_tokens=budget),
+        "breaks_at_documents": breaking_point(catalogue, budget_tokens=budget),
         "queries": len(queries),
         "cost_per_query_usd": prices.cost(
             model, input_tokens=catalogue.tokens, output_tokens=60
