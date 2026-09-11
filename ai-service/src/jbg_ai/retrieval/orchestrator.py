@@ -170,6 +170,7 @@ async def retrieve_products(
     coverage_alpha: float | None = None,
     branch_depth: int | None = None,
     pos_prefilter: bool | None = None,
+    signal_pos_id: UUID | None = None,
     projection_max_age_seconds: int | None = None,
     freshness: ProjectionFreshness | None = None,
 ) -> RetrievalResponse:
@@ -293,6 +294,7 @@ async def retrieve_products(
         run_vector=run_vector,
         run_lexical=run_lexical,
         pos_id=scope.pos_id,
+        signal_pos_id=signal_pos_id,
     )
 
     vector_hits: list[SearchHit] = []
@@ -310,6 +312,7 @@ async def retrieve_products(
             depth=depth,
             mode=payload.mode,
             pos_id=scope.pos_id,
+            signal_pos_id=signal_pos_id,
         )
     elif embedded is not None and embedded.error is not None:
         if payload.mode is RetrievalMode.VECTOR or not (typed_hits or expanded_hits):
@@ -418,6 +421,7 @@ async def _race_provider_against_text(
     run_vector: bool,
     run_lexical: bool,
     pos_id: UUID | None,
+    signal_pos_id: UUID | None,
 ) -> tuple[_EmbedOutcome | None, list[LexicalHit], list[LexicalHit]]:
     """`gather(embed, lexical A then B)` — one pool connection held at any moment (D10)."""
 
@@ -451,10 +455,18 @@ async def _race_provider_against_text(
         # Sequential on purpose: two concurrent statements would hold two of the five pool
         # connections, and the pair costs single-digit milliseconds behind the provider.
         typed = await search.search_lexical(
-            typed_request(payload.query), depth=depth, filters=filters, pos_id=pos_id
+            typed_request(payload.query),
+            depth=depth,
+            filters=filters,
+            pos_id=pos_id,
+            signal_pos_id=signal_pos_id,
         )
         widened = await search.search_lexical(
-            expanded_request(expanded), depth=depth, filters=filters, pos_id=pos_id
+            expanded_request(expanded),
+            depth=depth,
+            filters=filters,
+            pos_id=pos_id,
+            signal_pos_id=signal_pos_id,
         )
         logger.info(
             "stage=lexical trace_id=%s latency_ms=%.1f typed=%s expanded=%s scoped=%s",
@@ -483,6 +495,7 @@ async def _vector_branch(
     depth: int,
     mode: RetrievalMode,
     pos_id: UUID | None,
+    signal_pos_id: UUID | None,
 ) -> list[SearchHit]:
     started = time.perf_counter()
     hits = await search.search(
@@ -493,6 +506,7 @@ async def _vector_branch(
         model_version_key=embed.model_version_key,
         model_id=embed.model_id,
         pos_id=pos_id,
+        signal_pos_id=signal_pos_id,
     )
     hits = sorted(hits, key=lambda item: item.distance)[:depth]
     # `vector_empty` and not `low_confidence`: this stage knows only whether **its own**

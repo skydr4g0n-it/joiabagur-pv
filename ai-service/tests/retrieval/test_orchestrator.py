@@ -308,7 +308,9 @@ def test_lexical_query_runs_concurrently_with_embedding() -> None:
             return await super().embed(texts)
 
     class _SignallingSearch(FakeProductSearch):
-        async def search_lexical(self, request, *, depth, filters, pos_id=None):
+        async def search_lexical(
+            self, request, *, depth, filters, pos_id=None, signal_pos_id=None
+        ):
             lexical_started.set()
             return await super().search_lexical(
                 request, depth=depth, filters=filters, pos_id=pos_id
@@ -669,7 +671,9 @@ def test_only_one_lexical_query_is_in_flight_at_a_time() -> None:
             self.in_flight = 0
             self.peak = 0
 
-        async def search_lexical(self, request, *, depth, filters, pos_id=None):
+        async def search_lexical(
+            self, request, *, depth, filters, pos_id=None, signal_pos_id=None
+        ):
             self.in_flight += 1
             self.peak = max(self.peak, self.in_flight)
             try:

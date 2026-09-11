@@ -37,6 +37,11 @@ class SearchHit:
     #: and a bucket on the wire would be the beginning of one. `None` means the query ran
     #: unscoped, which is not the same as a bucket of zero.
     qty_bucket: str | None = None
+    #: The drain's own 30-day figure, already counted against the `computed_as_of` recorded
+    #: on that projection row and never against the wall clock. `None` means the row was not
+    #: read at all — no reading scope, or this point of sale does not carry the product — and
+    #: absence is NOT zero sales: no ordering rule may treat it as one.
+    sales_30d: int | None = None
 
 
 @dataclass(frozen=True)
@@ -58,14 +63,26 @@ class LexicalHit:
     price: float | None = None
     size_label: str | None = None
     qty_bucket: str | None = None
+    #: The drain's own 30-day figure, already counted against the `computed_as_of` recorded
+    #: on that projection row and never against the wall clock. `None` means the row was not
+    #: read at all — no reading scope, or this point of sale does not carry the product — and
+    #: absence is NOT zero sales: no ordering rule may treat it as one.
+    sales_30d: int | None = None
 
 
 class ProductSearchPort(Protocol):
     """k-NN and full-text over `ai.product_document`. Implementations must not read `public`.
 
-    `pos_id` is the point-of-sale scope and the only predicate here that removes a candidate
-    on availability grounds. It comes from the token claim, never from the request body, and
-    `None` means the query runs over the whole indexed catalogue.
+    The point of sale enters through TWO independent parameters, because restricting the
+    universe and reading a signal are different things that one flag used to do at once:
+
+    * `pos_id` RESTRICTS — the C22 prefilter, the only predicate here that removes a
+      candidate on availability grounds. `None` means the whole indexed catalogue.
+    * `signal_pos_id` only READS — the C25 business signals. It MUST preserve every
+      candidate the branches produced, and a product this point of sale does not carry
+      reports its signals as absent rather than as zero.
+
+    Both come from a token claim or from the evaluation harness, never from the request body.
     """
 
     async def count_compatible(self, *, model_version_key: str, model_id: str) -> int: ...
@@ -88,6 +105,7 @@ class ProductSearchPort(Protocol):
         model_version_key: str,
         model_id: str,
         pos_id: UUID | None = None,
+        signal_pos_id: UUID | None = None,
     ) -> list[SearchHit]: ...
 
     async def search_lexical(
@@ -97,4 +115,5 @@ class ProductSearchPort(Protocol):
         depth: int,
         filters: SearchFilters,
         pos_id: UUID | None = None,
+        signal_pos_id: UUID | None = None,
     ) -> list[LexicalHit]: ...

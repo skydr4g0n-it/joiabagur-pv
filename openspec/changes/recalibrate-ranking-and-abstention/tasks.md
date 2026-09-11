@@ -39,13 +39,13 @@
 
 ## 5. Señal de punto de venta separada del alcance
 
-- [ ] 5.1 `retrieval/search.py` — separar `scope_pos_id` (`INNER JOIN`, restringe) de `signal_pos_id` (`LEFT JOIN`, sólo lee); añadir `sales_30d` al `SELECT` del CTE
-- [ ] 5.2 `retrieval/ports.py` — `sales_30d` en `SearchHit` y `LexicalHit`, con `None` cuando no hay fila de proyección
-- [ ] 5.3 **Retirar** el test guardián `test_the_retrieval_path_cannot_read_the_sales_figures` y sustituirlo por el que prohíbe leer `sales_90d` y `last_sale_at`
-- [ ] 5.4 `retrieval/orchestrator.py` — los dos parámetros como argumentos independientes, nunca como campo del cuerpo
-- [ ] 5.5 Test `test_signal_join_never_restricts_the_candidate_set` — el conjunto de candidatos con señal es idéntico al de sin nada
-- [ ] 5.6 Test `test_absent_projection_row_reports_absent_signals_not_zero`
-- [ ] 5.7 Test `test_scope_join_still_restricts_when_supplied` — la garantía de C22 intacta
+- [x] 5.1 `retrieval/search.py` — separar `scope_pos_id` (`INNER JOIN`, restringe) de `signal_pos_id` (`LEFT JOIN`, sólo lee); añadir `sales_30d` al `SELECT` del CTE
+- [x] 5.2 `retrieval/ports.py` — `sales_30d` en `SearchHit` y `LexicalHit`, con `None` cuando no hay fila de proyección
+- [x] 5.3 **Retirar** el test guardián `test_the_retrieval_path_cannot_read_the_sales_figures` y sustituirlo por el que prohíbe leer `sales_90d` y `last_sale_at`
+- [x] 5.4 `retrieval/orchestrator.py` — los dos parámetros como argumentos independientes, nunca como campo del cuerpo
+- [x] 5.5 Test `test_signal_join_never_restricts_the_candidate_set` — el conjunto de candidatos con señal es idéntico al de sin nada
+- [x] 5.6 Test `test_absent_projection_row_reports_absent_signals_not_zero`
+- [x] 5.7 Test `test_scope_join_still_restricts_when_supplied` — la garantía de C22 intacta
 
 ## 6. Score de negocio en el último bloque
 

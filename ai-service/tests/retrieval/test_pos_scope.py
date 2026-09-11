@@ -24,7 +24,9 @@ from jbg_ai.retrieval.projection import (
     resolve_scope,
 )
 from support.fake_embedding_client import FakeEmbeddingClient
+from jbg_ai.retrieval.ports import SearchFilters
 from support.fake_product_search import (
+    DEFAULT_BUCKET,
     FakeAssignment,
     FakeIndexedRow,
     FakeProductSearch,
@@ -521,15 +523,22 @@ def test_no_vector_reaches_the_logs(caplog: pytest.LogCaptureFixture) -> None:
 # ------------------------------------------------------------------- sales, unread
 
 
-def test_the_retrieval_path_cannot_read_the_sales_figures() -> None:
-    """Written by the drain, read by nothing here. Structural, not a promise.
+def test_the_retrieval_path_cannot_read_the_unread_sales_figures() -> None:
+    """`sales_90d` and `last_sale_at` stay written by the drain and read by nothing.
 
-    `sales_30d`, `sales_90d` and `last_sale_at` are persisted so the business-signals
-    ranking that follows has an input, and this capability must not quietly start using
-    them — a weight that appeared here would be uncalibrated by definition, because the
-    golden set that could calibrate it does not exist yet. The cheapest guarantee is that
-    the values never reach the pipeline at all: no hit type carries them, so no ordering
-    rule can read one by accident.
+    This REPLACES C22's guard, which forbade all three figures. `sales_30d` leaves the
+    prohibition deliberately and under a declared weight, because C22 wrote that the
+    calibrating golden set did not exist yet and now it does. The other two do not follow it,
+    and the reason is not caution but that neither has an instrument that could approve it:
+
+    * `last_sale_at` is the tempting one — 4.021 non-null rows against `sales_30d`'s 1.424 —
+      and it is tempting as an exponential decay, whose "today" would be the wall clock. The
+      world of C10 ends on 2026-08-23, so wall-clock decay takes the signal to zero and makes
+      the ranking irreproducible by design. That is the trap C22 already closed.
+    * `sales_90d` has no reading of its own that `sales_30d` does not already carry.
+
+    Structural rather than a promise: the values may now reach a hit, so the guarantee moves
+    to the two field names never appearing in any ordering module.
     """
     import inspect
 
@@ -538,14 +547,17 @@ def test_the_retrieval_path_cannot_read_the_sales_figures() -> None:
 
     for hit_type in (SearchHit, LexicalHit):
         fields = set(hit_type.__dataclass_fields__)
-        assert not any(name.startswith("sales_") for name in fields), hit_type
-        assert "last_sale_at" not in fields
+        assert "sales_90d" not in fields, hit_type
+        assert "last_sale_at" not in fields, hit_type
+        assert "sales_30d" in fields, f"{hit_type} must carry the signal C25 reads"
 
     for module in (orchestrator, filters, fusion):
         source = inspect.getsource(module)
-        assert "sales_30d" not in source, module.__name__
         assert "sales_90d" not in source, module.__name__
         assert "last_sale_at" not in source, module.__name__
+        # And no ordering rule may reach for a wall clock to age the window it does read.
+        assert "date.today" not in source, module.__name__
+        assert "datetime.now" not in source, module.__name__
 
 
 def test_sales_figures_do_not_change_the_order() -> None:
@@ -584,3 +596,154 @@ def test_resolve_scope_skips_every_query_when_disabled() -> None:
     assert scope.reported_age is None
     assert search.scope_calls == []
     assert search.synced_at_calls == 0
+
+
+# --------------------------------------------------------------------------------------
+# C25 - the reading scope is separate from the restricting one.
+# --------------------------------------------------------------------------------------
+
+def test_signal_join_never_restricts_the_candidate_set() -> None:
+    """A LEFT JOIN that reads, against an INNER JOIN that restricts. C25 D4.
+
+    This is the whole point of splitting the parameter: it lets the reordering by
+    availability be measured WITHOUT paying the recall cost of the prefilter, which is the
+    confusion C22 declined to introduce and declared unmeasured. If the reading scope removed
+    even one candidate, the `v3` row would be measuring two changes at once.
+    """
+    rows = [row(A, "carried", 0.10), row(B, "not-carried", 0.11), row(C, "also-not", 0.12)]
+    # The point of sale carries exactly one of the three.
+    assignments = [FakeAssignment(pos_id=MINE, product_id=A, qty_bucket="3+", sales_30d=7)]
+
+    without_anything = serve(FakeProductSearch(list(rows)), pos_prefilter=False)
+    with_signal = serve(
+        FakeProductSearch(list(rows), assignments=list(assignments)),
+        pos_prefilter=False,
+        signal_pos_id=MINE,
+    )
+
+    assert [item.sku for item in with_signal.results] == [
+        item.sku for item in without_anything.results
+    ], "reading the signal must preserve every candidate, and their order"
+
+    # And the signals really were read for the candidate the point of sale carries.
+    search = FakeProductSearch(list(rows), assignments=list(assignments))
+    serve(search, pos_prefilter=False, signal_pos_id=MINE)
+    hits = run(
+        search.search(
+            [0.0],
+            threshold=0.65,
+            depth=60,
+            filters=SearchFilters(),
+            model_version_key="m:1",
+            model_id="m",
+            signal_pos_id=MINE,
+        )
+    )
+    by_sku = {hit.sku: hit for hit in hits}
+    assert len(by_sku) == 3, "the reading scope dropped a candidate"
+    assert by_sku["carried"].qty_bucket == "3+"
+    assert by_sku["carried"].sales_30d == 7
+
+
+def test_absent_projection_row_reports_absent_signals_not_zero() -> None:
+    """Absence is not evidence of zero stock, and it is not evidence of zero sales either.
+
+    `None` and `0` are different world states: "this point of sale does not carry it" against
+    "it is carried here and sold none". Collapsing them would make the availability demotion
+    fire on every product outside the assortment, turning assortment coverage into a
+    relevance penalty - exactly the conflation C22 kept apart.
+    """
+    rows = [row(A, "carried-sold-none", 0.10), row(B, "not-carried", 0.11)]
+    assignments = [
+        FakeAssignment(pos_id=MINE, product_id=A, qty_bucket="0", sales_30d=0),
+    ]
+    search = FakeProductSearch(rows, assignments=assignments)
+
+    hits = run(
+        search.search(
+            [0.0],
+            threshold=0.65,
+            depth=60,
+            filters=SearchFilters(),
+            model_version_key="m:1",
+            model_id="m",
+            signal_pos_id=MINE,
+        )
+    )
+    by_sku = {hit.sku: hit for hit in hits}
+
+    carried = by_sku["carried-sold-none"]
+    assert carried.qty_bucket == "0", "a real zero bucket"
+    assert carried.sales_30d == 0, "a real zero sales window"
+
+    absent = by_sku["not-carried"]
+    assert absent.qty_bucket is None, "absence must not be reported as a bucket"
+    assert absent.sales_30d is None, "absence must not be reported as zero sales"
+
+
+def test_no_reading_scope_leaves_every_signal_absent() -> None:
+    """With neither scope supplied, nothing is read and nothing is invented."""
+    search = FakeProductSearch([row(A, "anything", 0.10)])
+    hits = run(
+        search.search(
+            [0.0],
+            threshold=0.65,
+            depth=60,
+            filters=SearchFilters(),
+            model_version_key="m:1",
+            model_id="m",
+        )
+    )
+    assert hits[0].qty_bucket is None
+    assert hits[0].sales_30d is None
+
+
+def test_scope_join_still_restricts_when_supplied() -> None:
+    """C22's guarantee, intact. The new parameter must not have weakened the old one."""
+    rows = [row(A, "carried", 0.10), row(B, "not-carried", 0.11)]
+    assignments = [FakeAssignment(pos_id=MINE, product_id=A)]
+    search = FakeProductSearch(rows, assignments=assignments)
+
+    response = serve(search, pos_prefilter=True)
+
+    assert [item.sku for item in response.results] == ["carried"], (
+        "the restricting scope must still remove what the point of sale does not carry"
+    )
+    # And a restricting scope reads as well: in SQL the rows are joined already.
+    hits = run(
+        search.search(
+            [0.0],
+            threshold=0.65,
+            depth=60,
+            filters=SearchFilters(),
+            model_version_key="m:1",
+            model_id="m",
+            pos_id=MINE,
+        )
+    )
+    assert [hit.sku for hit in hits] == ["carried"]
+    assert hits[0].qty_bucket == DEFAULT_BUCKET
+
+
+def test_the_two_scopes_are_independent_parameters_not_one_flag() -> None:
+    """Four combinations, and each one is a different question. C25 D4.
+
+    The flag they replace did two things at once, so `scoped=False` meant BOTH "do not
+    restrict" and "do not read" - which is why the availability demotion C22 shipped never
+    fired once in the 192 rows of the published evaluation run.
+    """
+    from jbg_ai.retrieval.search import compile_search_sql
+
+    neither = compile_search_sql(SearchFilters())
+    reads_only = compile_search_sql(SearchFilters(), reads=True)
+    restricts_only = compile_search_sql(SearchFilters(), restricts=True)
+
+    assert "scope" not in neither and "NULL AS qty_bucket" in neither
+    assert "NULL AS sales_30d" in neither
+
+    assert "LEFT JOIN scope s" in reads_only, "reading must not restrict"
+    assert "s.qty_bucket" in reads_only and "s.sales_30d" in reads_only
+
+    assert "LEFT JOIN scope s" not in restricts_only, "restricting must restrict"
+    assert "JOIN scope s" in restricts_only
+    assert "s.qty_bucket" in restricts_only and "s.sales_30d" in restricts_only

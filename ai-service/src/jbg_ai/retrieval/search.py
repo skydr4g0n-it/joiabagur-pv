@@ -63,9 +63,18 @@ FROM ai.sync_checkpoint
 WHERE feed = :feed
 """
 
+# One CTE, two uses, and the difference between them is the join and nothing else. C25 D4.
+#
+#   scope_pos_id   ->  JOIN       restricts the universe   (the C22 prefilter)
+#   signal_pos_id  ->  LEFT JOIN  only reads               (the C25 business signals)
+#
+# Splitting them is what lets the reordering by availability be measured WITHOUT paying the
+# recall cost of the prefilter — the confusion C22 declined to introduce and declared unmeasured.
+# `sales_30d` joins the selection here because it is the drain's own figure, already counted
+# against the `computed_as_of` recorded on that row; reading it costs nothing extra.
 _SCOPE_CTE = """
 WITH scope AS MATERIALIZED (
-  SELECT product_id, qty_bucket
+  SELECT product_id, qty_bucket, sales_30d
   FROM ai.pos_projection
   WHERE pos_id = :pos_id
     AND is_assigned_hint IS TRUE
@@ -73,6 +82,7 @@ WITH scope AS MATERIALIZED (
 """
 
 _SCOPE_JOIN = "JOIN scope s ON s.product_id = d.product_id"
+_SIGNAL_JOIN = "LEFT JOIN scope s ON s.product_id = d.product_id"
 
 _SEARCH_SELECT = """SELECT
   d.product_id,
@@ -83,7 +93,8 @@ _SEARCH_SELECT = """SELECT
   d.variant_label,
   d.price,
   d.size_label,
-  {qty_bucket}
+  {qty_bucket},
+  {sales_30d}
 FROM ai.product_document d
 {scope_join}
 WHERE d.embedding IS NOT NULL
@@ -120,7 +131,8 @@ _LEXICAL_SELECT = """SELECT
   d.variant_label,
   d.price,
   d.size_label,
-  {qty_bucket}
+  {qty_bucket},
+  {sales_30d}
 FROM ai.product_document d
 {scope_join}
 WHERE d.is_active IS TRUE
@@ -165,27 +177,45 @@ def _body_filter_params(filters: SearchFilters) -> dict[str, object]:
     return params
 
 
-def _scoped(head: str, *, scoped: bool) -> str:
-    """Fill the two holes the scope opens: what selects the bucket, and what joins it."""
+def _scoped(head: str, *, restricts: bool, reads: bool) -> str:
+    """Fill the three holes the scope opens: the bucket, the sales window, and the join.
+
+    `restricts` and `reads` are independent, and only one join is ever emitted because both
+    read the same CTE. A restricting scope also reads — the rows are joined already — so the
+    caller never has to ask for both in order to get both.
+    """
+    joined = restricts or reads
     return head.format(
-        qty_bucket="s.qty_bucket" if scoped else "NULL AS qty_bucket",
-        scope_join=_SCOPE_JOIN if scoped else "",
+        qty_bucket="s.qty_bucket" if joined else "NULL AS qty_bucket",
+        sales_30d="s.sales_30d" if joined else "NULL AS sales_30d",
+        scope_join=(_SCOPE_JOIN if restricts else _SIGNAL_JOIN) if joined else "",
     )
 
 
-def _with_filters(head: str, filters: SearchFilters, tail: str, *, scoped: bool) -> str:
+def _with_filters(
+    head: str, filters: SearchFilters, tail: str, *, restricts: bool, reads: bool
+) -> str:
     extra = _body_filter_clauses(filters)
     extra_sql = ("\n  " + "\n  ".join(extra) + "\n") if extra else "\n"
-    return (_SCOPE_CTE if scoped else "") + _scoped(head, scoped=scoped) + extra_sql + tail
+    cte = _SCOPE_CTE if (restricts or reads) else ""
+    return cte + _scoped(head, restricts=restricts, reads=reads) + extra_sql + tail
 
 
-def compile_search_sql(filters: SearchFilters, *, scoped: bool = False) -> str:
-    """Return the vector statement. Filters by `pos_id` when scoped, never by price or stock."""
-    return _with_filters(_SEARCH_SELECT, filters, _SEARCH_ORDER_LIMIT, scoped=scoped)
+def compile_search_sql(
+    filters: SearchFilters, *, restricts: bool = False, reads: bool = False
+) -> str:
+    """Return the vector statement. Restricts by `pos_id` only when asked; never by price."""
+    return _with_filters(
+        _SEARCH_SELECT, filters, _SEARCH_ORDER_LIMIT, restricts=restricts, reads=reads
+    )
 
 
 def compile_lexical_sql(
-    request: LexicalRequest, filters: SearchFilters, *, scoped: bool = False
+    request: LexicalRequest,
+    filters: SearchFilters,
+    *,
+    restricts: bool = False,
+    reads: bool = False,
 ) -> tuple[str, dict]:
     """Return the lexical statement and its bound terms. Never filters by price or stock."""
     fragments = build_fragments(request, placeholder=lambda name: f":{name}")
@@ -198,7 +228,9 @@ def compile_lexical_sql(
         .replace("{coverage_denominator}", fragments.coverage_denominator)
     )
     return (
-        _with_filters(head, filters, _LEXICAL_ORDER_LIMIT, scoped=scoped),
+        _with_filters(
+            head, filters, _LEXICAL_ORDER_LIMIT, restricts=restricts, reads=reads
+        ),
         dict(fragments.params),
     )
 
@@ -221,6 +253,11 @@ def _optional_uuid(value: object) -> UUID | None:
 
 def _optional_str(value: object) -> str | None:
     return str(value) if value is not None else None
+
+
+def _optional_int(value: object) -> int | None:
+    """`None` stays `None`: an absent projection row is not a row reporting zero sales."""
+    return None if value is None else int(value)
 
 
 def _optional_float(value: object) -> float | None:
@@ -279,6 +316,7 @@ class SqlAlchemyProductSearch:
         model_version_key: str,
         model_id: str,
         pos_id: UUID | None = None,
+        signal_pos_id: UUID | None = None,
     ) -> list[SearchHit]:
         params: dict[str, object] = {
             "q": _vector_literal(query_vec),
@@ -288,10 +326,15 @@ class SqlAlchemyProductSearch:
             "model_id": model_id,
             **_body_filter_params(filters),
         }
-        if pos_id is not None:
-            params["pos_id"] = pos_id
+        # One bound `pos_id`, because one CTE serves both uses. The restricting scope wins
+        # when both are supplied: its join is the stricter of the two and already reads.
+        scope_pos_id = pos_id if pos_id is not None else signal_pos_id
+        if scope_pos_id is not None:
+            params["pos_id"] = scope_pos_id
 
-        sql = compile_search_sql(filters, scoped=pos_id is not None)
+        sql = compile_search_sql(
+            filters, restricts=pos_id is not None, reads=signal_pos_id is not None
+        )
         try:
             async with session_scope(self._settings) as session:
                 rows = (await session.execute(text(sql), params)).mappings().all()
@@ -309,6 +352,7 @@ class SqlAlchemyProductSearch:
                 price=_optional_float(row["price"]),
                 size_label=_optional_str(row["size_label"]),
                 qty_bucket=_optional_str(row["qty_bucket"]),
+                sales_30d=_optional_int(row["sales_30d"]),
             )
             for row in rows
         ]
@@ -320,15 +364,22 @@ class SqlAlchemyProductSearch:
         depth: int,
         filters: SearchFilters,
         pos_id: UUID | None = None,
+        signal_pos_id: UUID | None = None,
     ) -> list[LexicalHit]:
-        sql, terms = compile_lexical_sql(request, filters, scoped=pos_id is not None)
+        sql, terms = compile_lexical_sql(
+            request,
+            filters,
+            restricts=pos_id is not None,
+            reads=signal_pos_id is not None,
+        )
         params: dict[str, object] = {
             "depth": depth,
             **terms,
             **_body_filter_params(filters),
         }
-        if pos_id is not None:
-            params["pos_id"] = pos_id
+        scope_pos_id = pos_id if pos_id is not None else signal_pos_id
+        if scope_pos_id is not None:
+            params["pos_id"] = scope_pos_id
         try:
             async with session_scope(self._settings) as session:
                 rows = (await session.execute(text(sql), params)).mappings().all()
@@ -348,6 +399,7 @@ class SqlAlchemyProductSearch:
                 price=_optional_float(row["price"]),
                 size_label=_optional_str(row["size_label"]),
                 qty_bucket=_optional_str(row["qty_bucket"]),
+                sales_30d=_optional_int(row["sales_30d"]),
             )
             for row in rows
         ]
