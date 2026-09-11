@@ -890,3 +890,224 @@ def test_a_candidate_seen_by_both_lexical_lists_alone_is_not_cross_branch() -> N
         response = _serve(FakeProductSearch(list(rows)), **kwargs)
         assert response.low_confidence is True, "two lexical lists are not two branches"
         assert [item.sku for item in response.results] == ["both-lexical-lists"]
+
+
+# --------------------------------------------------------------------------------------
+# C25 - the adaptive coverage rule. The denominator is the change's number-one risk.
+# --------------------------------------------------------------------------------------
+
+#: The five categories measured at coverage 1,00 over the 48 judged queries, with one query
+#: each. `variante-talla` is the fifth and was NOT in the design's list: M2 found it, and it
+#: turned out to be the category the naive denominator would have damaged most - 0,655 naive
+#: against 1,000 corrected, on the best-scoring category of the live hybrid.
+#: Every one is a REAL query of the golden set, and every one is chosen to be a query the
+#: naive denominator would break: its naive coverage is below 1,00 while its corrected
+#: coverage is exactly 1,00. A fixture without a stop word would pass under either
+#: denominator and would witness nothing.
+FULL_COVERAGE_QUERIES = (
+    ("materiales", "sortija de plata"),  # naive 2/3
+    ("sinonimos", "dije de plata"),  # naive 2/3
+    ("lexico-exacto", "Colgante rosa de los vientos"),  # naive 2/4
+    ("piedra", "colgante de lapislazuli"),  # naive 2/3
+    ("variante-talla", "colgante de estrella de mar en talla XS"),  # naive 4/7
+)
+
+
+def _fully_anchored_text(query: str) -> str:
+    """A document matching every counting group of `query` whose tsquery is non-empty.
+
+    Built from the REAL expansion rather than from the query's words, because C20's dictionary
+    does not map one word to one group: `bano de oro` resolves to a single group of six
+    equivalent surface forms, and guessing at the words would silently produce a corpus the
+    expanded list never matches — a test that then passes for the wrong reason.
+    """
+    from jbg_ai.retrieval.lexical import counting_flags
+    from jbg_ai.retrieval.synonyms import expand_query
+    from support.fake_product_search import EMPTY_TSQUERY_FORMS
+
+    expanded = expand_query(query, enabled=True)
+    anchors = [
+        group[0]
+        for group, counts in zip(expanded.groups, counting_flags(expanded), strict=False)
+        if counts and any(form.strip() and form not in EMPTY_TSQUERY_FORMS for form in group)
+    ]
+    return "Tipo: " + ". ".join(anchors) + ". Materiales: plata."
+
+
+def _expanded_hits(search: FakeProductSearch):
+    """Re-run the EXPANDED lexical call the orchestrator just made, and return its hits.
+
+    The expanded list is the one carrying groups; the typed list carries none. Coverage is
+    read from this one and never from the typed one, which is the discriminator D8 rejected.
+    """
+    calls = [call for call in search.lexical_calls if call["request"].groups]
+    assert calls, "the orchestrator made no group-based lexical call"
+    call = calls[-1]
+    return _run(
+        search.search_lexical(call["request"], depth=60, filters=call["filters"])
+    )
+
+
+def _anchored_corpus(query: str):
+    """Two documents matching every expressible counting group, plus a vector-only one."""
+    text = _fully_anchored_text(query)
+    return [
+        _row(A, "anchored-1", 0.2, doc_text=text),
+        _row(B, "anchored-2", 0.3, doc_text=text),
+        _blind_row(C, "vector-only", 0.1),
+    ]
+
+
+@pytest.mark.parametrize(("category", "query"), FULL_COVERAGE_QUERIES)
+def test_full_coverage_leaves_the_lexical_weight_untouched(category: str, query: str) -> None:
+    """The gate of D7's falsifiable prediction. If this moves, something is wrong.
+
+    Measured over the golden set, these five categories have coverage 1,00 in every one of
+    their queries, so `w_lex x 1,00 = w_lex` and their ordering must be IDENTICAL with the
+    rule on and with it off. Their nDCG@5 must move by exactly zero.
+
+    With the NAIVE denominator - counting stop-word groups - they would score 0,64 to 0,88
+    and the rule would cut up to a third of the lexical weight off exactly the categories it
+    exists not to touch, while the global aggregate could rise anyway and hide it.
+    """
+    from jbg_ai.retrieval.orchestrator import _lexical_coverage
+
+    corpus = _anchored_corpus(query)
+    payload = _request(query=query, top_k=5)
+
+    # The premise, asserted rather than assumed: a corpus the expanded list does not match
+    # would make the comparison below pass for the wrong reason.
+    probe = FakeProductSearch(list(corpus))
+    _serve(probe, payload=payload)
+    assert _lexical_coverage(_expanded_hits(probe)) == pytest.approx(1.0), (
+        f"{category}: the fixture must actually reach full coverage"
+    )
+
+    with_rule = _serve(FakeProductSearch(list(corpus)), payload=payload)
+    # `alpha=1.0` under the binary rule is the rule switched off: full weight either way.
+    without_rule = _serve(
+        FakeProductSearch(list(corpus)),
+        payload=payload,
+        coverage_rule="binary",
+        coverage_alpha=1.0,
+    )
+
+    assert [item.sku for item in with_rule.results] == [
+        item.sku for item in without_rule.results
+    ], f"{category}: full coverage must not change the order"
+    assert [item.score for item in with_rule.results] == pytest.approx(
+        [item.score for item in without_rule.results]
+    ), f"{category}: full coverage must not change the scores"
+
+
+@pytest.mark.parametrize(
+    ("query", "anchors"),
+    [
+        ("sortija de plata", ("sortija", "plata")),
+        ("anillo de plata y oro", ("anillo", "plata", "oro")),
+    ],
+)
+def test_stopword_group_does_not_lower_coverage(query: str, anchors: tuple[str, ...]) -> None:
+    """`de` and `y` are counting groups whose tsquery is empty. C25 D8.
+
+    `sortija de plata` scores nDCG 1,000 live. Under the naive denominator its coverage is
+    2/3 and the rule would cut a third of the lexical weight off it.
+    """
+    from jbg_ai.retrieval.orchestrator import _lexical_coverage
+
+    search = FakeProductSearch(_anchored_corpus(query))
+    _serve(search, payload=_request(query=query, top_k=5))
+
+    hits = _expanded_hits(search)
+    assert hits[0].coverage_denominator == len(anchors), "the empty group must not be counted"
+    assert _lexical_coverage(hits) == pytest.approx(1.0)
+
+
+def test_partial_coverage_lowers_the_lexical_weight() -> None:
+    """`una bicicleta antigua`: 1 of 2 expressible groups matched, so the branch keeps half.
+
+    `una` is a stop word and leaves the denominator, which is why the coverage is 1/2 and not
+    the naive 1/3. The category this query belongs to - `descripcion-sin-anclaje` - is the
+    one the fusion damages most, and it is where the rule is supposed to fire.
+    """
+    from jbg_ai.retrieval.orchestrator import _lexical_coverage, _scaled_lexical_weight
+
+    # Matches `bicicleta` but not `antigua`: one of the two expressible groups.
+    rows = [
+        _row(A, "half-anchored", 0.2, doc_text="Tipo: bicicleta de plata."),
+        _blind_row(B, "vector-only", 0.1),
+    ]
+    search = FakeProductSearch(rows)
+    _serve(search, payload=_request(query="una bicicleta antigua", top_k=5))
+
+    hits = _expanded_hits(search)
+
+    assert hits[0].coverage_denominator == 2, "`una` must not be in the denominator"
+    coverage = _lexical_coverage(hits)
+    assert coverage == pytest.approx(0.5)
+    assert _scaled_lexical_weight(
+        0.5, coverage, rule="continuous", alpha=None
+    ) == pytest.approx(0.25)
+
+
+def test_empty_typed_list_does_not_by_itself_lower_the_weight() -> None:
+    """`bano de oro` matches nothing under the AND of `websearch` - the corpus spells it
+    with a tilde.
+
+    The scaling is read from the coordination tally of the GROUP-based list, never from
+    whether the typed list came back empty. That discriminator was measured and rejected: it
+    would crush a query that scores nDCG 1,000.
+    """
+    from jbg_ai.retrieval.orchestrator import _lexical_coverage
+
+    # No document contains the literal phrase `bano de oro`, so the typed list is empty; the
+    # equivalence groups answer it perfectly.
+    rows = [_row(A, "banado", 0.2, doc_text="Tipo: colgante dorado. Materiales: plata.")]
+    search = FakeProductSearch(rows)
+    _serve(search, payload=_request(query="bano de oro", top_k=5))
+
+    typed_call = [c for c in search.lexical_calls if not c["request"].groups][0]
+    typed_hits = _run(
+        search.search_lexical(typed_call["request"], depth=60, filters=typed_call["filters"])
+    )
+
+    assert typed_hits == [], "the literal phrasing matches nothing, which is the premise"
+    assert _lexical_coverage(_expanded_hits(search)) == pytest.approx(1.0)
+
+
+def test_coverage_introduces_no_configured_parameter() -> None:
+    """The property that made the continuous form the adopted one. C25 D7.
+
+    Nothing in `Settings` governs the strength of the scaling: the scaling IS the proportion.
+    `alpha` exists for the sweep's second candidate row and reaches the pipeline as a call
+    parameter, which is what keeps it out of the live system's configuration surface.
+    """
+    from jbg_ai.config.settings import FUSION_DEFAULTS
+
+    settings = build_settings()
+    for name in dir(settings):
+        assert "coverage" not in name and "alpha" not in name, f"{name} is a coverage knob"
+    assert not any("coverage" in key or "alpha" in key for key in FUSION_DEFAULTS)
+
+
+def test_the_binary_coverage_rule_is_available_as_a_sweep_alternative() -> None:
+    """Second candidate row, never the default: it carries one declared parameter."""
+    from jbg_ai.retrieval.orchestrator import _scaled_lexical_weight
+
+    assert _scaled_lexical_weight(0.5, 1.0, rule="binary", alpha=0.4) == pytest.approx(0.5)
+    assert _scaled_lexical_weight(0.5, 0.99, rule="binary", alpha=0.4) == pytest.approx(0.2)
+    assert _scaled_lexical_weight(0.5, 0.25, rule="binary", alpha=0.4) == pytest.approx(0.2)
+    # The continuous rule, for contrast: the proportion itself, with no alpha at all.
+    assert _scaled_lexical_weight(0.5, 0.25, rule="continuous", alpha=None) == pytest.approx(
+        0.125
+    )
+    with pytest.raises(ValueError, match="explicit alpha"):
+        _scaled_lexical_weight(0.5, 0.5, rule="binary", alpha=None)
+
+
+def test_absent_or_unanswerable_coverage_does_not_scale_the_weight() -> None:
+    """`None` means "do not scale", and it must never be read as zero."""
+    from jbg_ai.retrieval.orchestrator import _lexical_coverage, _scaled_lexical_weight
+
+    assert _lexical_coverage([]) is None, "no lexical hits: the weight decides nothing"
+    assert _scaled_lexical_weight(0.5, None, rule="continuous", alpha=None) == 0.5

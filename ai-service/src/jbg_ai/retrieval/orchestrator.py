@@ -63,6 +63,16 @@ VECTOR_LIST = "vector"
 #: whatever the two lexical lists did among themselves, stage 2 sees one ranked opinion holding
 #: one weight. That is what makes `len(ranks) > 1` in stage 2 mean cross-branch consensus.
 LEXICAL_BRANCH_LIST = "lexical"
+
+#: The adopted coverage rule and its sweep alternative. `continuous` is the live one and it is
+#: chosen for having ZERO parameters: the scaling IS the proportion. `binary` — "did the best
+#: candidate cover every expressible group? if not, alpha" — carries one declared parameter and
+#: exists only as a second candidate row of the calibration sweep. That is why alpha is a
+#: parameter of the orchestration call and NOT a setting: a knob in `Settings` would be a knob
+#: of the live system, and the live system has none governing the strength of this scaling.
+COVERAGE_CONTINUOUS = "continuous"
+COVERAGE_BINARY = "binary"
+COVERAGE_RULES = (COVERAGE_CONTINUOUS, COVERAGE_BINARY)
 LEXICAL_REASON = "lexical"
 VECTOR_REASON = "vector"
 
@@ -156,6 +166,8 @@ async def retrieve_products(
     fusion: str | None = None,
     branch_weight_lexical: float | None = None,
     branch_weight_vector: float | None = None,
+    coverage_rule: str = COVERAGE_CONTINUOUS,
+    coverage_alpha: float | None = None,
     branch_depth: int | None = None,
     pos_prefilter: bool | None = None,
     projection_max_age_seconds: int | None = None,
@@ -313,6 +325,26 @@ async def retrieve_products(
         )
 
     structural = extract_filters(expanded)
+
+    # The fourth stripped cable of this subsystem, after `tsv`, the expansion and
+    # `qty_bucket`: `coordination` has been computed, carried on every `LexicalHit` and read
+    # by nobody. C21 expected an adaptive weighting to EMERGE from `ts_rank` and it does not —
+    # `ts_rank` keeps ordering sixty documents that keep winning all of them.
+    coverage = _lexical_coverage(expanded_hits)
+    w_lex_effective = _scaled_lexical_weight(
+        w_lex_branch, coverage, rule=coverage_rule, alpha=coverage_alpha
+    )
+    if fusion_mode == FUSION_MODE_BRANCH:
+        logger.info(
+            "stage=coverage trace_id=%s rule=%s coverage=%s w_lex=%s w_lex_effective=%s",
+            principal.trace_id,
+            coverage_rule,
+            "none" if coverage is None else f"{coverage:.3f}",
+            w_lex_branch,
+            f"{w_lex_effective:.4f}",
+            extra={"trace_id": principal.trace_id},
+        )
+
     candidates, cross_branch = _fuse_branches(
         typed_hits,
         expanded_hits,
@@ -321,7 +353,7 @@ async def retrieve_products(
         depth=depth,
         mode=fusion_mode,
         flat_weights=(w_typed, w_expanded, w_vector),
-        branch_weights=(w_lex_branch, w_vec_branch),
+        branch_weights=(w_lex_effective, w_vec_branch),
         internal_weights=(w_typed, w_expanded),
     )
 
@@ -574,6 +606,62 @@ def _fuse_branches(
         ordered.append(item)
 
     return ordered, cross_branch
+
+
+def _lexical_coverage(expanded_hits: Sequence[LexicalHit]) -> float | None:
+    """How much of what the query CAN express its best lexical candidate actually matched.
+
+    The numerator is free: the expanded list arrives `ORDER BY coordination DESC`, so the
+    first hit's tally IS the maximum. The denominator counts only the groups whose tsquery
+    survives the language configuration, which is the point the whole rule turns on — a stop
+    word the operator typed becomes a counting group that can never match anything, and
+    counting it would lower the weight of a query that is in fact fully anchored.
+
+    `None` means "do not scale", and it is returned for the two cases where the ratio carries
+    no information rather than carrying zero:
+
+    * the lexical branch produced nothing, so its weight decides nothing;
+    * the query expressed no group the index can be asked about at all, so there is no
+      denominator. Scaling to zero there would silence the branch on the strength of a
+      question that was never asked.
+    """
+    if not expanded_hits:
+        return None
+    best = expanded_hits[0]
+    if best.coverage_denominator <= 0:
+        return None
+    # Clamped because a document can match a group more than one way through the OR of its
+    # surface forms; coverage is a proportion and must not exceed one.
+    return min(best.coordination / best.coverage_denominator, 1.0)
+
+
+def _scaled_lexical_weight(
+    weight: float,
+    coverage: float | None,
+    *,
+    rule: str,
+    alpha: float | None,
+) -> float:
+    """`w_lex x coverage`, and nothing else. C25 D7.
+
+    The continuous rule is adopted for introducing no parameter of its own: a branch whose
+    best candidate matched everything the query can express keeps its full declared weight,
+    and one that matched a fraction keeps that fraction. Its prediction is falsifiable and is
+    the gate of this change — the five categories measured at coverage 1,00 (`materiales`,
+    `sinonimos`, `lexico-exacto`, `piedra` and `variante-talla`) must move by exactly zero.
+
+    The binary rule is the sweep's second candidate row, never the live default, and `alpha`
+    reaches it as a call parameter so that no setting governs the strength of the scaling.
+    """
+    if coverage is None:
+        return weight
+    if rule == COVERAGE_BINARY:
+        if alpha is None:
+            raise ValueError("the binary coverage rule needs an explicit alpha")
+        return weight if coverage >= 1.0 else weight * alpha
+    if rule != COVERAGE_CONTINUOUS:
+        raise ValueError(f"unknown coverage rule {rule!r}, expected one of {COVERAGE_RULES}")
+    return weight * coverage
 
 
 def _fuse_two_stage(

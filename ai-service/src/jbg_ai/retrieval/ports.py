@@ -50,6 +50,11 @@ class LexicalHit:
     materials: list[str]
     family_id: UUID | None
     variant_label: str | None
+    #: How many counting groups could match any document at all. Constant per query, carried
+    #: per row because it is selected in the same statement. `coordination / this` is the
+    #: coverage that scales the lexical branch's weight; zero means the query expressed
+    #: nothing the index can be asked about, and the caller must not divide by it.
+    coverage_denominator: int = 0
     price: float | None = None
     size_label: str | None = None
     qty_bucket: str | None = None

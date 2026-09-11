@@ -114,6 +114,7 @@ _LEXICAL_SELECT = """SELECT
   d.sku,
   ts_rank(d.tsv, {match}) AS ts_rank,
   ({coordination}) AS coordination,
+  ({coverage_denominator}) AS coverage_denominator,
   d.materials,
   d.family_id,
   d.variant_label,
@@ -188,8 +189,13 @@ def compile_lexical_sql(
 ) -> tuple[str, dict]:
     """Return the lexical statement and its bound terms. Never filters by price or stock."""
     fragments = build_fragments(request, placeholder=lambda name: f":{name}")
-    head = _LEXICAL_SELECT.replace("{match}", fragments.match).replace(
-        "{coordination}", fragments.coordination
+    head = (
+        _LEXICAL_SELECT.replace("{match}", fragments.match)
+        .replace("{coordination}", fragments.coordination)
+        # Constant per query and therefore evaluated once by the planner, not per row. It
+        # rides along on the statement that already tallies the coordination precisely so
+        # that measuring coverage costs no extra trip through a pool capped at five.
+        .replace("{coverage_denominator}", fragments.coverage_denominator)
     )
     return (
         _with_filters(head, filters, _LEXICAL_ORDER_LIMIT, scoped=scoped),
@@ -335,6 +341,7 @@ class SqlAlchemyProductSearch:
                 sku=str(row["sku"]),
                 ts_rank=float(row["ts_rank"]),
                 coordination=int(row["coordination"] or 0),
+                coverage_denominator=int(row["coverage_denominator"] or 0),
                 materials=_materials_list(row["materials"]),
                 family_id=_optional_uuid(row["family_id"]),
                 variant_label=_optional_str(row["variant_label"]),

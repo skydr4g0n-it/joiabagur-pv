@@ -16,6 +16,20 @@ from jbg_ai.retrieval.ports import LexicalHit, SearchFilters, SearchHit
 #: A test about the scope passes `assignments` explicitly.
 DEFAULT_BUCKET = "3+"
 
+#: Stand-in for `numnode(plainto_tsquery('spanish', term)) > 0`, which is what the statement
+#: actually asks. These are the Spanish stop words the golden set's queries actually contain,
+#: and they are the whole reason the coverage denominator exists: `plainto_tsquery('spanish',
+#: 'de')` is an EMPTY tsquery, so that group can never match any document, and counting it
+#: would lower the coverage of a query that is in fact fully anchored.
+#:
+#: A stand-in and not a reimplementation: the real predicate is PostgreSQL's, and the C25
+#: implementation report records it verified against the live index query by query. What this
+#: buys is that a test about coverage can run with no database at all.
+EMPTY_TSQUERY_FORMS = frozenset(
+    {"de", "del", "la", "el", "los", "las", "un", "una", "unos", "unas",
+     "y", "o", "que", "en", "a", "al", "con", "para", "se", "lo", "su", "sus"}
+)
+
 
 @dataclass
 class FakeAssignment:
@@ -199,12 +213,18 @@ class FakeProductSearch:
                 for hit, counts in zip(matched, counting, strict=False)
                 if hit and counts
             )
+            coverage_denominator = sum(
+                1
+                for group, counts in zip(groups, counting, strict=False)
+                if counts and self._group_is_expressible(group)
+            )
             hits.append(
                 LexicalHit(
                     product_id=row.product_id,
                     sku=row.sku,
                     ts_rank=sum(matched) / len(matched),
                     coordination=coordination,
+                    coverage_denominator=coverage_denominator,
                     materials=list(row.materials),
                     family_id=row.family_id,
                     variant_label=row.variant_label,
@@ -218,6 +238,13 @@ class FakeProductSearch:
         # by something the SQL never mentions is a fake that cannot witness the property.
         hits.sort(key=lambda item: (-item.coordination, -item.ts_rank, item.product_id))
         return hits[:depth]
+
+    @staticmethod
+    def _group_is_expressible(group: tuple[str, ...]) -> bool:
+        """Could this group's tsquery match ANY document? Mirrors `numnode(...) > 0`."""
+        return any(
+            form.strip() and fold(form) not in EMPTY_TSQUERY_FORMS for form in group
+        )
 
     @staticmethod
     def _group_matches(row: FakeIndexedRow, group: tuple[str, ...]) -> bool:

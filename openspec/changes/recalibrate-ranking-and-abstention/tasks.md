@@ -28,14 +28,14 @@
 
 ## 4. Regla adaptativa por cobertura
 
-- [ ] 4.1 `retrieval/lexical.py` — expresión del **denominador** de cobertura con `numnode(<fragmento>) > 0`, en la **misma sentencia** que la coordinación
-- [ ] 4.2 `retrieval/search.py` — devolver el denominador junto a la coordinación, sin viaje extra al pool
-- [ ] 4.3 `retrieval/orchestrator.py` — leer `coordination` del primer *hit* de la lista expandida y aplicar `w_lex × cobertura`, **sin parámetro configurado**
-- [ ] 4.4 Test `test_full_coverage_leaves_the_lexical_weight_untouched` — el gate de la predicción falsable de D7
-- [ ] 4.5 Test `test_stopword_group_does_not_lower_coverage`, con `sortija de plata` y `anillo de plata y oro`
-- [ ] 4.6 Test `test_partial_coverage_lowers_the_lexical_weight`, con `una bicicleta antigua`
-- [ ] 4.7 Test `test_empty_typed_list_does_not_by_itself_lower_the_weight`, con `bano de oro`
-- [ ] 4.8 Implementar la variante **binaria con `α`** como configuración alternativa, para que entre como segunda fila del barrido
+- [x] 4.1 `retrieval/lexical.py` — expresión del **denominador** de cobertura con `numnode(<fragmento>) > 0`, en la **misma sentencia** que la coordinación
+- [x] 4.2 `retrieval/search.py` — devolver el denominador junto a la coordinación, sin viaje extra al pool
+- [x] 4.3 `retrieval/orchestrator.py` — leer `coordination` del primer *hit* de la lista expandida y aplicar `w_lex × cobertura`, **sin parámetro configurado**
+- [x] 4.4 Test `test_full_coverage_leaves_the_lexical_weight_untouched` — el gate de la predicción falsable de D7
+- [x] 4.5 Test `test_stopword_group_does_not_lower_coverage`, con `sortija de plata` y `anillo de plata y oro`
+- [x] 4.6 Test `test_partial_coverage_lowers_the_lexical_weight`, con `una bicicleta antigua`
+- [x] 4.7 Test `test_empty_typed_list_does_not_by_itself_lower_the_weight`, con `bano de oro`
+- [x] 4.8 Implementar la variante **binaria con `α`** como configuración alternativa, para que entre como segunda fila del barrido
 
 ## 5. Señal de punto de venta separada del alcance
 
