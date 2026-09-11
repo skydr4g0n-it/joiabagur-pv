@@ -42,7 +42,13 @@ from jbg_ai.indexing.constants import DEFAULT_EMBEDDING_MODEL
 from jbg_ai.indexing.embeddings import EmbeddingClient, EmbedResult, LiteLlmEmbeddingClient
 from jbg_ai.indexing.errors import EmbeddingError
 from jbg_ai.retrieval.errors import InvalidFamilyIdError, RetrievalDependencyError
-from jbg_ai.retrieval.filters import StructuralFilters, demote, extract_filters
+from jbg_ai.retrieval.filters import (
+    OUT_OF_STOCK_BUCKET,
+    BusinessWeights,
+    StructuralFilters,
+    demote,
+    extract_filters,
+)
 from jbg_ai.retrieval.fusion import FusedCandidate, RankedList, fuse, normalised_scores
 from jbg_ai.retrieval.lexical import EXPANDED_LIST, TYPED_LIST, expanded_request, typed_request
 from jbg_ai.retrieval.ports import LexicalHit, ProductSearchPort, SearchFilters, SearchHit
@@ -138,6 +144,9 @@ class _Candidate:
     #: Read by the availability block of `demotion_rank` and never emitted. `None` means the
     #: query ran unscoped, which is not the same as a bucket of zero.
     qty_bucket: str | None = None
+    #: Read by the business score of `demotion_rank` and never emitted. `None` is absence —
+    #: no reading scope, or a product this point of sale does not carry — and never a zero.
+    sales_30d: int | None = None
     vector_score: float | None = None
     lexical_score: float | None = None
     reasons: list[str] = field(default_factory=list)
@@ -171,6 +180,8 @@ async def retrieve_products(
     branch_depth: int | None = None,
     pos_prefilter: bool | None = None,
     signal_pos_id: UUID | None = None,
+    business_weight_availability: float | None = None,
+    business_weight_rotation: float | None = None,
     projection_max_age_seconds: int | None = None,
     freshness: ProjectionFreshness | None = None,
 ) -> RetrievalResponse:
@@ -207,6 +218,18 @@ async def retrieve_products(
         else branch_weight_vector
     )
     depth = settings.jpv_branch_depth if branch_depth is None else branch_depth
+    weights = BusinessWeights(
+        availability=(
+            settings.jpv_business_weight_availability
+            if business_weight_availability is None
+            else business_weight_availability
+        ),
+        rotation=(
+            settings.jpv_business_weight_rotation
+            if business_weight_rotation is None
+            else business_weight_rotation
+        ),
+    )
     prefilter = (
         settings.jpv_pos_prefilter_enabled if pos_prefilter is None else pos_prefilter
     )
@@ -360,13 +383,36 @@ async def retrieve_products(
         internal_weights=(w_typed, w_expanded),
     )
 
-    ordered, demoted = demote(candidates, structural)
+    before = [item.product_id for item in candidates]
+    ordered, demoted = demote(candidates, structural, weights)
     logger.info(
         "stage=filters trace_id=%s extracted=%s demoted=%s candidates=%s",
         principal.trace_id,
         structural.describe(),
         demoted,
         len(ordered),
+        extra={"trace_id": principal.trace_id},
+    )
+    # `stage=signals` reports the business signals alone, because `stage=filters` cannot: it
+    # counts everything the key demoted, and after C25 that conflates a price ceiling the
+    # operator typed with a stock figure they never asked about. No exact quantity and no
+    # vector appears here — the bucket is a bucket, and the sales window is reported only as
+    # how many candidates carried one.
+    logger.info(
+        "stage=signals trace_id=%s w_availability=%s w_rotation=%s reading_scope=%s "
+        "reordered=%s absent_signal=%s out_of_stock=%s with_rotation=%s",
+        principal.trace_id,
+        weights.availability,
+        weights.rotation,
+        signal_pos_id is not None or scope.applied,
+        sum(
+            1
+            for position, item in enumerate(ordered)
+            if position >= len(before) or before[position] != item.product_id
+        ),
+        sum(1 for item in ordered if item.qty_bucket is None),
+        sum(1 for item in ordered if item.qty_bucket == OUT_OF_STOCK_BUCKET),
+        sum(1 for item in ordered if item.sales_30d),
         extra={"trace_id": principal.trace_id},
     )
 
@@ -734,6 +780,7 @@ def _from_hit(hit: LexicalHit | SearchHit) -> _Candidate:
         price=hit.price,
         size_label=hit.size_label,
         qty_bucket=hit.qty_bucket,
+        sales_30d=hit.sales_30d,
     )
 
 

@@ -49,15 +49,15 @@
 
 ## 6. Score de negocio en el último bloque
 
-- [ ] 6.1 `config/settings.py` — `BUSINESS_DEFAULTS` con el peso de disponibilidad (calibrable) y el de rotación (**fijo y declarado**, con su rationale en el docstring)
-- [ ] 6.2 `retrieval/filters.py` — clave lexicográfica de tres componentes más score continuo en la cola; `demote()` conserva el *early return* y no elimina nada
-- [ ] 6.3 Test `test_typed_constraint_outranks_the_business_score`
-- [ ] 6.4 Test `test_out_of_stock_product_ranks_below_equivalent_in_stock`, **sin escopar** y con la señal por `LEFT JOIN`
-- [ ] 6.5 Test `test_rotation_only_breaks_ties` y `test_rotation_cannot_overturn_availability`
-- [ ] 6.6 Test `test_weights_load_from_config_not_hardcoded` y `test_zero_weights_restore_the_previous_ordering`
-- [ ] 6.7 Test `test_no_stock_quantity_reaches_the_response`
-- [ ] 6.8 Test `test_sales_window_is_read_against_the_row_reference_instant`
-- [ ] 6.9 Log `stage=signals` con pesos, alcance de lectura, candidatos reordenados y candidatos con señal ausente; sin cantidades exactas y sin vectores
+- [x] 6.1 `config/settings.py` — `BUSINESS_DEFAULTS` con el peso de disponibilidad (calibrable) y el de rotación (**fijo y declarado**, con su rationale en el docstring)
+- [x] 6.2 `retrieval/filters.py` — clave lexicográfica de tres componentes más score continuo en la cola; `demote()` conserva el *early return* y no elimina nada
+- [x] 6.3 Test `test_typed_constraint_outranks_the_business_score`
+- [x] 6.4 Test `test_out_of_stock_product_ranks_below_equivalent_in_stock`, **sin escopar** y con la señal por `LEFT JOIN`
+- [x] 6.5 Test `test_rotation_only_breaks_ties` y `test_rotation_cannot_overturn_availability`
+- [x] 6.6 Test `test_weights_load_from_config_not_hardcoded` y `test_zero_weights_restore_the_previous_ordering`
+- [x] 6.7 Test `test_no_stock_quantity_reaches_the_response`
+- [x] 6.8 Test `test_sales_window_is_read_against_the_row_reference_instant`
+- [x] 6.9 Log `stage=signals` con pesos, alcance de lectura, candidatos reordenados y candidatos con señal ausente; sin cantidades exactas y sin vectores
 
 ## 7. Métrica operativa y configuraciones
 

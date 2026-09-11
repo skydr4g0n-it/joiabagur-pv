@@ -44,6 +44,32 @@ FUSION_MODE_BRANCH = "branch"
 FUSION_MODE_FLAT = "flat"
 FUSION_MODES = (FUSION_MODE_BRANCH, FUSION_MODE_FLAT)
 
+#: C25 business-signal weights. Two weights, and they are NOT the same kind of number.
+#:
+#: `availability` is **calibrated**: it is swept against the golden set under the operational
+#: metric of D3, with pure relevance as the guardrail. That sweep is possible because the
+#: rubric's own scale supplies the hook — grade 1 is already defined as "a plausible
+#: substitute the operator would offer second", and a piece that cannot be put on the cloth is
+#: exactly that, so an exhausted grade 2 can be read as a grade 1 without inventing a constant.
+#:
+#: `rotation` is **declared and never swept**, and the reason is that no instrument exists that
+#: could approve it. There is no hook in the rubric — a piece that sells is not *more relevant*
+#: — the online route has 31 rows and 12 distinct texts all written by the developer, and the
+#: signal is non-null on 23,54 % of assigned pairs (1.424 of 6.050). What does exist is the
+#: sentence that justifies a TIEBREAK: "between two pieces the retriever and the stock rank
+#: equally, show the one that sells". The sentence that would justify a continuous weight does
+#: not. So the term is binary — sold in the window, or not — and its weight is smaller than the
+#: availability one by construction, which is what makes it unable to overturn availability.
+#:
+#: Both are read against the `computed_as_of` recorded on each projection row and never against
+#: the wall clock: with a wall clock the window goes to zero, because the world of C10 ends on
+#: 2026-08-23, and the ranking would be irreproducible by design.
+BUSINESS_DEFAULTS: dict[str, Any] = {
+    "jpv_business_weight_availability": 1.0,
+    "jpv_business_weight_rotation": 0.25,
+}
+
+
 #: C23 knowledge defaults, in one place for the same reason as FUSION_DEFAULTS: the field
 #: default, the blank-string fallback and the canonical OpenAPI profile are three copies of
 #: one value, and three copies drift. The threshold is the output of a calibration RULE and
@@ -341,6 +367,36 @@ class Settings(BaseSettings):
         ),
     )
 
+    jpv_business_weight_availability: float = Field(
+        default=BUSINESS_DEFAULTS["jpv_business_weight_availability"],
+        ge=0,
+        description=(
+            "C25 weight of the availability signal in the business score "
+            "(JPV_BUSINESS_WEIGHT_AVAILABILITY). Optional at boot; a blank export means unset "
+            "and falls back to the default. CALIBRATED against the golden set under the "
+            "operational metric, with pure relevance as the guardrail. Zero restores exactly "
+            "the ordering the fusion and the typed-constraint blocks produce on their own, "
+            "which makes it the rollback for the business signals. Supplies only the DEFAULT: "
+            "the effective value travels as a parameter of the orchestration call. Not "
+            "required to boot /health."
+        ),
+    )
+
+    jpv_business_weight_rotation: float = Field(
+        default=BUSINESS_DEFAULTS["jpv_business_weight_rotation"],
+        ge=0,
+        description=(
+            "C25 weight of the rotation signal in the business score "
+            "(JPV_BUSINESS_WEIGHT_ROTATION). Optional at boot; blank means unset. DECLARED and "
+            "never produced by a calibration sweep, because no instrument can approve it: the "
+            "annotation criterion has no hook for it, the online route has 31 rows, and the "
+            "signal is non-null on 23,54 % of assigned pairs. It is a tiebreak and must stay "
+            "strictly below JPV_BUSINESS_WEIGHT_AVAILABILITY, which is enforced rather than "
+            "trusted: a rotation term able to overturn availability would let a piece that is "
+            "not on the shelf outrank one that is. Not required to boot /health."
+        ),
+    )
+
     jpv_pos_prefilter_enabled: bool = Field(
         default=True,
         description=(
@@ -594,6 +650,39 @@ class Settings(BaseSettings):
         """A blank export means "unset". A blank weight read as 0 would silence a branch."""
         if isinstance(value, str) and not value.strip():
             return FUSION_DEFAULTS[str(info.field_name)]
+        return value
+
+    @field_validator(
+        "jpv_business_weight_availability",
+        "jpv_business_weight_rotation",
+        mode="before",
+    )
+    @classmethod
+    def blank_business_setting_is_default(cls, value: object, info: ValidationInfo) -> object:
+        """A blank export means "unset". Read as 0 it would silently drop a signal."""
+        if isinstance(value, str) and not value.strip():
+            return BUSINESS_DEFAULTS[str(info.field_name)]
+        return value
+
+    @field_validator("jpv_business_weight_rotation")
+    @classmethod
+    def rotation_cannot_overturn_availability(
+        cls, value: float, info: ValidationInfo
+    ) -> float:
+        """Enforced, not trusted. The tiebreak must stay a tiebreak.
+
+        Rotation is the LAST ordering key by requirement: it decides only between candidates
+        the fusion and the availability signal rank equally. A weight at or above the
+        availability one would let a piece that is not on the shelf outrank one that is,
+        which is the single ordering this signal is forbidden to produce.
+        """
+        availability = info.data.get("jpv_business_weight_availability")
+        if availability is not None and value > 0 and value >= availability:
+            raise ValueError(
+                f"the rotation weight ({value}) must stay strictly below the availability "
+                f"weight ({availability}): it is a tiebreak, and one that can overturn "
+                "availability is not a tiebreak"
+            )
         return value
 
     @field_validator("jpv_fusion_mode")

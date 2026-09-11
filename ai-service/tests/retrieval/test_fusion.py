@@ -317,6 +317,7 @@ class _FakeHit:
         self.price = None
         self.size_label = None
         self.qty_bucket = None
+        self.sales_30d = None
         self.ts_rank = 0.5
         self.coordination = 1
         self.distance = 0.3

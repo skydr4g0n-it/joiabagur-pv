@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -24,6 +26,8 @@ class _Item:
     #: than defended against with `getattr` in production code: a protocol whose fields the
     #: implementation is afraid to read is not a protocol.
     qty_bucket: str | None = None
+    #: Joined the protocol with the business score of C25. `None` is absence, never a zero.
+    sales_30d: int | None = None
 
     def __post_init__(self) -> None:
         if self.materials is None:
@@ -244,60 +248,86 @@ def test_neither_branch_carries_a_price_or_stock_predicate() -> None:
 class _Candidate:
     """The smallest thing `demotion_rank` can read."""
 
-    def __init__(self, *, price=None, size_label=None, materials=None, qty_bucket=None):
+    def __init__(
+        self, *, price=None, size_label=None, materials=None, qty_bucket=None, sales_30d=None
+    ):
         self.price = price
         self.size_label = size_label
         self.materials = materials or []
         self.qty_bucket = qty_bucket
+        self.sales_30d = sales_30d
 
 
-def test_the_ordering_key_is_one_tuple_with_stock_last() -> None:
-    """One key, not two sorts: priority is readable here instead of emerging from order."""
-    from jbg_ai.retrieval.filters import StructuralFilters, demotion_rank
+def test_the_ordering_key_is_one_tuple_with_the_business_score_last() -> None:
+    """One key, not two sorts. Three typed blocks, then ONE continuous score. C25 D9.
 
-    key = demotion_rank(_Candidate(qty_bucket="0"), StructuralFilters())
+    Before C25 the tail was a fourth integer. Making it continuous loses nothing — a stable
+    block sort is a score with two values — and it keeps every weight inside a single term at
+    the end of the key instead of spreading them over coupled components.
+    """
+    from jbg_ai.retrieval.filters import BusinessWeights, StructuralFilters, demotion_rank
+
+    weights = BusinessWeights(availability=1.0, rotation=0.25)
+    key = demotion_rank(_Candidate(qty_bucket="0"), StructuralFilters(), weights)
 
     assert len(key) == 4
-    assert key == (0, 0, 0, 1), "availability is the last component and nothing else fired"
+    assert key[:3] == (0, 0, 0), "no typed constraint fired"
+    assert key[3] == pytest.approx(1.0), "zero stock costs the availability weight"
+    assert isinstance(key[3], float), "the tail is continuous, not a fourth integer"
 
 
 def test_an_absent_bucket_is_not_a_zero_bucket() -> None:
     """`None` means the query ran unscoped. An absent signal must not demote anything."""
     from jbg_ai.retrieval.filters import StructuralFilters, demotion_rank
 
-    assert demotion_rank(_Candidate(qty_bucket=None), StructuralFilters())[3] == 0
-    assert demotion_rank(_Candidate(qty_bucket="0"), StructuralFilters())[3] == 1
+    from jbg_ai.retrieval.filters import BusinessWeights
+
+    weights = BusinessWeights(availability=1.0)
+    assert demotion_rank(_Candidate(qty_bucket=None), StructuralFilters(), weights)[3] == 0
+    assert demotion_rank(_Candidate(qty_bucket="0"), StructuralFilters(), weights)[3] > 0
 
 
 def test_the_two_non_zero_buckets_rank_identically() -> None:
     """Ordering `1-2` before `3+` would be a magic number with no evidence behind it."""
     from jbg_ai.retrieval.filters import StructuralFilters, demotion_rank
 
-    filters = StructuralFilters()
+    from jbg_ai.retrieval.filters import BusinessWeights
 
-    assert demotion_rank(_Candidate(qty_bucket="1-2"), filters) == demotion_rank(
-        _Candidate(qty_bucket="3+"), filters
+    filters = StructuralFilters()
+    weights = BusinessWeights(availability=1.0, rotation=0.25)
+
+    assert demotion_rank(_Candidate(qty_bucket="1-2"), filters, weights) == demotion_rank(
+        _Candidate(qty_bucket="3+"), filters, weights
     )
 
 
 def test_stock_only_decides_between_candidates_the_typed_blocks_rank_equally() -> None:
     from jbg_ai.retrieval.filters import StructuralFilters, demotion_rank
 
-    filters = StructuralFilters(price_ceiling=80.0)
-    over_but_stocked = _Candidate(price=900.0, qty_bucket="3+")
-    within_but_empty = _Candidate(price=40.0, qty_bucket="0")
+    from jbg_ai.retrieval.filters import BusinessWeights
 
-    assert demotion_rank(within_but_empty, filters) < demotion_rank(over_but_stocked, filters)
+    filters = StructuralFilters(price_ceiling=80.0)
+    weights = BusinessWeights(availability=1.0, rotation=0.25)
+    over_but_stocked = _Candidate(price=900.0, qty_bucket="3+", sales_30d=40)
+    within_but_empty = _Candidate(price=40.0, qty_bucket="0", sales_30d=0)
+
+    assert demotion_rank(within_but_empty, filters, weights) < demotion_rank(
+        over_but_stocked, filters, weights
+    )
 
 
 def test_demote_reorders_on_stock_alone_when_no_rule_fired() -> None:
     """The early return is on "nothing to demote by", and stock is now part of that."""
     from jbg_ai.retrieval.filters import StructuralFilters, demote
 
+    from jbg_ai.retrieval.filters import BusinessWeights
+
     empty = _Candidate(qty_bucket="0")
     stocked = _Candidate(qty_bucket="3+")
 
-    ordered, demoted = demote([empty, stocked], StructuralFilters())
+    ordered, demoted = demote(
+        [empty, stocked], StructuralFilters(), BusinessWeights(availability=1.0)
+    )
 
     assert ordered == (stocked, empty)
     assert demoted == 1
