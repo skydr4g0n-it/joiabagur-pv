@@ -8,12 +8,12 @@
 
 ## 2. Fase 0 — las cuatro mediciones, sin tocar código de ranking
 
-- [ ] 2.1 **M1** — distribución de `min(distancia)` por consulta, separando las 43 contestables de las 5 de fuera de dominio; publicar y declarar si un solo valor las separa
-- [ ] 2.2 **M1 (decisión)** — aplicar el criterio de 1.4 y asignar el trabajo del umbral a la **fase A** (escalar, mueve la ventana) o a la **fase D** (regla relativa, no la mueve)
-- [ ] 2.3 **M2** — cobertura por consulta y por categoría con el denominador corregido; confirmar que `materiales`, `sinonimos`, `lexico-exacto` y `piedra` dan cobertura 1,00
-- [ ] 2.4 **M3** — hermanas de familia en el top-10 por consulta, cruzando los `ranked` del run `d9222333` con `product_document.family_id`; dejar la penalización de variante refutada con una cifra (D16)
-- [ ] 2.5 **M4** — reparto de `1-2` frente a `3+` sobre los 6.050 pares asignados; dejar el binario confirmado con una cifra (D17)
-- [ ] 2.6 Volcar las cuatro mediciones en `Documentos/Proyecto Final AIEng/informes/c25-implementation-measurements.md`
+- [x] 2.1 **M1** — distribución de `min(distancia)` por consulta, separando las 43 contestables de las 5 de fuera de dominio; publicar y declarar si un solo valor las separa
+- [x] 2.2 **M1 (decisión)** — aplicar el criterio de 1.4 y asignar el trabajo del umbral a la **fase A** (escalar, mueve la ventana) o a la **fase D** (regla relativa, no la mueve)
+- [x] 2.3 **M2** — cobertura por consulta y por categoría con el denominador corregido; confirmar que `materiales`, `sinonimos`, `lexico-exacto` y `piedra` dan cobertura 1,00
+- [x] 2.4 **M3** — hermanas de familia en el top-10 por consulta, cruzando los `ranked` del run `d9222333` con `product_document.family_id`; dejar la penalización de variante refutada con una cifra (D16)
+- [x] 2.5 **M4** — reparto de `1-2` frente a `3+` sobre los 6.050 pares asignados; dejar el binario confirmado con una cifra (D17)
+- [x] 2.6 Volcar las cuatro mediciones en `Documentos/Proyecto Final AIEng/informes/c25-implementation-measurements.md`
 
 ## 3. Fusión en dos etapas, con la plana conservada
 
