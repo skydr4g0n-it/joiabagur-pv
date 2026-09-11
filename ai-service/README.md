@@ -510,6 +510,67 @@ warm — the process-wide client does not reduce the round trip on a repeated qu
    labelled unscoped, a decision taken in C22 so that retrieval quality and assortment coverage
    are not compressed into one number, and the scoped row was cut by declared decision.
 
+## Ranking, business signals and abstention (C25)
+
+C25 used that judge and found four things no argument had. The report is
+[`evals/results/c25-baselines-2026-09-11.md`](evals/results/c25-baselines-2026-09-11.md) and the
+measurements are in
+[`c25-implementation-measurements.md`](../Documentos/Proyecto%20Final%20AIEng/informes/c25-implementation-measurements.md).
+
+**The fusion did not fuse: it concatenated.** With C21's weights the sixty lexical documents
+outscored the vector branch's best hit in **every** query, so a grade-2 document the vector
+branch ranked **first** landed at **position 33**. It was an arithmetic defect, not a badly
+calibrated weight. The fusion is now composed in **two stages** — the two lexical lists into one
+ranked list, that list against the vector one under per-**branch** weights — so a branch's total
+vote is exactly its declared weight however many of its own lists matched, and the lexical branch
+stops contributing 120 candidates against the vector branch's 60. `JPV_FUSION_MODE=flat` restores
+C21's single-stage fusion exactly, and the published baseline row pins it.
+
+**The lexical branch now weighs less when its best candidate matched less of the query.** The
+coordination tally had been computed, carried on every hit and read by nobody — the fourth
+stripped cable of this subsystem. `w_lex x coverage`, with **no parameter of its own**. The
+denominator counts only the groups whose `tsquery` is non-empty, which is the whole rule: a stop
+word the operator typed becomes a counting group that can never match, and counting it would cut
+the weight of a query that is in fact fully anchored. Measured against the same fusion with the
+rule off, it buys **+0,128** on `descripcion-sin-anclaje` and **exactly zero** on the other seven
+categories — and it turns the branch ratio from a cliff into a plateau, taking the sweep's range
+over `rho` from **0,070 to 0,007**.
+
+**Availability reorders, and it is read without restricting.** The scope that RESTRICTS
+(`pos_id`, C22's prefilter) and the scope that only READS (`signal_pos_id`) are two independent
+parameters over one CTE, so the reordering can be measured without paying the prefilter's recall
+cost. A candidate the point of sale does not carry reports its signals **absent**, and absence is
+never read as zero. The score only ever subtracts, which is what keeps an unread row neutral.
+`JPV_BUSINESS_WEIGHT_AVAILABILITY=0` is the rollback.
+
+**The retriever can decline to answer.** The form of the rule was chosen by a measurement under a
+criterion written before the distribution was inspected: the best-hit distances of answerable and
+out-of-domain queries **overlap completely**, so no scalar separates them. What discriminates is
+the **shape** of the distance profile — an impossible query is flat, because nothing stands out.
+`JPV_ABSTENTION_ENABLED=false` is the rollback and restores answering everything.
+
+**The calibration runs offline after one capture.** See the two phases above under
+`uv run evals capture` / `rescore`.
+
+**Four limitations this change declares rather than mitigates:**
+
+1. **`Recall@5` reaches 0,758 against the 0,85 the design asks for.** The gap is +0,09 and no
+   lever in this change can close it: recall at five depends on **what** enters the window, and
+   the business signals only reorder what already did. The criterion was restated as a relative
+   one — each row beats the one it is built on — and this distance is declared.
+2. **The signals row does not clear the relative criterion either.** `v3` improves the
+   operational metric by **+0,030**, below the 0,05 this golden set can resolve. It is adopted
+   because its own adoption rule is satisfied and because the set is **structurally blind** to
+   availability — `criterion.md` never mentions stock — so what is missing is resolution, not
+   evidence. Reported as a gap, not as a pass.
+3. **Abstention reaches 0,150 against the 0,80 the ticket asks for.** Reaching 0,80 costs
+   silencing **21 of the 43** answerable queries. The rule is fixed at the most it can catch
+   while silencing **none** of them, and the rest is declared.
+4. **The out-of-domain category is unbalanced in a way that is measured but not corrected.**
+   Naming a material pulls a query **0,12 closer** to the catalogue and makes it look more
+   answerable; 12 of the 20 queries name one, because the five inherited from C24 all do and
+   rewriting them would falsify the comparison with the published baseline.
+
 ## Tests
 
 ```bash

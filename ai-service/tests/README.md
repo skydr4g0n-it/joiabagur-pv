@@ -133,3 +133,34 @@ not decoration: pydantic reads unset fields from the environment, so without the
 pin a developer with `DATABASE_URL` exported would see tests build engines against
 their own database — and the cases that assert "no database configured" would
 quietly stop failing when they should.
+
+## C25 — ranking, business signals and abstention
+
+`tests/retrieval/test_abstention.py` is new and owns the rule that declines to answer: the shape
+of the distance profile, what the rule must never do, and the observability. Its fixtures carry
+**twenty** candidates rather than ten, because a profile cannot be flat against a rule that asks
+for fifteen and a test that passed on that technicality would witness nothing.
+
+The rest extends files that already existed:
+
+| file | what C25 added |
+|---|---|
+| `test_fusion.py` | that `fuse` composes with itself without touching the formula, and that the flat mode is bit-identical to C21's single stage |
+| `test_orchestrator.py` | the two-stage fusion, the coverage rule and its **gate** |
+| `test_pos_scope.py` | the reading scope against the restricting one, and the business score |
+| `test_filters.py` | the ordering key with a continuous tail |
+| `test_sweep_phases.py` | capture and re-score, and that the second reaches no provider and no database |
+| `test_golden_validation.py` | the out-of-domain category at its new floor of twenty |
+
+**The gate is `test_full_coverage_leaves_the_lexical_weight_untouched`.** It covers five
+categories measured at coverage 1,00, and each of its five queries is a **real** query of the
+golden set chosen because the naive denominator breaks it. Verified by injecting that
+denominator: all five fail. A gate that cannot fail is not a gate.
+
+**C22's sales guard was retired and replaced.** It forbade `sales_30d`, `sales_90d` and
+`last_sale_at` from reaching the pipeline at all. `sales_30d` now travels — the report publishes
+its distribution and C26 needs it — so the guarantee moved to where it can still be structural:
+**the protocol the ordering reads does not carry the field**, so `demote` cannot consume it even
+by accident. The other two still never reach the pipeline, and no ordering module may reach for a
+wall clock.
+

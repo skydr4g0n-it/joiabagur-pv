@@ -119,14 +119,14 @@
 
 ## 13. Documentación, contrato y cierre
 
-- [ ] 13.1 Verificar que `ai-service/openapi.json` queda **sin diff** y que no hay migración de Alembic
-- [ ] 13.2 Verificar que `backend/`, `frontend/`, `terraform/` y `.github/workflows/` quedan **sin diff**
-- [ ] 13.3 `ai-service/README.md` — pesos por rama, cobertura, señales, abstención, las dos fases del barrido y las **cuatro limitaciones** a declarar
-- [ ] 13.4 `ai-service/tests/README.md` — los tests nuevos y la retirada del guardián de ventas
-- [ ] 13.5 Renombrar en comentarios de código las referencias a C25 que lo nombran como sucesor: `retrieval/filters.py`, `retrieval/fusion.py`, `tests/retrieval/test_fusion.py`, `tests/retrieval/test_pos_scope.py`
-- [ ] 13.6 Actualizar la **ficha C25** y añadir la entrada fechada del §0 en `Documentos/Proyecto Final AIEng/proyecto-final-plan-changes-openspec.md`, con el renombrado y las dos refutaciones
-- [ ] 13.7 Actualizar el **§11.2 del diseño RAG**: `v3-señales` pasa a dos filas y el criterio a relativo
-- [ ] 13.8 Actualizar `Documentos/epicas.md` al cerrar (estado de C25 y recuento)
-- [ ] 13.9 `uv run pytest` en verde, sin llamadas reales a proveedor ni a RDS
-- [ ] 13.10 `openspec validate --all --strict` en **`0 failed`**
+- [x] 13.1 Verificar que `ai-service/openapi.json` queda **sin diff** y que no hay migración de Alembic
+- [x] 13.2 Verificar que `backend/`, `frontend/`, `terraform/` y `.github/workflows/` quedan **sin diff**
+- [x] 13.3 `ai-service/README.md` — pesos por rama, cobertura, señales, abstención, las dos fases del barrido y las **cuatro limitaciones** a declarar
+- [x] 13.4 `ai-service/tests/README.md` — los tests nuevos y la retirada del guardián de ventas
+- [x] 13.5 Renombrar en comentarios de código las referencias a C25 que lo nombran como sucesor: `retrieval/filters.py`, `retrieval/fusion.py`, `tests/retrieval/test_fusion.py`, `tests/retrieval/test_pos_scope.py`
+- [x] 13.6 Actualizar la **ficha C25** y añadir la entrada fechada del §0 en `Documentos/Proyecto Final AIEng/proyecto-final-plan-changes-openspec.md`, con el renombrado y las dos refutaciones
+- [x] 13.7 Actualizar el **§11.2 del diseño RAG**: `v3-señales` pasa a dos filas y el criterio a relativo
+- [x] 13.8 Actualizar `Documentos/epicas.md` al cerrar (estado de C25 y recuento)
+- [x] 13.9 `uv run pytest` en verde, sin llamadas reales a proveedor ni a RDS
+- [x] 13.10 `openspec validate --all --strict` en **`0 failed`**
 - [ ] 13.11 `/opsx:verify` antes de archivar, con atención a las dos refutaciones y al orden de fases

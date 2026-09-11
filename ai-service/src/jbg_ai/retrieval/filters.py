@@ -14,8 +14,10 @@ catalogue) that carry no extracted materials at all — 36 rings out of every si
 The lookup is `ExpandedQuery.matched`, which C20 already built: no second mapping from typed
 term to vocabulary field is constructed over the same data.
 
-This module is the seam C25 replaces with calibrated weights against the golden set. Doing so
-undoes nothing, because a stable block sort is a score with two values.
+C25 took that seam: the fourth integer of the key became a continuous business score, and
+doing so undid nothing, because a stable block sort IS a score with two values. What it buys
+is a bounded blast radius — every weight lives in one term at the end of the key — and what it
+keeps is the lexicographic precedence of everything the operator actually typed.
 """
 
 from __future__ import annotations

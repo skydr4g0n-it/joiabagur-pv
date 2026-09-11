@@ -55,7 +55,7 @@ def test_provenance_reports_every_list_and_position() -> None:
 
 
 def test_fusion_performs_no_input_or_output(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Pure by contract: C23, C25 and C26 import it without an endpoint around it."""
+    """Pure by contract: C23 imports it, C25 composes it with itself, C26 is next."""
 
     def _fail(*_args: object, **_kwargs: object) -> None:
         raise AssertionError("the fusion must not open a socket")

@@ -14,6 +14,52 @@
 
 Este documento se escribió antes de implementar. Cuando una sesión de diseño de un change concreto altera lo que su ficha decía, el cambio se registra aquí con fecha y motivo, y la ficha afectada se corrige en el sitio.
 
+### 2026-09-11 — C25, al aplicar: la fusión no fusionaba, y dos puntos de la ficha se caen por medición
+
+**Medido contra el Postgres local, sobre los 1.168 documentos vivos y el golden set de C24.** El
+change se renombra de `add-business-signals-ranking` a **`recalibrate-ranking-and-abstention`**,
+porque el nombre viejo cubría un tercio de lo que había que hacer. El número **se conserva**:
+renumerar rompería las referencias de C26 (`prereq C22, C25`) y C27 (`C10, C25`) a cambio de nada.
+
+**El hallazgo que reordenó el change.** La fusión de C21 no fusionaba: **concatenaba**. Con
+`wC = 0,33` los sesenta documentos léxicos ganaban al mejor acierto vectorial en **toda** consulta,
+de modo que un documento de grado 2 que la rama vectorial ponía **primero** caía a la **posición
+33** — reproducido en tres consultas distintas y también en el modelo. Es un defecto **aritmético**
+y no un peso mal calibrado, así que la ficha pasa de «calibrar pesos» a **rehacer la composición**:
+dos etapas, pesos por rama, y la rama léxica deja de meter 120 candidatos contra 60.
+
+**Tres puntos de la ficha se retiran, los tres refutados por medición y no por argumento:**
+
+1. **Penalizar la variante ambigua dentro de familia.** 29,2 % de las consultas tienen 3+ hermanas
+   en el top-10 pero **ninguna pasa de cuatro**, así que la familia nunca ocupa más de 4 de los 10
+   huecos que el operador ve. Es un problema de **presentación** y pertenece a C30/C36; penalizar
+   costaría relevancia y escondería al operador que las tallas existen.
+2. **Calibrar `1-2` frente a `3+`.** Con la función de ganancia operativa los dos caen en la misma
+   rama y ninguno pierde grado, así que **no existe función objetivo** que pueda ordenarlos. Y
+   `1-2` son 191 pares contra 5.431: aunque existiera, calibraría sobre ruido.
+3. **Ordenar por rotación.** Retirada **durante el apply**. Como el desempate estricto que su
+   propio requisito describía decidía **cero** pares del top-5 en las 48 consultas; como clave de
+   ordenación no desempataba sino que **particionaba** —11.067 pares invertidos, el 71,2 % a más de
+   diez puestos— y costaba relevancia donde actuaba. `sales_30d` se sigue leyendo para diagnóstico
+   y no ordena nada.
+
+**Lo que el change entrega, con su cifra.** La fusión por rama gana **+0,083** sobre la línea base
+en la lectura que decide. La ponderación adaptativa por cobertura aporta **+0,128** en
+`descripcion-sin-anclaje` y **cero exacto** en las otras siete categorías, y convierte la elección
+del cociente de rama de **acantilado en meseta** (recorrido del barrido 0,070 → 0,007). La señal de
+disponibilidad retira el **91 %** de las piezas agotadas del top-5. La abstención pasa de 0,050 a
+**0,150** sin silenciar ni una consulta contestable.
+
+**Y tres listones no se alcanzan, declarados y no cerrados:** el `Recall@5 ≥ 0,85` del §11.2 se
+queda en **0,758**; la abstención de 0,80 de la ficha, en **0,150**; y `v3` no bate a `v2b` por el
+margen de 0,05 —**+0,030** operativo— aunque cumple su propia regla de adopción. Los tres son
+listones fijados **antes de que existiera el instrumento** que los mediría. Ninguno se ha cerrado
+moviendo el listón después de medir, y ninguna etiqueta se ha reescrito.
+
+**Zona.** Decimotercera vez que la ficha se queda corta: además de `retrieval/` toca `evals/`,
+`config/settings.py` y `evals/golden/`. Sin diff en `backend/`, `frontend/`, `terraform/`,
+`.github/` ni `openapi.json`, y sin migración de Alembic.
+
 ### 2026-09-01 — C20, al explorar: el diccionario no es sólo de sinónimos, y una consulta ensanchada tira el término exacto
 
 **Medido contra el Postgres local, sobre los 1.168 documentos vivos de `ai.product_document` y con 12 embeddings reales del proveedor.** La ficha describía un fichero YAML de sinónimos comerciales. Es eso y dos cosas más que nadie había nombrado.
@@ -607,7 +653,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 | **C22** | `add-pos-projection-soft-prefilter` | Python + .NET | C10, C12, C14 | 🟢 | **archivado el 5 sep** · *tres puntos de la ficha refutados con medición; entra además el reloj inyectado (FIX2)* |
 | **C23** | `add-knowledge-corpus-and-indexer` | Python | C11 | 🟢 | **archivado el 6 sep** · *zona, alcance y conflicto de zona de la ficha refutados por la implementación* |
 | **C24** | `add-eval-harness-golden-set-and-baselines` | Python | C14, C21 | ✅ | **archivado el 2026-09-11** · dec. 12 respondida: la vectorial bate a la léxica · etiquetado simple |
-| **C25** | `add-business-signals-ranking` | Python | C21, C22, C24 | 🔴 | — |
+| **C25** | `recalibrate-ranking-and-abstention` | Python | C21, C22, C24 | 🔴 | **rev. 2026-09-11** · renombrado; 3 puntos retirados por medición |
 | **C26** | `add-substitutes-retrieval` | Python | C22, C25 | 🟢 | specs v2 §6.3.2 |
 | **C27** | `add-complementary-recommendations` | Python + .NET 🗄️ | C10, C25 | 🟢 | **rev. dec. 8** · **corte nº 1 pre-autorizado** |
 | **C28** | `add-profile-review-ui-and-metrics` | Frontend + .NET | C08 | 🟢 | **rev. dec. 5** · *lo pide el checklist §16* |
