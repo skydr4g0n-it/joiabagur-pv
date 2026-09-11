@@ -686,6 +686,37 @@ C24 no lo corrigió por procedencia y no por pereza: tocar el fichero movía `go
 su informe habría afirmado una versión bajo la que nunca corrió. **Aquí sale gratis**, porque la
 versión ya se ha movido al ampliar la categoría. Los 3.926 pasan a `2026-09-07`.
 
+### 12.4 · Profundizar el *pool*: no hay nada que juzgar
+
+| configuración | sin juicio @5 | @10 | @20 |
+|---|---:|---:|---:|
+| `v2b-fusion` | **0** | 0 | 0 |
+| `v3-senales` | **0** | 0 | 2 |
+
+**`unjudged@5` es 0,0000 en las dos filas.** La predicción de la exploración se confirma: los
+documentos que la fusión por rama puede promover al top-5 **ya están juzgados todos**, porque C24
+metió `v1-vectorial` en su *pool* y la corrección de la fusión promueve exactamente lo que esa
+rama ya veía. **Ninguna persona tiene que etiquetar nada para esta ampliación.**
+
+A profundidad 20 —la de *pooling* declarada— `v3` promueve **dos** pares sin juicio, y los dos
+están en la **posición 20 exacta**:
+
+| consulta | categoría | producto |
+|---|---|---|
+| `q02` *la lagartija que toma el sol en las paredes* | `descripcion-sin-anclaje` | `231e8d76-…` |
+| `q03` *el calzado tipico que se lleva en las fiestas de la isla* | `descripcion-sin-anclaje` | `db599e46-…` |
+
+Es un **efecto de frontera** y no de la fusión: el *pool* se construyó a profundidad 20 con las
+configuraciones de C24, y la reordenación por disponibilidad cambia cuál cae en el último puesto.
+**No afectan a ninguna cifra publicada** —todas se calculan a 5 o a 3— y quedan anotados por si un
+change posterior informa más hondo. **No se juzgan aquí: el golden set lo etiqueta una persona.**
+
+Para que esta cifra signifique algo hubo que arreglar antes una lectura: las 15 consultas nuevas
+no llevan filas de juicio, así que `unjudged@5` habría salido 1,00 para ellas y habría marcado la
+categoría entera como **no comparable**. Por la rúbrica **sí están juzgadas** —todo es grado 0—,
+así que la métrica trata ahora `fuera-de-dominio` como plenamente juzgada en lugar de escribir
+miles de ceros que no dicen nada.
+
 ### La versión del conjunto, y lo que arrastra
 
 ```

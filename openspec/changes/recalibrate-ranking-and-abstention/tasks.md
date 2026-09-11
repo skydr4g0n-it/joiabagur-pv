@@ -109,9 +109,9 @@
 - [x] 12.2 **Declarar la contaminación que este change crea**: el barrido corre sobre las 48, así que al fijar `ρ` las 40 hoy limpias dejan de serlo para cualquier change posterior. Re-marcar el golden set en consecuencia y registrar en el informe qué lectura queda sin contaminar
 - [x] 12.2b Dejar **al menos una lectura limpia** para C26 y C38: las consultas nuevas de 12.1 no entran en ningún barrido de este change, así que nacen y se conservan como partición no contaminada. Anotar explícitamente que la marca `in_tuning_set` es un hecho histórico y **nunca** una elección — marcar como contaminada una consulta limpia sería falsear la única defensa contra el sobreajuste que este conjunto tiene
 - [x] 12.3 Validación de composición: la carga falla si `fuera-de-dominio` baja del mínimo declarado
-- [ ] 12.4 *Pooling* de lo que `v2b` y `v3` promuevan; **juzgar sólo lo nuevo**, agrupando por categoría y con relectura diferida de las dudosas
+- [x] 12.4 *Pooling* de lo que `v2b` y `v3` promuevan; **juzgar sólo lo nuevo**, agrupando por categoría y con relectura diferida de las dudosas
 - [x] 12.5 Corregir el desfase de un día en `judged_at` que C24 dejó a propósito
-- [ ] 12.6 Re-correr **las seis filas** bajo la versión nueva, `v0-cag` incluida, para que la tabla comparte una sola procedencia
+- [x] 12.6 Re-correr **las seis filas** bajo la versión nueva, `v0-cag` incluida, para que la tabla comparte una sola procedencia
 - [ ] 12.6b **Fijar los parámetros de la regla de abstención** sobre la categoría ampliada de 12.1 y decidir si se activa. **Tarea añadida el 2026-09-11 durante el apply:** el plan no la tenía, y sin ella la regla queda implementada pero con sus dos parámetros ajustados a cinco consultas — que es lo que este change rechaza en todas partes. Publicar las dos caras del intercambio sobre las 15-20
 - [ ] 12.7 **Re-confirmar** los ganadores de 9.4 y 10.4 contra el titular en la versión nueva — un punto de rejilla, no la rejilla
 - [ ] 12.8 Informe versionado en `ai-service/evals/results/` con la tabla v0→v3 de seis filas, las lecturas de D14 con su recuento de saturación, la distribución de D11 y el antes/después de las consultas sin anclaje

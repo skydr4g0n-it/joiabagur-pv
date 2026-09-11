@@ -24,7 +24,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from uuid import UUID
 
-from jbg_ai.evals.golden import MAX_GRADE, RELEVANT_FROM, GoldenSet
+from jbg_ai.evals.golden import MAX_GRADE, OUT_OF_DOMAIN, RELEVANT_FROM, GoldenSet
 
 #: Where the acceptance criterion is applied and where the report reads its headline.
 CUTOFF = 5
@@ -177,6 +177,11 @@ def score_case(
     inflated by making the task smaller.
     """
     judged = {item.product_id: item for item in golden.judgements_for(query_id)}
+    # An out-of-domain query has every document at grade zero BY the annotation criterion, so
+    # nothing about it is unjudged. Reading the absence of rows as "unjudged" would mark the
+    # whole category not comparable and hide the one figure it exists to produce; writing
+    # thousands of zero rows to say the same thing would be worse.
+    out_of_domain = golden.query(query_id).category == OUT_OF_DOMAIN
     relevant = [
         item
         for item in golden.relevant_documents(query_id)
@@ -186,7 +191,7 @@ def score_case(
     def grade_of(product_id: UUID) -> int | None:
         item = judged.get(str(product_id))
         if item is None:
-            return None
+            return 0 if out_of_domain else None
         if origin is not None and item.data_origin != origin:
             return 0
         return item.grade
