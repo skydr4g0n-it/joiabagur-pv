@@ -530,6 +530,69 @@ No es una contradicción entre dos reglas: son dos preguntas distintas. La regla
 pregunta *¿es seguro encender esta señal?* y la respuesta es sí. D2 pregunta *¿ha demostrado esta
 fila que merece existir?* y la respuesta honesta es **no con este instrumento**.
 
+## Fase D · La abstención: forma elegida, parámetros sin fijar (tareas 11.1 a 11.5)
+
+### M9 · Lo que separa no es el nivel, es la forma
+
+M1 midió el **nivel** —`min(distancia)`— y encontró contención total. Lo que faltaba era mirar la
+**forma del perfil**: una consulta contestable tiene un **pico**, una de fuera de dominio es
+**plana**, porque nada del catálogo destaca para ella.
+
+| estadístico | contestables (mediana) | fuera de dominio (mediana) |
+|---|---:|---:|
+| `d1` (nivel, M1) | 0,3983 | 0,5025 |
+| `d1/d5` | 0,9224 | **0,9725** |
+| `d1/d10` | 0,8774 | **0,9625** |
+| `(d10−d1)/d1` | 0,1397 | **0,0390** |
+
+Ninguno separa limpiamente —las cinco de fuera siguen contenidas en el rango de las 43— pero la
+dirección es inequívoca y **sostiene una regla mucho más barata que el escalar**.
+
+### Las dos caras del intercambio, por regla candidata (tarea 11.5)
+
+Regla: **abstenerse si `|{d ≤ d_min·(1+α)}| ≥ N`** — el perfil es plano, nada destaca.
+
+| α | N | de las 5 de fuera, calla | de las 43 contestables, silencia |
+|---:|---:|---:|---:|
+| 0,02 | 5 | 1 | 3 |
+| 0,03 | 5 | 3 | **4** |
+| **0,05** | **10** | **3** | **4** |
+| 0,05 | 5 | 4 | 8 |
+| 0,08 | 10 | 4 | 9 |
+| 0,08 | 20 | 3 | 5 |
+| 0,10 | 20 | 4 | 9 |
+| 0,15 | 20 | 5 | 16 |
+| 0,05 | 3 | 5 | 18 |
+
+**Contra el escalar, a igual captura, es cuatro veces más barata:**
+
+| para callar | escalar (M1) cuesta | **regla relativa** cuesta |
+|---|---:|---:|
+| 3 de 5 | 17 de 43 | **4 de 43** |
+| 5 de 5 | 19 de 43 | 16 de 43 |
+
+M1 asignó bien la fase: la forma relativa es genuinamente mejor, no sólo distinta.
+
+### Por qué la regla se implementa pero **se envía apagada**
+
+Fijar **dos parámetros contra cinco consultas** es exactamente lo que este change ha rechazado en
+todas partes: es ajustar a cinco puntos y validar sobre nada. Y el propio diseño ya lo dijo en
+D11 — *«con n=5 la única cifra de aceptación alcanzable no es creíble»*.
+
+Así que la regla queda **implementada, medida y publicada**, y **no decide nada**:
+`jpv_abstention_enabled` es `false` por defecto. Los valores `α = 0,05` y `N = 10` son el mejor
+punto de operación medido sobre las cinco, y están declarados como **punto de partida de una
+calibración**, no como decisión.
+
+Encenderla sólo puede hacer que el servicio conteste **menos**, así que el default que no cambia
+nada es el seguro.
+
+> **Hallazgo de secuenciación, y es del plan, no de la medición.** La tarea 12.1 amplía
+> `fuera-de-dominio` de 5 a 15-20 y **no cuesta etiquetado documento a documento**, porque por la
+> rúbrica todo es grado 0 ahí. Los parámetros de esta regla deberían fijarse **después** de esa
+> ampliación, y ninguna tarea del plan lo hace: la 12.7 re-confirma los ganadores de 9.4 y 10.4 —
+> fusión y señales— y no menciona la abstención. Queda como tarea nueva a añadir en la fase E.
+
 ## Qué queda decidido al cerrar la fase 0
 
 1. **La abstención es una regla relativa por consulta y vive en la fase D.** No mueve la ventana.

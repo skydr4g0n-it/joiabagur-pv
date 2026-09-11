@@ -65,6 +65,23 @@ BUSINESS_DEFAULTS: dict[str, Any] = {
     "jpv_business_weight_availability": 1.0,
 }
 
+#: C25 abstention. The FORM was selected by a measurement under a criterion written before it
+#: — the two populations of best-hit distance overlap completely, so a scalar bound cannot
+#: separate them — and the relative rule reads the SHAPE of the distance profile instead: an
+#: out-of-domain query is flat, because nothing in the catalogue stands out for it.
+#:
+#: **It ships disabled.** Its two parameters cannot be fixed against five out-of-domain
+#: queries, and fitting two numbers to five points is what this change refused to do
+#: everywhere else. They are fixed once the category grows to 15-20, which needs no
+#: per-document labelling. The values below are the best operating point measured on the five
+#: — three of five caught at a cost of four answerable queries, four times cheaper than the
+#: scalar — and they are a STARTING POINT for that calibration, not a decision.
+ABSTENTION_DEFAULTS: dict[str, Any] = {
+    "jpv_abstention_enabled": False,
+    "jpv_abstention_band_alpha": 0.05,
+    "jpv_abstention_band_min_candidates": 10,
+}
+
 
 #: C23 knowledge defaults, in one place for the same reason as FUSION_DEFAULTS: the field
 #: default, the blank-string fallback and the canonical OpenAPI profile are three copies of
@@ -379,6 +396,40 @@ class Settings(BaseSettings):
         ),
     )
 
+    jpv_abstention_enabled: bool = Field(
+        default=ABSTENTION_DEFAULTS["jpv_abstention_enabled"],
+        description=(
+            "C25 relative abstention rule (JPV_ABSTENTION_ENABLED). Optional at boot; blank "
+            "means unset. Default FALSE: the rule is implemented, measured and published, and "
+            "it decides nothing until its parameters are fixed against a category of 15-20 "
+            "out-of-domain queries rather than the five it has today. Enabling it can only "
+            "make the service answer LESS, so the default that changes nothing is the safe "
+            "one. Not required to boot /health."
+        ),
+    )
+
+    jpv_abstention_band_alpha: float = Field(
+        default=ABSTENTION_DEFAULTS["jpv_abstention_band_alpha"],
+        ge=0,
+        description=(
+            "C25 half-width of the band around the best retrieval distance, as a fraction of "
+            "it (JPV_ABSTENTION_BAND_ALPHA). With JPV_ABSTENTION_BAND_MIN_CANDIDATES it says "
+            "when a distance profile is FLAT — nothing stands out — which is the shape an "
+            "out-of-domain query has. A starting point measured on five queries, not a fixed "
+            "figure. Not required to boot /health."
+        ),
+    )
+
+    jpv_abstention_band_min_candidates: int = Field(
+        default=ABSTENTION_DEFAULTS["jpv_abstention_band_min_candidates"],
+        gt=0,
+        description=(
+            "C25 how many candidates must fall inside the band before the profile counts as "
+            "flat (JPV_ABSTENTION_BAND_MIN_CANDIDATES). See JPV_ABSTENTION_BAND_ALPHA. Not "
+            "required to boot /health."
+        ),
+    )
+
     jpv_pos_prefilter_enabled: bool = Field(
         default=True,
         description=(
@@ -632,6 +683,19 @@ class Settings(BaseSettings):
         """A blank export means "unset". A blank weight read as 0 would silence a branch."""
         if isinstance(value, str) and not value.strip():
             return FUSION_DEFAULTS[str(info.field_name)]
+        return value
+
+    @field_validator(
+        "jpv_abstention_enabled",
+        "jpv_abstention_band_alpha",
+        "jpv_abstention_band_min_candidates",
+        mode="before",
+    )
+    @classmethod
+    def blank_abstention_setting_is_default(cls, value: object, info: ValidationInfo) -> object:
+        """A blank export means "unset". Read as false it would silently disable the rule."""
+        if isinstance(value, str) and not value.strip():
+            return ABSTENTION_DEFAULTS[str(info.field_name)]
         return value
 
     @field_validator("jpv_business_weight_availability", mode="before")

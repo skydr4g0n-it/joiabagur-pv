@@ -1084,9 +1084,22 @@ def test_coverage_introduces_no_configured_parameter() -> None:
     from jbg_ai.config.settings import FUSION_DEFAULTS
 
     settings = build_settings()
-    for name in dir(settings):
-        assert "coverage" not in name and "alpha" not in name, f"{name} is a coverage knob"
-    assert not any("coverage" in key or "alpha" in key for key in FUSION_DEFAULTS)
+    # Nothing in the settings governs the COVERAGE scaling. The guard names the scaling
+    # rather than the word `alpha`, because the abstention rule legitimately has one and a
+    # test that forbade the letter would fail for a reason it does not mean.
+    for name in type(settings).model_fields:
+        assert "coverage" not in name, f"{name} is a coverage knob"
+    assert not any("coverage" in key for key in FUSION_DEFAULTS)
+    # And the rule itself takes no strength argument: only which of the two forms to apply.
+    import inspect
+
+    from jbg_ai.retrieval.orchestrator import _scaled_lexical_weight
+
+    assert set(inspect.signature(_scaled_lexical_weight).parameters) == {
+        "weight",
+        "coverage",
+        "rule",
+    }
 
 
 def test_the_control_arm_switches_the_rule_off_without_a_parameter() -> None:

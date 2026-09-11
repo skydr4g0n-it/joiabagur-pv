@@ -41,6 +41,9 @@ from jbg_ai.config.settings import (
 from jbg_ai.indexing.constants import DEFAULT_EMBEDDING_MODEL
 from jbg_ai.indexing.embeddings import EmbeddingClient, EmbedResult, LiteLlmEmbeddingClient
 from jbg_ai.indexing.errors import EmbeddingError
+from jbg_ai.retrieval.abstention import AbstentionRule
+from jbg_ai.retrieval.abstention import log_decision as log_abstention
+from jbg_ai.retrieval.abstention import should_abstain
 from jbg_ai.retrieval.errors import InvalidFamilyIdError, RetrievalDependencyError
 from jbg_ai.retrieval.filters import (
     OUT_OF_STOCK_BUCKET,
@@ -183,6 +186,7 @@ async def retrieve_products(
     branch_weight_lexical: float | None = None,
     branch_weight_vector: float | None = None,
     coverage_rule: str = COVERAGE_CONTINUOUS,
+    abstain: bool | None = None,
     branch_depth: int | None = None,
     pos_prefilter: bool | None = None,
     signal_pos_id: UUID | None = None,
@@ -430,6 +434,38 @@ async def retrieve_products(
     shown = ordered[:window]
     fused = run_lexical and vector_ran
     low_confidence = _low_confidence(shown, fused=fused)
+
+    # The decision about whether the catalogue can answer this query at all. It runs HERE —
+    # after the fusion, over the distances the vector branch already produced — and not in the
+    # retrieval statement, because the measurement that chose its form also chose its phase:
+    # a relative rule does not alter the candidate set, which is what keeps the persisted
+    # windows of the calibration valid.
+    #
+    # It is reached only when the vector branch actually ran. A provider failure degrades to
+    # the lexical branch further up, or raises; serving that as an abstention would be the
+    # same lie as a 200 with an empty list, and D8 of the fusion design prevents it.
+    abstention = AbstentionRule(
+        enabled=(
+            settings.jpv_abstention_enabled if abstain is None else abstain
+        ),
+        band_alpha=settings.jpv_abstention_band_alpha,
+        min_candidates=settings.jpv_abstention_band_min_candidates,
+    )
+    distances = [hit.distance for hit in vector_hits]
+    abstained = vector_ran and should_abstain(distances, abstention)
+    if vector_ran:
+        log_abstention(
+            trace_id=principal.trace_id,
+            rule=abstention,
+            distances=distances,
+            abstained=abstained,
+        )
+    if abstained:
+        # A decision about the query, applied to the WHOLE response: no candidate is removed
+        # one by one, because an abstention built by filtering is indistinguishable from a
+        # retrieval that merely found little.
+        shown = []
+        low_confidence = True
 
     logger.info(
         "stage=fuse trace_id=%s mode=%s typed=%s expanded=%s vector=%s fused=%s branches=%s "

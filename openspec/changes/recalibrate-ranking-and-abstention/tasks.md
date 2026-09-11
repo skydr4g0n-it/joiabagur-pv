@@ -97,11 +97,11 @@
 
 ## 11. Fase D — abstención
 
-- [ ] 11.1 Implementar la forma de regla que M1 seleccionó, en el módulo que le corresponda según su fase
-- [ ] 11.2 Test `test_abstention_does_not_fire_on_answerable_queries`
-- [ ] 11.3 Test `test_dependency_failure_is_not_disguised_as_an_abstention` y `test_empty_projection_is_not_an_abstention`
-- [ ] 11.4 Log `stage=abstain` con la regla, la mejor distancia observada y la decisión; sin vectores
-- [ ] 11.5 Publicar, por cada regla candidata, la tasa sobre fuera de dominio **y** el número de contestables que silenció
+- [x] 11.1 Implementar la forma de regla que M1 seleccionó, en el módulo que le corresponda según su fase
+- [x] 11.2 Test `test_abstention_does_not_fire_on_answerable_queries`
+- [x] 11.3 Test `test_dependency_failure_is_not_disguised_as_an_abstention` y `test_empty_projection_is_not_an_abstention`
+- [x] 11.4 Log `stage=abstain` con la regla, la mejor distancia observada y la decisión; sin vectores
+- [x] 11.5 Publicar, por cada regla candidata, la tasa sobre fuera de dominio **y** el número de contestables que silenció
 
 ## 12. Fase E — golden set, re-corrida y publicación
 
@@ -112,6 +112,7 @@
 - [ ] 12.4 *Pooling* de lo que `v2b` y `v3` promuevan; **juzgar sólo lo nuevo**, agrupando por categoría y con relectura diferida de las dudosas
 - [ ] 12.5 Corregir el desfase de un día en `judged_at` que C24 dejó a propósito
 - [ ] 12.6 Re-correr **las seis filas** bajo la versión nueva, `v0-cag` incluida, para que la tabla comparte una sola procedencia
+- [ ] 12.6b **Fijar los parámetros de la regla de abstención** sobre la categoría ampliada de 12.1 y decidir si se activa. **Tarea añadida el 2026-09-11 durante el apply:** el plan no la tenía, y sin ella la regla queda implementada pero con sus dos parámetros ajustados a cinco consultas — que es lo que este change rechaza en todas partes. Publicar las dos caras del intercambio sobre las 15-20
 - [ ] 12.7 **Re-confirmar** los ganadores de 9.4 y 10.4 contra el titular en la versión nueva — un punto de rejilla, no la rejilla
 - [ ] 12.8 Informe versionado en `ai-service/evals/results/` con la tabla v0→v3 de seis filas, las lecturas de D14 con su recuento de saturación, la distribución de D11 y el antes/después de las consultas sin anclaje
 - [ ] 12.9 Aplicar el criterio **relativo** de D2 y declarar **las dos brechas** con sus cifras medidas: la absoluta contra el §11.2, y la del propio criterio relativo — `v2b` lo cumple (+0,073) y **`v3` no** (+0,027 operativo, bajo el margen de 0,05)
