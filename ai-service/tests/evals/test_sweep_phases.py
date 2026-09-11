@@ -338,7 +338,9 @@ def test_the_capture_phase_runs_end_to_end_against_the_ports() -> None:
     )
 
     assert result.version == CAPTURE_VERSION
-    assert len(result.windows) == 48, "one window per judged query"
+    assert len(result.windows) == len(load_golden_set().judged_queries), (
+        "one window per judged query"
+    )
     assert result.fusion.signal_pos_id == str(pos)
     assert result.buckets, "the assortment's buckets must be persisted for the operational metric"
 

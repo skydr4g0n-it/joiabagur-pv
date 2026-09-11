@@ -593,6 +593,109 @@ nada es el seguro.
 > ampliación, y ninguna tarea del plan lo hace: la 12.7 re-confirma los ganadores de 9.4 y 10.4 —
 > fusión y señales— y no menciona la abstención. Queda como tarea nueva a añadir en la fase E.
 
+## Fase E · El golden set, ampliado y re-marcado (tareas 12.1 a 12.5)
+
+### M10 · Nombrar el material es un confusor, medido
+
+Antes de escribir una sola consulta se midió qué hace decir «de plata» o «de oro». Diez pares
+controlados, el mismo producto con y sin el material:
+
+| efecto medio de nombrar el material | |
+|---|---:|
+| `d1` (nivel) | **−0,1225** → acerca la consulta al catálogo |
+| `d1/d10` (forma) | **−0,0202** → la hace parecer **más puntiaguda** |
+| candidatos en banda del 5 % | **−6,9** (de ~13 a ~6) |
+
+Casos extremos: `un abrecartas` deja **20** candidatos en banda y `un abrecartas de plata`, **6**;
+`un lingote` deja 20 y `un lingote de oro`, **1**.
+
+**Nombrar el material hace que una consulta imposible parezca contestable.** Un conjunto
+construido todo «con material» mediría en parte *«¿menciona un metal del catálogo?»* en vez de
+*«¿existe este producto?»*, y una regla calibrada ahí aprendería «plata → contestable».
+
+Pero quitarlo del todo sería peor: sin material las consultas quedan lejos y planas, la regla las
+caza casi todas y **la tasa de abstención saldría inflada**. También sería irreal.
+
+**Decisión: equilibrio declarado.** De las 15 nuevas, **7 nombran material y 8 no**. Las cinco
+previas lo nombran las cinco, así que el conjunto de 20 queda en **12 con / 8 sin**, y ese sesgo
+residual se declara aquí en lugar de corregirse: `q44`-`q48` son un hecho histórico, ya juzgadas,
+y reescribirlas falsearía la comparación con la línea base de C24.
+
+### Las 15, y la restricción que casi las tumba
+
+Todas son productos que una joyería española recibe como petición y que este catálogo no tiene.
+La imposibilidad está verificada: **el sustantivo principal de cada una aparece en 0 documentos**
+—`correa`, `reloj`, `pila`, `bandeja`, `cubertería`, `salero`, `abrecartas`, `pluma`,
+`estilográfica`, `joyero`, `petaca`, `moneda`, `lingote`, `sonajero`, `placa`, `candelabro`—.
+
+**La validación P5 rechazó 7 de 15, y eran exactamente las «sin material».** La regla exige que
+la consulta resuelva un término del diccionario de C20, y el diccionario cubre tipo de pieza,
+material, piedra, color, estilo y ocasión. Es decir: **la validación imponía mecánicamente el
+confusor que acabábamos de equilibrar.**
+
+Se consideró ensanchar la regla a una prueba por distancia y **se descartó por medición**: el
+sinsentido real cae fuera del rango de las contestables —`xyzzy quimbombo` 0,7475,
+`asdfgh qwerty zxcvb` 0,8150— pero *«una excavadora hidráulica de cadenas»* cae **dentro**
+(0,6493). Una prueba por distancia sola admitiría consultas que no son de joyería, así que la
+regla del diccionario caza algo real y se conserva.
+
+**La salida fue reformular, no relajar.** Las 7 se anclan al dominio con vocabulario del catálogo
+que **no es material**: `regalo` y `boda` (`occasion_tags`), `pulsera` y `anillos` (`piece_type`).
+`una pila para el reloj de pulsera` es más natural que la original, y el equilibrio 7/8 se
+conserva intacto.
+
+### M11 · La ampliación diluía un requisito de composición
+
+Efecto lateral que sólo aparece al ejecutar: cinco de las consultas reformuladas resuelven **sólo
+a `occasion_tags`**, así que contaban para el requisito **P3 subjective** — el que exige consultas
+cuya respuesta venga de un campo escasamente etiquetado. El recuento pasaba de **6 a 11**.
+
+**Una consulta que nada responde no puede demostrar que un campo escaso la respondió.** P3 pasa a
+excluir `fuera-de-dominio`. Sin ese arreglo, un déficit real de consultas subjetivas habría pasado
+inadvertido a partir de este change.
+
+### 12.2 · La contaminación que este change crea
+
+El barrido de la fase A corrió sobre las **48** consultas juzgadas de la versión anterior. Al
+fijar `rho` con ellas, **las 40 que hoy están marcadas como limpias dejan de serlo aguas abajo**:
+cualquier change posterior que las use para arbitrar la fusión estaría validando sobre el conjunto
+con el que se calibró.
+
+**`in_tuning_set` no se toca, y eso es deliberado.** Registra un **hecho histórico** —qué consultas
+calibraron qué— y no una elección. Marcar como contaminada una consulta limpia falsearía la única
+defensa contra el sobreajuste que este conjunto tiene, así que la contaminación se declara **aquí**
+y no reescribiendo el dato.
+
+### 12.2b · La lectura que queda limpia
+
+**Las 15 consultas nuevas no entran en ningún barrido de este change.** Se añadieron después de
+congelar `v2b` (9.4) y `v3` (10.4), así que nacen limpias y se conservan como la partición no
+contaminada que C26 y C38 necesitan.
+
+Son de `fuera-de-dominio`, así que sirven para arbitrar **abstención** y no relevancia. Para
+relevancia, la lectura limpia que queda es la que este change no pudo evitar contaminar, y el
+informe lo dice en lugar de fingir lo contrario.
+
+### 12.5 · El desfase de un día, corregido
+
+C24 dejó los 3.926 juicios con `judged_at: 2026-09-06` mientras `criterion.md` lleva la hora del
+reloj **00:22:40 del 7**, de modo que sobre el dato desnudo *todos* los juicios precedían al
+criterio — lo contrario de lo que pasó: la sesión de etiquetado entró en la madrugada del 7.
+
+C24 no lo corrigió por procedencia y no por pereza: tocar el fichero movía `golden_set_version` y
+su informe habría afirmado una versión bajo la que nunca corrió. **Aquí sale gratis**, porque la
+versión ya se ha movido al ampliar la categoría. Los 3.926 pasan a `2026-09-07`.
+
+### La versión del conjunto, y lo que arrastra
+
+```
+1:93a94fa8fbc3   →   1:198c4af44506
+```
+
+**Ninguna cifra publicada por C24 sigue siendo comparable.** Es exactamente lo que las tareas
+12.6 y 12.7 existen para arreglar: las seis filas se re-corren bajo la versión nueva y los
+ganadores de 9.4 y 10.4 se re-confirman contra el titular.
+
 ## Qué queda decidido al cerrar la fase 0
 
 1. **La abstención es una regla relativa por consulta y vive en la fase D.** No mueve la ventana.

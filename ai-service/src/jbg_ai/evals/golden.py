@@ -106,7 +106,15 @@ MINIMUM_UNANCHORED = 12
 MINIMUM_SUBJECTIVE = 5
 MINIMUM_STONE = 4
 MINIMUM_SYNONYM_PER_KIND = 2
-MINIMUM_OUT_OF_DOMAIN = 5
+#: The category name a query carries when the catalogue cannot answer it at all.
+OUT_OF_DOMAIN = "fuera-de-dominio"
+
+#: How many out-of-domain queries the set must carry for an abstention rate to be a figure
+#: anybody can act on. Raised from 5 to 20 by C25: with five, the only reachable acceptance
+#: number is not credible, and a rule with two parameters fitted against five points is fitted
+#: to five points. Growing the category costs no per-document labelling, because every
+#: document is grade zero there by the annotation criterion.
+MINIMUM_OUT_OF_DOMAIN = 20
 MINIMUM_LEXICAL_LITERAL = 4
 MINIMUM_JUDGED_QUERIES = 45
 """The hard floor of the composition. 48 is the target; below 45 the set stops covering the
@@ -482,8 +490,9 @@ def _validate_structure(golden: GoldenSet) -> None:
 
     for item in golden.queries:
         recorded = golden.judgements_for(item.id)
-        if item.judged and not recorded:
+        if item.judged and not recorded and item.category != OUT_OF_DOMAIN:
             raise GoldenSetError(f"{item.id}: declared as judged and carries no judgement")
+
         if not item.judged and recorded:
             raise GoldenSetError(
                 f"{item.id}: declared WITHOUT judgements and carries {len(recorded)}. The two "
@@ -524,10 +533,17 @@ def _validate_traceability(golden: GoldenSet) -> None:
         ),
     )
 
+    # Out-of-domain queries are excluded, and the reason is what the requirement is FOR: it
+    # asks for queries whose answer comes from a sparsely tagged field, and a query nothing
+    # answers cannot demonstrate that anything answered it. C25 made this bite — its
+    # out-of-domain queries are anchored to the domain through `regalo` and `boda` precisely
+    # so they are not nonsense, and five of them landed in this tally, taking it from 6 to 11
+    # and letting a real shortfall pass unnoticed.
     subjective = [
         item.id
         for item in golden.judged_queries
-        if (fields := resolved_fields(item.text, dictionary))
+        if item.category != OUT_OF_DOMAIN
+        and (fields := resolved_fields(item.text, dictionary))
         and fields & {"occasion_tags", "style_tags"}
         and not fields & HIGH_COVERAGE_FIELDS
     ]
@@ -614,6 +630,18 @@ def _validate_traceability(golden: GoldenSet) -> None:
             raise GoldenSetError(
                 f"{item.id}: declared out of domain and carries a relevant document. It is "
                 "answerable, so it measures ranking and not abstention",
+                requirement="P5 abstention",
+            )
+        # And no grade above zero at all, which is stricter than "no relevant document":
+        # the intermediate grade does not make a query answerable, but by the annotation
+        # criterion nothing in the catalogue deserves even that for a question it cannot
+        # satisfy, so one is evidence of a mislabelled query rather than of a near miss.
+        graded = {judgement.grade for judgement in golden.judgements_for(item.id)}
+        if graded - {0}:
+            raise GoldenSetError(
+                f"{item.id}: out of domain and carries a judgement of grade "
+                f"{sorted(graded - {0})}. Every document is grade zero here by the annotation "
+                "criterion, so a higher one is a mislabelled query or a broken rubric",
                 requirement="P5 abstention",
             )
     _require(

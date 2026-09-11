@@ -110,14 +110,36 @@ def _minimal_set() -> tuple[list[dict], list[dict]]:
         queries.append(_query(qid, text, "sinonimos", synonym_kind=kind))
         judgements.append(_judgement(qid, f"c{index:07d}-0000-0000-0000-000000000000", 2))
 
-    # 5 out of domain: plausible, and with nothing relevant at all.
+    # 20 out of domain: plausible, and with nothing relevant at all. C25 raised the floor
+    # from five, because two parameters of an abstention rule cannot be fixed against five
+    # points. The list mirrors the real set, including its deliberate balance between queries
+    # that name a catalogue material and queries that do not - measured, naming one pulls the
+    # query 0,12 closer to the catalogue and makes it look MORE answerable, so a category
+    # built entirely one way would measure the material rather than the absence.
     for index, text in enumerate(
         [
+            # with a material named
             "un reloj de plata sumergible",
             "piercing de ombligo de acero quirurgico",
             "un rosario de plata",
             "un dedal de plata de coleccion",
             "una hucha de plata para bautizo",
+            "una bandeja de plata para servir",
+            "cuberteria de plata para doce",
+            "un salero de plata",
+            "una petaca de plata",
+            "una moneda de plata antigua",
+            "un lingote de oro",
+            "un sonajero de plata para un bebe",
+            # without one, anchored to the domain by an occasion or a piece type instead
+            "una correa de reloj marron",
+            "un reloj de bolsillo para regalo",
+            "una pila para el reloj de pulsera",
+            "un abrecartas para un regalo de empresa",
+            "una pluma estilografica para un regalo",
+            "un joyero de viaje para los anillos",
+            "una placa para un aniversario de boda",
+            "un candelabro para un regalo de boda",
         ]
     ):
         qid = f"o{index:02d}"
