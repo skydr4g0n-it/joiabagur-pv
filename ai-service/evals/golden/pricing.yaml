@@ -1,0 +1,21 @@
+# Provider list prices, versioned with the date and the source they were taken from.
+#
+# Verified on the day of the run against the source below, which is where the pricing page of
+# `openai.com/api/pricing/` now redirects. If the source is ever unreachable, this file records
+# `as_of: unknown` and the report declares the cost figures UNVERIFIED rather than carrying
+# numbers taken from memory — a price copied from recollection looks exactly like a measured
+# one and is the sort of figure that survives for years.
+#
+# The column exists because `v0-cag` exists. Without a context-only row it would be five zeros
+# and four decimal places of nothing: embedding a ten-token query is five million queries to the
+# dollar, which is contably irrelevant. With it, the comparison between retrieval and putting
+# the catalogue in the prompt is a number instead of an argument.
+as_of: 2026-09-07
+source: https://developers.openai.com/api/docs/pricing
+verified: true
+models:
+  openai/text-embedding-3-small:
+    input_per_1m_usd: 0.02
+  openai/gpt-4o-mini:
+    input_per_1m_usd: 0.15
+    output_per_1m_usd: 0.60

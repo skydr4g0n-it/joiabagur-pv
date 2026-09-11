@@ -161,7 +161,11 @@ class FakeProductSearch:
                     qty_bucket=None if scope is None else scope[row.product_id],
                 )
             )
-        hits.sort(key=lambda item: item.distance)
+        # Mirrors `_SEARCH_ORDER_LIMIT` key for key, including the `product_id` tiebreak:
+        # a fake that truncated under a weaker order than the statement would let a test
+        # about truncation pass while the real branch cut arbitrarily. `UUID` compares by
+        # its 128-bit value, which is the byte order PostgreSQL uses for `uuid`.
+        hits.sort(key=lambda item: (item.distance, item.product_id))
         return hits[:depth]
 
     async def search_lexical(
@@ -209,7 +213,10 @@ class FakeProductSearch:
                     qty_bucket=None if scope is None else scope[row.product_id],
                 )
             )
-        hits.sort(key=lambda item: (-item.coordination, -item.ts_rank, item.sku))
+        # Same reason as the vector branch, and the same final key as the statement. It is
+        # `product_id` and not `sku` because the statement has no `sku` key: a fake ordering
+        # by something the SQL never mentions is a fake that cannot witness the property.
+        hits.sort(key=lambda item: (-item.coordination, -item.ts_rank, item.product_id))
         return hits[:depth]
 
     @staticmethod

@@ -28,6 +28,12 @@ dependencies = [
     "httpx>=0.28.1",
 ]
 
+[project.scripts]
+# `uv run evals run --config vX`. The other CLIs of this service are `python -m` entry points;
+# this one is a console script because the change asks for that exact command line, and because
+# the harness is the only CLI a reader of the README is expected to type by hand.
+evals = "jbg_ai.evals.cli:run_module"
+
 [build-system]
 requires = ["uv_build>=0.11.7,<0.12.0"]
 build-backend = "uv_build"

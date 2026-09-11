@@ -12,12 +12,14 @@ from jbg_ai.api.main import create_app
 from support.sample_requests import V1_REQUESTS
 from support.settings import build_settings
 
-#: C09 delivered enrich; C13 delivered index; C14 delivered product retrieval.
+#: C09 delivered enrich; C13 delivered index; C14 delivered product retrieval; C24 delivered
+#: the evaluation runs, whose placeholder had named it in writing as the change that would.
 _REAL_WHEN_STUBS_OFF = {
     "/v1/enrich/products",
     "/v1/index/sync",
     "/v1/index/status",
     "/v1/retrieval/products",
+    "/v1/evals/runs",
 }
 STUB_ONLY_REQUESTS = [item for item in V1_REQUESTS if item[1] not in _REAL_WHEN_STUBS_OFF]
 

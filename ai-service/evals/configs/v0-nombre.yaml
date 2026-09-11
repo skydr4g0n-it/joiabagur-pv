@@ -1,0 +1,18 @@
+# The product search the jeweller already had, before any of this project's AI work.
+#
+# Replicates `ProductService.SearchProductsAsync`: an exact code match first, then every active
+# product whose NAME CONTAINS THE WHOLE QUERY as a substring, alphabetically. No tokenisation,
+# no stemming, no synonyms. A two-word natural-language query returns nothing at all unless
+# some product is literally named that, and that is not a defect of the replica.
+#
+# It answers decision 12, which has never been measured: is semantic search better than what
+# was there? A table without this row cannot say.
+id: v0-nombre
+kind: name-substring
+label: "Buscador anterior (subcadena sobre el nombre + SKU exacto)"
+rationale: >-
+  Réplica de ProductService.SearchProductsAsync. Es el buscador que la joyería tenía antes del
+  trabajo de IA y la única fila que responde la decisión 12. Sin tokenizar, sin derivar y sin
+  sinónimos: la subcadena es la consulta entera.
+uses_provider: false
+max_results: 60

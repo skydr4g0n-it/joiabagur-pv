@@ -1,0 +1,22 @@
+# The vector branch alone, through the live orchestrator with the lexical branch switched off.
+#
+# The parameters are the live defaults; only `mode` moves. That is deliberate: this row exists
+# to isolate the branch that costs the external provider, the 170-1707 ms and the HNSW index,
+# and any other difference from `v2-hibrido` would confound it.
+id: v1-vectorial
+kind: pipeline
+label: "Rama vectorial sola"
+rationale: >-
+  El orquestador vivo con mode=vector. Aísla exactamente lo que cuesta el proveedor externo,
+  que es el pleito mayor: la única medición existente le da 67 aciertos de 120 frente a 107 de
+  la rama léxica, bajo una rúbrica que el propio informe que la usó declaró recusada.
+uses_provider: true
+mode: vector
+expand_synonyms: true
+rrf_k: 60
+weight_typed: 0.5
+weight_expanded: 0.5
+weight_vector: 0.33
+branch_depth: 60
+pos_prefilter: false
+max_results: 60

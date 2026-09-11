@@ -1,0 +1,55 @@
+{
+  "model": "openai/gpt-4o-mini",
+  "measured_at": "2026-09-06",
+  "documents_total": 1168,
+  "documents_omitted": 0,
+  "tokens": 17583,
+  "budget_tokens": 100000,
+  "scale": [
+    {
+      "documents": 1168,
+      "tokens": 17583,
+      "fits": true
+    },
+    {
+      "documents": 2500,
+      "tokens": 37635,
+      "fits": true
+    },
+    {
+      "documents": 5000,
+      "tokens": 75270,
+      "fits": true
+    }
+  ],
+  "queries": 12,
+  "cost_per_query_usd": 0.00267345,
+  "price_verified": true,
+  "recall_at_5_capped": 0.13333333333333333,
+  "answers": {
+    "q01": [
+      "SKU102",
+      "SKU124",
+      "SKU131",
+      "SKU111",
+      "SKU97"
+    ],
+    "q02": [],
+    "q03": [],
+    "q04": [],
+    "q05": [],
+    "q06": [],
+    "q07": [],
+    "q08": [],
+    "q09": [],
+    "q10": [],
+    "q11": [],
+    "q12": [
+      "SKU102",
+      "SKU236",
+      "SKU78",
+      "SKU61",
+      "SKU30"
+    ]
+  }
+}

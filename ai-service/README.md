@@ -392,6 +392,98 @@ Stated here because a citation that is well formed and wrong is worse than no ci
   `establecimiento`. Confirming those ranges with the business is a pending, non-blocking
   verification: if they differ, it changes **one section of one document**, and its mark
   already flags it.
+## The evaluation harness and the golden set (C24)
+
+The retriever was complete before anything measured whether it was any good. Expansion, fused
+retrieval and the point-of-sale prefilter were all decided against a rubric that counts a hit as
+«right piece type and right material» — which is the lexical branch's own objective function,
+since `doc_text` carries canonical `Tipo:` and `Materiales:` lines and the expansion aims at
+them. C24 builds the impartial judge those four changes each promised would re-measure them.
+
+**48 judged queries and 56 written**, in [`evals/golden/`](evals/golden/), versioned in git with
+graded relevance 0-2 and the annotation criterion written **before** any label. The composition
+is validated by code and **the load fails** when the set stops being able to arbitrate what it
+exists for — twelve queries whose best document the lexical branch cannot reach even after
+synonym expansion, five that resolve only to a sparsely tagged field, four naming four different
+stones, six covering the three classes of dictionary entry, five plausible in-domain questions
+the catalogue cannot answer, four that are a literal code or name, and no category answered
+entirely by synthetic products.
+
+```bash
+cd ai-service
+uv run evals validate                                  # the set alone: no database, no provider
+uv run evals freeze-vectors                            # once, against the real provider
+uv run evals run --all --repeat 3 [--persist]          # the ablation table
+uv run evals run --config v2-hibrido                   # one row
+uv run evals sweep                                     # the directional sweep and its verdict
+uv run evals cag [--dry-run]                           # the context-only measurement, dated
+uv run evals provider-latency                          # the provider round trip, cold and warm
+```
+
+`--persist` is the only thing that writes `ai.eval_run` / `ai.eval_case` / `ai.eval_result`; the
+report and the per-query detail land in [`evals/results/`](evals/results/) either way. The
+component that produces the results does not import the one that persists them.
+
+**The harness introduces no setting of its own.** What it needs is already in the table above,
+and the reason it is listed here is that it needs all three at once and fails naming the missing
+one rather than measuring something else:
+
+| what | why the harness needs it |
+|---|---|
+| `DATABASE_URL` | The pool cannot be built from a file: knowing what each configuration returns means running it against the real index. Read from the process environment, not from `backend/.env`, which carries credentials only |
+| `JPV_EMBEDDING_API_KEY` | Only for `freeze-vectors` and `provider-latency`. A **run** never calls the provider: the query vectors are frozen once and served from `golden/query_vectors.jsonl`, and a missing vector raises instead of embedding on the fly, because a run that silently embeds is a run nobody can repeat |
+| `JPV_RAG_LLM_API_KEY` | Only for `evals cag`. A different key from the embedding one, on purpose |
+| `SSL_CERT_FILE` | On this machine TLS is intercepted and LiteLLM verifies against `certifi` rather than the operating system store — see the two Windows traps above. Set `REQUESTS_CA_BUNDLE` to the same file for `evals cag`, whose token counter downloads its encoding through `requests` |
+
+The event loop policy is handled by the CLI itself: `psycopg` cannot run in async mode on the
+proactor loop Windows installs by default, and the failure names neither psycopg nor the policy.
+
+The measured answer to the question the project rests on, over graded relevance
+([full report](evals/results/c24-baselines-2026-09-07.md), [implementation
+report](../Documentos/Proyecto%20Final%20AIEng/informes/c24-implementation-measurements.md)):
+
+| configuration | what it is | nDCG@5 | cost/query |
+|---|---|---:|---:|
+| `v0-nombre` | the product search the shop already had | 0,082 | $0 |
+| `v0-fts` | the degraded Spanish full-text searcher | 0,454 | $0 |
+| `v0-cag` | the whole catalogue in the context, no retrieval | — | $0,00267 |
+| `v1-vectorial` | the vector branch alone | 0,548 | $0,0000002 |
+| `v2-hibrido` | what ships today | **0,603** | $0,0000002 |
+
+Read in two steps: tokenising Spanish buys **+0,372** and is free; semantic retrieval on top of
+that buys **+0,149**. And the verdict of the earlier rubric is **reversed** — it gave the vector
+branch 67 of 120 against the lexical 107, and against a judge that is not one of the parties the
+vector branch beats the full-text baseline. On the twelve queries with no lexical anchor the
+full-text baseline scores 0,035 and the vector branch 0,431.
+
+**RAG against CAG, measured rather than argued.** The compacted catalogue is 17.583 tokens and
+$0,00267 a query — four orders of magnitude more than embedding a query — and on the subset that
+most favours it, it recalls 0,133 against the vector branch's 0,483, answering literally
+`NINGUNO` on ten of twelve. Retrieval also has no catalogue ceiling: the same context stops
+fitting a 100.000-token budget at about 6.600 products.
+
+Latency is reported as **two figures**, always. `p95` of retrieval, which excludes the provider
+round trip, is **128,6 ms** against the 500 ms the design fixes; end to end with a cold provider
+would be ~900 ms, and applying the criterion to that column would report a red that belongs to
+the provider. Measured separately, the provider costs p50 223 ms / p95 832 ms cold and **0 ms**
+warm — the process-wide client does not reduce the round trip on a repeated query, it removes it.
+
+**Four limitations, declared rather than mitigated:**
+
+1. **There is no inter-annotator agreement.** The design promised double labelling with
+   reconciliation between two people; the project is developed by one, so that mitigation **was
+   not applied**. What replaces it is the criterion written before labelling, grouping the
+   sessions by category and a deferred re-read of the doubtful ones. The absolute values carry
+   the bias of a single judgement; **what is comparable between configurations remains valid,
+   because the bias is the same in every row.**
+2. **The annotator wrote part of the corpus** — the 764 synthetic products came from C06b. This
+   is irreducible, and it is why every metric is broken down by data origin.
+3. **The set is small.** With 41 queries in the real portion the confidence interval of the
+   acceptance criterion is ±0,13: it does not tell 0,80 from 0,88.
+4. **What the point-of-sale prefilter costs in recall is not measured.** The golden set is
+   labelled unscoped, a decision taken in C22 so that retrieval quality and assortment coverage
+   are not compressed into one number, and the scoped row was cut by declared decision.
+
 ## Tests
 
 ```bash
@@ -423,7 +515,9 @@ These four tests exist to catch failures that produce **no error at all**: an HN
 - No real retrieval or agent loops — stubs are replaced route by route in later changes. Enrichment is real when `STUB_MODE=false` (C09). Catalog index sync is real when `STUB_MODE=false` (C13). Product retrieval is real when `STUB_MODE=false` (C14) and **hybrid since C21**: three ranked lists fused by weighted RRF, distance threshold 0.65 (a floor, not a discriminator), no `query_log`, `indexing/embeddings.py` and `openapi.json` unchanged. Substitutes stay stub/501 (C26)
 - No `POST /v1/retrieval/complementary` — later OpenAPI negotiation. `POST /v1/families/suggest` **exists since C18a**, which is the change that first called it; `POST /v1/families/audit` since C18b, for the same reason
 - `ai.product_document` is written by C13 from the catalog feed; `ai.pos_projection` is **written by C22** from the POS availability feed; `ai.knowledge_document` and `ai.knowledge_chunk` are **written by C23**, by `python -m jbg_ai.indexing sync-knowledge`, from the corpus in `data/knowledge/`
-- No `ai.eval_*` tables (C24) and no `ai.query_log` (unassigned; the pipeline logs `stage=expand|embed|search|lexical|filters|fuse` with `trace_id` instead)
+- No `ai.query_log` (unassigned; the pipeline logs `stage=expand|embed|search|lexical|filters|fuse` with `trace_id` instead). The `ai.eval_*` tables **exist since C24** and are written only with `--persist`
+- No reranking. C24 measured the number that would make it decidable — **one query of forty-eight** has a maximum-grade document inside the window a reranker would reorder but outside the five that are shown — and a cross-encoder at ~250 ms would spend 10-15 % of C16's budget for a ceiling of 2 % of the queries. Adding one is a `configs/v2-rerank.yaml` plus a run, which is the protocol being executable rather than rhetorical
+- No recalibration of `JPV_RETRIEVAL_DISTANCE_THRESHOLD`: it is C25's scope. C24 published the input it needs and the answer is negative — over 3.926 judgements the relevant documents reach a distance of 0,8008 and the irrelevant ones start at 0,3268, so **the two populations overlap and no single value separates them**. A per-query quantile is required, which is a redesign rather than a sweep
 - No SQL access to schema `public`, ever
 - No production deploy, SSM or `CREATE EXTENSION` on RDS. C17 delivered the **enriched health** — `GET /health` reports database reachability, indexed document count, whether the embedding provider credential is configured, and a contrast between the configured embedding model and the one recorded on the index rows, all without ever calling the provider — and deployed it to an **isolated demo account**, not to the shop's production account. The return annotation stays an open mapping, so `openapi.json` is unchanged
 - No production tuning: `halfvec`, `hnsw.iterative_scan`, `CREATE INDEX CONCURRENTLY` and the `VACUUM`/`REINDEX` cycle are deliberate omissions at ~1,500 vectors, not oversights

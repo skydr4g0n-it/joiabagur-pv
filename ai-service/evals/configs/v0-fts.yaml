@@ -1,0 +1,26 @@
+# The degraded Spanish full-text searcher — the path that answers when the AI service is down.
+#
+# Replicates `AssistedSearchRepository.SearchLexicalAsync`: tokenise on whitespace, drop
+# one-character terms, keep at most sixteen distinct ones, join with ` OR `, and match with
+# `websearch_to_tsquery('spanish', ...)` against `name ‖ sku ‖ description`, ordered by rank
+# and then by name.
+#
+# THE TEXT IS RECOMPOSED, and that is the whole subtlety of this row. `ai.product_document` has
+# no `description` column: it has `doc_text`, the canonical `source-text/v1`, which also carries
+# `Tipo:`, `Materiales:`, `Colores:` and the rest. A full-text search over `doc_text` would be
+# an UPPER BOUND on this baseline rather than a replica of it — it would see extracted fields
+# the .NET searcher has never seen. So the statement pulls the `Descripción: ` line back out,
+# and `test_v0_fts_composes_only_over_the_dotnet_columns` pins that prefix as a contract of the
+# renderer, so a change to `build_source_text` breaks a test instead of the fidelity in silence.
+#
+# It is NOT "what she had": this project's own C15/C16 built it. Both rows exist so the report
+# can separate what tokenising Spanish buys — free, no AI — from what semantic retrieval buys.
+id: v0-fts
+kind: full-text
+label: "Buscador degradado (FTS español sobre nombre, SKU y descripción)"
+rationale: >-
+  Réplica de AssistedSearchRepository.SearchLexicalAsync, recomponiendo el texto que ve .NET
+  (nombre, SKU y la línea `Descripción:` de doc_text) en lugar de buscar sobre el documento
+  canónico completo, que sería una cota superior y no una réplica.
+uses_provider: false
+max_results: 60

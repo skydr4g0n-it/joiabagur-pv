@@ -1,0 +1,22 @@
+# What ships today: the fused pipeline with the live defaults.
+#
+# `pos_prefilter` is off, and this is the one place the configuration departs from production.
+# The golden set is labelled UNSCOPED, a decision taken in C22 so that retrieval quality and
+# assortment coverage are not measured as one number. The consequence is declared rather than
+# hidden: what the prefilter costs in recall is not measured by this change.
+id: v2-hibrido
+kind: pipeline
+label: "Híbrido (configuración viva)"
+rationale: >-
+  El orquestador vivo con los defaults de C21: expansión activa, fusión RRF de las tres listas
+  con wC=0,33 y profundidad 60. Es la fila contra la que se leen todas las demás.
+uses_provider: true
+mode: hybrid
+expand_synonyms: true
+rrf_k: 60
+weight_typed: 0.5
+weight_expanded: 0.5
+weight_vector: 0.33
+branch_depth: 60
+pos_prefilter: false
+max_results: 60
