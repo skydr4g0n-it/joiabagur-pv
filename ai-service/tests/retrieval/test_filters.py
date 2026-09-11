@@ -267,7 +267,7 @@ def test_the_ordering_key_is_one_tuple_with_the_business_score_last() -> None:
     """
     from jbg_ai.retrieval.filters import BusinessWeights, StructuralFilters, demotion_rank
 
-    weights = BusinessWeights(availability=1.0, rotation=0.25)
+    weights = BusinessWeights(availability=1.0)
     key = demotion_rank(_Candidate(qty_bucket="0"), StructuralFilters(), weights)
 
     assert len(key) == 4
@@ -294,7 +294,7 @@ def test_the_two_non_zero_buckets_rank_identically() -> None:
     from jbg_ai.retrieval.filters import BusinessWeights
 
     filters = StructuralFilters()
-    weights = BusinessWeights(availability=1.0, rotation=0.25)
+    weights = BusinessWeights(availability=1.0)
 
     assert demotion_rank(_Candidate(qty_bucket="1-2"), filters, weights) == demotion_rank(
         _Candidate(qty_bucket="3+"), filters, weights
@@ -307,9 +307,9 @@ def test_stock_only_decides_between_candidates_the_typed_blocks_rank_equally() -
     from jbg_ai.retrieval.filters import BusinessWeights
 
     filters = StructuralFilters(price_ceiling=80.0)
-    weights = BusinessWeights(availability=1.0, rotation=0.25)
-    over_but_stocked = _Candidate(price=900.0, qty_bucket="3+", sales_30d=40)
-    within_but_empty = _Candidate(price=40.0, qty_bucket="0", sales_30d=0)
+    weights = BusinessWeights(availability=1.0)
+    over_but_stocked = _Candidate(price=900.0, qty_bucket="3+")
+    within_but_empty = _Candidate(price=40.0, qty_bucket="0")
 
     assert demotion_rank(within_but_empty, filters, weights) < demotion_rank(
         over_but_stocked, filters, weights

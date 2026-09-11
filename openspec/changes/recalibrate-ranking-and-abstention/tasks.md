@@ -49,11 +49,11 @@
 
 ## 6. Score de negocio en el último bloque
 
-- [x] 6.1 `config/settings.py` — `BUSINESS_DEFAULTS` con el peso de disponibilidad (calibrable) y el de rotación (**fijo y declarado**, con su rationale en el docstring)
+- [x] 6.1 `config/settings.py` — `BUSINESS_DEFAULTS` con **un solo** peso, el de disponibilidad. El de rotación se retira (D10); el de disponibilidad decide su **signo y no su valor**, y el docstring lo declara así en vez de llamarlo calibrado
 - [x] 6.2 `retrieval/filters.py` — clave lexicográfica de tres componentes más score continuo en la cola; `demote()` conserva el *early return* y no elimina nada
 - [x] 6.3 Test `test_typed_constraint_outranks_the_business_score`
 - [x] 6.4 Test `test_out_of_stock_product_ranks_below_equivalent_in_stock`, **sin escopar** y con la señal por `LEFT JOIN`
-- [x] 6.5 Test `test_rotation_only_breaks_ties` y `test_rotation_cannot_overturn_availability`
+- [x] 6.5 ~~Test `test_rotation_only_breaks_ties` y `test_rotation_cannot_overturn_availability`~~ → **la rotación se retira del orden**, refutada por medición durante el apply (D10). La sustituyen `test_rotation_does_not_order_anything` y `test_availability_is_the_only_business_weight`
 - [x] 6.6 Test `test_weights_load_from_config_not_hardcoded` y `test_zero_weights_restore_the_previous_ordering`
 - [x] 6.7 Test `test_no_stock_quantity_reaches_the_response`
 - [x] 6.8 Test `test_sales_window_is_read_against_the_row_reference_instant`
@@ -91,8 +91,8 @@
 ## 10. Fase B y C — capturar y fijar las señales
 
 - [ ] 10.1 Ejecutar la fase `capture` con la fusión de 9.4 congelada
-- [ ] 10.2 Ejecutar la fase `rescore` sobre la rejilla de pesos de negocio, con el objetivo operativo y el guardarraíl de relevancia pura
-- [ ] 10.3 Validar los pesos ganadores en **FORNELLS** y **HT-GALDANA**, además de calibrarlos en **MAO-AIR**
+- [ ] 10.2 Ejecutar la fase `rescore` sobre la rejilla del **único** peso de negocio, con el objetivo operativo y el guardarraíl de relevancia pura; publicar que el orden es **invariante al valor** del peso y que lo decidido es su signo
+- [ ] 10.3 Validar el peso ganador en **FORNELLS** y **HT-GALDANA**, además de decidirlo en **MAO-AIR**
 - [ ] 10.4 **Congelar `v3-senales`** y registrar su configuración
 
 ## 11. Fase D — abstención

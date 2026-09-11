@@ -181,7 +181,6 @@ async def retrieve_products(
     pos_prefilter: bool | None = None,
     signal_pos_id: UUID | None = None,
     business_weight_availability: float | None = None,
-    business_weight_rotation: float | None = None,
     on_fused_candidates: Callable[[Sequence[object]], None] | None = None,
     projection_max_age_seconds: int | None = None,
     freshness: ProjectionFreshness | None = None,
@@ -224,11 +223,6 @@ async def retrieve_products(
             settings.jpv_business_weight_availability
             if business_weight_availability is None
             else business_weight_availability
-        ),
-        rotation=(
-            settings.jpv_business_weight_rotation
-            if business_weight_rotation is None
-            else business_weight_rotation
         ),
     )
     prefilter = (
@@ -409,11 +403,10 @@ async def retrieve_products(
     # vector appears here — the bucket is a bucket, and the sales window is reported only as
     # how many candidates carried one.
     logger.info(
-        "stage=signals trace_id=%s w_availability=%s w_rotation=%s reading_scope=%s "
-        "reordered=%s absent_signal=%s out_of_stock=%s with_rotation=%s",
+        "stage=signals trace_id=%s w_availability=%s reading_scope=%s "
+        "reordered=%s absent_signal=%s out_of_stock=%s with_sales_signal=%s",
         principal.trace_id,
         weights.availability,
-        weights.rotation,
         signal_pos_id is not None or scope.applied,
         sum(
             1
@@ -422,6 +415,9 @@ async def retrieve_products(
         ),
         sum(1 for item in ordered if item.qty_bucket is None),
         sum(1 for item in ordered if item.qty_bucket == OUT_OF_STOCK_BUCKET),
+        # A DIAGNOSTIC count and nothing else: `sales_30d` is persisted and read so the
+        # report can publish its distribution, and no ordering rule consumes it. The
+        # `Constrained` protocol `demote` reads does not even carry the field.
         sum(1 for item in ordered if item.sales_30d),
         extra={"trace_id": principal.trace_id},
     )

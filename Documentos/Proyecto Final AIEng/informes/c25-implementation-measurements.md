@@ -19,6 +19,11 @@ contrasta explícitamente contra ella.
 | **M2** | Cobertura con el denominador corregido | Las cuatro categorías protegidas dan **1,00 exacto**; con el ingenuo darían 0,64–0,88 | El denominador corregido es **obligatorio**, y el riesgo número uno queda cuantificado |
 | **M3** | Hermanas de familia en el top-10 | **14 de 48** consultas (29,2 %) tienen 3+ hermanas; **nunca más de 4** de 10 huecos | Penalización de variante **refutada**; `groups[]` **sube de prioridad** en C30/C36 |
 | **M4** | Reparto de `1-2` frente a `3+` | `1-2` es el **3,4 %** de los pares no nulos (191 contra 5.431) | Binario **confirmado**: no hay masa sobre la que calibrar |
+| **M5** | Qué reordena la rotación | Como desempate estricto, **0 pares** del top-5; como clave, **11.067** inversiones con el 71,2 % a más de diez puestos | La rotación **se retira del orden**: se lee para diagnóstico |
+| **M6** | Rejilla del peso de disponibilidad | **Invariante**: siete valores, cifras idénticas | Lo calibrado es el **signo**, no el valor |
+
+**M5 y M6 no estaban planificadas**: salen de ejecutar el barrido y son las dos únicas que
+**refutan el diseño** en lugar de confirmarlo. Están registradas aquí y en D10 del `design.md`.
 
 **Ninguna cifra contradice la exploración.** Las cinco predicciones de cobertura de D8 reproducen
 al decimal, y el `23,54 %` de `sales_30d` no nulo se confirma exactamente. Lo que M1 añade es una
@@ -256,6 +261,78 @@ la ausencia de gancho en la rúbrica, de que D10 la declare en vez de calibrarla
 
 ---
 
+## M5 · La rotación, retirada del orden por medición
+
+**Medición no planificada**, ejecutada durante el apply cuando el barrido de la fase C mostró que
+la rotación pagaba en las dos lecturas. D10 la había fijado como *desempate declarado, no
+calibrado*, con peso 0,25. La medición la retira del orden.
+
+### El requisito, tomado al pie de la letra, es un no-op
+
+La spec exigía que la rotación *«SHALL act as the last ordering key, deciding only between
+candidates that the fusion and the availability signal rank equally»*. Empates exactos de score
+hay, y muchos: **662 pares, el 35,1 %** de los 3.774 candidatos de las 48 ventanas — RRF los
+produce porque `w/(k+1) + w/(k+2)` iguala a `w/(k+2) + w/(k+1)`. Pero de los que caen **dentro del
+top-5**, los que enfrentan a un vendedor con un no-vendedor son:
+
+> **0 pares en las 48 consultas.**
+
+Implementada como su propio requisito la define, la rotación nunca actúa y su peso no puede
+importar.
+
+### Como clave de ordenación no desempata: particiona
+
+| | |
+|---|---:|
+| pares cuyo orden relativo invierte | **11.067** |
+| adyacentes en la fusión (empate real) | **3,4 %** |
+| separados por **más de 10 puestos** | **71,2 %** |
+| salto mediano | **21 posiciones** |
+| salto máximo | 98 posiciones |
+
+Es estructural: un indicador binario al final de una clave lexicográfica **parte el bloque entero
+en dos**. Como **168 de los 416** productos que MAO-AIR lleva vendieron algo, la rotación partía
+la lista casi por la mitad y reordenaba a través de todo el orden de fusión.
+
+### Y donde actúa, cuesta
+
+De las **22** entradas nuevas al top-5 que provoca, **6 desplazan a un documento de mejor grado**.
+En agregado paga en las dos lecturas:
+
+| | relevancia pura (`new`) | operativa |
+|---|---:|---:|
+| sólo disponibilidad | **0,595** | **0,656** |
+| con rotación | 0,584 | 0,645 |
+
+La señal además es gruesa: **7 valores distintos, máximo 6**, y el **64,5 %** son cero.
+
+*Hipótesis descartada por el camino:* que la rotación fuera un proxy de «pieza barata» y
+degradara sistemáticamente el inventario caro. Es al revés — lo que vende es **más caro**
+(538,13 € de media frente a 415,22 €; mediana 385 € frente a 275 €).
+
+### Veredicto
+
+**Un mecanismo que sólo puede ser un no-op o un error no se ajusta: se retira.** La frase que lo
+justificaba sigue siendo cierta en el mostrador; lo que la medición establece es que este
+recuperador no produce la situación que la frase describe. `sales_30d` se sigue leyendo y
+persistiendo para publicar su distribución y para C26, y la prohibición de ordenar con ella
+vuelve a ser **estructural**: el protocolo que lee la ordenación no tiene el campo.
+
+El modelo de negocio queda en **un peso y una frase**: *una pieza de la que la tienda se ha
+quedado sin existencias se enseña después de las piezas comparables que sí tiene.*
+
+## M6 · El peso de disponibilidad decide su signo, no su valor
+
+Siete puntos de rejilla sobre el peso de disponibilidad —0,25, 0,5, 0,75, 1,0, 1,5, 2,0— dan
+**cifras idénticas hasta el último decimal**. Sólo el cero difiere.
+
+Es aritmética, no ruido: con un único término binario el score toma **dos valores**, y como es la
+última clave lexicográfica, el orden depende de cuáles son mayores, no de cuánto. La calibración
+decide **encender o apagar**, y `1,0` es una **unidad declarada**.
+
+Publicarlo así importa: un «peso calibrado» que no calibra nada afirma una evidencia que nunca se
+produjo. La spec recoge ahora la obligación de declararlo.
+
 ## Qué queda decidido al cerrar la fase 0
 
 1. **La abstención es una regla relativa por consulta y vive en la fase D.** No mueve la ventana.
@@ -264,6 +341,8 @@ la ausencia de gancho en la rúbrica, de que D10 la declare en vez de calibrarla
    **cinco** categorías, no cuatro: se añade `variante-talla`.
 3. **La penalización de variante no se implementa.** Refutada con 29,2 % y techo de 4.
 4. **El binario de `qty_bucket` no se calibra.** Refutado con 3,4 %.
+5. **La rotación no ordena nada.** Refutada con 0 pares del top-5 y 11.067 inversiones (M5).
+6. **El peso de disponibilidad decide su signo, no su valor.** Invariante en siete puntos (M6).
 
 Ninguna de las cuatro decisiones se ha tomado mirando el resultado de un barrido, porque **todavía no
 se ha ejecutado ningún barrido**.

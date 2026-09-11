@@ -30,7 +30,13 @@ calibrarlos.
 - **Señal de punto de venta separada del alcance**: un parámetro que lee la proyección por
   `LEFT JOIN` frente al que la restringe por `INNER JOIN`, para medir la reordenación sin pagar
   el coste de recall del prefiltro.
-- **`sales_30d` entra en la ruta de recuperación** como desempate declarado y no calibrado.
+- **`sales_30d` entra en la ruta de recuperación para diagnóstico y no ordena nada.** Entró como
+  desempate declarado y se retiró del orden durante el apply, refutado por medición: como
+  desempate estricto decidía **0 pares** del top-5 en las 48 consultas, y como clave de
+  ordenación no desempataba sino que particionaba —11.067 pares invertidos, el 71,2 % separados
+  por más de diez puestos— y costaba relevancia donde actuaba. Se sigue leyendo y persistiendo
+  para publicar su distribución y para C26; la prohibición de ordenar con ella vuelve a ser
+  estructural.
   **BREAKING (interno):** cae el test guardián `test_the_retrieval_path_cannot_read_the_sales_figures`.
 - **Score continuo en el último bloque de la clave de degradación**, conservando lexicográfico lo
   que el operador tecleó.
@@ -54,7 +60,7 @@ calibrarlos.
 
 ### New Capabilities
 
-- `business-signals-ranking`: la disponibilidad y la rotación del punto de venta como reordenación
+- `business-signals-ranking`: la disponibilidad del punto de venta como reordenación
   blanda calibrada contra el golden set — la señal leída sin restringir el conjunto de candidatos,
   los pesos en configuración, la métrica operativa que hace calibrable lo que la relevancia pura
   no puede ver, y el barrido por re-puntuado sobre ventanas persistidas.

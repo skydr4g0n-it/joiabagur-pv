@@ -142,7 +142,7 @@ def test_calibration_sweep_is_reproducible() -> None:
         ),
     )
     captured = _capture(window)
-    weights = BusinessWeights(availability=1.0, rotation=0.25)
+    weights = BusinessWeights(availability=1.0)
 
     first = rescore(captured, golden, weights)
     second = rescore(captured, golden, weights)
@@ -158,8 +158,9 @@ def test_the_rescore_orders_by_the_weights_and_removes_nothing() -> None:
         _candidate("22222222-2222-2222-2222-222222222222", qty_bucket="3+", sales_30d=5),
         _candidate("33333333-3333-3333-3333-333333333333", qty_bucket=None, sales_30d=None),
     )
+    # Only the exhausted candidate can move: the sales window orders nothing.
 
-    weighted = rescore_window(window, BusinessWeights(availability=1.0, rotation=0.25))
+    weighted = rescore_window(window, BusinessWeights(availability=1.0))
     zeroed = rescore_window(window, BusinessWeights())
 
     assert len(weighted) == len(zeroed) == 3, "no candidate may be dropped"
@@ -267,13 +268,27 @@ def test_a_capture_survives_a_round_trip_through_its_file() -> None:
     assert candidate.branches == ("lexical", "vector")
 
 
-def test_the_business_grid_excludes_rotation_that_is_not_a_tiebreak() -> None:
-    """A rotation weight at or above the availability one is not a point anybody may adopt."""
-    grid = business_grid(availability=(0.0, 0.5, 1.0), rotation=(0.0, 0.25, 0.5, 1.0))
+def test_the_business_grid_has_one_dimension_and_two_outcomes() -> None:
+    """The grid explores one weight, and reports that its VALUE does not change the order.
 
-    assert all(
-        item.rotation == 0.0 or item.rotation < item.availability for item in grid
+    Saying so is part of the result rather than a caveat about it: with a single binary term
+    the business score takes two values, so every positive weight produces the same ranking.
+    The grid is run over several values anyway, cheaply and offline, because a grid that
+    reports the invariance is evidence while asserting it would be an argument.
+    """
+    grid = business_grid(availability=(0.0, 0.5, 1.0, 2.0))
+
+    assert [item.availability for item in grid] == [0.0, 0.5, 1.0, 2.0]
+    assert BusinessWeights(availability=0.0) in grid, "the rollback is a point of the grid"
+    assert all(not hasattr(item, "rotation") for item in grid)
+
+    # One window, and every positive weight orders it the same way.
+    window = _window(
+        _candidate("11111111-1111-1111-1111-111111111111", qty_bucket="0", sales_30d=6),
+        _candidate("22222222-2222-2222-2222-222222222222", qty_bucket="3+", sales_30d=0),
     )
-    assert BusinessWeights(availability=0.0, rotation=0.0) in grid, "the rollback is a point"
-    assert BusinessWeights(availability=1.0, rotation=0.25) in grid
-    assert BusinessWeights(availability=0.5, rotation=0.5) not in grid
+    orders = {rescore_window(window, item) for item in grid if item.availability > 0}
+    assert len(orders) == 1, "the value of the weight must not change the order"
+    assert rescore_window(window, BusinessWeights()) != orders.pop(), (
+        "and zero must restore the captured order"
+    )

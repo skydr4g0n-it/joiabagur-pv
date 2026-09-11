@@ -18,7 +18,7 @@ detectado, y este change las resuelve.
 | `Recall@5` sobre la porción real | **0,483** contra un criterio de 0,85 |
 | Consultas de la partición de ajuste en el techo del nDCG@5 | **6 de 8** (y **8 de 8** en Recall@5, P@3 y MRR) |
 | Consultas de ajuste procedentes de la lista curada de C20/C21 | **7 de 8** |
-| `sales_30d` no nulo sobre pares asignados | **23,54 %** (1.424 de 6.050) |
+| `sales_30d` no nulo sobre pares asignados | **23,54 %** (1.424 de 6.050) — se lee para diagnóstico y **no ordena** (D10) |
 | `p95` de recuperación contra presupuesto | 128,6 ms contra 500 ms |
 
 **Restricciones que gobiernan el diseño.** El pool de conexiones está capado en 5 con
@@ -33,7 +33,8 @@ mundo de C10 termina el 2026-08-23.
 
 - Que la rama vectorial pueda colocar un resultado en el top-5 **sin permiso de la léxica**, y que
   la corrección **no cobre peaje** donde la léxica acierta.
-- Que la disponibilidad real del punto de venta pese en el orden, **medida** y no supuesta.
+- Que la disponibilidad real del punto de venta pese en el orden, **medida** y no supuesta — y
+  que lo que no se pueda medir no pese, que es lo que retiró la rotación (D10).
 - Que el buscador tenga una regla para no contestar, fijada con la cantidad que de verdad decide.
 - Que cada efecto sea **atribuible a su causa** en la tabla de ablations.
 - Que la línea base publicada por C24 siga siendo reproducible después del change.
@@ -44,6 +45,7 @@ mundo de C10 termina el 2026-08-23.
   change puede cerrarlo. Se sustituye por criterio relativo y se declara la brecha.
 - Penalizar la variante ambigua dentro de familia — retirado, refutado por medición (D16).
 - Calibrar `1-2` frente a `3+` — retirado, refutado por construcción (D17).
+- **Ordenar por rotación** — retirado durante el apply, refutado por medición (D10).
 - Reranking, sustitutos (C26), RAGAS y escenarios de agente (C38).
 - Migración de Alembic, ruta HTTP nueva, regeneración de `openapi.json`, reindexado.
 - Cualquier diff en `backend/`, `frontend/`, `terraform/` o `.github/workflows/`.
@@ -272,23 +274,60 @@ dispara, que es el caso mayoritario, así que la clave es `(0,0,0)` para todos y
 lexicográfica —suficiente evidencia de stock derribaría un techo de precio explícito— y es
 exactamente el sistema del que S10 dice que *«nadie sabe ya por qué un documento quedó tercero»*.
 
-### D10 · La rotación es desempate declarado, no calibrado
+### D10 · La rotación se retira del orden: se lee para diagnóstico y no ordena nada
 
-`sales_30d` entra como última clave, con peso fijo y argumentado en configuración, sin barrido, y
-el README dice por qué.
+> **Corregido el 2026-09-11, durante el apply y por medición.** La versión anterior de esta
+> decisión metía `sales_30d` como última clave con peso fijo y declarado. Se retira del orden.
+> `sales_30d` **se sigue leyendo y viajando** en los *hits* y en las ventanas capturadas, para
+> que el informe publique su distribución y C26 tenga insumo; lo que desaparece es el término
+> del score y su peso. La prohibición vuelve a ser **estructural**: el protocolo `Constrained`
+> que lee `demote` no tiene el campo, así que la ordenación no puede consumirlo ni por
+> accidente.
 
-*Razón:* **no existe instrumento que pueda aprobarla.** No hay gancho en la rúbrica —una pieza que
-rota no es *más relevante*, y el truco que justifica D3 no tiene análogo—; la vía online tiene
-**31 filas y 12 textos** escritos por el desarrollador; y la señal es no nula en el **23,54 %** de
-los pares. La frase que justifica un desempate existe —*«entre dos piezas que el recuperador y el
-stock empatan, enseña la que se vende»*— y la que justificaría un peso continuo, no.
+*Razón, y es de medición y no de cautela.* La frase que justificaba el desempate —*«entre dos
+piezas que el recuperador y el stock empatan, enseña la que se vende»*— sigue siendo cierta en un
+mostrador. Lo que la medición establece es que **este recuperador no produce la situación que la
+frase describe**, y que implementarla como clave hace algo muy distinto de lo que declara:
 
-Se lee contra el `computed_as_of` de la fila y **nunca** contra `now()`: con reloj de pared la
-señal se va a cero y el ranking sería irreproducible por diseño.
+| lectura | qué hace | cifra |
+|---|---|---|
+| **desempate estricto**, como decía su propio requisito | actuar sólo entre candidatos que la fusión ordena **igual** | **0 pares** del top-5 en las 48 consultas |
+| **clave de ordenación**, como estaba implementada | partir el bloque entero en dos y reordenarlo | **11.067** pares invertidos |
 
-*Alternativa descartada:* decaimiento exponencial sobre `last_sale_at`, más denso (4.021 filas no
-nulas frente a 1.424) según el apunte de S10 — pero su `date.today()` es precisamente la trampa
-que C22 ya cerró, y sigue sin tener gancho en la rúbrica.
+Los empates exactos existen y son frecuentes —**662 pares, el 35 %** de los candidatos, porque
+en RRF `w/(k+1) + w/(k+2)` empata con `w/(k+2) + w/(k+1)`— pero **ninguno dentro del top-5**
+enfrentaba a un vendedor con un no-vendedor. Y como clave no desempataba: sólo el **3,4 %** de
+los pares que invertía eran adyacentes en la fusión, mientras que el **71,2 %** estaban separados
+por más de diez puestos, con un salto mediano de **21 posiciones**. La razón es estructural: un
+indicador binario al final de una clave lexicográfica **no desempata, particiona**, y como el
+40 % del surtido de MAO-AIR vendió algo, partía la lista casi por la mitad.
+
+Donde actuaba, costaba: **6 de las 22** entradas nuevas al top-5 desplazaban a un documento de
+mejor grado, y el agregado pagaba en las dos lecturas —relevancia pura 0,595 → 0,584, operativa
+0,656 → 0,645—. **Un mecanismo que sólo puede ser un no-op o un error no se ajusta: se retira.**
+Es la misma aritmética de D17 aplicada aquí: cuando las lecturas legítimas se cancelan, el peso
+honesto es cero, y un peso declarado que no ordena nada es peor de explicar que no tenerlo.
+
+*Se gana además la propiedad que más vale:* el modelo de negocio queda en **un solo peso** y en
+una sola frase — *«una pieza de la que la tienda se ha quedado sin existencias se enseña después
+de las piezas comparables que sí tiene»*.
+
+*Alternativas descartadas.* Conservar el término en cero sin retirar la perilla: mantiene un peso
+que no hace nada, que es justo lo que el apunte de S10 avisa de no dejar en un sistema. Y el
+decaimiento exponencial sobre `last_sale_at`, más denso (4.021 filas no nulas frente a 1.424)
+según el mismo apunte — su `date.today()` es la trampa que C22 ya cerró, y sigue sin tener gancho
+en la rúbrica.
+
+### D10b · El peso de disponibilidad decide su signo, no su valor
+
+Medido en el barrido de la fase C: con un único término binario el score de negocio toma **dos
+valores**, así que el orden es **invariante al valor del peso**. Siete puntos de rejilla —0,25,
+0,5, 0,75, 1,0, 1,5, 2,0— dan cifras idénticas hasta el último decimal.
+
+*Consecuencia:* lo que la calibración decide es **encender o apagar** la señal, y `1,0` queda como
+**unidad declarada** y no como cifra ajustada. El informe lo dice así en lugar de publicar un
+«peso calibrado» que no calibra nada. El peso sigue siendo un `float` configurable porque el cero
+es la marcha atrás, que es lo que la spec de `pos-projection` exige.
 
 ### D11 · La abstención se diseña después de medir, y la medición es otra
 

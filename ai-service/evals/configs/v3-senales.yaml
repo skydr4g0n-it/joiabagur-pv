@@ -1,4 +1,4 @@
-# `v2b` plus the business signals: availability and rotation.
+# `v2b` plus the business signal: availability. One signal, and it was two.
 #
 # The reading scope is MAO-AIR, and it is declared here rather than inferred. It is the point
 # of sale where the signal is richest — 34,4 % of its assortment at zero stock, 143 of 416 —
@@ -12,12 +12,13 @@
 # C22 declined to introduce.
 id: v3-senales
 kind: pipeline
-label: "Señales de negocio sobre la fusión por rama"
+label: "Señal de disponibilidad sobre la fusión por rama"
 rationale: >-
-  v2b más disponibilidad y rotación, leídas de la proyección de MAO-AIR sin restringir el
-  conjunto de candidatos. El peso de disponibilidad se calibra contra la métrica operativa con
-  la relevancia pura como guardarraíl; el de rotación se declara y no se barre, porque no
-  existe instrumento que pueda aprobarlo. Es la única fila con lectura operativa.
+  v2b más la disponibilidad, leída de la proyección de MAO-AIR sin restringir el conjunto de
+  candidatos. Es la única fila con lectura operativa. La rotación se retiró, refutada por
+  medición: como desempate estricto decidía cero pares del top-5 en las 48 consultas, y como
+  clave de ordenación no era un desempate sino una partición que invertía 11.067 pares y
+  costaba relevancia donde actuaba.
 uses_provider: true
 mode: hybrid
 expand_synonyms: true
@@ -30,5 +31,4 @@ branch_depth: 60
 pos_prefilter: false
 signal_pos_id: "43da2f6a-cb64-4067-b5c2-cd67f5a8f6b3"
 business_weight_availability: 1.0
-business_weight_rotation: 0.25
 max_results: 60

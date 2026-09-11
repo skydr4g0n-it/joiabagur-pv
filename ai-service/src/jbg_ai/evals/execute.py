@@ -206,7 +206,6 @@ async def execute(
                 pos_prefilter=config.pos_prefilter,
                 signal_pos_id=UUID(config.signal_pos_id) if config.signal_pos_id else None,
                 business_weight_availability=config.business_weight_availability,
-                business_weight_rotation=config.business_weight_rotation,
             )
             hits = tuple(
                 RankedHit(UUID(item.product_id), item.sku, item.score)

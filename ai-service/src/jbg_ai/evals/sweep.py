@@ -658,18 +658,13 @@ async def capture(
     )
 
 
-def business_grid(
-    availability: tuple[float, ...],
-    rotation: tuple[float, ...],
-) -> tuple[BusinessWeights, ...]:
-    """Every combination the re-score explores, minus the ones the tiebreak rule forbids.
+def business_grid(availability: tuple[float, ...]) -> tuple[BusinessWeights, ...]:
+    """Every weight configuration the re-score explores. One dimension, and barely that.
 
-    A rotation weight at or above the availability one is not a tiebreak, so it is not a point
-    of the grid: excluding it here rather than rejecting it later keeps the report free of
-    rows nobody may adopt.
+    **The grid has two distinct outcomes, not as many as it has points**, and saying so is
+    part of the result rather than a caveat about it: with a single binary term the business
+    score takes two values, so every positive weight produces the same ranking. The sweep is
+    run over several values anyway — cheaply, offline — because a grid that reports the
+    invariance is evidence, while asserting it would be an argument.
     """
-    return tuple(
-        BusinessWeights(availability=a, rotation=r)
-        for a, r in product(availability, rotation)
-        if r == 0.0 or r < a
-    )
+    return tuple(BusinessWeights(availability=value) for value in availability)

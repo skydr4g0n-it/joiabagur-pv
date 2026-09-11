@@ -394,7 +394,6 @@ def test_baseline_row_is_still_selectable_and_reproducible() -> None:
     # It reads no business signal, so it cannot be quietly reordered by one.
     assert baseline.signal_pos_id is None
     assert baseline.business_weight_availability is None
-    assert baseline.business_weight_rotation is None
 
     # And the row that isolates the fusion differs from it in the composition alone.
     fusion_row = load_config("v2b-fusion")
@@ -405,7 +404,7 @@ def test_baseline_row_is_still_selectable_and_reproducible() -> None:
     assert fusion_row.signal_pos_id is None, "v2b isolates the fusion, with no signals"
 
 
-def test_the_signals_row_declares_its_reading_scope_and_its_weights() -> None:
+def test_the_signals_row_declares_its_reading_scope_and_its_weight() -> None:
     """Declared in the file, not inferred: a row nobody can read is a row nobody can check."""
     signals = load_config("v3-senales")
 
@@ -415,10 +414,9 @@ def test_the_signals_row_declares_its_reading_scope_and_its_weights() -> None:
         "cost of the prefilter as one number"
     )
     assert signals.business_weight_availability is not None
-    assert signals.business_weight_rotation is not None
-    assert signals.business_weight_rotation < signals.business_weight_availability, (
-        "rotation is a tiebreak and must not be able to overturn availability"
-    )
+    # One business weight, and it is the only one: the rotation term was withdrawn, refuted
+    # by measurement rather than by argument.
+    assert not hasattr(signals, "business_weight_rotation")
     # It is built on v2b, so the fusion must be the same one.
     fusion_row = load_config("v2b-fusion")
     assert signals.fusion == fusion_row.fusion

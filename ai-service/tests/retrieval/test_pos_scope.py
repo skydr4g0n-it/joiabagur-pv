@@ -532,39 +532,55 @@ def test_no_vector_reaches_the_logs(caplog: pytest.LogCaptureFixture) -> None:
 # ------------------------------------------------------------------- sales, unread
 
 
-def test_the_retrieval_path_cannot_read_the_unread_sales_figures() -> None:
-    """`sales_90d` and `last_sale_at` stay written by the drain and read by nothing.
+def test_the_sales_figures_are_persisted_and_read_but_never_order_anything() -> None:
+    """Three figures the drain writes. One is read for diagnostics. NONE orders anything.
 
-    This REPLACES C22's guard, which forbade all three figures. `sales_30d` leaves the
-    prohibition deliberately and under a declared weight, because C22 wrote that the
-    calibrating golden set did not exist yet and now it does. The other two do not follow it,
-    and the reason is not caution but that neither has an instrument that could approve it:
+    This replaces C22's guard, whose promise was that no sales figure reached the pipeline at
+    all. `sales_30d` now does reach it — it travels on every hit and is persisted in the
+    sweep's captured windows, so the report can publish its distribution and C26 has an input
+    — so the guarantee moves to where it can still be structural: **the protocol the ordering
+    reads does not carry the field.** `demote` cannot consume it even by accident, because it
+    cannot see it.
 
-    * `last_sale_at` is the tempting one — 4.021 non-null rows against `sales_30d`'s 1.424 —
-      and it is tempting as an exponential decay, whose "today" would be the wall clock. The
-      world of C10 ends on 2026-08-23, so wall-clock decay takes the signal to zero and makes
-      the ranking irreproducible by design. That is the trap C22 already closed.
-    * `sales_90d` has no reading of its own that `sales_30d` does not already carry.
+    Why it orders nothing is measured, not cautious. As the strict tiebreak its requirement
+    described, it decided **0 pairs of the top five across all 48 queries**: exact score ties
+    are common — 662 pairs, 35 % of candidates — but none inside the reported window pitted a
+    seller against a non-seller. As a component of the ordering key it was no tiebreak at all,
+    inverting 11.067 pairs of which 71,2 % sat more than ten positions apart, and 6 of the 22
+    candidates it lifted into the top five displaced a better-graded document.
 
-    Structural rather than a promise: the values may now reach a hit, so the guarantee moves
-    to the two field names never appearing in any ordering module.
+    `sales_90d` and `last_sale_at` never reach the pipeline at all. `last_sale_at` is the
+    tempting one — 4.021 non-null rows against `sales_30d`'s 1.424 — as an exponential decay
+    whose "today" would be a wall clock; the world of C10 ends on 2026-08-23, so wall-clock
+    decay takes the signal to zero and makes the ranking irreproducible by design.
     """
     import inspect
 
     from jbg_ai.retrieval import filters, fusion, orchestrator
+    from jbg_ai.retrieval.filters import Constrained
     from jbg_ai.retrieval.ports import LexicalHit, SearchHit
 
+    # It travels: the hits carry it, so a diagnostic and a capture can read it.
     for hit_type in (SearchHit, LexicalHit):
         fields = set(hit_type.__dataclass_fields__)
+        assert "sales_30d" in fields, f"{hit_type} must carry the signal for diagnostics"
         assert "sales_90d" not in fields, hit_type
         assert "last_sale_at" not in fields, hit_type
-        assert "sales_30d" in fields, f"{hit_type} must carry the signal C25 reads"
+
+    # It orders nothing: the protocol the ordering reads does not have the field.
+    ordering_fields = set(Constrained.__annotations__)
+    assert "sales_30d" not in ordering_fields, "the ordering must not be able to see it"
+    assert not any(name.startswith("sales_") for name in ordering_fields)
+    assert "last_sale_at" not in ordering_fields
+
+    # And the ordering module never names it.
+    assert "sales_30d" not in inspect.getsource(filters), "filters.py must not mention it"
 
     for module in (orchestrator, filters, fusion):
         source = inspect.getsource(module)
         assert "sales_90d" not in source, module.__name__
         assert "last_sale_at" not in source, module.__name__
-        # And no ordering rule may reach for a wall clock to age the window it does read.
+        # And no ordering rule may reach for a wall clock.
         assert "date.today" not in source, module.__name__
         assert "datetime.now" not in source, module.__name__
 
@@ -775,7 +791,7 @@ class _Candidate:
 # C25 - the business score orders only the tail block.
 # --------------------------------------------------------------------------------------
 
-LIVE_WEIGHTS = BusinessWeights(availability=1.0, rotation=0.25)
+LIVE_WEIGHTS = BusinessWeights(availability=1.0)
 
 
 def test_typed_constraint_outranks_the_business_score() -> None:
@@ -835,52 +851,50 @@ def test_out_of_stock_product_ranks_below_equivalent_in_stock() -> None:
     assert len(response.results) == 2, "demoted, never removed"
 
 
-def test_rotation_only_breaks_ties() -> None:
-    """The last ordering key: it decides between candidates everything else ranks equally."""
+def test_rotation_does_not_order_anything() -> None:
+    """The withdrawn term, kept as a test so the refutation cannot be undone by accident.
+
+    Two candidates the availability signal ranks equally, one of which sold and one of which
+    did not, keep the order the fusion gave them. The sentence that justified a tiebreak is
+    still true at a counter; what the measurement established is that this retriever does not
+    produce the situation the sentence describes - in the top five, across all 48 queries,
+    there was not one tied pair for rotation to decide.
+    """
     filters = StructuralFilters()
-    sold = _Candidate(qty_bucket="3+", sales_30d=3)
+    sold = _Candidate(qty_bucket="3+", sales_30d=6)
     unsold = _Candidate(qty_bucket="3+", sales_30d=0)
 
+    assert business_score(sold, LIVE_WEIGHTS) == business_score(unsold, LIVE_WEIGHTS)
     ordered, _ = demote([unsold, sold], filters, LIVE_WEIGHTS)
-    assert ordered == (sold, unsold), "between equals, show the one that sells"
-
-    # And it decides nothing when the availability signal already separates them.
-    demoted_but_sold = _Candidate(qty_bucket="0", sales_30d=99)
-    stocked_unsold = _Candidate(qty_bucket="3+", sales_30d=0)
-    ordered, _ = demote([demoted_but_sold, stocked_unsold], filters, LIVE_WEIGHTS)
-    assert ordered == (stocked_unsold, demoted_but_sold)
+    assert ordered == (unsold, sold), "the fused order survives; the sales window decides nothing"
 
 
-def test_rotation_cannot_overturn_availability() -> None:
-    """Structural, not hoped for: the settings refuse a weight that could.
+def test_availability_is_the_only_business_weight() -> None:
+    """One weight, and its SIGN is what the calibration decided rather than its value.
 
-    A rotation term able to outrank availability would put a piece that is not on the shelf
-    ahead of one that is, which is the single ordering this signal is forbidden to produce.
+    With a single binary term the score takes two values, so every positive weight produces
+    the same ranking. The weight stays configurable because zero is the rollback, but the
+    report says plainly that 1.0 is a declared unit and not a fitted figure.
     """
-    from jbg_ai.config.settings import Settings
+    from jbg_ai.config.settings import BUSINESS_DEFAULTS, Settings
 
-    filters = StructuralFilters()
-    # Even at the largest sales figure the corpus could hold, the order does not invert.
-    ordered, _ = demote(
-        [_Candidate(qty_bucket="0", sales_30d=10**6), _Candidate(qty_bucket="3+", sales_30d=0)],
-        filters,
-        LIVE_WEIGHTS,
-    )
-    assert [item.qty_bucket for item in ordered] == ["3+", "0"]
+    assert list(BUSINESS_DEFAULTS) == ["jpv_business_weight_availability"]
+    assert not hasattr(BusinessWeights(), "rotation")
+    settings = Settings(app_env="local", service_version="c25", jwt_secret="x" * 32)
+    assert not any("rotation" in name for name in type(settings).model_fields)
 
-    # The term is binary, so its contribution is bounded by its weight whatever the count.
-    assert business_score(_Candidate(qty_bucket="3+", sales_30d=1), LIVE_WEIGHTS) == (
-        business_score(_Candidate(qty_bucket="3+", sales_30d=10**6), LIVE_WEIGHTS)
-    )
-
-    with pytest.raises(ValidationError, match="strictly below"):
-        Settings(
-            app_env="local",
-            service_version="c25",
-            jwt_secret="x" * 32,
-            jpv_business_weight_availability=0.5,
-            jpv_business_weight_rotation=0.5,
+    exhausted = _Candidate(qty_bucket="0", sales_30d=6)
+    stocked = _Candidate(qty_bucket="3+", sales_30d=0)
+    orders = {
+        tuple(
+            item.qty_bucket
+            for item in demote(
+                [exhausted, stocked], StructuralFilters(), BusinessWeights(availability=w)
+            )[0]
         )
+        for w in (0.25, 0.5, 1.0, 2.0, 100.0)
+    }
+    assert orders == {("3+", "0")}, "every positive weight gives the same ranking"
 
 
 def test_weights_load_from_config_not_hardcoded() -> None:
@@ -897,9 +911,6 @@ def test_weights_load_from_config_not_hardcoded() -> None:
     settings = build_settings()
     assert settings.jpv_business_weight_availability == BUSINESS_DEFAULTS[
         "jpv_business_weight_availability"
-    ]
-    assert settings.jpv_business_weight_rotation == BUSINESS_DEFAULTS[
-        "jpv_business_weight_rotation"
     ]
 
     # Two configurations in one process, and neither mutates the settings object.
@@ -923,7 +934,6 @@ def test_weights_load_from_config_not_hardcoded() -> None:
         pos_prefilter=False,
         signal_pos_id=MINE,
         business_weight_availability=0.0,
-        business_weight_rotation=0.0,
     )
     assert skus(weighted) == ["in-stock", "out-of-stock"]
     assert skus(unweighted) == ["out-of-stock", "in-stock"]
@@ -946,7 +956,6 @@ def test_zero_weights_restore_the_previous_ordering() -> None:
         pos_prefilter=False,
         signal_pos_id=MINE,
         business_weight_availability=0.0,
-        business_weight_rotation=0.0,
     )
     no_signal_at_all = serve(FakeProductSearch(list(rows)), pos_prefilter=False)
 
@@ -1033,9 +1042,12 @@ def test_the_signals_stage_logs_its_weights_without_quantities_or_vectors(caplog
         )
 
     entry = next(m for m in caplog.messages if "stage=signals" in m)
-    assert "w_availability=1.0" in entry and "w_rotation=0.25" in entry
+    assert "w_availability=1.0" in entry
+    assert "w_rotation" not in entry, "the withdrawn weight must not be logged"
     assert "reading_scope=True" in entry
-    assert "out_of_stock=1" in entry and "with_rotation=1" in entry
+    assert "out_of_stock=1" in entry
+    # A diagnostic count, not an ordering input: the report publishes the distribution.
+    assert "with_sales_signal=1" in entry
     assert TOKEN_TRACE_ID in entry
     # No exact quantity and no vector.
     assert "sales_30d=5" not in entry
@@ -1063,17 +1075,18 @@ def test_an_absent_signal_never_ranks_below_a_read_one() -> None:
     # And no score is ever positive: only bad news moves a candidate.
     for item in (absent, carried_and_sold, carried_unsold, exhausted):
         assert business_score(item, LIVE_WEIGHTS) <= 0.0
+    # With rotation withdrawn the surviving asymmetry is gone too: a row that was read and
+    # did not sell scores exactly what an unread one scores.
+    assert business_score(carried_unsold, LIVE_WEIGHTS) == business_score(
+        absent, LIVE_WEIGHTS
+    )
 
     ordered, _ = demote(
         [exhausted, carried_unsold, absent, carried_and_sold],
         StructuralFilters(),
         LIVE_WEIGHTS,
     )
-    # Absent and carried-and-sold tie at the top and keep their fused order; then the one
-    # that was read and did not sell; then the exhausted one.
-    assert ordered[:2] == (absent, carried_and_sold) or ordered[:2] == (
-        carried_and_sold,
-        absent,
-    )
-    assert ordered[2] is carried_unsold
-    assert ordered[3] is exhausted
+    # Only the exhausted candidate moves. Absent, carried-and-sold and carried-unsold all
+    # score zero and keep the order the fusion gave them.
+    assert ordered[-1] is exhausted
+    assert [item for item in ordered[:3]] == [carried_unsold, absent, carried_and_sold]

@@ -29,7 +29,7 @@ When only the reading scope is supplied, the join MUST preserve every candidate 
 
 ### Requirement: The business score orders only candidates that typed constraints rank equally
 
-Availability and rotation MUST be applied as a continuous score that decides the order **within** the last block of the ordering key, and MUST NOT be able to overturn a constraint the operator expressed in the query. The blocks produced by a price ceiling, a size or a material named in the text MUST keep their lexicographic precedence over the business score.
+Availability MUST be applied as a continuous score that decides the order **within** the last block of the ordering key, and MUST NOT be able to overturn a constraint the operator expressed in the query. The blocks produced by a price ceiling, a size or a material named in the text MUST keep their lexicographic precedence over the business score.
 
 No candidate may be removed on the basis of a business signal, and every candidate MUST remain inside the over-retrieval window that is returned, because the caller owns the authoritative price and stock.
 
@@ -53,37 +53,37 @@ No candidate may be removed on the basis of a business signal, and every candida
 - **THEN** no field reports an exact stock quantity
 - **AND** the availability signal is never emitted as a number of units
 
-### Requirement: Rotation breaks ties and is a declared weight, never a calibrated one
+### Requirement: The sales window is read for diagnosis and orders nothing
 
-The sales window SHALL act as the **last** ordering key, deciding only between candidates that the fusion and the availability signal rank equally. Its weight MUST be declared in configuration with its rationale, MUST NOT be produced by a calibration sweep, and MUST NOT be able to reverse the availability signal or any typed constraint.
+The sales window SHALL be readable from the projection and carried on a retrieved candidate, so that the evaluation can publish its distribution and a later capability has an input. **No ordering rule may consume it.** The guarantee MUST be structural rather than a promise: the interface the ordering reads MUST NOT carry the field at all, so a rule cannot consume it by accident.
 
-The sales window MUST be read against the reference instant recorded on the projection row and MUST NOT be computed against the wall clock, so that the same configuration yields the same order on different days.
+A weight for it MUST NOT be declared, because a weight is a statement that a signal orders something.
 
-#### Scenario: Rotation decides a tie
+The report MUST record why it orders nothing, and the reason MUST rest on measurement rather than on caution: measured over the judged set, a rule acting only between candidates the fusion ranks **equally** decided no pair at all inside the reported window, while the same signal applied as a component of the ordering key reordered candidates the fusion had separated by many positions and displaced better-graded documents.
+
+#### Scenario: The sales window reaches a candidate
+
+- **WHEN** a candidate is retrieved with a reading scope supplied
+- **THEN** its sales window is available for diagnosis
+- **AND** a candidate the point of sale does not carry reports it as absent rather than as zero
+
+#### Scenario: The ordering cannot see the sales window
+
+- **WHEN** the interface the ordering reads is inspected
+- **THEN** it does not carry the sales window
+- **AND** no ordering module names it
+
+#### Scenario: Two candidates differing only in their sales window keep the fused order
 
 - **GIVEN** two candidates the fusion and the availability signal rank equally, one of which sold in the window and one of which did not
 - **WHEN** the candidates are ordered
-- **THEN** the one that sold precedes the one that did not
+- **THEN** their relative order is the one the fusion produced
 
-#### Scenario: Rotation cannot overturn availability
+#### Scenario: No weight is declared for it
 
-- **GIVEN** two candidates differing in availability, where the zero-stock one sold more
-- **WHEN** the candidates are ordered
-- **THEN** the in-stock candidate precedes the zero-stock one
-- **AND** the sales window does not reverse that order
-
-#### Scenario: The rotation weight does not come from a sweep
-
-- **WHEN** the calibration report is inspected
-- **THEN** the rotation weight appears as a declared value with its rationale
-- **AND** it is not listed among the weights the sweep explored
-
-#### Scenario: The same configuration gives the same order on a different day
-
-- **GIVEN** a projection whose rows carry a reference instant
-- **WHEN** the same configuration is evaluated on two different days
-- **THEN** the sales windows read are identical
-- **AND** the resulting order is identical
+- **WHEN** the settings are inspected
+- **THEN** no weight governs the sales window
+- **AND** the report states the measured reason it orders nothing
 
 ### Requirement: Weights are configuration and travel as call parameters
 
@@ -114,7 +114,7 @@ Setting every business weight to zero MUST reproduce the ordering the pipeline p
 
 A business weight MUST NOT be adopted on the basis of a ranking metric computed over labelled relevance alone, because the annotation criterion of the golden set judges what a piece **is** and never what the shop **has**, so such a metric is at best orthogonal to availability and at worst adversarial to it.
 
-The objective MUST be an operational metric whose gain function is a declared function of the labelled grade and the availability signal, published together with the pure-relevance reading. The pure-relevance reading MUST act as a **guardrail**: a weight configuration that improves the operational metric while degrading pure relevance by more than the agreed margin MUST NOT be adopted. No measured category may degrade by more than that margin either.
+The objective MUST be an operational metric whose gain function is a declared function of the labelled grade and the availability signal, published together with the pure-relevance reading. Where the measurement shows the ordering to be invariant to a weight's **value** — as it is for a signal with two states — the report MUST say so and MUST present the adopted figure as a declared unit rather than as a fitted one, because publishing an invariant number as a calibrated result claims evidence that was never produced. The pure-relevance reading MUST act as a **guardrail**: a weight configuration that improves the operational metric while degrading pure relevance by more than the agreed margin MUST NOT be adopted. No measured category may degrade by more than that margin either.
 
 The gain function MUST be declared before the measurement is executed, and the recorded judgements MUST NOT be modified by it.
 

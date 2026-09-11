@@ -41,19 +41,35 @@ OUT_OF_STOCK_BUCKET = "0"
 
 @dataclass(frozen=True)
 class BusinessWeights:
-    """What the business score is made of. Both values come from configuration. C25.
+    """What the business score is made of. ONE weight, and it comes from configuration. C25.
 
-    Held as a value object rather than two loose floats so that `demote` cannot be called
-    with one of them and not the other, and so the "all zero" case — the rollback — is one
-    readable predicate instead of a conjunction spelled out at every call site.
+    It was two. The rotation term was withdrawn, **refuted by measurement rather than by
+    argument**, and the figures are in the C25 implementation report:
+
+    * As the strict tiebreak its own requirement described — acting only between candidates
+      the fusion ranks EQUALLY — it decided **0 pairs in the top five across all 48 queries**.
+      Exact score ties are common (662 pairs, 35 % of candidates), but none of the ones inside
+      the reported window pitted a seller against a non-seller. Implemented literally, it was
+      a no-op whose weight could not matter.
+    * As a component of the ordering key it was not a tiebreak at all: a binary flag at the
+      end of a lexicographic key PARTITIONS the whole block, so it inverted 11.067 pairs of
+      which only **3,4 % were adjacent** in the fused order and **71,2 % were more than ten
+      positions apart**. Where it acted it cost relevance — 6 of the 22 candidates it lifted
+      into the top five displaced a better-graded document.
+
+    A mechanism that can only be a no-op or a mistake is withdrawn, not tuned. The sentence
+    that justified it stays true at a counter; what the measurement establishes is that this
+    retriever does not produce the situation the sentence describes.
+
+    Kept as a value object rather than a loose float because the "zero" case — the rollback —
+    should be one readable predicate, and because a second signal may yet earn its place.
     """
 
     availability: float = 0.0
-    rotation: float = 0.0
 
     @property
     def is_zero(self) -> bool:
-        return self.availability == 0.0 and self.rotation == 0.0
+        return self.availability == 0.0
 
 #: Ceiling phrases an operator actually types, with the figure captured. Deliberately narrow:
 #: a rule that fires on "80" alone would invent a constraint out of a reference number.
@@ -97,9 +113,6 @@ class Constrained(Protocol):
     #: The projection bucket for the point of sale, or `None` when no reading scope was
     #: applied or this point of sale does not carry the product.
     qty_bucket: str | None
-    #: The 30-day sales window from the same projection row, counted against that row's own
-    #: `computed_as_of`. `None` is absence and never a zero.
-    sales_30d: int | None
 
 
 ConstrainedT = TypeVar("ConstrainedT", bound=Constrained)
@@ -169,34 +182,26 @@ def _out_of_stock(item: Constrained) -> bool:
 def business_score(item: Constrained, weights: BusinessWeights) -> float:
     """The continuous score that orders the tail block. Higher is better. C25 D9.
 
-    Two terms, both binary, and neither invents a value for an absent signal:
+    One term, and it only ever SUBTRACTS: availability costs its weight when the projection
+    reports `qty_bucket` of zero, and nothing else moves a candidate at all.
 
-    * **availability** costs its weight when the projection reports `qty_bucket` of zero.
-      An ABSENT row costs nothing — no reading scope, or a product this point of sale does
-      not carry — because absence is not evidence of zero stock.
-    * **rotation** costs its weight when a row that WAS read records no sale. It is binary,
-      not proportional to the count, because the sentence that justifies it is about a
-      tiebreak: "between two pieces the retriever and the stock rank equally, show the one
-      that sells". No sentence justifies a piece that sold forty outranking one that sold
-      four, and a weight with no hypothesis behind it fits the noise of 48 queries.
+    **An absent row costs nothing** — no reading scope was applied, or this point of sale does
+    not carry the product — because absence is not evidence of zero stock. That the score can
+    only subtract is the requirement rather than a preference: a term that PAID for good news
+    would rank a candidate whose row was never read below one whose row was, which is exactly
+    "treating absence as zero". Measured on a reading scope covering 416 of 1.168 products, a
+    bonus-shaped term cost 0,244 of pure relevance, because it sorted the assortment above
+    everything outside it instead of sorting the exhausted below the available.
 
-    **Both terms only ever subtract, and that is the requirement rather than a preference.**
-    A bonus for having sold would rank a candidate whose row was never read BELOW one that
-    sold — which is precisely "treating absence as zero sales", the thing the projection
-    capability forbids. Measured, the bonus form cost 0,244 of pure relevance on a reading
-    scope covering 416 of 1.168 products, because it sorted the assortment above everything
-    outside it rather than sorting the exhausted below the available. Only bad news moves a
-    candidate, so an absent signal is neutral by construction and not by care.
-
-    Rotation cannot overturn availability, and that too is structural: the settings refuse a
-    rotation weight that is not strictly below the availability one.
+    **The value of the weight does not change the order, only its sign does.** With a single
+    binary term the score takes two values, so any positive weight yields the same ranking;
+    the sweep measured exactly that. The weight stays a configured float because zero is the
+    rollback, but the calibration report says plainly that `1.0` is a declared unit and not a
+    fitted figure.
     """
-    score = 0.0
     if _out_of_stock(item):
-        score -= weights.availability
-    if item.sales_30d is not None and item.sales_30d <= 0:
-        score -= weights.rotation
-    return score
+        return -weights.availability
+    return 0.0
 
 
 def demotion_rank(

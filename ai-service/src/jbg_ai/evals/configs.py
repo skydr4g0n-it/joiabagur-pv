@@ -100,7 +100,6 @@ class EvalConfig:
     #: both is exactly why the demotion C22 shipped never fired in the published run.
     signal_pos_id: str | None = None
     business_weight_availability: float | None = None
-    business_weight_rotation: float | None = None
     branch_depth: int | None = None
     pos_prefilter: bool = False
     max_results: int = 60

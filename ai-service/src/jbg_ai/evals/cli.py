@@ -422,11 +422,8 @@ def _rescore(args: argparse.Namespace) -> int:
             "figures that no longer share a provenance"
         )
 
-    grid = business_grid(
-        availability=(0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0),
-        rotation=(0.0, 0.1, 0.25, 0.5),
-    )
-    rows: list[tuple[float, float, dict]] = []
+    grid = business_grid(availability=(0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0))
+    rows: list[tuple[float, dict]] = []
     for weights in grid:
         readings = rescore(
             captured,
@@ -435,7 +432,7 @@ def _rescore(args: argparse.Namespace) -> int:
             buckets=captured.buckets or None,
             depth=config.max_results,
         )
-        rows.append((weights.availability, weights.rotation, readings))
+        rows.append((weights.availability, readings))
 
     lines = [
         "# C25 — barrido de los pesos de negocio por re-puntuado (fase C)",
@@ -448,18 +445,32 @@ def _rescore(args: argparse.Namespace) -> int:
         "ventana persistida. Dos corridas sobre las mismas ventanas dan lo mismo, y eso es "
         "una propiedad **estructural** y no una promesa sobre semillas.",
         "",
-        f"| w disponibilidad | w rotación | {DECISION_METRIC} ({DECIDING_READING}) "
-        "| operativo | global |",
-        "|---:|---:|---:|---:|---:|",
+        f"| w disponibilidad | {DECISION_METRIC} ({DECIDING_READING}) | operativo | global |",
+        "|---:|---:|---:|---:|",
     ]
-    for availability, rotation, readings in rows:
+    for availability, readings in rows:
         deciding = readings[DECIDING_READING].values[DECISION_METRIC]
         operational = readings["global"].values.get("ndcg_at_5_operational")
         lines.append(
-            f"| {availability} | {rotation} | {deciding:.3f} | "
+            f"| {availability} | {deciding:.3f} | "
             f"{'—' if operational is None else f'{operational:.3f}'} | "
             f"{readings['global'].values[DECISION_METRIC]:.3f} |"
         )
+    distinct = {
+        (
+            round(readings[DECIDING_READING].values[DECISION_METRIC], 6),
+            round(readings["global"].values[DECISION_METRIC], 6),
+        )
+        for _, readings in rows
+    }
+    lines += [
+        "",
+        f"> **{len(rows)} puntos de rejilla y {len(distinct)} resultados distintos.** No es un "
+        "defecto del barrido: con un único término binario el score de negocio toma dos "
+        "valores, así que **el orden es invariante al valor del peso y sólo depende de su "
+        "signo**. La calibración decide encender o apagar la señal, no cuánto pesa, y `1,0` "
+        "queda como unidad declarada y no como cifra ajustada.",
+    ]
 
     name = args.name or "c25-rescore.md"
     out = (Path(args.out) if args.out else RESULTS_DIR) / name
