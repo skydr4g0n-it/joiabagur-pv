@@ -93,7 +93,7 @@
 - [x] 10.1 Ejecutar la fase `capture` con la fusión de 9.4 congelada
 - [x] 10.2 Ejecutar la fase `rescore` sobre la rejilla del **único** peso de negocio, con el objetivo operativo y el guardarraíl de relevancia pura; publicar que el orden es **invariante al valor** del peso y que lo decidido es su signo
 - [x] 10.3 Validar el peso ganador en **FORNELLS** y **HT-GALDANA**, además de decidirlo en **MAO-AIR**
-- [ ] 10.4 **Congelar `v3-senales`** y registrar su configuración
+- [x] 10.4 **Congelar `v3-senales`** y registrar su configuración → `v2b` más `business_weight_availability: 1.0`, leyendo MAO-AIR sin restringir. La regla de adopción se cumple entera; **la brecha contra el criterio relativo de D2 queda declarada** en la cabecera del fichero, en D2 y en el informe
 
 ## 11. Fase D — abstención
 
@@ -114,7 +114,7 @@
 - [ ] 12.6 Re-correr **las seis filas** bajo la versión nueva, `v0-cag` incluida, para que la tabla comparte una sola procedencia
 - [ ] 12.7 **Re-confirmar** los ganadores de 9.4 y 10.4 contra el titular en la versión nueva — un punto de rejilla, no la rejilla
 - [ ] 12.8 Informe versionado en `ai-service/evals/results/` con la tabla v0→v3 de seis filas, las lecturas de D14 con su recuento de saturación, la distribución de D11 y el antes/después de las consultas sin anclaje
-- [ ] 12.9 Aplicar el criterio **relativo** de D2 y declarar la brecha contra el absoluto del §11.2 con sus cifras medidas
+- [ ] 12.9 Aplicar el criterio **relativo** de D2 y declarar **las dos brechas** con sus cifras medidas: la absoluta contra el §11.2, y la del propio criterio relativo — `v2b` lo cumple (+0,073) y **`v3` no** (+0,027 operativo, bajo el margen de 0,05)
 
 ## 13. Documentación, contrato y cierre
 

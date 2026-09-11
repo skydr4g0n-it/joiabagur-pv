@@ -207,6 +207,8 @@ When a measured baseline shows that an absolute acceptance threshold is beyond t
 
 The restatement MUST record the measured figures that justify it.
 
+**A configuration that fails the relative criterion MAY still be adopted, and when it is, that gap MUST be declared with the same prominence as the absolute one.** Adoption in that case MUST rest on a rule of its own that the configuration does satisfy, and the report MUST state which rule admitted it, why the deciding metric cannot resolve the difference, and what evidence outside that metric supports the decision. A gap that is adopted MUST NOT be reported as a pass, and a criterion MUST NOT be weakened after the measurement so that a configuration meets it.
+
 #### Scenario: The relative criterion is applied and the gap declared
 
 - **GIVEN** a configuration that beats the one it is built on beyond the margin in the deciding reading
@@ -214,6 +216,21 @@ The restatement MUST record the measured figures that justify it.
 - **WHEN** the evaluation is reported
 - **THEN** the configuration is accepted under the relative criterion
 - **AND** the distance to the absolute threshold is declared as a limitation with its measured figures
+
+#### Scenario: A configuration adopted without meeting the relative criterion declares that gap
+
+- **GIVEN** a configuration that does not beat the one it is built on beyond the margin in any reading
+- **AND** that satisfies the adoption rule its own capability defines
+- **WHEN** it is adopted
+- **THEN** the report declares that the relative criterion was not met, with its measured figures
+- **AND** names the rule that admitted it and the evidence outside the deciding metric
+- **AND** the outcome is not reported as having met the criterion
+
+#### Scenario: A criterion is not weakened to fit a result
+
+- **WHEN** a configuration fails an acceptance criterion
+- **THEN** the criterion recorded before the measurement is unchanged
+- **AND** the failure is declared rather than absorbed
 
 #### Scenario: Judgements are not relabelled to meet a threshold
 

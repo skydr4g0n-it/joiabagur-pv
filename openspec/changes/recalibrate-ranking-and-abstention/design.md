@@ -78,6 +78,41 @@ antes de saber que `relevant_total` puede valer 144 para una consulta.
 *Alternativa descartada:* medir contra el 0,85 y declarar el fallo. No distingue «no mejoró» de
 «el listón estaba mal puesto».
 
+> **Resultado medido el 2026-09-11, al cerrar la fase C.** El criterio se cumple para una de las
+> dos filas y **no** para la otra, y las dos cosas se declaran:
+>
+> | | lectura | delta | ¿supera 0,05? |
+> |---|---|---:|---|
+> | `v2b` contra `v2` | `new` | **+0,073** | **sí** |
+> | `v3` contra `v2b` | operativa | +0,027 | **no** |
+> | `v3` contra `v2b` | pura (`new`) | −0,014 | no |
+>
+> **`v3` se adopta igualmente, y por qué no es una excepción *ad hoc*.** Son dos preguntas
+> distintas con dos reglas distintas. La regla de adopción del peso —la que define la capacidad
+> `business-signals-ranking`— pregunta *¿es seguro encender esta señal?* y se cumple entera:
+> el objetivo operativo sube, el guardarraíl de relevancia pura aguanta con −0,014 y ninguna
+> categoría veta. D2 pregunta *¿ha demostrado esta fila que merece existir?* y la respuesta
+> honesta es **no con este instrumento**.
+>
+> Lo que falta es **resolución**, no evidencia. El golden set es estructuralmente ciego a la
+> disponibilidad —hallazgo 1 de la exploración: `criterion.md` no menciona stock ni rotación—, y
+> la métrica operativa de D3 lo hace visible sin darle más resolución a un conjunto de 48
+> consultas cuyo margen resoluble es 0,05. Exigir que una señal que la rúbrica no ve supere el
+> umbral de ruido de la rúbrica es pedirle al instrumento que mida lo que declaró no medir.
+>
+> A favor de encenderla pesan tres cosas que el agregado no muestra: el signo se mantiene en
+> **los tres puntos de venta** con magnitud proporcional a la densidad de la señal (+0,027 al
+> 34,4 % de surtido a cero, +0,013 y +0,004 al 12 %); el efecto es **quirúrgico**, sólo mueve
+> las 13 consultas afectadas de 48; y retira el **91 %** de las piezas agotadas del top-5, que
+> es un fallo operativo —enseñar al cliente algo que no está en el cajón— que ninguna métrica de
+> relevancia captura.
+>
+> *Alternativa descartada:* apagar la señal y enviar la capacidad inerte. Es defendible y más
+> conservadora, pero confunde «el instrumento no resuelve esta diferencia» con «no hay
+> diferencia», y deja sin entregar lo único que C22 construyó la proyección para habilitar.
+> La brecha se **declara**, que es lo que D2 ya hace con la absoluta del §11.2: dos limitaciones
+> escritas valen más que una escondida.
+
 ### D3 · Métrica objetivo derivada, sin re-etiquetar
 
 ```

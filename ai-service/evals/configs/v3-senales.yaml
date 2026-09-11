@@ -19,6 +19,24 @@ rationale: >-
   medición: como desempate estricto decidía cero pares del top-5 en las 48 consultas, y como
   clave de ordenación no era un desempate sino una partición que invertía 11.067 pares y
   costaba relevancia donde actuaba.
+#
+# CONGELADA el 2026-09-11 al cerrar la fase C (tarea 10.4), con el peso a 1,0 y una brecha
+# DECLARADA. Las tres condiciones de la regla de adopcion se cumplen: el objetivo operativo
+# sube +0,027, la relevancia pura cae 0,014 y la peor categoria es `piedra` con -0,039, dentro
+# de la tolerancia de 0,05 aunque rozandola. Validada en los tres puntos de venta con el signo
+# mantenido: +0,027 donde el 34,4 % del surtido esta a cero, +0,013 y +0,004 donde lo esta el 12 %.
+#
+# LA BRECHA, declarada y no escondida: D2 exige que esta fila bata a `v2b` por encima del
+# margen de 0,05 y la mejora operativa es +0,027. Cumple su propia regla de adopcion pero NO el
+# criterio relativo del change. Son dos preguntas distintas: si es seguro encender la senal
+# —si— y si esta fila ha demostrado con este instrumento que merece existir —no—. Se adopta
+# porque el golden set es estructuralmente ciego a la disponibilidad, asi que lo que falta es
+# resolucion del instrumento y no evidencia; en terminos de mostrador la senal retira el 91 %
+# de las piezas agotadas del top-5, que es el resultado que ninguna cifra de nDCG captura.
+#
+# El valor 1,0 es UNIDAD DECLARADA y no cifra ajustada: con un unico termino binario el orden
+# es invariante al valor del peso, y seis valores positivos dan cifras identicas. Lo que la
+# calibracion decidio es el SIGNO. El cero sigue siendo la marcha atras.
 uses_provider: true
 mode: hybrid
 expand_synonyms: true
