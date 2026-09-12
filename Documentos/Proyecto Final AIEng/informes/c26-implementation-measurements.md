@@ -270,3 +270,12 @@ comportamiento resultante es defendible en mostrador —una pieza que no está n
 sin **eliminar** nada, que es el invariante; y el golden set está etiquetado **sin alcance de
 punto de venta**, así que la rebanada no puede calibrar ese peso. Se anota para que quien
 implemente **C34** sepa que el término está en ese régimen y no lo descubra midiendo.
+
+> **Cerrado en la spec, no sólo anotado aquí** *(2026-09-12, tras `/opsx:verify`)*. La
+> verificación leyó el título del requisito —*«never partitions on a boolean»*— contra este
+> párrafo y encontró que la spec viva iba a afirmar lo contrario de lo que el código hace. El
+> requisito pasa a llamarse *«no integer block enters the key»* y lleva el recorte explícito:
+> el término de disponibilidad **particiona de hecho y se acepta**, por ser continuo en la
+> forma, restar sólo, no eliminar nada, y no tener en el golden set —etiquetado sin alcance de
+> punto de venta— ningún dato con el que calibrar su peso. Lo que la prohibición veta es un
+> **bloque entero** en la clave, y ese sitio es el de la talla.

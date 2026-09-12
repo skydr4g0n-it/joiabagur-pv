@@ -70,8 +70,6 @@ class LexicalHit:
     sales_30d: int | None = None
 
 
-
-
 @dataclass(frozen=True)
 class SourceDocument:
     """The reference product a substitutes request is anchored to. C26.

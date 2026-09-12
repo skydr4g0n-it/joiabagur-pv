@@ -45,8 +45,10 @@ The candidate universe MUST be restricted to active indexed documents whose `pie
 - **WHEN** substitutes are requested
 - **THEN** that product does not appear among the candidates
 
-### Requirement: Ordering composes continuous terms and never partitions on a boolean
+### Requirement: Ordering composes continuous terms and no integer block enters the key
 Candidates MUST be ordered by a score composed of the cosine similarity to the source product plus continuous penalty terms for size mismatch and for unavailability. No term of the ordering key MAY be an integer block, because an integer block partitions the result instead of breaking ties. The availability term MUST reuse the business score calibrated by `business-signals-ranking` and MUST only ever subtract. The size penalty weight MUST be read from configuration and MUST NOT be written into the code.
+
+Reusing that business score has a measured consequence this requirement ACCEPTS rather than forbids. Its calibrated weight is `1.0` and the cosine similarity lives in `[0, 1]`, so the availability term spans the whole similarity range and in practice orders every out-of-stock candidate behind every available one. That is a partition in effect, and it is permitted here for four reasons: the term is continuous in FORM, so lowering the weight reorders the list without a line of code changing; it only ever subtracts; it removes nothing, which is the invariant that matters; and the golden set is labelled with no point-of-sale scope, so no slice of it can calibrate that weight — re-fixing it would be a figure chosen rather than measured. What the prohibition above forbids is an integer block in the key, and the SIZE term is where one would have gone.
 
 #### Scenario: A same-size candidate outranks a same-family candidate of a different size
 - **GIVEN** the source product declares a size and its family has members of other sizes
@@ -101,8 +103,12 @@ When the request carries a point of sale, the availability projection MUST be re
 - **WHEN** substitutes are requested
 - **THEN** that candidate is not demoted by the availability term
 
-### Requirement: No live family member is dropped from the result
-Every active member of the source product's family MUST be present in the returned candidate set when the source product belongs to a family, and each MUST report `family_match` as true. Family membership MUST NOT by itself place a candidate ahead of another; its position MUST be decided by the ordering rule like any other candidate.
+### Requirement: No rule of this capability drops a live family member
+No rule of this capability MAY remove an active member of the source product's family from the candidate universe. The only hard filter is the piece type, which every member of a family shares by construction, so a sibling can only ever be absent by falling outside the over-retrieval window — never by being excluded. Every family member inside that window MUST report `family_match` as true.
+
+**The guarantee is the absence of an excluding rule and not a bound on the window**, and that distinction is what this wording exists to make. Under the default window — three times the requested page size, so thirty rows — every active sibling is reached, because a product's distance to its own family runs to a measured maximum of 0,123; the scenario below is stated against that default for exactly that reason. A caller that asks for a page smaller than the family MUST NOT expect every sibling back, and the retriever MUST NOT silently widen the window to pretend otherwise: what it produced is declared in `candidates_returned`.
+
+Family membership MUST NOT by itself place a candidate ahead of another; its position MUST be decided by the ordering rule like any other candidate.
 
 #### Scenario: Every living sibling is present
 - **GIVEN** the source product belongs to a family with other active members

@@ -556,6 +556,11 @@ async def _substitutes(args: argparse.Namespace) -> int:
         run_slice,
         substitute_queries,
     )
+    # The shipped default and the noise floor, both IMPORTED rather than retyped: the report
+    # has to name the weight the service actually runs with, and a literal here could drift
+    # away from `settings.py` without a single test noticing.
+    from jbg_ai.config.settings import SUBSTITUTE_DEFAULTS
+    from jbg_ai.evals.sweep import MATERIAL_DELTA
 
     weights = (
         tuple(float(item) for item in args.weights.split(",") if item.strip())
@@ -669,6 +674,56 @@ async def _substitutes(args: argparse.Namespace) -> int:
             f"y Recall@5 "
             f"{by_weight[best_safe]['recall_at_5'] - by_weight[argmax]['recall_at_5']:.4f}: "
             "entra un documento de grado 0 en un top-5. Gana el guardarraíl.",
+        )
+
+    # **Which weight is ADOPTED**, stated here rather than left to the reader. The guardrail
+    # winner above is not automatically the shipped value: the rule written before the sweep
+    # ran is that a gain this set cannot resolve does not move a default.
+    #
+    # `MATERIAL_DELTA` is BORROWED, and borrowed in the safe direction. It was measured for the
+    # 71-query ablation set, and five anchored queries resolve less than seventy-one rather
+    # than more — so reusing it sets the bar for moving a default HIGHER than this slice could
+    # justify on its own, never lower. Doing better would mean calibrating a floor for five
+    # queries against those same five, which is a number fitted to its own sample. The printed
+    # sentence says where the figure comes from for that reason: a reader must not take it as
+    # this slice's own resolution.
+    #
+    # Naming only the winner would leave the report pointing at a weight the service does not
+    # run with: the one way a published figure can mislead while every number in it is correct.
+    shipped = float(SUBSTITUTE_DEFAULTS["jpv_substitute_weight_size"])
+    floor = f"umbral de {MATERIAL_DELTA:g} que C24 midió sobre el conjunto de ablations"
+    if best_safe is None or shipped not in by_weight:
+        # Either nothing holds the guardrail, or the grid was overridden on the command line
+        # and does not contain the shipped value. Inventing an adoption here would be a claim
+        # about a weight this run never measured.
+        pass
+    elif shipped not in safe:
+        lines.append(
+            f"- **El valor por defecto `{shipped:g}` DEGRADA el guardarraíl en este barrido**, "
+            f"así que la decisión no es suya: el mejor punto que lo respeta es `{best_safe:g}`. "
+            "Mover el default o justificar por escrito por qué se conserva."
+        )
+    elif best_safe == shipped:
+        lines.append(
+            f"- **Adoptado: `w_size = {shipped:g}`**, que es a la vez el mejor punto que no "
+            "degrada el guardarraíl y el valor por defecto del servicio."
+        )
+    elif by_weight[best_safe]["ndcg_at_5"] - by_weight[shipped]["ndcg_at_5"] < MATERIAL_DELTA:
+        gain = by_weight[best_safe]["ndcg_at_5"] - by_weight[shipped]["ndcg_at_5"]
+        lines.append(
+            f"- **Adoptado: `w_size = {shipped:g}`**, el valor por defecto del servicio. El "
+            f"mejor punto que no degrada el guardarraíl es `{best_safe:g}`, y supera al "
+            f"adoptado en **{gain:.4f}** de nDCG@5 — por debajo del {floor}, así que la "
+            "diferencia queda bajo el ruido y no mueve un default. La regla se fijó antes de "
+            "correr el barrido."
+        )
+    else:
+        gain = by_weight[best_safe]["ndcg_at_5"] - by_weight[shipped]["ndcg_at_5"]
+        lines.append(
+            f"- **El guardarraíl premia `{best_safe:g}` por {gain:.4f} de nDCG@5 sobre el "
+            f"`{shipped:g}` que el servicio trae por defecto**, por encima del {floor}: la "
+            "diferencia NO queda bajo el ruido y el default debe moverse o justificarse por "
+            "escrito."
         )
 
     lines += [

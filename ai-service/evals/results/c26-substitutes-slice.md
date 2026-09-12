@@ -46,6 +46,7 @@
 - **Máximo de nDCG@5 graduado:** `0.075` (0.8785).
 - **Guardarraíl** (lectura binaria, Recall@5 y P@3 en su máximo): se mantiene hasta `0.06` inclusive y se rompe a partir de ahí.
 - Las dos lecturas **discrepan**, y `criterion.md` dice que eso es un hallazgo y se publica: el graduado premia `0.075` (+0.0281), pero ahí la lectura binaria cae 0.0262 y Recall@5 0.0105: entra un documento de grado 0 en un top-5. Gana el guardarraíl.
+- **Adoptado: `w_size = 0.05`**, el valor por defecto del servicio. El mejor punto que no degrada el guardarraíl es `0.06`, y supera al adoptado en **0.0051** de nDCG@5 — por debajo del umbral de 0.05 que C24 midió sobre el conjunto de ablations, así que la diferencia queda bajo el ruido y no mueve un default. La regla se fijó antes de correr el barrido.
 
 Configuraciones: `c26-substitutes-w0`, `c26-substitutes-w0.02`, `c26-substitutes-w0.04`, `c26-substitutes-w0.05`, `c26-substitutes-w0.06`, `c26-substitutes-w0.07`, `c26-substitutes-w0.075`, `c26-substitutes-w0.08`, `c26-substitutes-w0.1`, `c26-substitutes-w0.12`, `c26-substitutes-w0.2`.
 

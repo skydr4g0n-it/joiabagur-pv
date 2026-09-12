@@ -171,7 +171,15 @@ def test_explicitly_excluded_products_are_not_returned() -> None:
 
 
 def test_no_live_family_member_is_dropped_from_the_result() -> None:
-    """Recall is what survived the measurement, not the "same family first" of the ticket."""
+    """Recall is what survived the measurement, not the "same family first" of the ticket.
+
+    **Read the name with the scope the spec states.** What is guaranteed is that no RULE
+    removes a sibling: the only hard filter is `piece_type`, which a family shares by
+    construction. A sibling can still be absent by falling outside the over-retrieval window,
+    and the spec says so rather than promising a bound the statement does not enforce — with
+    `top_k=1` the window is three rows and a family of eight cannot fit in it. Here the window
+    holds every candidate, so what this asserts is the absence of the rule.
+    """
     response = _run(FakeProductSearch(_erizo_rows()))
 
     siblings = {"SKU14", "SKU12", "SKU15"}

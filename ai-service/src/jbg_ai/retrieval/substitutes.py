@@ -176,8 +176,10 @@ def _match_reasons(item: _Scored, source: SourceDocument) -> list[str]:
     `SimilaritySignals` cannot express the **size**, which is the attribute that actually
     discriminates in half of the reserved golden-set queries, so it is stated here. No price
     and no stock FIGURE may appear: .NET owns both, and a number written here would be one
-    this service cannot stand behind. The price BAND is a label rather than a figure, and it
-    is mentioned only when it differs from the source product's.
+    this service cannot stand behind. **That includes the price band**, whose values are
+    literally euro ranges on the live catalogue, so only the FACT that two bands differ is
+    stated and never which two — see the comment on the band clause below, which carries the
+    measurement that rules out naming them.
     """
     reasons: list[str] = []
 
