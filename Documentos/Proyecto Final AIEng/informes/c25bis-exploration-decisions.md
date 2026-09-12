@@ -1,6 +1,6 @@
 # C25bis — decisiones de exploración: retirar el andamio de la fusión plana
 
-**Change:** [`clean-plain-fusion`](../../../openspec/changes/clean-plain-fusion/) · **Fecha:** 2026-09-12
+**Change:** [`clean-plain-fusion`](../../../openspec/changes/archive/2026-09-12-clean-plain-fusion/) · **Fecha:** 2026-09-12
 **Árbol explorado:** `ai-eng` en `b162422` · **Rama de implementación:** `c25bis-clean-plain-fusion`
 
 Este informe recoge lo que la exploración **comprobó sobre el árbol** y las siete decisiones de

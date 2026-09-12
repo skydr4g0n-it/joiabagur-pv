@@ -75,7 +75,7 @@ de S10 avisa de no inventar.
 
 ## 2. Hoy la señal no existe en la evaluación
 
-[`v2-hibrido.yaml`](../../../ai-service/evals/configs/v2-hibrido.yaml) corre con
+[`v2-hibrido.yaml`](../../../ai-service/evals/configs/retired/v2-hibrido.yaml) *(retirada por C25bis: histórica y no ejecutable)* corre con
 `pos_prefilter: false`, y su propio comentario declara la consecuencia. En
 [`search.py`](../../../ai-service/src/jbg_ai/retrieval/search.py) eso significa literalmente
 `NULL AS qty_bucket`, y `_out_of_stock` devuelve `False` para `None` **por diseño explícito**

@@ -1137,7 +1137,7 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 **Verificado con las cifras delante.** Las **315 filas** por consulta de las cinco configuraciones supervivientes son **idénticas** antes y después, listas de resultados incluidas; el único elemento de la procedencia que difiere es la revisión del código. Suite **994 → 997 con cero fallos** a los dos lados. Sin migración, sin contrato, sin diff fuera de `ai-service/`, `Documentos/` y `openspec/`.
 
-**Estado.** **45/45 tareas**, pendiente de verificar y archivar. Change [`clean-plain-fusion`](../../openspec/changes/clean-plain-fusion/) · informe en [`c25bis-implementation-measurements.md`](informes/c25bis-implementation-measurements.md).
+**Estado.** **45/45 tareas**, pendiente de verificar y archivar. Change [`clean-plain-fusion`](../../openspec/changes/archive/2026-09-12-clean-plain-fusion/) · informe en [`c25bis-implementation-measurements.md`](informes/c25bis-implementation-measurements.md).
 
 ---
 

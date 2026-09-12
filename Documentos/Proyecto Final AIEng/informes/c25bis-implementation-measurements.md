@@ -1,6 +1,6 @@
 # C25bis — implementación: el borrado, y la prueba de que no movió nada
 
-**Change:** [`clean-plain-fusion`](../../../openspec/changes/clean-plain-fusion/) · **Fecha:** 2026-09-12
+**Change:** [`clean-plain-fusion`](../../../openspec/changes/archive/2026-09-12-clean-plain-fusion/) · **Fecha:** 2026-09-12
 **Rama:** `c25bis-clean-plain-fusion` · **Decisiones previas:** [`c25bis-exploration-decisions.md`](c25bis-exploration-decisions.md)
 
 Este change no tiene autoridad para mover una cifra. Su entrega, por tanto, no es una mejora sino

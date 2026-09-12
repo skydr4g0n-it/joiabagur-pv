@@ -111,7 +111,7 @@ alto.
 
 ### Referencias
 
-- Change: [`openspec/changes/clean-plain-fusion/`](../../../openspec/changes/clean-plain-fusion/)
+- Change: [`openspec/changes/clean-plain-fusion/`](../../../openspec/changes/archive/2026-09-12-clean-plain-fusion/)
 - Decisiones y evidencias: [`c25bis-exploration-decisions.md`](../../Proyecto%20Final%20AIEng/informes/c25bis-exploration-decisions.md)
 - Historia origen del andamio: [`HU-AIENG-025`](HU-AIENG-025.md)
 - Specs vivas afectadas: [`hybrid-fusion`](../../../openspec/specs/hybrid-fusion/spec.md) · [`retrieval-evaluation`](../../../openspec/specs/retrieval-evaluation/spec.md)
@@ -246,7 +246,7 @@ alto.
 - **Tentación que el diseño convierte en fallo**: «aprovechar» para ajustar algo. Un change de
   limpieza que mueve una cifra deja de ser verificable.
 - **Change de OpenSpec por el que se implementa**:
-  [`clean-plain-fusion`](../../../openspec/changes/clean-plain-fusion/), sobre la rama
+  [`clean-plain-fusion`](../../../openspec/changes/archive/2026-09-12-clean-plain-fusion/), sobre la rama
   `c25bis-clean-plain-fusion`.
 
 ---
