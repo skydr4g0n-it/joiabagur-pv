@@ -104,7 +104,7 @@ Mediciones completas en [c23-exploration-measurements.md](../../Proyecto%20Final
 - Specs vivas que enmarcan el change: `openspec/specs/ai-vector-schema/` (las dos tablas ya especificadas), `openspec/specs/hybrid-fusion/`, `openspec/specs/query-expansion/`, `openspec/specs/ai-service-api-contracts/`.
 - Historias previas: [HU-AIENG-011](HU-AIENG-011.md) (texto canónico y cliente de embeddings), [HU-AIENG-020](HU-AIENG-020.md) (diccionario de sinónimos), [HU-AIENG-021](HU-AIENG-021.md) (fusión híbrida), [HU-AIENG-022](HU-AIENG-022.md) (prefiltro por punto de venta).
 - Apuntes: [S11 · Citación y atribución verificable](../../Sesiones%20Master%20AIEng/S11_RAG_avanzado/Citacion%20y%20Atribucion%20verificable.md), [S10 · Multi-índice y routing](../../Sesiones%20Master%20AIEng/S10_Tecnicas_Recuperacion/Multi-indice%20y%20routing.md), [S11 · Reindexación y versionado de embeddings](../../Sesiones%20Master%20AIEng/S11_RAG_avanzado/Reindexacion%20y%20Versionado%20Embeddings.md).
-- Change: [`add-knowledge-corpus-and-indexer`](../../../openspec/changes/add-knowledge-corpus-and-indexer/) · ticket [T-AIENG-023](../../../openspec/changes/add-knowledge-corpus-and-indexer/ticket.md).
+- Change: [`add-knowledge-corpus-and-indexer`](../../../openspec/changes/archive/2026-09-06-add-knowledge-corpus-and-indexer/) · ticket [T-AIENG-023](../../../openspec/changes/archive/2026-09-06-add-knowledge-corpus-and-indexer/ticket.md).
 
 ---
 

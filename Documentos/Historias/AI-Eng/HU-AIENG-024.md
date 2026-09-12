@@ -109,7 +109,7 @@ Las trece están razonadas con alternativas en el [informe de exploración §4](
 - Specs vivas que enmarcan el change: `openspec/specs/vector-retrieval/`, `openspec/specs/hybrid-fusion/`, `openspec/specs/query-expansion/`, `openspec/specs/pos-projection/`, `openspec/specs/ai-vector-schema/`, `openspec/specs/ai-service-api-contracts/`.
 - Historias previas: [HU-AIENG-014](HU-AIENG-014.md) (recuperador vectorial), [HU-AIENG-020](HU-AIENG-020.md) (diccionario de sinónimos), [HU-AIENG-021](HU-AIENG-021.md) (fusión híbrida), [HU-AIENG-022](HU-AIENG-022.md) (prefiltro por punto de venta), [HU-AIENG-023](HU-AIENG-023.md) (corpus de conocimiento).
 - Apuntes: [S10 · Cómo saber si el reranking compensa](../../Sesiones%20Master%20AIEng/S10_Tecnicas_Recuperacion/Como%20saber%20reranking%20compensa%20-%20medicion%20artesanal%20relevancia%20.md), [S16 · Tratamiento de regresiones](../../Sesiones%20Master%20AIEng/S16_Produccion_II/Tratamiento%20de%20regresiones.md), [S16 · Un sistema debe saber decir «No lo sé»](../../Sesiones%20Master%20AIEng/S16_Produccion_II/Un%20sistema%20debe%20saber%20decir%20%E2%80%9CNo%20lo%20se%E2%80%9D.md).
-- Change: [`add-eval-harness-golden-set-and-baselines`](../../../openspec/changes/add-eval-harness-golden-set-and-baselines/) · ticket [T-AIENG-024](../../../openspec/changes/add-eval-harness-golden-set-and-baselines/ticket.md).
+- Change: [`add-eval-harness-golden-set-and-baselines`](../../../openspec/changes/archive/2026-09-11-add-eval-harness-golden-set-and-baselines/) · ticket [T-AIENG-024](../../../openspec/changes/archive/2026-09-11-add-eval-harness-golden-set-and-baselines/ticket.md).
 
 ---
 

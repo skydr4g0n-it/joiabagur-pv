@@ -417,7 +417,7 @@ joiabagur-pv/
 │   ├── src/                             # pages, components, services, hooks, providers, routing, types
 │   ├── e2e/                             # Playwright
 │   └── package.json
-├── ai-service/                          # Microservicio de IA (C01–C24)
+├── ai-service/                          # Microservicio de IA (C01–C25)
 │   ├── src/jbg_ai/
 │   │   ├── api/                         # main.py (create_app), auth.py, deps.py, middleware.py, routers/, schemas/
 │   │   ├── config/                      # settings.py (pydantic-settings)
@@ -431,6 +431,10 @@ joiabagur-pv/
 │   │   │                                #   degradan (filters) y caché acotado del singleton (cache)
 │   │   │                                # + C22 alcance por punto de venta (projection)
 │   │   │                                # + C24 desempate determinista en las dos sentencias
+│   │   │                                # + C25 fusión en dos etapas con pesos por rama (la plana
+│   │   │                                #   queda seleccionable), ponderación por cobertura, señal de
+│   │   │                                #   POS que lee sin restringir, score de negocio en el último
+│   │   │                                #   bloque y abstención relativa por consulta (abstention)
 │   │   ├── families/                    # C18a agrupador + C18b auditoría de familias persistidas; offline
 │   │   ├── knowledge/                   # C23 segundo índice: corpus, troceado, indexador y búsqueda con citas
 │   │   ├── evals/                       # C24 arnés de evaluación: golden set, pooling, métricas, líneas
@@ -438,7 +442,7 @@ joiabagur-pv/
 │   │   └── stubs/                       # respuestas deterministas bajo STUB_MODE
 │   ├── prompts/                         # catalog-synth/v3 (C06b) + enrichment/v1 (C09)
 │   ├── openapi.json                     # snapshot versionado del contrato
-│   ├── tests/                           # api, config, db, migrations, data, enrichment, indexing, retrieval, support
+│   ├── tests/                           # api, config, db, migrations, data, enrichment, evals, families, indexing, knowledge, retrieval, support
 │   ├── pyproject.toml · uv.lock
 │   └── Dockerfile
 ├── terraform/                           # IaC de producción (EC2, RDS, S3, ECR, SSM, IAM)

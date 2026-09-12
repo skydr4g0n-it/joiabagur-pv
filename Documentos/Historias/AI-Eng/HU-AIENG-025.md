@@ -182,7 +182,7 @@ Las quince están razonadas con alternativas y con las mediciones que las sostie
 - Specs vivas que enmarcan el change: `openspec/specs/hybrid-fusion/`, `openspec/specs/pos-projection/`, `openspec/specs/retrieval-evaluation/`, `openspec/specs/vector-retrieval/`, `openspec/specs/query-expansion/`.
 - Historias previas: [HU-AIENG-020](HU-AIENG-020.md) (diccionario de sinónimos), [HU-AIENG-021](HU-AIENG-021.md) (fusión híbrida), [HU-AIENG-022](HU-AIENG-022.md) (prefiltro por punto de venta), [HU-AIENG-024](HU-AIENG-024.md) (arnés y golden set).
 - Apuntes: [S10 · Filtrado contextual y temporal](../../Sesiones%20Master%20AIEng/S10_Tecnicas_Recuperacion/Filtrado%20contextual%20y%20temporal.md), [S10 · Búsqueda híbrida](../../Sesiones%20Master%20AIEng/S10_Tecnicas_Recuperacion/Busqueda%20hibrida.md), [S16 · Un sistema debe saber decir «No lo sé»](../../Sesiones%20Master%20AIEng/S16_Produccion_II/Un%20sistema%20debe%20saber%20decir%20%E2%80%9CNo%20lo%20se%E2%80%9D.md), [S16 · Tratamiento de regresiones](../../Sesiones%20Master%20AIEng/S16_Produccion_II/Tratamiento%20de%20regresiones.md).
-- Change: [`recalibrate-ranking-and-abstention`](../../../openspec/changes/recalibrate-ranking-and-abstention/) · ticket [T-AIENG-025](../../../openspec/changes/recalibrate-ranking-and-abstention/ticket.md).
+- Change: [`recalibrate-ranking-and-abstention`](../../../openspec/changes/archive/2026-09-12-recalibrate-ranking-and-abstention/) · ticket [T-AIENG-025](../../../openspec/changes/archive/2026-09-12-recalibrate-ranking-and-abstention/ticket.md).
 
 ---
 
