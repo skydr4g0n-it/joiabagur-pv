@@ -4,7 +4,7 @@
 **Documento hermano de:** [proyecto-final-diseno-rag-joiabagur.md](proyecto-final-diseno-rag-joiabagur.md)
 **Ventana:** arranque el 3 de agosto de 2026 · **prórroga abierta desde el 31 de agosto** — no hay fecha de entrega, el objetivo es entregar cuanto antes
 **Equipo:** **1 desarrollador**, trabaja en Python, .NET y frontend
-**Total:** 41 fichas (39 de la v3, más los partos de C06 y C18) · **36 vivas** tras anular la rama de C19 — **19 archivadas · 17 pendientes**
+**Total:** 41 fichas (39 de la v3, más los partos de C06 y C18) · **37 vivas** tras anular la rama de C19 y cortar C27 — **27 archivadas · 10 pendientes**
 
 > **Dos supuestos de la versión 3 ya no valen, y conviene leer el resto del documento con eso puesto.** Se escribió para **dos personas** y con **entrega el 3 de septiembre de 2026**. Desde el 31 de agosto de 2026 hay **prórroga abierta** y el proyecto lo desarrolla **una sola persona**. En consecuencia: no se planifica por calendario ni por «carga por persona y semana», sino por **desbloqueo del grafo**; los marcadores 👥 son de una sola persona; y las olas del §5 se conservan como registro de lo ya ejecutado, no como plan.
 
@@ -13,6 +13,28 @@
 ## 0. Revisiones posteriores a la versión 3
 
 Este documento se escribió antes de implementar. Cuando una sesión de diseño de un change concreto altera lo que su ficha decía, el cambio se registra aquí con fecha y motivo, y la ficha afectada se corrige en el sitio.
+
+### 2026-09-12 — El corte nº 1 se dispara, y no por juicio: C27 sale del alcance con cinco mediciones
+
+**El §6 llevaba a C27 pre-autorizado desde el 31 de agosto con un disparador redactado en términos de juicio —*«si el núcleo peligra»*—, y eso deja el corte a merced del calendario. Se sustituye por un disparador de medición.** Con prórroga abierta, el plazo ya no es argumento para nada; la pregunta correcta no es si cabe, sino si aporta. Medido contra el Postgres local sobre los 1.168 documentos vivos, antes de escribir una línea del change: **las dos señales de C27 están vacías, y el proyecto nunca previó medirlo**. El corte pasa de concesión a **decisión técnica justificada**, que es la diferencia que el rubro del PF premia por escrito.
+
+**Primero, y es lo que decide: el generador no tiene modelo de afinidad — tiene lo contrario.** La co-ocurrencia se deriva del `BulkOperationId`, y **todas las ventas del sistema las escribe el simulador de C10**. Su `_pack_operations` baraja las líneas del día —muestreadas de forma independiente, ponderadas sólo por colección y POS— y luego elige activamente el siguiente artículo **cuyo lexema de nombre o cuya colección difieran**. La matriz de co-ocurrencia es, por construcción, el producto exterior de la popularidad marginal por POS con un empujón **anti**-correlativo contra los pares afines. Leerla como *«co-venta histórica»* es circular en la peor dirección: el generador fue escrito para **evitar** emparejar lo parecido. No es una señal débil, es una señal sesgada en contra de lo que se le pide. C10 no tiene la culpa —nunca prometió afinidad, y diversificar la cesta es correcto para el stock coherente que sí debía producir—; el error es que C27 dé por supuesta una propiedad que nadie generó.
+
+**Segundo: aunque la tuviera, es un booleano y no un ordenador.** De 22.968 ventas, 5.641 llevan `BulkOperationId` en 2.381 operaciones, y salen **4.078 pares distintos** de ~719.400 posibles (0,57 %). De ellos, **4.019 — el 98,6 % — se han visto una sola vez**, 59 dos veces y **ninguno tres o más en dieciséis meses**. Por producto y restringido a tipo distinto, que es la regla de la ficha: **463 de 1.168 productos (39,6 %) no tienen ni un socio**, y los 705 que lo tienen reciben una mediana de **nueve socios empatados a 1**. Sólo el **7,2 %** tiene algún socio repetido. Es el caso que C25 ya resolvió con la rotación —*«como desempate estricto decidía **cero** pares del top-5»*— y aquí es peor, porque la rotación al menos salía de agregados reales. La tabla, además, tiene hoy **0 filas**: persistirla es trabajo del propio C27.
+
+**Tercero: la otra mitad de la regla está igual de vacía, y sobre todo donde importa.** El solape exigido de `color_tags`/`style_tags` se apoya en dos campos cuya cobertura es **226 (19,4 %) y 131 (11,2 %)** del catálogo — y **872 documentos, el 74,7 %, no tienen ninguno de los dos**. Desglosado por origen, en la porción **real**, que es la que el criterio de aceptación del §11.2 designa como resultado principal: **37 de 404 con color y exactamente 1 de 404 con estilo**. Retiradas las dos señales, lo que queda de C27 es `WHERE piece_type <> :tipo AND price_band IN (…) AND stock > 0`: una cláusula sin una sola llamada a un LLM, que es el criterio exacto con el que el 31 de agosto se anularon cinco changes.
+
+**Cuarto, y es información sobre el change y no sobre los datos: nunca hubo intención de medirlo.** La tabla del golden set del §11.1 del diseño reserva **6 consultas a sustitutos y ninguna a complementarios**; el golden set real tiene **8 consultas sin juzgar, 4 a nombre de C26 y 4 a nombre de C31, y cero a nombre de C27**; `criterion.md` define el grado 1 citando literalmente al sustituto; y `/v1/retrieval/substitutes` está en el `openapi.json` congelado mientras `/v1/retrieval/complementary` no. **C27 es, por construcción del propio proyecto, una funcionalidad no medible** — cuesta la última migración viva y no añade ni una fila a la tabla de ablations.
+
+**Quinto, la condición que hace el corte firme y no aplazado: no hay cestas reales, ni las habrá.** El export del 17 de agosto fue **catálogo y nada más** —436 productos, 28 colecciones—; **cero ventas reales**. La fila `D8 · Histórico de ventas · Co-ocurrencia por operación de venta` del §8.3 describe un dataset **generado**, no recibido. Es una condición de datos, no de esfuerzo.
+
+**Lo que el corte retira es la implementación, no el diseño** —precedente del §10, el inventario anulado cuyo diseño íntegro se entrega como próximo paso—. Se conservan la ficha con su sello, la tabla `ai.co_occurrence` vacía (no cuesta nada y es el enganche del día que lleguen tickets) y `cooccurrence.py` con su test, que derivan correctamente lo que se les pide: el defecto está en el generador de cestas, no en ellos. Se retiran la tool `buscar_complementarios` de C32 —misma regla que retiró `perfil_punto_venta`: una tool que falla siempre es peor que una ausente—, la ruta `.../recommendations` y su test en C34, y el bloque «También puede encajar» de C36. **Y `/v1/retrieval/complementary` no se añade al contrato: un 501 menos, no uno más.** La **condición de reactivación se deja comprobable y no opinable**: un export con histórico real a nivel de ticket cuyo percentil 95 de `co_sales_count` sea ≥ 3. Con la matriz actual ese percentil es **1**.
+
+**Una cautela sobre el vídeo, declarada y no barrida.** La card de venta pierde uno de sus cuatro bloques y se ve más pobre en la demo. Se acepta: el rubro premia *«se identifican limitaciones actuales y se propone cómo resolverlas»*, y una limitación medida con cinco cifras y con su condición de reactivación escrita vale más que una señal de ruido enviada. **C27 habría sido el primer change de este proyecto en entregar una señal que su propia medición declara vacía.**
+
+**C26 no se toca y sube a siguiente a abrir.** Es el caso simétrico y por eso conviene contrastarlo aquí: tiene contrato congelado con un 501 que cerrar, **4 consultas del golden set reservadas a su nombre con la nota escrita** (*«La hereda C26»*), todos sus datos puestos —1.168 de 1.168 con embedding e índice HNSW, 156 familias, 90 % con materiales, 100 % con banda de precio, `ai.pos_projection` con 6.720 filas—, y **cero llamadas al proveedor en tiempo de consulta**, porque sustituto es producto→producto y el embedding de origen ya está almacenado.
+
+Informe con el SQL reproducible y los contraargumentos en [`c27-cut-measurements.md`](informes/c27-cut-measurements.md).
 
 ### 2026-09-12 — C25bis implementado: el andamio retirado, y tres puntos de su propia ficha refutados
 
@@ -247,7 +269,7 @@ C22 depende de C10, C12 y C14. C25 depende de C21, C22 y C24. **Ninguno de los d
 - **C33 no necesitaba C19.** Su dependencia estaba sobre-especificada. Sus métricas (`top_piece_types`, `top_materials`, `top_price_ranges`, `top_collections`, `average_ticket`, `best_selling`, `slow_moving`) son agregados a nivel POS sobre `Sales` × `ProductAiProfile`, y lo único per-producto que necesitan —`sales_30d` y `lastSaleAt`— **ya lo calcula `GetSalesAggregatesAsync`**. No usa `IsSupplySource`, ni `stock_in_other_pos`, ni `estimated_days_to_stockout`, ni `is_top_seller_in_pos`, ni `sales_7d`, ni `sales_60d`. Si el núcleo cierra y sobra sesión, **C33 con prereq C08+C12 es un change suelto y sin migración** que devuelve la octava tool al agente de venta y da a §11.3 su test de fidelidad.
 - **`sales_7d` estaba muerta al nacer, y se midió.** El mundo de C10 termina el 2026-08-23; medido el 2026-08-31 contra el reloj de pared, `sales_7d` es distinto de cero en **3 de 6.050** pares (producto, POS) activos — 0,05 %. Anclada al fin del mundo serían 443. Cualquier resucitación de las señales de demanda necesita **primero** decidir el reloj (`asOf` inyectado y `computedAsOf` declarado en la respuesta, como `projection_age_seconds` en C22), y no al revés.
 
-**Cortes confirmados de antemano**, elegidos en la misma sesión y ya reordenados en el §6: **C27** (complementarios) y **C23 reducido a 15 documentos**. No están anulados — están pre-autorizados, y se disparan en ese orden si hace falta.
+**Cortes confirmados de antemano**, elegidos en la misma sesión y ya reordenados en el §6: **C27** (complementarios) y **C23 reducido a 15 documentos**. No están anulados — están pre-autorizados, y se disparan en ese orden si hace falta. *(Epílogo: los dos se resolvieron por **medición** y en direcciones opuestas. El de C23 **se refutó** el 6 de septiembre —quince documentos daban la mitad del mínimo en fragmentos, y la abstención dejaba de poder demostrarse—; el de C27 **se disparó** el 12 de septiembre, con cinco mediciones que vaciaron sus dos señales. Ninguno de los dos lo decidió el calendario, que es lo que este bloque temía.)*
 
 ### 2026-08-31 — C18, al aplicar: el umbral del §7.5 no existe, y el plan se contradecía
 
@@ -686,7 +708,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 | **C25** | `recalibrate-ranking-and-abstention` | Python | C21, C22, C24 | ✅ | **archivado el 2026-09-12** · renombrado desde `add-business-signals-ranking`; **3 puntos de la ficha retirados por medición** y un defecto de C21 corregido: la fusión concatenaba |
 | **C25bis** | `clean-plain-fusion` | Python | C25 | ✅ | **implementado el 2026-09-12**, 45/45 · *retiró la fusión plana y los tres pesos por lista; las 315 filas por consulta, idénticas* |
 | **C26** | `add-substitutes-retrieval` | Python | C22, C25 | 🟢 | specs v2 §6.3.2 |
-| **C27** | `add-complementary-recommendations` | Python + .NET 🗄️ | C10, C25 | 🟢 | **rev. dec. 8** · **corte nº 1 pre-autorizado** |
+| ~~**C27**~~ | ~~`add-complementary-recommendations`~~ | ~~Python + .NET 🗄️~~ | C10, C25 | ⛔ | **rev. dec. 8** · **corte nº 1 disparado el 2026-09-12** con cinco mediciones (§0) |
 | **C28** | `add-profile-review-ui-and-metrics` | Frontend + .NET | C08 | 🟢 | **rev. dec. 5** · *lo pide el checklist §16* |
 | ~~**C29**~~ | ~~`add-inventory-recommendation-entity`~~ | .NET 🗄️ | C19 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
 | **C30** | `add-assist-generation-with-rule-warnings` | Python | C07, C21, C23 | 🔴 | **rev. dec. 4** |
@@ -704,7 +726,9 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 
 **⛔ Anulados el 2026-08-31 (5):** C19, C29, C33, C35 y C37 — la rama del agente de inventario. Motivo y consecuencias en el §0. Las fichas se conservan como registro y llevan el sello en el sitio.
 
-**Vivos: 38** (36 numerados más `FIX1` y `C25bis`). Archivados **27** (C01–C18b, C20, C21, C22, C23, C24, C25 y `FIX1`). Pendientes **11**: C25bis, C26, C27, C28, C30, C31, C32, C34, C36, C38 y C39 — de los cuales C27 lleva corte pre-autorizado. **C23 se archivó el 2026-09-06** y su corte pre-autorizado —bajar a 15 documentos— se refutó por su propia unidad de medida: el diseño fija el tamaño en fragmentos y quince documentos dan la mitad del mínimo, con lo que la abstención dejaba de poder demostrarse. **C21 se archivó el 2026-09-02**, y con él caen los prerrequisitos de C24 y C30, o sea las dos mitades del proyecto que estaban esperando a la fusión. **C22 y `FIX1` se archivaron el 2026-09-05**, con lo que la ventana que `FIX1` tenía que respetar —entrar antes de que C24 etiquete su línea base— queda cumplida. **C24 se archivó el 2026-09-11 y C25 el 2026-09-12**, con lo que la cadena crítica `C21 → C24 → C25 → C26 → C34 → C36` arranca ahora en **C26**. C25 se archiva habiendo **refutado tres puntos de su propia ficha con mediciones** — la penalización de variante ambigua, la calibración de `1-2` frente a `3+` y la rotación como criterio de orden — y habiendo corregido un defecto que no estaba en su alcance: la fusión de C21 **concatenaba en vez de fusionar**. Deja **tres brechas declaradas y no cerradas** (`Recall@5` 0,758 contra 0,85, abstención 0,150 contra 0,80, y `v3` sin batir a `v2b` por el margen) y **desbloquea C25bis** (`clean-plain-fusion`), que retira el andamio de la fusión plana.
+**⛔ Cortado el 2026-09-12 (1):** **C27**, complementarios — el corte nº 1 del §6, disparado **con medición y no por juicio de plazo**. Sus dos señales están vacías (co-ocurrencia: 98,6 % de los pares vistos **una sola vez** y ninguno tres veces, sobre un generador que **diversifica las cestas a propósito**; etiquetas de color/estilo: **1 de 404** productos reales con estilo) y el proyecto nunca le reservó categoría en el golden set. Ficha conservada con el sello y la condición de reactivación; detalle en el §0 y en [`c27-cut-measurements.md`](informes/c27-cut-measurements.md).
+
+**Vivos: 37** (35 numerados más `FIX1` y `C25bis`). Archivados **27** (C01–C18b, C20, C21, C22, C23, C24, C25 y `FIX1`). Pendientes **10**: C25bis, C26, C28, C30, C31, C32, C34, C36, C38 y C39. **C23 se archivó el 2026-09-06** y su corte pre-autorizado —bajar a 15 documentos— se refutó por su propia unidad de medida: el diseño fija el tamaño en fragmentos y quince documentos dan la mitad del mínimo, con lo que la abstención dejaba de poder demostrarse. **C21 se archivó el 2026-09-02**, y con él caen los prerrequisitos de C24 y C30, o sea las dos mitades del proyecto que estaban esperando a la fusión. **C22 y `FIX1` se archivaron el 2026-09-05**, con lo que la ventana que `FIX1` tenía que respetar —entrar antes de que C24 etiquete su línea base— queda cumplida. **C24 se archivó el 2026-09-11 y C25 el 2026-09-12**, con lo que la cadena crítica `C21 → C24 → C25 → C26 → C34 → C36` arranca ahora en **C26**. C25 se archiva habiendo **refutado tres puntos de su propia ficha con mediciones** — la penalización de variante ambigua, la calibración de `1-2` frente a `3+` y la rotación como criterio de orden — y habiendo corregido un defecto que no estaba en su alcance: la fusión de C21 **concatenaba en vez de fusionar**. Deja **tres brechas declaradas y no cerradas** (`Recall@5` 0,758 contra 0,85, abstención 0,150 contra 0,80, y `v3` sin batir a `v2b` por el margen) y **desbloquea C25bis** (`clean-plain-fusion`), que retira el andamio de la fusión plana.
 
 ---
 
@@ -1150,7 +1174,13 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ---
 
-#### C27 · `add-complementary-recommendations` 🟢 🗄️
+#### ~~C27 · `add-complementary-recommendations`~~ ⛔ 🗄️
+
+> **⛔ Corte nº 1 disparado el 2026-09-12, con medición y no por juicio de plazo.** Estaba pre-autorizado desde el 31 de agosto con el disparador *«si el núcleo peligra»*; con prórroga abierta ese disparador no decide nada, así que se sustituyó por uno de evidencia. Las cinco mediciones están en el §0 y en [`c27-cut-measurements.md`](informes/c27-cut-measurements.md). En resumen: **el simulador de C10 no tiene modelo de afinidad** —`_pack_operations` baraja y luego escoge deliberadamente lo de lexema o colección distinta, así que la co-ocurrencia está sesgada **en contra** de lo que se le pide medir—; **98,6 % de los 4.078 pares se han visto una sola vez** y ninguno tres, con **39,6 % de productos sin ningún socio**; el solape de `color_tags`/`style_tags` está indefinido para el 74,7 % del catálogo y para **403 de 404 productos reales**; **no existe categoría de complementarios en el golden set** ni en la tabla del §11.1 del diseño, así que el change no puede añadir una sola fila a la evaluación; y **no hay ventas reales**, sólo las 22.968 de C10. Lo que quedaría en pie es `WHERE piece_type <> :tipo AND price_band IN (…) AND stock > 0`, sin una llamada a un LLM.
+>
+> **Qué se conserva:** esta ficha, la tabla `ai.co_occurrence` vacía de C05 (no cuesta nada y es el enganche futuro) y [`cooccurrence.py`](../../ai-service/src/jbg_ai/data/world/cooccurrence.py) con su test — deriva correctamente lo que se le pide, el defecto está en el generador de cestas. **Qué se retira:** la tool `buscar_complementarios` de C32, la ruta `.../recommendations` y su test en C34, y el bloque «También puede encajar» de C36. **`/v1/retrieval/complementary` no se añade al contrato congelado**: un 501 menos, no uno más.
+>
+> **Condición de reactivación, comprobable y no opinable:** un export con histórico de ventas reales **a nivel de ticket** cuyo percentil 95 de `co_sales_count` sea **≥ 3**. Con la matriz actual ese percentil es **1**.
 
 **Objetivo.** Complementarios por reglas + co-ocurrencia, con curación manual. Decisión 8 de la revisión.
 **Prereq.** C10, C25 · **Zona.** Python + `Domain/`
@@ -1210,8 +1240,8 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 **Objetivo.** Capa de decisión: bucle con function calling, tools de solo lectura, presupuesto duro.
 **Prereq.** C30, C31 · **Zona.** `ai-service/src/jbg_ai/assist/`
-**Alcance.** Tools `buscar_catalogo`, `consultar_disponibilidad` (.NET), `listar_familia`, `buscar_sustitutos`, `buscar_complementarios`, `consultar_conocimiento`, `pedir_aclaracion` — **siete, no ocho**; máx. 5 iteraciones y 6 llamadas; errores como datos; `partial: true` al agotar presupuesto; **ninguna tool escribe**; decorador de trazado con tokens y coste por iteración.
-**Tools retiradas** *(31 ago)*. **`perfil_punto_venta`** sale del registro: la servía C33, anulada con la rama de C19 (§0). Registrarla sin servicio detrás daría al modelo una herramienta que falla siempre, y una tool que devuelve error es peor que una tool ausente — el bucle la reintenta y quema presupuesto. Si C33 se rescata (su ficha explica cómo), vuelve. **`buscar_complementarios`** se retira también si se dispara el corte nº 1 (C27).
+**Alcance.** Tools `buscar_catalogo`, `consultar_disponibilidad` (.NET), `listar_familia`, `buscar_sustitutos`, `consultar_conocimiento`, `pedir_aclaracion` — **seis** *(corregido el 12 sep; eran siete)*; máx. 5 iteraciones y 6 llamadas; errores como datos; `partial: true` al agotar presupuesto; **ninguna tool escribe**; decorador de trazado con tokens y coste por iteración.
+**Tools retiradas** *(31 ago y 12 sep)*. **`perfil_punto_venta`** sale del registro: la servía C33, anulada con la rama de C19 (§0). Registrarla sin servicio detrás daría al modelo una herramienta que falla siempre, y una tool que devuelve error es peor que una tool ausente — el bucle la reintenta y quema presupuesto. Si C33 se rescata (su ficha explica cómo), vuelve. **`buscar_complementarios`** sale el **12 de septiembre** al dispararse el corte nº 1 sobre C27 (§0), por la misma regla y no por una distinta. **Seis tools, y el recuento no es lo que el PF evalúa del agente**: lo son el bucle, el presupuesto duro, el invariante de solo-lectura y el `partial: true`.
 **Tests.** `test_loop_stops_at_iteration_budget_and_flags_partial`; `test_tool_error_is_returned_as_data_not_exception`; `test_out_of_stock_query_triggers_substitutes_tool`; `test_no_registered_tool_performs_writes` (introspección del registro); `test_token_usage_accumulated_across_iterations`.
 
 ---
@@ -1232,9 +1262,9 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 #### C34 · `add-dotnet-assist-and-recommendation-endpoints` 🔴
 
 **Objetivo.** Exponer venta asistida, sustitutos y complementarios con hidratación y resolución de placeholders.
-**Prereq.** C15, C26, C30 · **C27 solo si sobrevive a su corte** *(§6, nº 1)*: si cae, se retira la ruta `.../recommendations` y su test `Recommendations_ManualPairsRankedFirst`, y el resto del change no se toca · **Zona.** `API/Controllers/`, `Application/`
-**Alcance.** `GET /api/ai/products/{id}/sales-assist`, `.../substitutes?pointOfSaleId=`, `.../recommendations?pointOfSaleId=`; **sustitución de `{{price}}`/`{{stock}}`** por valores reales; **rechazo de la respuesta si queda algún placeholder sin resolver**.
-**Tests.** `SalesAssist_ReplacesPlaceholdersWithRealValues`; `SalesAssist_WhenPlaceholderUnresolved_ReturnsErrorInsteadOfRawTemplate`; `Substitutes_ExcludeProductsWithoutStockAtTargetPos`; `Recommendations_ManualPairsRankedFirst`; `SalesAssist_AsOperatorOfAnotherPos_Returns403`.
+**Prereq.** C15, C26, C30 *(C27 **cayó** el 12 sep: la cláusula condicional se ejecuta — fuera la ruta `.../recommendations` y fuera su test `Recommendations_ManualPairsRankedFirst`, y el resto del change no se toca, tal como esta ficha ya instruía)* · **Zona.** `API/Controllers/`, `Application/`
+**Alcance.** `GET /api/ai/products/{id}/sales-assist` y `.../substitutes?pointOfSaleId=`; **sustitución de `{{price}}`/`{{stock}}`** por valores reales; **rechazo de la respuesta si queda algún placeholder sin resolver**.
+**Tests.** `SalesAssist_ReplacesPlaceholdersWithRealValues`; `SalesAssist_WhenPlaceholderUnresolved_ReturnsErrorInsteadOfRawTemplate`; `Substitutes_ExcludeProductsWithoutStockAtTargetPos`; `SalesAssist_AsOperatorOfAnotherPos_Returns403`. *(`Recommendations_ManualPairsRankedFirst` no se escribe: su ruta se retiró con C27.)*
 **Conflicto de zona.** Mismo controlador que C15 → nunca simultáneos.
 
 ---
@@ -1255,8 +1285,8 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 **Objetivo.** Cerrar el flujo visible de venta: card con desambiguación por familia, citas, sustitutos y complementarios.
 **Prereq.** C16, C34 · **Zona.** `frontend/src/`
-**Alcance.** Card con argumentario, avisos calculados y citas desplegables; bloque de **variantes de la familia con `variant_label` destacado y confirmación explícita antes de vender**; bloque de sustitutos cuando `stock = 0`; bloque "También puede encajar" con complementarios.
-**Tests.** `should require variant confirmation when family has multiple members`; `should show substitutes block when selected product is out of stock`; `should render complementary block when recommendations exist`; `should render citations when pitch has sources`.
+**Alcance.** Card con argumentario, avisos calculados y citas desplegables; bloque de **variantes de la familia con `variant_label` destacado y confirmación explícita antes de vender**; bloque de sustitutos cuando `stock = 0`. ~~Bloque "También puede encajar" con complementarios~~ — **retirado el 12 sep con el corte de C27** (§0): la card entrega **tres bloques de los cuatro previstos**, y el que falta se declara en el §15 del diseño con su medición, no se calla.
+**Tests.** `should require variant confirmation when family has multiple members`; `should show substitutes block when selected product is out of stock`; `should render citations when pitch has sources`. *(`should render complementary block when recommendations exist` no se escribe: su bloque se retiró con C27.)*
 
 ---
 
@@ -1311,7 +1341,7 @@ flowchart LR
     C07 --> C12 & C18a & C30
     C08 --> C12 & C28
     C09 --> C11
-    C10 --> C22 & C27
+    C10 --> C22
     C11 --> C13 & C23
     C12 --> C13 & C22
     C13 --> C14 & C18a
@@ -1325,23 +1355,26 @@ flowchart LR
     C22 --> C25 & C26
     C23 --> C30
     C24 --> C25 & C38
-    C25 --> C26 & C27 & C25bis
+    C25 --> C26 & C25bis
     C26 --> C34
-    C27 --> C34
     C30 --> C31 & C34 & C38
     C31 --> C32
     C32 --> C38
     C34 --> C36 & C38
 
+    C27["C27 · complementarios<br/>CORTADO 12 sep"]
+
     classDef hecho fill:#d9ead3,stroke:#38761d,color:#274e13
     classDef ahora fill:#fce5cd,stroke:#b45f06,color:#7f3f00,stroke-width:3px
     classDef corte fill:#f4cccc,stroke:#a61c00,color:#660000,stroke-dasharray:4 3
-    class C01,C02,C03,C05,C06a,C06b,C07,C08,C09,C10,C11,C12,C13,C14,C15,C16,C17,C18a,C18b,C20 hecho
-    class C21 ahora
-    class C23,C27 corte
+    class C01,C02,C03,C05,C06a,C06b,C07,C08,C09,C10,C11,C12,C13,C14,C15,C16,C17,C18a,C18b,C20,C21,FIX1,C22,C23,C24,C25 hecho
+    class C26 ahora
+    class C27 corte
 ```
 
-🟩 archivado · 🟧 **siguiente a abrir** · 🟥 con corte pre-autorizado (§6) · sin color: pendiente
+🟩 archivado · 🟧 **siguiente a abrir** · 🟥 **cortado** *(C27, corte nº 1 disparado el 2026-09-12 — §0)* · sin color: pendiente
+
+> `C25bis` se queda **sin color a propósito**: está implementado pero **no archivado**, y el verde significa archivado.
 
 **Fuera del dibujo, a propósito:** **C04** no tiene prerrequisitos ni dependientes *(está archivado)*, y **C39** depende de todos los vivos, así que ninguna de las dos arista añade información.
 
@@ -1354,10 +1387,13 @@ flowchart LR
 | C23 | C30 | |
 | C22 | C25, C26 | |
 | **C25bis** | nada — es una hoja, como `FIX1` | **por eso cede el turno a C26**: la regla 2 del §1 da prioridad a lo que abre aristas. Y antes de que C25 se archivara no se podía hacer, porque la fila plana seguía siendo la referencia de la tabla y no el andamio |
+| **C26** 🟧 | **C34** → y con él C36 y C38 | **siguiente a abrir** *(12 sep)*. Es lo único que queda en la cadena crítica, y el corte de C27 le deja el turno sin competencia. Además cierra un **501 en el contrato congelado** y **4 huecos declarados del golden set** que C24 dejó a su nombre por escrito |
 | C28 | nada — pero lo pide el checklist §16 del diseño | hoja obligatoria |
 | C18b | nada — pero es la única evidencia posible del checklist §16 sobre familias | hoja, ya no gratis de recortar |
 
-**Cadena crítica que queda:** `C26 → C34 → C36` *(C20 archivado el 1 sep; C24 el 11 sep; **C25 el 12 sep**, y con él cae el último eslabón que bloqueaba a C26 y a C27)*, con `C22` y `C23` ya entrados por los lados, y `C30 → C31 → C32 → C38 → C39` cerrando.
+**Cadena crítica que queda:** `C26 → C34 → C36` *(C20 archivado el 1 sep; C24 el 11 sep; **C25 el 12 sep**, y con él cae el último eslabón que bloqueaba a C26)*, con `C22` y `C23` ya entrados por los lados, y `C30 → C31 → C32 → C38 → C39` cerrando.
+
+**Y el hueco que el corte de C27 deja a la vista, que conviene no perder de vista al elegir el siguiente:** `ai-service/src/jbg_ai/assist/` **no existe**. C30, C31 y C32 están a cero, y son lo que el rubro del PF nombra por su nombre —*«escala desde un prototipo CAG hasta un sistema RAG **con agentes**»*—. Ésa, y no complementarios, es la deuda grande que queda.
 
 ---
 
@@ -1393,7 +1429,7 @@ Con un solo desarrollador esto deja de ser coordinación y pasa a ser disciplina
 
 **Reescrito el 2026-08-31.** La lista de la v3 tenía ocho posiciones y **cuatro de ellas vivían dentro de la rama de C19** —Rotate y Transfer de C29, vista imprimible de C37, y C35 entero—, que es precisamente lo que delató que la rama sobraba: un plan que se compromete de antemano a destripar una funcionalidad está diciendo que no la necesita. Anulada la rama, quedan cuatro cortes, y el disparador ya no es una fecha sino el juicio de que el núcleo peligra:
 
-1. **C27** complementarios → fase posterior; los sustitutos (C26) ya cubren el caso de venta. **Ahorra además la última migración EF Core viva**, y arrastra la retirada de la tool `buscar_complementarios` de C32 y de la ruta `.../recommendations` de C34
+1. ~~**C27** complementarios~~ → **DISPARADO el 2026-09-12**, y no por el disparador de esta lista sino por **cinco mediciones** que vaciaron sus dos señales (§0 e [informe](informes/c27-cut-measurements.md)). Pasa a fase posterior con condición de reactivación escrita; los sustitutos (C26) ya cubren el caso de venta. **Ahorra la última migración EF Core viva**, y arrastra la retirada de la tool `buscar_complementarios` de C32 y de la ruta `.../recommendations` de C34
 2. **C23** corpus 30-45 → **15 documentos**, manteniendo las citas verificables, que es lo que el PF evalúa
 3. **RAGAS dentro de C38** → se conservan validador anti-alucinación, escenarios de venta y adversarios
 4. **Golden set de C24** 70 → 45 consultas
@@ -1419,5 +1455,5 @@ Tres entradas nuevas en esa lista, y conviene el porqué: **C20** porque tapona 
 | **El golden set lo etiqueta una sola persona** | No se finge la conciliación: *pooling* sobre la unión de configuraciones, relectura diferida de las dudosas, y la ausencia de acuerdo entre anotadores **declarada** en el README como limitación |
 | C09, C10 y C38 son sesiones largas | Punto de partición predefinido en cada ficha; se entrega primero la mitad que desbloquea |
 | ~~C29 necesita saber cuál es el POS origen de suministro~~ | **Sin objeto:** C29 anulada. `IsSupplySource` no llega a existir en SQL, y sigue viviendo solo en el YAML de C10 |
-| ~~Seis~~ ~~Cuatro~~ **Cinco** migraciones EF Core (C04, C07, C08, **C18b**, C27) | Tres archivadas. **C18b abre una el 31 de agosto** —`FamilyReviewVerdict`—, posible porque la contención por el turno murió con la rama de C19, **y termina con tres**: la revisión real obligó a `ReviewSeconds` y a `SubjectWasMember`. **Vivas: C18b y C27**, ésta además el corte nº 1. Regla de migración única activa: no se abren a la vez |
+| ~~Seis~~ ~~Cuatro~~ ~~Cinco~~ **Cuatro** migraciones EF Core (C04, C07, C08, **C18b**) | **Sin objeto desde el 2026-09-12.** Las cuatro están archivadas: C18b abrió la suya el 31 de agosto —`FamilyReviewVerdict`, que terminó siendo tres, porque la revisión real obligó a `ReviewSeconds` y a `SubjectWasMember`— y **C27 era la última viva, cortada con medición**. **No queda ninguna migración EF Core pendiente en el plan**, así que la regla de migración única ya no tiene a qué aplicarse |
 | Artefactos OpenSpec consumen tiempo de sesión | `design.md` solo cuando hay decisión con alternativas reales (C02, C11, C21, C22, C24, C32, y de hecho también **C17**, **C18a** y **C18b**); en el resto, `proposal` + `tasks` + spec delta |
