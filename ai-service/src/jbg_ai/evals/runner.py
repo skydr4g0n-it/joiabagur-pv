@@ -23,7 +23,8 @@ from sqlalchemy import text
 
 from jbg_ai.config.settings import Settings
 from jbg_ai.db.engine import session_scope
-from jbg_ai.evals.configs import EvalConfig
+from jbg_ai.api.schemas.retrieval import RetrievalMode
+from jbg_ai.evals.configs import KIND_PIPELINE, EvalConfig
 from jbg_ai.evals.execute import QueryRun, execute
 from jbg_ai.evals.golden import OUT_OF_DOMAIN, GoldenQuery, GoldenSet
 from jbg_ai.evals.latency import LatencySummary, Sample, summarise
@@ -37,7 +38,12 @@ from jbg_ai.evals.metrics import (
     stale_judgements,
 )
 from jbg_ai.evals.pricing import PriceList
-from jbg_ai.evals.provenance import Provenance, current_git_sha, index_set_hash
+from jbg_ai.evals.provenance import (
+    NO_FUSION,
+    Provenance,
+    current_git_sha,
+    index_set_hash,
+)
 from jbg_ai.indexing.embeddings import EmbeddingClient
 from jbg_ai.retrieval.ports import ProductSearchPort
 
@@ -115,6 +121,19 @@ class Report:
             if item.config_id == config_id:
                 return item
         raise KeyError(config_id)
+
+
+def _fusion_mode_of(config: EvalConfig, settings: Settings) -> str:
+    """How this row composed its lists, or that it composed nothing.
+
+    Only a hybrid pipeline fuses: the two degraded baselines and the context-only row never
+    reach the fusion, and the vector row runs one branch, which leaves nothing to fuse with.
+    """
+    if config.kind != KIND_PIPELINE:
+        return NO_FUSION
+    if RetrievalMode(config.mode or "hybrid") is not RetrievalMode.HYBRID:
+        return NO_FUSION
+    return config.fusion or settings.jpv_fusion_mode
 
 
 async def corpus_snapshot(settings: Settings) -> tuple[list[UUID], dict[str, str]]:
@@ -384,6 +403,7 @@ async def run(
                 embed.model_version_key if config.uses_provider and embed else None
             ),
             git_sha=sha,
+            fusion_mode=_fusion_mode_of(config, settings),
         )
         reports.append(
             await run_config(

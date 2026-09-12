@@ -122,6 +122,7 @@ async def _run_once(tmp_path: Path):
             index_set_hash="0" * 64,
             embedding_model_version_key="openai/text-embedding-3-small:1536",
             git_sha="a03b4ad",
+            fusion_mode="branch",
         ),
         repeat=2,
     )

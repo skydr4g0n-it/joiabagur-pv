@@ -154,7 +154,7 @@ def test_abstention_does_not_fire_on_answerable_queries() -> None:
     assert response.candidates_returned == len(response.results)
 
 
-def test_a_dependency_failure_is_not_disguised_as_an_abstention() -> None:
+def test_dependency_failure_is_not_disguised_as_an_abstention() -> None:
     """A 200 with an empty list is indistinguishable from a deliberate abstention.
 
     So the provider failure has to keep failing loudly. C16's panel paints its "we found
@@ -174,7 +174,7 @@ def test_a_dependency_failure_is_not_disguised_as_an_abstention() -> None:
         _serve(search, embed=_Boom(), abstain=True)
 
 
-def test_an_empty_projection_is_not_an_abstention() -> None:
+def test_empty_projection_is_not_an_abstention() -> None:
     """A point of sale that carries nothing fails loudly, as the projection capability defines."""
     search = FakeProductSearch(_rows([0.5] * 20), assignments=[])
 

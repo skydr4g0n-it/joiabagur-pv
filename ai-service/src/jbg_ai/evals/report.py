@@ -13,6 +13,7 @@ from pathlib import Path
 
 from jbg_ai.data.paths import AI_SERVICE_ROOT
 from jbg_ai.evals.metrics import CUTOFF
+from jbg_ai.evals.provenance import DIRTY_SUFFIX
 from jbg_ai.evals.runner import ConfigReport, Report
 
 RESULTS_DIR = AI_SERVICE_ROOT / "evals" / "results"
@@ -40,6 +41,16 @@ def _fmt(value: float | int | None, digits: int = 3) -> str:
     return f"{value:.{digits}f}"
 
 
+def _short_sha(value: str) -> str:
+    """Twelve characters identify a commit; the dirty marker is not decoration and survives.
+
+    Truncating it away would restore exactly the defect the marker exists to prevent: a run
+    taken on a modified tree presenting itself as the commit it merely started from.
+    """
+    base, sep, suffix = value.partition(DIRTY_SUFFIX)
+    return f"{base[:12]}{sep}{suffix}"
+
+
 def not_comparable(item: ConfigReport) -> bool:
     """True when too much of this row's top results carries no judgement to score it as final."""
     return item.readings["global"].values["unjudged_at_5"] > NOT_COMPARABLE_UNJUDGED
@@ -47,9 +58,9 @@ def not_comparable(item: ConfigReport) -> bool:
 
 def _ablation_table(report: Report) -> list[str]:
     lines = [
-        "| configuración | nDCG@5 | nDCG@5 bin | nDCG@5 oper | Recall@5 | P@3 | MRR "
-        "| no juzgado@5 | coste/consulta |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| configuración | fusión | nDCG@5 | nDCG@5 bin | nDCG@5 oper | Recall@5 | P@3 "
+        "| MRR | no juzgado@5 | coste/consulta |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for item in report.configs:
         values = item.readings["global"].values
@@ -63,7 +74,8 @@ def _ablation_table(report: Report) -> list[str]:
             else "—"
         )
         lines.append(
-            f"| `{item.config_id}`{mark} | {_fmt(values['ndcg_at_5'])} | "
+            f"| `{item.config_id}`{mark} | `{item.provenance.fusion_mode}` | "
+            f"{_fmt(values['ndcg_at_5'])} | "
             f"{_fmt(values['ndcg_at_5_binary'])} | {operational} | "
             f"{_fmt(values['recall_at_5_capped'])} | "
             f"{_fmt(values['precision_at_3'])} | {_fmt(values['mrr'])} | "
@@ -156,7 +168,7 @@ def render_markdown(report: Report, *, title: str) -> str:
         "|---|---|",
         f"| versión del golden set | `{report.golden_set_version}` |",
         f"| huella del conjunto indexado | `{report.index_set_hash[:16]}…` |",
-        f"| revisión del código | `{report.git_sha[:12]}` |",
+        f"| revisión del código | `{_short_sha(report.git_sha)}` |",
         f"| identificador de la ejecución | `{report.run_id}` |",
         "",
         "Dos ejecuciones cuya procedencia no coincida **no son comparables**, y el arnés lo "
@@ -273,12 +285,25 @@ def render_markdown(report: Report, *, title: str) -> str:
         "",
         "## Abstención",
         "",
-        "**Provisional.** El umbral de distancia vigente deja pasar prácticamente todo el "
-        "catálogo, así que lo que se mide aquí es la mecánica de las ramas y no una decisión "
-        "de confianza. Este change **no** toca el umbral; su re-fijación es alcance del "
-        "siguiente, y la distribución que necesita se publica más abajo.",
+        "**La regla vigente es relativa por consulta**, y su forma la eligió una medición "
+        "bajo un criterio escrito **antes** de tomarla. Un umbral escalar sobre la distancia "
+        "no puede servir aquí: el mejor acierto de las contestables llega más lejos que el de "
+        "las imposibles, así que el rango de éstas cae **dentro** del de aquéllas y ningún "
+        "valor único las separa. La regla cuenta cuántos candidatos caen en una banda "
+        "alrededor del mejor —lee la **forma** del perfil y no su nivel—, corre **después** "
+        "de la fusión y **no altera el conjunto de candidatos**, que es lo que mantiene "
+        "válidas las ventanas persistidas del barrido. La distribución por consulta de la que "
+        "sale se publica más abajo.",
         "",
-        "| configuración | tasa de abstención sobre fuera de dominio |",
+        "**Qué cuenta exactamente esta columna.** Las dos maneras que tiene una configuración "
+        "de no contestar con confianza —la regla de abstención y `low_confidence`, que mide "
+        "desacuerdo entre ramas— terminan en la misma bandera de la respuesta, así que la "
+        "cifra es su **unión** y no la tasa de la regla sola. Una fila con la regla apagada "
+        "no marca cero: marca su `low_confidence`. Las dos caras del intercambio de cada "
+        "regla candidata —cuántas imposibles calla y cuántas contestables silencia— se "
+        "publican en el informe de implementación de C25, que es donde la regla se fijó.",
+        "",
+        "| configuración | sin respuesta confiada sobre fuera de dominio |",
         "|---|---:|",
     ]
     for item in report.configs:

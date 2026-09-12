@@ -129,4 +129,4 @@
 - [x] 13.8 Actualizar `Documentos/epicas.md` al cerrar (estado de C25 y recuento)
 - [x] 13.9 `uv run pytest` en verde, sin llamadas reales a proveedor ni a RDS
 - [x] 13.10 `openspec validate --all --strict` en **`0 failed`**
-- [ ] 13.11 `/opsx:verify` antes de archivar, con atención a las dos refutaciones y al orden de fases
+- [x] 13.11 `/opsx:verify` antes de archivar, con atención a las dos refutaciones y al orden de fases → ejecutado el 2026-09-12: sin críticos, las dos refutaciones y el orden de fases confirmados. Tres avisos corregidos — la prosa de abstención del generador seguía afirmando la exigencia que este change **retiró** (*«no toca el umbral; su re-fijación es alcance del siguiente»*), la procedencia no registraba el modo de fusión pese a exigirlo la spec, y el árbol sucio se registraba como su commit limpio, invirtiendo la comparabilidad de la tabla publicada

@@ -565,7 +565,10 @@ the **shape** of the distance profile — an impossible query is flat, because n
    evidence. Reported as a gap, not as a pass.
 3. **Abstention reaches 0,150 against the 0,80 the ticket asks for.** Reaching 0,80 costs
    silencing **21 of the 43** answerable queries. The rule is fixed at the most it can catch
-   while silencing **none** of them, and the rest is declared.
+   while silencing **none** of them, and the rest is declared. The 0,150 is what the system
+   declines, not what the rule alone catches: an abstention and a `low_confidence` land on the
+   same response flag, so the figure unions the two — the rule takes it from 0,050 to 0,150,
+   and its own two-sided figures are in the C25 implementation report.
 4. **The out-of-domain category is unbalanced in a way that is measured but not corrected.**
    Naming a material pulls a query **0,12 closer** to the catalogue and makes it look more
    answerable; 12 of the 20 queries name one, because the five inherited from C24 all do and

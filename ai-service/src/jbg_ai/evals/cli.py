@@ -174,6 +174,7 @@ async def _sweep(args: argparse.Namespace) -> int:
         index_set_hash=index_set_hash(ids),
         embedding_model_version_key=embed.model_version_key,
         git_sha=current_git_sha(),
+        fusion_mode=config.fusion or settings.jpv_fusion_mode,
     )
     baseline, candidates = await sweep(
         config,

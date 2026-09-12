@@ -6,7 +6,8 @@ a generated `to_tsvector('spanish', doc_text)` column with its GIN index — had
 on every live row since C05 and nothing queried it. C20 computed the query expansion, logged it
 as `stage=expand` and nobody read the result. Both are consumed here.
 
-The order of the pipeline is a decision and not an accident (design D10): the lexical branch
+The order of the pipeline is a decision and not an accident (**C21** design D10 — not C25's,
+whose D10 withdrew rotation from the ordering): the lexical branch
 races the **embedding provider**, not the vector search. Running the two SQL statements in
 parallel would optimise what costs nothing — on 1.168 rows with a GIN index the lexical query
 is noise — while holding two of the five pool connections per request against a pool with

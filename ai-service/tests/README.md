@@ -150,6 +150,7 @@ The rest extends files that already existed:
 | `test_pos_scope.py` | the reading scope against the restricting one, and the business score |
 | `test_filters.py` | the ordering key with a continuous tail |
 | `test_sweep_phases.py` | capture and re-score, and that the second reaches no provider and no database |
+| `test_provenance_and_report.py` | the fusion mode as the sixth element of the provenance, the dirty-tree marker, and that the published table carries no withdrawn claim |
 | `test_golden_validation.py` | the out-of-domain category at its new floor of twenty |
 
 **The gate is `test_full_coverage_leaves_the_lexical_weight_untouched`.** It covers five

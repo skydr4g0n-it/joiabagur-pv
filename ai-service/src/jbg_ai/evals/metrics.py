@@ -347,10 +347,16 @@ def aggregate(cases: Sequence[CaseMetrics]) -> Aggregate:
 def abstention_rate(cases: Sequence[CaseMetrics]) -> float:
     """Share of queries the configuration declined to answer with confidence.
 
-    Reported over the out-of-domain category, and PROVISIONAL: the live distance threshold
-    admits essentially the whole catalogue, so what this measures is branch mechanics rather
-    than a confidence decision. Recalibrating the threshold is a later change; this change
-    publishes the distance distribution it will need.
+    Reported over the out-of-domain category. The flag it counts is the **union** of the two
+    ways a configuration declines: C25's relative abstention rule, and `low_confidence`, which
+    means the branches disagreed. Both land on the same field of the response — an abstention
+    empties the page and sets it — so this is not the rate of the rule alone, and a
+    configuration with the rule switched off still reports its `low_confidence`.
+
+    Separating them would need a second field on a response schema that is frozen by contract,
+    so the rule's own two-sided figures —how many impossible queries it catches, how many
+    answerable ones it silences— are fixed and published in the C25 implementation report
+    instead, against the out-of-domain category once it had grown to twenty.
     """
     if not cases:
         return 0.0
