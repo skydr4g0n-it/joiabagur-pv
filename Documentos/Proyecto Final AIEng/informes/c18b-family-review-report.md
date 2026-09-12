@@ -1,6 +1,6 @@
 # C18b — Informe de la revisión humana de familias
 
-**Change:** [`add-family-review-ui-and-orphan-alert`](../../../openspec/changes/add-family-review-ui-and-orphan-alert/) · **Rama:** `c18b-add-family-review-ui-and-orphan-alert`
+**Change:** [`add-family-review-ui-and-orphan-alert`](../../../openspec/changes/archive/2026-09-01-add-family-review-ui-and-orphan-alert/) · **Rama:** `c18b-add-family-review-ui-and-orphan-alert`
 **Estado:** completo — redactado durante el apply, no al final. Última medición: 2026-09-01.
 
 ---

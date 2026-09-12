@@ -1,6 +1,6 @@
 # C18a — Informe del lote de familias asistidas
 
-**Fecha de ejecución:** 2026-08-31 · **Change:** [`add-family-suggestion-and-approval`](../../../openspec/changes/add-family-suggestion-and-approval/) · **Rama:** `c18a-add-family-suggestion-and-approval`
+**Fecha de ejecución:** 2026-08-31 · **Change:** [`add-family-suggestion-and-approval`](../../../openspec/changes/archive/2026-08-31-add-family-suggestion-and-approval/) · **Rama:** `c18a-add-family-suggestion-and-approval`
 
 Ejecutado por el camino real —`POST /api/ai/catalog/family-suggestions` en .NET, que llama a `POST /v1/families/suggest` en `jbg-ai` con el JWT interno— y no por un script suelto, porque el objeto de C18a es precisamente que ese camino exista y estampe lo que tiene que estampar.
 
@@ -150,4 +150,4 @@ Ambos arreglos tocan los mismos dos ficheros —`vocabularies.yaml` y el prompt,
 
 ## Vuelta atrás
 
-Documentada en [`design.md`](../../../openspec/changes/add-family-suggestion-and-approval/design.md) y disponible: borrar las familias con `Origin = AiApproved` —cascadea sus miembros por la regla de C07— devolver los 32 perfiles a `Approved`, y resincronizar. El corpus vuelve a su estado anterior. El respaldo `pre-c18a.dump` cubre el caso de que algo salga peor de lo previsto.
+Documentada en [`design.md`](../../../openspec/changes/archive/2026-08-31-add-family-suggestion-and-approval/design.md) y disponible: borrar las familias con `Origin = AiApproved` —cascadea sus miembros por la regla de C07— devolver los 32 perfiles a `Approved`, y resincronizar. El corpus vuelve a su estado anterior. El respaldo `pre-c18a.dump` cubre el caso de que algo salga peor de lo previsto.

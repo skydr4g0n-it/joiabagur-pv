@@ -7,7 +7,7 @@ brand-new AWS account, populate it with the corpus, and hand out a public URL.
 > different AWS account, with its own Terraform state, its own image
 > repositories, its own parameter prefix and its own deployment workflow. The
 > shop's account is not referenced anywhere in it. See
-> [`openspec/changes/add-ai-service-deployment/design.md`](../../openspec/changes/add-ai-service-deployment/design.md).
+> [`openspec/changes/add-ai-service-deployment/design.md`](../../openspec/changes/archive/2026-08-30-add-ai-service-deployment/design.md).
 
 | Piece | Where |
 |---|---|

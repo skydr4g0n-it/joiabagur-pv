@@ -10,7 +10,7 @@ arranca sin clave de proveedor.
 
 ## Secretos locales
 
-Un solo fichero, junto al compose: [`backend/.env.example`](../../../backend/.env.example)
+Un solo fichero, junto al compose: [`backend/.env.example`](../../../../backend/.env.example)
 → copia a `backend/.env` (gitignored).
 
 ```powershell
@@ -52,7 +52,7 @@ uv run --system-certs python -m jbg_ai.data ingest --jsonl ../data/catalog/synth
 
 ## Mundo (C10)
 
-Perfiles commiteados: [`data/world/pos-profiles.yaml`](../../../data/world/pos-profiles.yaml)
+Perfiles commiteados: [`data/world/pos-profiles.yaml`](../../../../data/world/pos-profiles.yaml)
 (`generator_version` `c10-world/v1`, semilla `20260823`). El JSONL de ventas y los
 dumps SQL **no** van a git (`data/world/generated/`, `data/world/backups/`).
 

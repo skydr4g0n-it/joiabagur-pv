@@ -274,13 +274,13 @@ Cerrados aplicando la opción por defecto de las preguntas abiertas del ticket. 
 - **Familia frente a colección.** Son cosas distintas y conviene dejarlo escrito porque la spec viva lo justifica mal: una colección agrupa 1–154 productos (mediana 15) atravesando **13–16 tipos de pieza**; una familia agrupa 2–4 productos de **un solo tipo**. El test operativo es el de C36: *la familia es el conjunto sobre el que el operador está obligado a preguntar antes de cobrar.*
 - **Limitación conocida:** un rechazo no se recuerda. Al repetir `suggest`, una propuesta descartada vuelve a aparecer. Es aceptable mientras la aprobación sea por lotes; C18b introduce la lista de descartes.
 - **Limitación conocida:** la tasa de nulos de `piece_type` en `ai.product_document` no se pudo medir durante la exploración (el contenedor de Postgres se detuvo). El comportamiento está **fijado por D9** —el nulo no agrupa con nadie—, así que la medición del apply sirve para **confirmar el parámetro y dimensionar su efecto**, no para decidirlo. Si la tasa resultara alta, la puerta perdería fuerza y el peso recaería sobre el veto del embedding: se anotaría en el informe del lote y en `design.md`, sin cambiar la regla.
-- **Change asociado:** [`add-family-suggestion-and-approval`](../../../openspec/changes/add-family-suggestion-and-approval/), rama `c18a-add-family-suggestion-and-approval`, creada desde `ai-eng` en `f5212a7`.
+- **Change asociado:** [`add-family-suggestion-and-approval`](../../../openspec/changes/archive/2026-08-31-add-family-suggestion-and-approval/), rama `c18a-add-family-suggestion-and-approval`, creada desde `ai-eng` en `f5212a7`.
 
 ---
 
 ## Referencias
 
-- Ticket técnico: [T-AIENG-018a](../../../openspec/changes/add-family-suggestion-and-approval/ticket.md)
+- Ticket técnico: [T-AIENG-018a](../../../openspec/changes/archive/2026-08-31-add-family-suggestion-and-approval/ticket.md)
 - Épica: [EP13 — Familias de Producto y Desambiguación de Variantes](../../epicas.md)
 - Diseño: [`proyecto-final-diseno-rag-joiabagur.md`](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) §2.2 (decisión abierta 4), §7.5 (flujo mixto), §7.8 (revisión híbrida), §8.3 (D4), §11.1 (categoría de variante del golden set)
 - Plan: [`proyecto-final-plan-changes-openspec.md`](../../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md), ficha C18

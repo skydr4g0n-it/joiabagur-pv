@@ -97,16 +97,16 @@ Separador de líneas `\n`. Sin `\r`. `sku` y `name` son obligatorios en el DTO.
 
 **Referencias:**
 
-[proyecto-final-plan-changes-openspec.md](../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (ficha C11, §0 C05/C07/C08, §7 `design.md`),
-[proyecto-final-diseno-rag-joiabagur.md](../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) (§6.3 sincronización, §7.1 pipeline, §7.2 esquema, D3),
-[joiabagur-ia-especificaciones-funcionales-v2.md](../Proyecto%20Final%20AIEng/joiabagur-ia-especificaciones-funcionales-v2.md) (§4.7 ejemplo de `SourceText`),
-[Reindexación y versionado de embeddings](../Sesiones%20Master%20AIEng/S11_RAG_avanzado/Reindexacion%20y%20Versionado%20Embeddings.md) (guía, no dogma: hash + versión de proceso; *blue/green* es C13+),
-[Abstracción de proveedores](../Sesiones%20Master%20AIEng/S3_Patrones_Diseños_Wrappers_Modelos/Abstracci%C3%B3n%20de%20proveedores%20y%20estrategias%20de%20fallback.md) (LiteLLM),
+[proyecto-final-plan-changes-openspec.md](../../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (ficha C11, §0 C05/C07/C08, §7 `design.md`),
+[proyecto-final-diseno-rag-joiabagur.md](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) (§6.3 sincronización, §7.1 pipeline, §7.2 esquema, D3),
+[joiabagur-ia-especificaciones-funcionales-v2.md](../../Proyecto%20Final%20AIEng/joiabagur-ia-especificaciones-funcionales-v2.md) (§4.7 ejemplo de `SourceText`),
+[Reindexación y versionado de embeddings](../../Sesiones%20Master%20AIEng/S11_RAG_avanzado/Reindexacion%20y%20Versionado%20Embeddings.md) (guía, no dogma: hash + versión de proceso; *blue/green* es C13+),
+[Abstracción de proveedores](../../Sesiones%20Master%20AIEng/S3_Patrones_Diseños_Wrappers_Modelos/Abstracci%C3%B3n%20de%20proveedores%20y%20estrategias%20de%20fallback.md) (LiteLLM),
 [epicas.md](../../epicas.md) (EP12),
 [modelo-de-datos.md](../../modelo-de-datos.md) (`ai.product_document`),
 [HU-AIENG-005.md](HU-AIENG-005.md), [HU-AIENG-008.md](HU-AIENG-008.md), [HU-AIENG-009.md](HU-AIENG-009.md),
 specs vivas `openspec/specs/ai-vector-schema/spec.md`, `openspec/specs/ai-service-runtime/spec.md`, `openspec/specs/catalog-enrichment-pipeline/spec.md`, `openspec/specs/product-ai-profile/spec.md`,
-change OpenSpec [`openspec/changes/add-source-text-and-embedding-client/`](../../../openspec/changes/add-source-text-and-embedding-client/) y su [ticket técnico](../../../openspec/changes/add-source-text-and-embedding-client/ticket.md).
+change OpenSpec [`openspec/changes/add-source-text-and-embedding-client/`](../../../openspec/changes/archive/2026-08-25-add-source-text-and-embedding-client/) y su [ticket técnico](../../../openspec/changes/archive/2026-08-25-add-source-text-and-embedding-client/ticket.md).
 
 ---
 

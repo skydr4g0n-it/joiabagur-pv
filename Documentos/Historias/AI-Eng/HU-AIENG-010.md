@@ -10,7 +10,7 @@ Como **desarrollador del proyecto**, quiero **simular una red de puntos de venta
 
 Change OpenSpec `add-synthetic-world-simulator` / **C10**, épica **EP12 — Corpus y Enriquecimiento del Catálogo**. Marcado 🟢. Prerrequisito de la ficha: **C06a** (archivado). En la práctica el generate se engancha al catálogo **ya ingerido** por C06a+C06b (`public."Products"` = 1.200). Desbloquea **C19** (señales de demanda), **C22** (proyección POS), **C27** (complementarios por co-ocurrencia) y, aguas abajo, C33/C29/C35.
 
-No es un servicio de producto de Joiabagur: no hay pantalla, no hay ruta `/v1`, no hay seeder de la API. Es el dataset **D6 / D7 / D8** del [diseño RAG](../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) §8.2–8.3: mundo **numérico y relacional**, código determinista con semilla, **cero LLM**. El histórico tiene que ser coherente por construcción con catálogo y stock (no se vende sin stock en ese POS).
+No es un servicio de producto de Joiabagur: no hay pantalla, no hay ruta `/v1`, no hay seeder de la API. Es el dataset **D6 / D7 / D8** del [diseño RAG](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) §8.2–8.3: mundo **numérico y relacional**, código determinista con semilla, **cero LLM**. El histórico tiene que ser coherente por construcción con catálogo y stock (no se vende sin stock en ese POS).
 
 Estado verificado en Docker local (`jpv-pv-postgres`, `:5433`, `joiabagur_pv`, 2026-08-23): `"Products"` 1.200, `"Collections"` 38, `"PaymentMethods"` 6, `"Users"` 1 (`admin`). Vacías las tablas que este change puebla (`"PointOfSales"`, `"Inventories"`, `"Sales"`, `"InventoryMovements"`, `"PointOfSalePaymentMethods"`, `"UserPointOfSales"`). El esquema `ai` **no está** provisionado en este volumen. `"Products"` tiene tres huecos respecto al ancla 1–436 (`SKU135`, `SKU400`, `SKU418`): el ingest usa la BD como autoridad, no el JSONL de catálogo.
 
@@ -106,12 +106,12 @@ Cobertura de inventario (orden de magnitud): taller ≈ catálogo entero qty alt
 
 **Referencias:**
 
-[proyecto-final-plan-changes-openspec.md](../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (ficha C10, §0 C06b 22–23 ago),
-[proyecto-final-diseno-rag-joiabagur.md](../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) (§6.3 frontera, §8.2 mundo determinista, D6–D8, §10 señales),
+[proyecto-final-plan-changes-openspec.md](../../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (ficha C10, §0 C06b 22–23 ago),
+[proyecto-final-diseno-rag-joiabagur.md](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) (§6.3 frontera, §8.2 mundo determinista, D6–D8, §10 señales),
 [epicas.md](../../epicas.md) (EP12),
 [modelo-de-datos.md](../../modelo-de-datos.md) (`PointOfSale`, `Inventory`, `InventoryMovement`, `Sale`, `User`, `UserPointOfSale`, `PointOfSalePaymentMethod`),
 [HU-AIENG-006a.md](HU-AIENG-006a.md), [HU-AIENG-006b.md](HU-AIENG-006b.md),
-change OpenSpec [`openspec/changes/add-synthetic-world-simulator/`](../../../openspec/changes/add-synthetic-world-simulator/) y su [ticket técnico](../../../openspec/changes/add-synthetic-world-simulator/ticket.md).
+change OpenSpec [`openspec/changes/add-synthetic-world-simulator/`](../../../openspec/changes/archive/2026-08-23-add-synthetic-world-simulator/) y su [ticket técnico](../../../openspec/changes/archive/2026-08-23-add-synthetic-world-simulator/ticket.md).
 
 ---
 

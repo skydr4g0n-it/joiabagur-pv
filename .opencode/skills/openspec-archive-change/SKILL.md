@@ -82,13 +82,41 @@ Archive a completed change in the experimental workflow.
    mv openspec/changes/<name> openspec/changes/archive/YYYY-MM-DD-<name>
    ```
 
-6. **Display summary**
+6. **Repair the links the move just broke**
+
+   Moving the change directory breaks every relative link that pointed at it — from
+   `Documentos/Historias/AI-Eng/HU-*.md`, from `Documentos/epicas.md`, from reports.
+   Nothing surfaces this, so it accumulates silently: on 2026-09-12 a full audit found
+   **61 broken links**, most of them tickets of changes archived weeks earlier.
+
+   Run the checker from the repository root:
+
+   ```bash
+   pwsh <skill-dir>/scripts/check-doc-links.ps1          # report only, exit 1 if any break
+   pwsh <skill-dir>/scripts/check-doc-links.ps1 -Fix     # apply the repairs
+   ```
+
+   `<skill-dir>` is the folder holding this SKILL.md; the skill is replicated across the
+   repo's harnesses (`.agent/`, `.claude/`, `.codex/`, `.cursor/`, `.github/` and
+   `.opencode/skills/openspec-archive-change/`), so use your environment's copy.
+
+   It only rewrites a link whose corrected target **exists on disk** — an archived change
+   resolved through `openspec/changes/archive/`, or a relative depth that resolves at
+   exactly one level. Anything ambiguous is reported and left alone, because guessing a
+   target hides the breakage instead of fixing it.
+
+   **Report what it could not resolve** in the summary rather than silently accepting it.
+   `Documentos/prompts.md` and `openspec/changes/archive/**` are excluded by design: they
+   are dated records, and repointing their links would rewrite history rather than repair it.
+
+7. **Display summary**
 
    Show archive completion summary including:
    - Change name
    - Schema that was used
    - Archive location
    - Whether specs were synced (if applicable)
+   - How many documentation links were repaired, and any the checker could not resolve
    - Note about any warnings (incomplete artifacts/tasks)
 
 **Output On Success**
@@ -100,6 +128,7 @@ Archive a completed change in the experimental workflow.
 **Schema:** <schema-name>
 **Archived to:** openspec/changes/archive/YYYY-MM-DD-<name>/
 **Specs:** ✓ Synced to main specs (or "No delta specs" or "Sync skipped")
+**Links:** ✓ N repaired, 0 unresolved (or "No broken links")
 
 All artifacts complete. All tasks complete.
 ```
@@ -112,3 +141,6 @@ All artifacts complete. All tasks complete.
 - Show clear summary of what happened
 - If sync is requested, use openspec-sync-specs approach (agent-driven)
 - If delta specs exist, always run the sync assessment and show the combined summary before prompting
+- Always run the link checker after the move — the archive is what breaks those links, so
+  leaving them for someone else is how 61 of them accumulated unnoticed
+- Never hand-edit a link the checker declined to resolve without confirming the target first

@@ -64,7 +64,7 @@ Y hay una segunda cosa que sólo se ve al llegar aquí. La spec viva `ai-search-
 
 **Referencias:**
 
-- Change: `openspec/changes/add-frontend-assisted-search-panel/` · ticket [T-AIENG-016](../../../openspec/changes/add-frontend-assisted-search-panel/ticket.md)
+- Change: `openspec/changes/add-frontend-assisted-search-panel/` · ticket [T-AIENG-016](../../../openspec/changes/archive/2026-08-29-add-frontend-assisted-search-panel/ticket.md)
 - Plan: [proyecto-final-plan-changes-openspec.md](../../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) — ficha C16 y entrada §0 de 2026-08-29
 - Diseño: [proyecto-final-diseno-rag-joiabagur.md](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) — §6.4 (degradación), §7.6 (prefiltro y sobre-recuperación), §11 (evaluación)
 - Specs vivas: `ai-assisted-search` · `ai-search-telemetry` · `sales-management` · `frontend` · `access-control` · `point-of-sale-management`

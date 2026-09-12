@@ -75,7 +75,7 @@ El valor no es de operador: no hay pantalla y, hasta que C21 encienda la rama l�
 [modelo-de-datos.md](../../modelo-de-datos.md) (`ai.product_document`, `tsv` generada, GIN),
 [HU-AIENG-009.md](HU-AIENG-009.md) (vocabulario cerrado), [HU-AIENG-011.md](HU-AIENG-011.md) (`source-text/v1`), [HU-AIENG-014.md](HU-AIENG-014.md) (retriever vectorial),
 specs vivas `vector-retrieval`, `catalog-enrichment-pipeline`, `catalog-source-text`, `ai-vector-schema`, `ai-service-runtime`,
-change OpenSpec [`openspec/changes/add-synonym-dictionary/`](../../../openspec/changes/add-synonym-dictionary/) y su [ticket técnico](../../../openspec/changes/add-synonym-dictionary/ticket.md).
+change OpenSpec [`openspec/changes/add-synonym-dictionary/`](../../../openspec/changes/archive/2026-09-01-add-synonym-dictionary/) y su [ticket técnico](../../../openspec/changes/archive/2026-09-01-add-synonym-dictionary/ticket.md).
 
 ---
 

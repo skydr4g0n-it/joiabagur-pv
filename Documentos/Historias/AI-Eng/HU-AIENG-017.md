@@ -81,7 +81,7 @@ De modo que C17 no despliega a producción: **levanta un entorno de demo autocon
 
 **Referencias:**
 
-- Change: `openspec/changes/add-ai-service-deployment/` · ticket [T-AIENG-017](../../../openspec/changes/add-ai-service-deployment/ticket.md)
+- Change: `openspec/changes/add-ai-service-deployment/` · ticket [T-AIENG-017](../../../openspec/changes/archive/2026-08-30-add-ai-service-deployment/ticket.md)
 - Plan: [proyecto-final-plan-changes-openspec.md](../../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) — ficha C17 y entrada §0 de 2026-08-29
 - Diseño: [proyecto-final-diseno-rag-joiabagur.md](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) — §6.1 (topología), §6.4 (seguridad y degradación), §12 (despliegue), §15 (limitaciones), §16 (checklist de entrega)
 - Specs vivas: `ai-service-runtime` · `ai-service-dev-compose` *(no se modifica)* · `ai-assisted-search` · `vector-retrieval` · `product-document-indexer` · `dashboard-analytics` · `access-control`

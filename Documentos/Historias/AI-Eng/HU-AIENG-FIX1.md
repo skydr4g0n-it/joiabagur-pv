@@ -107,7 +107,7 @@ Tomadas el **2026-09-05** sobre las mediciones del informe.
 - Origen del hallazgo: [c18a-family-suggestion-report.md](../../Proyecto%20Final%20AIEng/informes/c18a-family-suggestion-report.md), hallazgos (b) y (c).
 - Specs vivas afectadas: `openspec/specs/catalog-enrichment-pipeline/`, `openspec/specs/query-expansion/`.
 - Historias previas: [HU-AIENG-009](HU-AIENG-009.md) (pipeline de enriquecimiento y vocabularios cerrados), [HU-AIENG-016](HU-AIENG-016.md) (panel de búsqueda asistida y espejo del vocabulario), [HU-AIENG-018a](HU-AIENG-018a.md) (donde nace el hallazgo), [HU-AIENG-020](HU-AIENG-020.md) (diccionario de consulta y sus exclusiones), [HU-AIENG-021](HU-AIENG-021.md) (rama léxica que hace visible el efecto).
-- Change: [`fix-enrichment-vocabulary-gaps`](../../../openspec/changes/fix-enrichment-vocabulary-gaps/) · ticket [T-AIENG-FIX1](../../../openspec/changes/fix-enrichment-vocabulary-gaps/ticket.md).
+- Change: [`fix-enrichment-vocabulary-gaps`](../../../openspec/changes/archive/2026-09-05-fix-enrichment-vocabulary-gaps/) · ticket [T-AIENG-FIX1](../../../openspec/changes/archive/2026-09-05-fix-enrichment-vocabulary-gaps/ticket.md).
 
 ---
 

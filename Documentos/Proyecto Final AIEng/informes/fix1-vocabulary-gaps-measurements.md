@@ -1,6 +1,6 @@
 # Informe FIX1 — Corrida de reenriquecimiento de la cohorte de veintidós
 
-> Acta de ejecución del change [`fix-enrichment-vocabulary-gaps`](../../../openspec/changes/fix-enrichment-vocabulary-gaps/).
+> Acta de ejecución del change [`fix-enrichment-vocabulary-gaps`](../../../openspec/changes/archive/2026-09-05-fix-enrichment-vocabulary-gaps/).
 > **Fecha:** 2026-09-05 · **Entorno:** local (PostgreSQL 15 en `:5433`, `jbg-ai` en `:8001`, API .NET en `:5056`).
 > **Exploración previa:** [fix1-exploration-measurements.md](fix1-exploration-measurements.md) · **Historia:** [HU-AIENG-FIX1](../../Historias/AI-Eng/HU-AIENG-FIX1.md)
 

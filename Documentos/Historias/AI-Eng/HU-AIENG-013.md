@@ -67,16 +67,16 @@ C12 no emite `data_origin` ni `text_provenance`. C05 exige `data_origin` NOT NUL
 
 **Referencias:**
 
-[proyecto-final-plan-changes-openspec.md](../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (ficha C13, §0 C06a/`text_provenance`, §0 C12 archivado, §6 nunca se recorta, par C13 ‖ C23),
-[proyecto-final-diseno-rag-joiabagur.md](../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) (§6.2, **§6.3**, §7.2, §8.1.1 ejes de procedencia),
-[informes/c12-catalog-autobulk-runbook.md](../Proyecto%20Final%20AIEng/informes/c12-catalog-autobulk-runbook.md),
-[Diseño del esquema y búsqueda semántica](../Sesiones%20Master%20AIEng/S8_BBDD_Vectoriales/Diseño%20del%20esquema%20y%20busqueda%20semantica.md) (guía: no mezclar dimensión; el catálogo **no** se trocea),
-[Del CAG estático al flujo RAG](../Sesiones%20Master%20AIEng/S9_Fundamentos_RAG/Del%20CAG%20estatico%20al%20flujo%20RAG%20-%20Las%20cuatro%20etapas%20y%20por%20que%20el%20Retrievel%20domina.md) (frescura = indexar sin redesplegar; índice vacío = fallo mudo),
+[proyecto-final-plan-changes-openspec.md](../../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (ficha C13, §0 C06a/`text_provenance`, §0 C12 archivado, §6 nunca se recorta, par C13 ‖ C23),
+[proyecto-final-diseno-rag-joiabagur.md](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) (§6.2, **§6.3**, §7.2, §8.1.1 ejes de procedencia),
+[informes/c12-catalog-autobulk-runbook.md](../../Proyecto%20Final%20AIEng/informes/c12-catalog-autobulk-runbook.md),
+[Diseño del esquema y búsqueda semántica](../../Sesiones%20Master%20AIEng/S8_BBDD_Vectoriales/Diseño%20del%20esquema%20y%20busqueda%20semantica.md) (guía: no mezclar dimensión; el catálogo **no** se trocea),
+[Del CAG estático al flujo RAG](../../Sesiones%20Master%20AIEng/S9_Fundamentos_RAG/Del%20CAG%20estatico%20al%20flujo%20RAG%20-%20Las%20cuatro%20etapas%20y%20por%20que%20el%20Retrievel%20domina.md) (frescura = indexar sin redesplegar; índice vacío = fallo mudo),
 [epicas.md](../../epicas.md) (EP14),
 [modelo-de-datos.md](../../modelo-de-datos.md) (`ai.product_document`, `ai.sync_failure`),
 [HU-AIENG-011.md](HU-AIENG-011.md), [HU-AIENG-012.md](HU-AIENG-012.md),
 specs vivas `catalog-source-text`, `index-feed`, `ai-vector-schema`, `ai-service-api-contracts`, `ai-service-auth`, `ai-service-runtime`,
-change OpenSpec [`openspec/changes/add-product-document-indexer/`](../../../openspec/changes/add-product-document-indexer/) y su [ticket técnico](../../../openspec/changes/add-product-document-indexer/ticket.md).
+change OpenSpec [`openspec/changes/add-product-document-indexer/`](../../../openspec/changes/archive/2026-08-26-add-product-document-indexer/) y su [ticket técnico](../../../openspec/changes/archive/2026-08-26-add-product-document-indexer/ticket.md).
 
 ---
 

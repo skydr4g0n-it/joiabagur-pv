@@ -53,7 +53,7 @@ Todo lo siguiente está comprobado en el código, no asumido.
 
 ---
 
-## 2. Análisis crítico de [`joiabagur-ia-especificaciones-funcionales.md`](joiabagur-ia-especificaciones-funcionales.md)
+## 2. Análisis crítico de [`joiabagur-ia-especificaciones-funcionales.md`](joiabagur-ia-especificaciones-funcionales-v1.md)
 
 Esta sección precede deliberadamente al diseño porque lo condiciona.
 
