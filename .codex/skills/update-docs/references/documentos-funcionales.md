@@ -89,7 +89,7 @@ actualiza ese fichero, no el índice.
 
 - `joiabagur-ia-especificaciones-funcionales-v2.md` — versión vigente. **La v1
   no se toca**: es histórico.
-- `proyecto-final-plan-changes-openspec.md` y su variante `-3devs.md` — plan de
+- `proyecto-final-plan-changes-openspec.md` — plan de
   changes C01–C39. Se actualiza cuando un change se completa, se archiva, se
   parte o cambia de alcance. Si el cambio afecta al reparto entre
   desarrolladores, revisa las dos variantes.

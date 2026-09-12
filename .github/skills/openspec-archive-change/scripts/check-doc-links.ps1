@@ -54,7 +54,7 @@ $frozen = @('Documentos/prompts.md')
 # `openspec/changes/archive/**` queda fuera por la misma razon que `prompts.md`: los
 # artefactos de un change archivado describen el mundo tal como estaba al cerrarlo, y
 # reapuntar sus enlaces seria reescribir un registro fechado.
-$excludedDirs = @('.docs-update', 'node_modules', '.git', 'bin', 'obj', '.venv',
+$excludedDirs = @('.docs-update', '.pr', 'node_modules', '.git', 'bin', 'obj', '.venv',
                   'openspec/changes/archive')
 
 function Get-DocFiles {

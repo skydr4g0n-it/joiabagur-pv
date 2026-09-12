@@ -161,7 +161,6 @@
       "title": "Plan de changes OpenSpec del Proyecto Final (C01-C39)",
       "language": "es",
       "policy": "editable",
-      "note": "Existe tambien la variante -3devs.md: si el cambio afecta al reparto por desarrollador, revisa las dos.",
       "reference": "references/documentos-funcionales.md"
     },
 
