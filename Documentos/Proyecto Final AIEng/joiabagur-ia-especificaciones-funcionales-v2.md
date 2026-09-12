@@ -578,6 +578,37 @@ También debe sugerir sustitutos para productos top sellers aunque todavía haya
 | Buena rotación en ese hotel | Medio |
 | Margen/prioridad comercial | Bajo-medio |
 
+> **Lo que la medición cambió de esta tabla** *(2026-09-12, al entregar C26 —
+> [`add-substitutes-retrieval`](../../openspec/changes/archive/2026-09-12-add-substitutes-retrieval/))*.
+> La tabla se conserva como el criterio **de producto** que es: varios de sus pesos son de C34 y C36 y
+> siguen pendientes. Pero cuatro filas no sobrevivieron al contacto con el catálogo real, y conviene
+> leerlas con esta nota delante:
+>
+> - **«Misma familia de producto: Alto» está invertida.** La familia es, por construcción, el conjunto de
+>   piezas que se diferencian **justo en el atributo que descalifica** —la talla—. Para `SKU13 Anillo
+>   erizo de mar M` el top-5 del vector puro no contiene **un solo** sustituto usable: los tres primeros
+>   son el mismo anillo en L, S y XL. La familia **entra en el conjunto y no impone orden**, y se declara
+>   en `family_match`. Pero tampoco se excluye: el mejor sustituto de `SKU159` es su hermano de **misma
+>   talla y otro material**, el #1.
+> - **Falta la fila que de verdad discrimina: la talla.** No aparece en esta tabla y decide en 2 de las 4
+>   consultas reservadas. Entra como **término continuo** —nunca como bloque entero, que desterraría las
+>   variantes de la propia pieza— e **inerte cuando alguna de las dos piezas no declara talla**: el 54 %
+>   de los anillos no tiene `size_label`, y ausencia no es desajuste.
+> - **«Estilo/tags similares: Medio» no tiene dato.** Sólo **1 de 404** productos reales tiene algún
+>   candidato del mismo tipo con el que compartir etiqueta de estilo, frente al 97,8 % que lo tiene por
+>   material. La señal se emite igual (el contrato la exige requerida y no nulable), y el cero **se
+>   explica** en `match_reasons` para que nunca pueda leerse como «estilos distintos».
+> - **«Disponible en el POS destino: Alto» no elimina en Python.** La proyección de disponibilidad puede
+>   desfasarse minutos, así que **degrada y nunca excluye**: una pieza agotada vuelve, ordenada detrás.
+>   La **exclusión** por falta de stock es de **C34**, en .NET, que es donde vive la autoridad sobre el
+>   stock; `POST /v1/retrieval/substitutes` sobre-recupera a propósito para que C34 tenga con qué llenar
+>   la página. «Mismo tipo de pieza: Alto» sí se confirmó, y es el **único filtro duro**.
+>
+> Mediciones en
+> [`c26-exploration-measurements.md`](informes/c26-exploration-measurements.md) y
+> [`c26-implementation-measurements.md`](informes/c26-implementation-measurements.md); comportamiento
+> exigible en la capability viva `substitutes-retrieval`.
+
 ### Salida esperada
 
 ```text

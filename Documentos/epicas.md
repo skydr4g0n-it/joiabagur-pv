@@ -504,7 +504,7 @@ Capa de generación y agéntica. Convierte un conjunto de candidatos en una resp
 - Sustitutos por falta de stock. ~~Complementarios por reglas y co-ocurrencia~~ — **cortado el 2026-09-12 con medición** (ver abajo)
 - Tarjeta de asistencia y desambiguación por familia en el frontend
 
-**Changes asociados:** **C26** (`add-substitutes-retrieval` — **implementado el 2026-09-12**, pendiente de archivar), ~~C27~~ (**cortado**), C30, C31, C32, C34, C36
+**Changes asociados:** **C26** (`add-substitutes-retrieval` — **archivado el 2026-09-12**, 62/62), ~~C27~~ (**cortado**), C30, C31, C32, C34, C36
 
 > **Ampliado el 2026-09-12, al implementar C26.** **`POST /v1/retrieval/substitutes` deja de responder 501** y pasa a servir candidatos reales, con lo que cae el **último 501 cerrable** del contrato congelado —`/v1/inventory/propose` también responde 501, pero su rama se anuló el 31 de agosto y eso ya está declarado como limitación—. Sin migración, sin mover `openapi.json` y **sin una sola llamada al proveedor**: sustituto es producto→producto y el embedding de origen ya está almacenado, así que la capacidad entera es una sentencia SQL. Suite de `ai-service` de **997 a 1038 passed, 0 failed**; `openspec validate --all --strict` en **55/0**.
 >
@@ -595,7 +595,7 @@ Se miden por *changes* de OpenSpec, no por número de historias: la serie `HU-AI
 | **EP12** | Corpus y Enriquecimiento del Catálogo | C06a (hecho), C06b (hecho), C08 (hecho), C09 (hecho), C10 (hecho), C11 (hecho), **C23 (hecho)**, **FIX1 (hecho)** | 🔴 parcial |
 | **EP13** | Familias de Producto y Desambiguación | C07 (hecho), C18a (hecho), C18b (hecho), C28 | 🟢 parcial |
 | **EP14** | Búsqueda Semántica Híbrida | C12, C13, C14, C15, C16, C20, C21, **C22**, **C25** (hechos) | 🟠 parcial |
-| **EP15** | Venta Asistida, Sustitutos y Agentes | **C26 (implementado)**, ~~C27~~ *(cortado 12 sep)*, C30, C31, C32, C34, C36 | 🟠 parcial |
+| **EP15** | Venta Asistida, Sustitutos y Agentes | **C26 (archivado)**, ~~C27~~ *(cortado 12 sep)*, C30, C31, C32, C34, C36 | 🟠 parcial |
 | **EP16** | ~~Inventario Asistido y Señales de Demanda~~ | ~~C19, C29, C33, C35, C37~~ | ⛔ **anulada 31 ago** |
 | **EP17** | Evaluación y Observabilidad de IA | C04 (hecho), **C24 (hecho)**, C38, C39 · *(C25 amplía el arnés y el golden set desde EP14)* | 🔴 parcial |
 | **TOTAL PF** | | **43 fichas · 37 vivas** (5 anuladas, 1 cortada) — **27 archivadas, 10 pendientes** | |
@@ -617,6 +617,8 @@ Se miden por *changes* de OpenSpec, no por número de historias: la serie `HU-AI
 > **Actualizado el 2026-09-12, al cortar C27 y abrir C26.** **C27 sale del alcance con cinco mediciones** (detalle en EP15 y en [c27-cut-measurements.md](Proyecto%20Final%20AIEng/informes/c27-cut-measurements.md)) y **C26 pasa a en curso**. Recuento: **27 archivadas, 10 pendientes** — C25bis, C26, C28, C30, C31, C32, C34, C36, C38 y C39.
 >
 > **Y el hueco que el corte deja a la vista, que gobierna el orden de lo que queda:** `ai-service/src/jbg_ai/assist/` **no existe**. C30 (generación con citas), C31 (guardrails y router de intención) y C32 (bucle agéntico) están a cero, y son lo que el rubro del PF nombra por su nombre — *«escala desde un prototipo CAG hasta un sistema RAG **con agentes**»*. Ésa, y no complementarios, es la deuda grande de EP15.
+>
+> **Actualizado el 2026-09-12, al archivar C26.** **C26 (`add-substitutes-retrieval`) pasa a hecho** y con él la cadena crítica deja de arrancar en C26 y arranca en **C34**. Recuento: **29 archivadas, 8 pendientes** (C28, C30, C31, C32, C34, C36, C38 y C39) — suben dos de golpe porque `C25bis` se archivó el mismo día. Con C26 cae el **último 501 cerrable** del contrato congelado: `/v1/inventory/propose` sigue respondiendo 501, pero por una rama anulada el 2026-08-31 y ya declarada como limitación, no por falta de turno. Nace la capability viva `substitutes-retrieval` con diez requisitos, y `vector-retrieval` pierde por escrito la obligación de que la ruta siguiera devolviendo 501. **Lo que C26 no se lleva** y queda anotado en la ficha de **C34**: la exclusión por falta de stock, porque la autoridad sobre el stock es de .NET y en Python la disponibilidad degrada y nunca elimina.
 
 ---
 
