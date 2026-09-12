@@ -1,19 +1,15 @@
-# C25 — líneas base de recuperación con relevancia graduada, señal y abstención
+# C25bis — corrida de verificación tomada DESPUÉS del borrado
 
-> **La fila `v2-hibrido` es HISTÓRICA y no re-ejecutable** *(anotado el 2026-09-12, al aplicar C25bis)*. La composición de una sola etapa bajo la que se midió se retiró del código: se había conservado seleccionable sólo para que esta fila pudiera re-medirse, y publicada la tabla pasó a ser un camino muerto activable por error cuya aritmética este mismo proyecto midió como defectuosa. Lo que se garantiza de ella a partir de aquí es que se puede **citar**, no que se pueda repetir. Tres artefactos versionados la sostienen: esta tabla, el detalle por consulta en [`runs/d91d4864-ba84-40a0-b78f-acb0c461108f.jsonl`](runs/d91d4864-ba84-40a0-b78f-acb0c461108f.jsonl) y la configuración exacta bajo la que se midió en [`../configs/retired/v2-hibrido.yaml`](../configs/retired/v2-hibrido.yaml) —que ya no carga, por diseño—. **Las otras cinco filas siguen siendo re-ejecutables**, y se comprobó que lo son: la corrida de verificación de C25bis las reprodujo con las 315 líneas por consulta **idénticas**, listas de resultados incluidas. El arnés **no** reimplementa el pipeline retirado para mantener viva la fila, porque un arnés que reformula un pipeline mide la reformulación.
-
-Ejecutado el 2026-09-11 contra 1168 documentos vivos de `ai.product_document`, en solo lectura sobre el índice.
+Ejecutado el 2026-09-12 contra 1168 documentos vivos de `ai.product_document`, en solo lectura sobre el índice.
 
 | procedencia | valor |
 |---|---|
 | versión del golden set | `1:198c4af44506` |
 | huella del conjunto indexado | `051a6b06021efc3f…` |
-| revisión del código | `29a7bc5249aa+dirty` |
-| identificador de la ejecución | `d91d4864-ba84-40a0-b78f-acb0c461108f` |
+| revisión del código | `59f63ef04738+dirty` |
+| identificador de la ejecución | `e0a10740-4c61-466c-b86d-56a6df94b1a0` |
 
 Dos ejecuciones cuya procedencia no coincida **no son comparables**, y el arnés lo dice en lugar de compararlas igualmente.
-
-> **La marca `+dirty` no es decoración.** Esta corrida se tomó con cambios sin commitear: las cifras salen del código que aterrizó en `8ace5ac` —el que promedia la relevancia sobre las contestables— y no del árbol limpio de `29a7bc5`, que las daría distintas. Anotada a posteriori el 2026-09-12, al detectarse que la procedencia estaba invertida: un re-cálculo en el commit citado se habría declarado comparable y habría discrepado. El arnés marca ahora el árbol sucio por su cuenta, de modo que esto no puede repetirse en silencio.
 
 ## Tabla de ablations v0 → v3
 
@@ -22,7 +18,6 @@ Dos ejecuciones cuya procedencia no coincida **no son comparables**, y el arnés
 | `v0-nombre` | `none` | 0.092 | 0.086 | — | 0.079 | 0.039 | 0.116 | 0.000 | $0.0000000 |
 | `v0-fts` | `none` | 0.507 | 0.579 | — | 0.558 | 0.550 | 0.661 | 0.000 | $0.0000000 |
 | `v1-vectorial` | `none` | 0.612 | 0.648 | — | 0.637 | 0.628 | 0.720 | 0.000 | $0.0000002 |
-| `v2-hibrido` | `flat` | 0.673 | 0.708 | — | 0.698 | 0.667 | 0.770 | 0.000 | $0.0000002 |
 | `v2b-fusion` | `branch` | 0.740 | 0.770 | — | 0.758 | 0.713 | 0.834 | 0.000 | $0.0000002 |
 | `v3-senales` | `branch` | 0.729 | 0.755 | 0.732 | 0.744 | 0.698 | 0.824 | 0.000 | $0.0000002 |
 
@@ -60,14 +55,6 @@ Una decisión de configuración **no se da por confirmada** si no apunta en el m
 | tuning | 8 | 0.660 | 0.715 | 0.725 | 0.708 | 0.754 |
 | new | 35 | 0.601 | 0.632 | 0.617 | 0.610 | 0.713 |
 
-**`v2-hibrido`** — Híbrido (configuración viva)
-
-| lectura | n | nDCG@5 | nDCG@5 bin | Recall@5 | P@3 | MRR |
-|---|---:|---:|---:|---:|---:|---:|
-| global | 43 | 0.673 | 0.708 | 0.698 | 0.667 | 0.770 |
-| tuning | 8 | 0.942 | 1.000 | 1.000 | 1.000 | 1.000 |
-| new | 35 | 0.612 | 0.641 | 0.629 | 0.590 | 0.717 |
-
 **`v2b-fusion`** — Fusión por rama con cobertura adaptativa
 
 | lectura | n | nDCG@5 | nDCG@5 bin | Recall@5 | P@3 | MRR |
@@ -84,7 +71,7 @@ Una decisión de configuración **no se da por confirmada** si no apunta en el m
 | tuning | 8 | 0.944 | 1.000 | 1.000 | 1.000 | 1.000 |
 | new | 35 | 0.680 | 0.699 | 0.686 | 0.629 | 0.783 |
 
-> **Saturación de la partición de ajuste.** `v0-fts` 2/8, `v1-vectorial` 3/8, `v2-hibrido` 6/8, `v2b-fusion` 6/8, `v3-senales` 6/8 consultas ya están **en el techo** del nDCG@5. Una lectura saturada no puede registrar una mejora: sólo empatar o caer. Por eso `tuning` se publica como **diagnóstico de contaminación** y no veta una decisión — la lectura que decide es `new`, y el lector puede ver aquí cuánto margen tenía la otra.
+> **Saturación de la partición de ajuste.** `v0-fts` 2/8, `v1-vectorial` 3/8, `v2b-fusion` 6/8, `v3-senales` 6/8 consultas ya están **en el techo** del nDCG@5. Una lectura saturada no puede registrar una mejora: sólo empatar o caer. Por eso `tuning` se publica como **diagnóstico de contaminación** y no veta una decisión — la lectura que decide es `new`, y el lector puede ver aquí cuánto margen tenía la otra.
 
 ## Desglose por origen del dato
 
@@ -98,8 +85,6 @@ La recuperación corre **siempre sobre el catálogo completo**. Lo que se agrupa
 | `v0-fts` | synthetic | 27 | 0.250 | 0.281 | 0.120 |
 | `v1-vectorial` | real | 41 | 0.439 | 0.389 | 0.220 |
 | `v1-vectorial` | synthetic | 27 | 0.368 | 0.430 | 0.240 |
-| `v2-hibrido` | real | 41 | 0.494 | 0.483 | 0.220 |
-| `v2-hibrido` | synthetic | 27 | 0.366 | 0.393 | 0.080 |
 | `v2b-fusion` | real | 41 | 0.559 | 0.537 | 0.171 |
 | `v2b-fusion` | synthetic | 27 | 0.379 | 0.407 | 0.080 |
 | `v3-senales` | real | 41 | 0.569 | 0.551 | 0.171 |
@@ -112,7 +97,6 @@ La recuperación corre **siempre sobre el catálogo completo**. Lo que se agrupa
 | `v0-nombre` | 0.000 | 0.000 | 0.902 | 0.068 | 0.000 | 0.000 | 0.000 | 0.000 |
 | `v0-fts` | 0.035 | 0.000 | 1.000 | 0.938 | 0.918 | 0.241 | 0.357 | 0.827 |
 | `v1-vectorial` | 0.431 | 0.000 | 0.500 | 0.682 | 0.785 | 0.729 | 0.502 | 0.817 |
-| `v2-hibrido` | 0.172 | 0.000 | 1.000 | 0.968 | 0.747 | 0.984 | 0.665 | 0.830 |
 | `v2b-fusion` | 0.417 | 0.000 | 1.000 | 0.959 | 0.747 | 0.969 | 0.682 | 0.830 |
 | `v3-senales` | 0.407 | 0.000 | 1.000 | 0.959 | 0.708 | 0.965 | 0.648 | 0.830 |
 
@@ -122,12 +106,11 @@ Dos columnas siempre. El criterio de aceptación se aplica a `p95 recuperación`
 
 | configuración | p50 recup. | p95 recup. | p50 e2e | p95 e2e | p50 léxica | p50 en frío | muestras |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| `v0-nombre` | 6.3 | 8.7 | 6.3 | 8.7 | — | 6.1 | 126 |
-| `v0-fts` | 126.8 | 167.9 | 126.8 | 167.9 | — | 125.6 | 126 |
-| `v1-vectorial` | 74.6 | 87.7 | 74.6 | 87.7 | — | 73.4 | 126 |
-| `v2-hibrido` | 85.1 | 152.6 | 85.1 | 152.6 | 12.9 | 84.5 | 126 |
-| `v2b-fusion` | 82.4 | 183.9 | 82.4 | 183.9 | 12.8 | 83.5 | 126 |
-| `v3-senales` | 92.0 | 153.9 | 92.0 | 153.9 | 14.8 | 93.4 | 126 |
+| `v0-nombre` | 7.0 | 10.0 | 7.0 | 10.0 | — | 7.3 | 126 |
+| `v0-fts` | 146.5 | 240.3 | 146.5 | 240.3 | — | 151.4 | 126 |
+| `v1-vectorial` | 71.5 | 93.6 | 71.5 | 93.6 | — | 72.6 | 126 |
+| `v2b-fusion` | 90.7 | 180.1 | 90.7 | 180.1 | 14.2 | 90.6 | 126 |
+| `v3-senales` | 86.8 | 141.2 | 86.8 | 141.2 | 13.4 | 87.5 | 126 |
 
 ## Abstención
 
@@ -140,7 +123,6 @@ Dos columnas siempre. El criterio de aceptación se aplica a `p95 recuperación`
 | `v0-nombre` | 1.000 |
 | `v0-fts` | 0.050 |
 | `v1-vectorial` | 0.100 |
-| `v2-hibrido` | 0.050 |
 | `v2b-fusion` | 0.150 |
 | `v3-senales` | 0.150 |
 
@@ -153,7 +135,6 @@ Consultas cuyo documento de grado máximo está dentro de la ventana que un rera
 | `v0-nombre` | 0.000 (0 de 43) |
 | `v0-fts` | 0.093 (4 de 43) |
 | `v1-vectorial` | 0.023 (1 de 43) |
-| `v2-hibrido` | 0.023 (1 de 43) |
 | `v2b-fusion` | 0.047 (2 de 43) |
 | `v3-senales` | 0.047 (2 de 43) |
 
@@ -186,23 +167,6 @@ La distribución de arriba es **por documento** y contesta otra pregunta. Lo que
 - Precios: `as_of: 2026-09-07`, fuente `https://developers.openai.com/api/docs/pricing`, **verificados** el día de la corrida.
 - Lo no juzgado cuenta grado 0, que es el supuesto estándar del *pooling*. Por eso `no juzgado@5` se publica por configuración: una fila con buena parte de su top-5 sin juzgar es visiblemente no comparable, no silenciosamente injusta.
 
-## `v0-cag` — el catálogo entero en el contexto
-
-Medición **fechada y no reproducible bit a bit**: llama a un modelo de lenguaje, y ni a temperatura 0 devuelve lo mismo dos veces. No es una fila que se re-ejecute en cada corrida.
-
-- Modelo: `openai/gpt-4o-mini` · fecha: 2026-09-11
-- Catálogo compactado: **17583 tokens** para 1168 de 1168 productos (presupuesto 100000, omitidos **0**).
-- Coste por consulta: **$0.002673**.
-- Recall@5 sobre las 12 consultas sin anclaje léxico: **0.133**.
-
-| catálogo | tokens | ¿cabe? |
-|---:|---:|---|
-| 1168 | 17583 | sí |
-| 2500 | 37635 | sí |
-| 5000 | 75270 | sí |
-
-El contexto **deja de caber en 6643 productos** con el presupuesto de 100000 tokens. La recuperación no tiene ese techo: su coste por consulta no se mueve con el tamaño del catálogo.
-
 ## Notas
 
-- wall clock 100.7 s
+- wall clock 87.2 s

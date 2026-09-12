@@ -117,13 +117,16 @@ def test_fusion_weights_and_k_load_from_settings_not_hardcoded() -> None:
     settings = build_settings()
 
     assert settings.jpv_rrf_k == 60
-    assert settings.jpv_rrf_weight_typed == 0.5
-    assert settings.jpv_rrf_weight_expanded == 0.5
-    assert settings.jpv_rrf_weight_vector == 0.33
+    assert settings.jpv_branch_weight_lexical == 0.5
+    assert settings.jpv_branch_weight_vector == 0.5
     assert settings.jpv_branch_depth == 60
 
-    swept = build_settings(jpv_rrf_k=10, jpv_rrf_weight_vector=1.0, jpv_branch_depth=5)
-    assert (swept.jpv_rrf_k, swept.jpv_rrf_weight_vector, swept.jpv_branch_depth) == (10, 1.0, 5)
+    swept = build_settings(jpv_rrf_k=10, jpv_branch_weight_vector=1.0, jpv_branch_depth=5)
+    assert (swept.jpv_rrf_k, swept.jpv_branch_weight_vector, swept.jpv_branch_depth) == (
+        10,
+        1.0,
+        5,
+    )
 
     source = (fusion_module.__file__ or "")
     assert source
@@ -146,28 +149,51 @@ def test_fusion_weights_and_k_load_from_settings_not_hardcoded() -> None:
     assert not hasattr(fusion_module, "DEFAULT_BRANCH_DEPTH")
 
 
-def test_vector_branch_weight_defaults_below_lexical() -> None:
-    """Measured: branch parity is the WORST fusion, 96/120 against 105/120 at 0,33.
+def test_the_default_branch_ratio_is_one_vote_each() -> None:
+    """The pin that replaced "the vector weight is lower". C25bis.
 
-    The cause is structural rather than incidental: the 0,65 distance threshold passes
-    1.168 of 1.168 documents on an ordinary query, so the vector branch returns a full list
-    whether or not it understood the query — and a branch that always fills its list always
-    votes at full strength. Raising this weight "for symmetry" sinks `dije de plata` from
-    10/10 to 2/10 and `gargantilla dorada` from 10 to 5.
+    That earlier default belonged to the per-LIST weights, and it was already declared
+    withdrawn when the two-stage composition was adopted: under a graded golden set it made
+    the vector branch unable to place a candidate the lexical branch had not also produced.
+    The per-list weights are gone, so the pin has to be on what exists — the ratio between the
+    two BRANCH weights, whose default is a value of principle: each branch holds one vote.
+
+    Measured as robust rather than merely chosen: with the adaptive coverage rule on, the
+    sweep's range over that ratio falls from 0,070 to 0,007 — a cliff turned into a plateau.
     """
     settings = build_settings()
 
-    assert settings.jpv_rrf_weight_vector < settings.jpv_rrf_weight_typed
-    assert settings.jpv_rrf_weight_vector < settings.jpv_rrf_weight_expanded
-    assert FUSION_DEFAULTS["jpv_rrf_weight_vector"] < FUSION_DEFAULTS["jpv_rrf_weight_typed"]
-    assert FUSION_DEFAULTS["jpv_rrf_weight_vector"] < FUSION_DEFAULTS["jpv_rrf_weight_expanded"]
+    assert settings.jpv_branch_weight_vector == pytest.approx(
+        settings.jpv_branch_weight_lexical
+    )
+    assert FUSION_DEFAULTS["jpv_branch_weight_vector"] == pytest.approx(
+        FUSION_DEFAULTS["jpv_branch_weight_lexical"]
+    )
 
 
-def test_the_two_lexical_weights_sum_to_one_lexical_list() -> None:
-    typed = FUSION_DEFAULTS["jpv_rrf_weight_typed"]
-    expanded = FUSION_DEFAULTS["jpv_rrf_weight_expanded"]
+def test_the_internal_lexical_weights_are_equal_and_not_settable() -> None:
+    """Equal by requirement, and therefore not configuration at all. C25bis.
 
-    assert typed + expanded == pytest.approx(1.0)
+    The specification requires the two lists of the lexical branch to carry the same weight and
+    forbids sweeping them. A setting could then only ever be moved into violation, with nothing
+    to detect it — which is worse than a dead knob, because it looks like a decision. So they
+    became one declared constant, and no per-list weight survives in settings.
+
+    The move could not change a result: both lists carry the same value, RRF scales linearly
+    with the weight, and stage two receives only the ORDER stage one produced.
+    """
+    from jbg_ai.retrieval import orchestrator
+
+    assert orchestrator.LEXICAL_INTERNAL_WEIGHT > 0
+
+    settings = build_settings()
+    for retired in (
+        "jpv_rrf_weight_typed",
+        "jpv_rrf_weight_expanded",
+        "jpv_rrf_weight_vector",
+    ):
+        assert not hasattr(settings, retired), f"{retired} must not exist as a setting"
+        assert retired not in FUSION_DEFAULTS
 
 
 def test_branch_depth_is_of_the_same_order_as_the_smoothing_constant() -> None:
@@ -256,68 +282,90 @@ def test_a_branch_relayed_as_one_list_votes_once_however_many_lists_composed_it(
         assert by_key["v"] == pytest.approx(0.5 / (K + 1))
 
 
-def test_flat_fusion_mode_reproduces_the_published_baseline() -> None:
-    """The flat mode is bit-identical to C21's single fusion over the three lists.
+# --------------------------------------------------------------------------------------
+# The fossil: why the single-stage fusion was retired, kept executable and unreachable.
+#
+# These are the weights C21 shipped, written here as LOCAL LITERALS and deliberately not read
+# from `FUSION_DEFAULTS` — they no longer live there, and that is the point. A number in a
+# settings module is a configuration somebody can set; the same number in a test is a record of
+# what was measured. The path that consumed them is gone, `fuse()` is pure and domain-free, and
+# nothing selects this arithmetic: it can be read, and it cannot be switched on.
+RETIRED_W_TYPED = 0.5
+RETIRED_W_EXPANDED = 0.5
+RETIRED_W_VECTOR = 0.33
 
-    This is the offline half of the guarantee: the flat path composes nothing, so the order
-    it produces is the one the published baseline was measured under. The other half is the
-    live half — `v2-hibrido.yaml` pins `fusion: flat` and reproduces 0,603 / 0,942 / 0,535
-    against golden set `1:93a94fa8fbc3`, recorded in the C25 implementation report.
 
-    If this fails, the table has lost the row every other row is read against.
+def test_the_flat_arithmetic_that_was_retired_buried_the_vector_leader() -> None:
+    """Why one composition exists and not two. C25bis D-F, over `fuse()` alone.
+
+    The single-stage fusion over all three lists did not fuse: it concatenated. The defect was
+    an ARITY, not a weighting choice — the lexical branch fielded two lists against the vector
+    branch's one, so its combined vote ran to 1,00 against 0,33 and its documents occupied
+    twice as many slots.
+
+    The consequence, measured on the published run: a grade-2 document the vector branch ranked
+    FIRST landed at position 33 in three separate queries of the golden set, and the 32 ahead
+    of it were lexical-only while the tail preserved the vector order exactly.
     """
-    from uuid import UUID
+    lexical_ids = [f"lex-{i:03d}" for i in range(1, 33)]
+    vector_leader = "vector-top-hit"
 
-    from jbg_ai.retrieval.orchestrator import _fuse_branches
-
-    typed = [UUID(f"00000000-0000-0000-0000-{i:012d}") for i in range(1, 31)]
-    expanded = [UUID(f"00000000-0000-0000-0000-{i:012d}") for i in range(5, 45)]
-    vector = [UUID(f"22222222-0000-0000-0000-{i:012d}") for i in range(1, 61)]
-
-    c21_weights = (
-        FUSION_DEFAULTS["jpv_rrf_weight_typed"],
-        FUSION_DEFAULTS["jpv_rrf_weight_expanded"],
-        FUSION_DEFAULTS["jpv_rrf_weight_vector"],
-    )
-    expected = fuse(
+    fused = fuse(
         [
-            RankedList("typed", c21_weights[0], typed),
-            RankedList("expanded", c21_weights[1], expanded),
-            RankedList("vector", c21_weights[2], vector),
+            RankedList("typed", RETIRED_W_TYPED, lexical_ids),
+            RankedList("expanded", RETIRED_W_EXPANDED, lexical_ids),
+            RankedList("vector", RETIRED_W_VECTOR, [vector_leader, *lexical_ids]),
         ],
-        k=FUSION_DEFAULTS["jpv_rrf_k"],
-        depth=FUSION_DEFAULTS["jpv_branch_depth"],
+        k=K,
+        depth=DEPTH,
+    )
+    order = [item.key for item in fused]
+
+    assert order.index(vector_leader) == 32, (
+        "the vector branch's best candidate lands at position 33, behind every lexical "
+        f"document: {order[:5]}"
     )
 
-    hits = {key: _FakeHit(key) for key in (*typed, *expanded, *vector)}
-    ordered, _ = _fuse_branches(
-        [hits[key] for key in typed],
-        [hits[key] for key in expanded],
-        [hits[key] for key in vector],
-        k=FUSION_DEFAULTS["jpv_rrf_k"],
-        depth=FUSION_DEFAULTS["jpv_branch_depth"],
-        mode="flat",
-        flat_weights=c21_weights,
-        branch_weights=(0.5, 0.5),
-        internal_weights=(0.5, 0.5),
+    # And the arithmetic that forces it, stated as the two numbers that cannot cross. The worst
+    # possible lexical document — last of a full list, in BOTH lexical lists — still outscores
+    # the vector branch's first.
+    worst_lexical = RETIRED_W_TYPED / (K + DEPTH) + RETIRED_W_EXPANDED / (K + DEPTH)
+    best_vector = RETIRED_W_VECTOR / (K + 1)
+
+    assert worst_lexical == pytest.approx(0.008333, abs=1e-6)
+    assert best_vector == pytest.approx(0.005410, abs=1e-6)
+    assert worst_lexical > best_vector, (
+        "with the retired per-list weights the whole lexical list outranks the vector "
+        "branch's leader in EVERY query — which is what made it a defect and not a setting"
     )
 
-    assert [item.product_id for item in ordered] == [item.key for item in expected]
 
+def test_no_flat_fusion_path_exists() -> None:
+    """The retired composition must not come back through a configuration. C25bis."""
+    import inspect
 
-class _FakeHit:
-    """The minimum a hit needs to be rebuilt into a candidate by the orchestrator."""
+    from jbg_ai.config import settings as settings_module
+    from jbg_ai.retrieval import orchestrator
 
-    def __init__(self, product_id) -> None:
-        self.product_id = product_id
-        self.sku = str(product_id)[:8]
-        self.materials: list[str] = []
-        self.family_id = None
-        self.variant_label = None
-        self.price = None
-        self.size_label = None
-        self.qty_bucket = None
-        self.sales_30d = None
-        self.ts_rank = 0.5
-        self.coordination = 1
-        self.distance = 0.3
+    source = inspect.getsource(orchestrator)
+    assert "FUSION_MODE" not in source
+    assert "flat_weights" not in source
+
+    for gone in ("FUSION_MODES", "FUSION_MODE_FLAT", "FUSION_MODE_BRANCH"):
+        assert not hasattr(settings_module, gone), f"{gone} must not exist"
+
+    signature = inspect.signature(orchestrator.retrieve_products)
+    for gone in ("fusion", "weight_typed", "weight_expanded", "weight_vector"):
+        assert gone not in signature.parameters, f"`{gone}` must not be an orchestration knob"
+
+    # The second half of the scenario, asserted in the same test so that the requirement maps
+    # to one place: no per-list weight is defined anywhere a configuration could reach.
+    from jbg_ai.evals.configs import EvalConfig
+
+    for gone in ("jpv_rrf_weight_typed", "jpv_rrf_weight_expanded", "jpv_rrf_weight_vector"):
+        assert gone not in FUSION_DEFAULTS
+        assert not hasattr(build_settings(), gone)
+    for gone in ("weight_typed", "weight_expanded", "weight_vector", "fusion"):
+        assert gone not in EvalConfig.__dataclass_fields__, (
+            f"`{gone}` must not be an evaluation configuration key"
+        )

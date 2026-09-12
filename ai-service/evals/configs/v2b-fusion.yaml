@@ -29,7 +29,9 @@ rationale: >-
 uses_provider: true
 mode: hybrid
 expand_synonyms: true
-fusion: branch
+# C25bis retiró `fusion: branch` de esta fila. **No la mueve**: era el valor vivo por defecto y
+# ahora es la única composición que el código sabe producir, así que la clave sólo podía repetir
+# lo que ya ocurría. La fila sigue CONGELADA en todo lo que decide su orden.
 rrf_k: 60
 branch_weight_lexical: 0.5
 branch_weight_vector: 0.5

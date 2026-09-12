@@ -39,6 +39,7 @@ from jbg_ai.evals.metrics import (
 )
 from jbg_ai.evals.pricing import PriceList
 from jbg_ai.evals.provenance import (
+    BRANCH_FUSION,
     NO_FUSION,
     Provenance,
     current_git_sha,
@@ -123,17 +124,19 @@ class Report:
         raise KeyError(config_id)
 
 
-def _fusion_mode_of(config: EvalConfig, settings: Settings) -> str:
+def _fusion_mode_of(config: EvalConfig) -> str:
     """How this row composed its lists, or that it composed nothing.
 
     Only a hybrid pipeline fuses: the two degraded baselines and the context-only row never
     reach the fusion, and the vector row runs one branch, which leaves nothing to fuse with.
+    That is still a real decision, which is why this function survives C25bis — what it stopped
+    doing is reading a setting, because there is no longer a composition to choose.
     """
     if config.kind != KIND_PIPELINE:
         return NO_FUSION
     if RetrievalMode(config.mode or "hybrid") is not RetrievalMode.HYBRID:
         return NO_FUSION
-    return config.fusion or settings.jpv_fusion_mode
+    return BRANCH_FUSION
 
 
 async def corpus_snapshot(settings: Settings) -> tuple[list[UUID], dict[str, str]]:
@@ -403,7 +406,7 @@ async def run(
                 embed.model_version_key if config.uses_provider and embed else None
             ),
             git_sha=sha,
-            fusion_mode=_fusion_mode_of(config, settings),
+            fusion_mode=_fusion_mode_of(config),
         )
         reports.append(
             await run_config(

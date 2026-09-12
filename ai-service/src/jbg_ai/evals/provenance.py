@@ -6,11 +6,19 @@ configuration, which indexed document set, which embedding model, which fusion m
 revision of the code produced it. Six things, recorded on the run rather than in a log, because
 a run whose provenance has to be reconstructed from memory is a run that will be compared anyway.
 
-The fusion mode is the sixth because C25 made it one. Until then there was one way to fuse and
-the mode was implied by the revision; now the flat fusion stays selectable so the published
-baseline remains reproducible, which means two runs of the SAME configuration at the SAME
-revision can compose their lists differently. Reaching the mode through `config_id` and the
-versioned YAML is an indirection, and an indirection is what provenance exists to remove.
+The composition is the sixth, and C25bis is the reason it STAYS one. C25 added it because the
+flat fusion was selectable, so two runs of the same configuration at the same revision could
+compose their lists differently; retiring that mode removes the case, and the tempting
+conclusion is that the element can go back to being implied by the revision.
+
+It cannot, and the distinction is worth writing down because it is the one C25bis turns on:
+**selecting a composition and recording it are different things.** No configuration can choose
+one any more, but a run archived under the retired composition must still be distinguishable
+from one taken today — `differences()` is what keeps the published baseline from being compared
+with a current row as if nothing had changed — and a run must declare what it actually composed
+rather than what somebody's environment was thought to request. So the value comes from the
+code, never from a setting, and it is exactly because it is no longer a knob that it has to
+remain a record.
 
 Two runs whose provenance differs are reported as NOT COMPARABLE and the differing element is
 named. That is the whole mechanism: it is cheaper to say "the index moved" than to explain a
@@ -40,6 +48,15 @@ DIRTY_SUFFIX = "+dirty"
 #: that never composed anything, and the column would stop meaning what it says.
 NO_FUSION = "none"
 
+#: The one composition the code can produce: the two lexical lists fused into one ranked list,
+#: that list fused against the vector list under the per-branch weights.
+#:
+#: It lives here, in the module that RECORDS provenance, and no longer in settings, because
+#: C25bis retired the knob and kept the record. The archived baseline carries `flat` in its own
+#: provenance, so the two values still disagree where they should — which is the entire reason
+#: this element survived the knob.
+BRANCH_FUSION = "branch"
+
 
 @dataclass(frozen=True)
 class Provenance:
@@ -52,8 +69,9 @@ class Provenance:
     index_set_hash: str
     embedding_model_version_key: str | None
     git_sha: str
-    #: How the branches were composed: `branch` (two stages) or `flat` (one stage over every
-    #: list). Two runs that fused differently are not comparable even at the same revision.
+    #: How the branches were composed. Live runs record `BRANCH_FUSION`; rows that fuse nothing
+    #: record `NO_FUSION`; and archived runs still carry the `flat` of the retired single-stage
+    #: composition. Two runs that fused differently are not comparable even at the same revision.
     fusion_mode: str
 
     def differences(self, other: "Provenance") -> tuple[str, ...]:

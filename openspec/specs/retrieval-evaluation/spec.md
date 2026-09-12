@@ -5,7 +5,7 @@ How retrieval quality is measured in this service, and what makes one measuremen
 
 Judgements are graded on three levels and published on both scales under one declared binarisation rule, with a divergence between the readings reported as a finding rather than resolved by picking one; a third, operational reading joins them whenever a configuration under evaluation reorders by a business signal, its gain function of labelled grade and availability declared before the measurement and never modifying what was recorded. They are keyed by the pair of query and document, so a later configuration appends to them instead of re-recording what exists, and each carries the content hash of the text it was made against, so labels resting on since-changed documents are counted beside the metrics and not in a separate log. The judged pool is the union of what the indexed configurations return, deepened in blocks while the previous block still contributed a relevant document and stopped at the branch depth beyond which the live retriever cannot surface anything; the depth reached is recorded per query, everything outside the pool is declared irrelevant by assumption, and the unjudged share of a configuration's top results marks that row not comparable instead of scoring it silently. Retrieval always executes over the complete indexed catalogue — restricting the corpus by data origin is not an available configuration — while the breakdown by origin counts only the relevant documents of each, and the report records how often an irrelevant synthetic product outranks the first relevant real one, so that interference is measured rather than assumed.
 
-The comparison is against baselines that replicate what they claim to replicate: the substring-over-name plus exact-code product search that preceded this project's AI work, the degraded Spanish full-text searcher composed over the same text the .NET side indexes rather than over the richer canonical document — an equivalence an automated test breaks when the renderer drifts — and a context-only configuration that places the whole catalogue in the model context without retrieval, priced per query, carrying no product price, truncating deterministically with the omitted count recorded, and projected to the catalogue size at which it no longer fits. Every run records its provenance — golden set version, configuration, index fingerprint, embedding model version and code revision — and two runs whose provenance differs are reported as not comparable rather than compared; query embeddings are frozen per embedding model version so that repeating a run does not depend on a provider answering identically. Latency is two figures, retrieval and end-to-end, measured warm with the first execution discarded, and cost comes from a versioned price list, recorded as zero rather than absent for a configuration that calls no paid provider and declared unverified when the source cannot be reached. Abstention is measured over the out-of-domain category with both the per-document distance distribution and the per-query best-hit distribution published, and the live distance threshold and the abstention rule may be re-fixed under a rule recorded before the measurement, justified from the per-query distribution rather than the per-document one and reported with both sides of the trade: the rate gained over out-of-domain queries and the answerable queries the rule silenced. A configured default moves only under a rule written before the measurement, in the reading that decides — the queries no calibration has seen, because the tuning subset is saturated and contaminated and is published as a diagnostic that cannot veto a change — and the outcome is documented whether or not anything moves. An evaluation reporting more than one change publishes a row isolating each of them beside the combined one and keeps the previous baseline selectable; deepening the golden set re-runs every row so the table carries one provenance tuple and re-confirms the decision against the incumbent; and an absolute acceptance criterion the evidence cannot reach is restated as a relative one with the gap declared, never met by relabelling or by weakening the criterion after the fact. The normative output is the versioned report and the per-query detail under `ai-service/evals/results/`, written on every run; persistence to the evaluation tables is optional and the component that produces the results does not depend on the one that stores them. The harness tests run offline against fixtures, with no provider and no production database.
+The comparison is against baselines that replicate what they claim to replicate: the substring-over-name plus exact-code product search that preceded this project's AI work, the degraded Spanish full-text searcher composed over the same text the .NET side indexes rather than over the richer canonical document — an equivalence an automated test breaks when the renderer drifts — and a context-only configuration that places the whole catalogue in the model context without retrieval, priced per query, carrying no product price, truncating deterministically with the omitted count recorded, and projected to the catalogue size at which it no longer fits. Every run records its provenance — golden set version, configuration, index fingerprint, embedding model version, code revision and how its ranked lists were composed, that last value read from the code rather than from any setting because it is recorded even where no configuration can select it — and two runs whose provenance differs are reported as not comparable rather than compared; query embeddings are frozen per embedding model version so that repeating a run does not depend on a provider answering identically. Latency is two figures, retrieval and end-to-end, measured warm with the first execution discarded, and cost comes from a versioned price list, recorded as zero rather than absent for a configuration that calls no paid provider and declared unverified when the source cannot be reached. Abstention is measured over the out-of-domain category with both the per-document distance distribution and the per-query best-hit distribution published, and the live distance threshold and the abstention rule may be re-fixed under a rule recorded before the measurement, justified from the per-query distribution rather than the per-document one and reported with both sides of the trade: the rate gained over out-of-domain queries and the answerable queries the rule silenced. A configured default moves only under a rule written before the measurement, in the reading that decides — the queries no calibration has seen, because the tuning subset is saturated and contaminated and is published as a diagnostic that cannot veto a change — and the outcome is documented whether or not anything moves. An evaluation reporting more than one change publishes a row isolating each of them beside the combined one and keeps the previous baseline citable, its figures, provenance and measured configuration archived as versioned artefacts and the row marked historical and not re-executable once that configuration leaves the code, neither loadable as a configuration nor restated inside the harness; deepening the golden set re-runs every row so the table carries one provenance tuple and re-confirms the decision against the incumbent; and an absolute acceptance criterion the evidence cannot reach is restated as a relative one with the gap declared, never met by relabelling or by weakening the criterion after the fact. The normative output is the versioned report and the per-query detail under `ai-service/evals/results/`, written on every run; persistence to the evaluation tables is optional and the component that produces the results does not depend on the one that stores them. The harness tests run offline against fixtures, with no provider and no production database.
 
 ## Requirements
 
@@ -188,7 +188,9 @@ Its measurement MUST be recorded with the model and the date that produced it, a
 - **AND** identifies the size at which the catalogue no longer fits
 
 ### Requirement: A run is comparable to another only when its provenance matches
-Every evaluation run MUST record the golden set version, the configuration, a stable fingerprint of the indexed document set, the embedding model version and the code revision that produced it. Two runs whose provenance differs MUST be reported as not comparable rather than compared.
+Every evaluation run MUST record the golden set version, the configuration, a stable fingerprint of the indexed document set, the embedding model version, the code revision that produced it **and how its ranked lists were composed**. Two runs whose provenance differs MUST be reported as not comparable rather than compared.
+
+**The composition MUST be recorded even when it can no longer be chosen.** Recording it and selecting it are different things: once a single composition remains, no configuration may select one, but a run archived under a retired composition MUST still be distinguishable from a current one, and a run MUST still declare what it actually composed rather than what its environment was thought to request. The recorded value MUST therefore come from the code and never from a setting, and a configuration that composes no ranked lists at all MUST record that absence rather than inherit the live value.
 
 Query embeddings MUST be frozen as a versioned artefact keyed by the embedding model version, so that repeating a run does not depend on the provider answering identically.
 
@@ -199,6 +201,18 @@ Query embeddings MUST be frozen as a versioned artefact keyed by the embedding m
 #### Scenario: A moved index makes previous runs incomparable
 - **WHEN** the indexed document set changes and a run is compared with an earlier one
 - **THEN** the report states that the two are not comparable and names the differing element
+
+#### Scenario: The composition is recorded although no configuration selects it
+- **WHEN** an evaluation run is recorded
+- **THEN** its provenance names how its ranked lists were composed
+- **AND** that value comes from the code rather than from any setting
+- **AND** a run whose configuration composes no ranked lists records that absence instead of the live value
+
+#### Scenario: A run archived under a retired composition is not comparable with a current one
+- **GIVEN** an archived run recorded under a composition that has since been retired
+- **WHEN** it is compared with a run taken after the retirement
+- **THEN** the two are reported as not comparable
+- **AND** the composition is named as the differing element
 
 ### Requirement: Deepening the golden set re-runs every row and re-confirms the decision
 When an evaluation appends judgements or adds queries, the golden set version changes and every previously published figure stops being comparable. Every row of the table MUST therefore be re-run under the new version, so that the published table carries **one** provenance tuple.
@@ -309,7 +323,11 @@ When the price source cannot be verified at measurement time, the file MUST reco
 ### Requirement: An ablation table isolates each change it reports
 When one evaluation reports more than one change to the retrieval pipeline, the table MUST contain a row for each change applied **on its own**, in addition to the row that applies them together. A table that reports only the combined result MUST NOT be published, because an improvement it shows cannot be attributed to a cause.
 
-The baseline row MUST remain reproducible: whatever configuration the previously published baseline was measured under MUST still be selectable, so the new table keeps the row every other row is read against.
+**The baseline row MUST remain citable, and citable is not the same as re-executable.** When the configuration a published baseline was measured under is retired from the code, the evaluation MUST preserve that row's figures, its full provenance tuple **and the configuration it was measured under** as versioned artefacts in the repository, and MUST mark the row as **historical and not re-executable** wherever it is cited. The report MUST state which rows can be re-run and which cannot.
+
+The retired configuration MUST NOT remain loadable as a configuration: it is preserved as a record of what was measured, not as something that can be selected, and an attempt to load it MUST fail naming what no longer exists.
+
+A retired baseline configuration MUST NOT be reimplemented inside the evaluation harness in order to keep it runnable: a harness that restates the pipeline measures the restatement, not the pipeline.
 
 #### Scenario: Each change has its own row
 - **GIVEN** an evaluation that reports both a fusion change and a ranking change
@@ -318,10 +336,27 @@ The baseline row MUST remain reproducible: whatever configuration the previously
 - **AND** a row with both changes applied
 - **AND** the improvement of each is attributable
 
-#### Scenario: The baseline row is still reproducible
-- **WHEN** the baseline configuration is evaluated after the change
-- **THEN** it runs under the configuration it was originally measured with
-- **AND** reproduces the published figures against the same golden set version
+#### Scenario: A retired baseline row stays citable
+- **GIVEN** the configuration a published baseline was measured under has been retired from the code
+- **WHEN** that baseline is cited
+- **THEN** its figures, its full provenance tuple and the configuration it was measured under are present as versioned artefacts
+- **AND** the row is marked historical and not re-executable
+
+#### Scenario: The preserved configuration is a record and not a choice
+- **GIVEN** the preserved configuration of a retired baseline
+- **WHEN** it is loaded as a configuration
+- **THEN** the load fails naming the knobs that no longer exist
+- **AND** it is not listed among the configurations the table can run
+
+#### Scenario: The report says which rows can be re-run
+- **WHEN** an ablation table containing a retired row is published
+- **THEN** it states for each row whether it can be re-executed
+- **AND** a reader can tell which figures are reproducible and which are archived
+
+#### Scenario: A retired configuration is not reimplemented in the harness
+- **WHEN** the evaluation harness is inspected after a baseline configuration is retired
+- **THEN** the harness contains no restatement of that pipeline
+- **AND** the row's figures come from the archived artefact rather than from a copy of the code
 
 ### Requirement: A configured default changes only when the verdict is material
 A default retrieval setting MUST NOT be changed on the basis of this evaluation unless the improvement exceeds the agreed margin **in the reading that decides**, and degrades no measured category beyond the agreed margin. The rule MUST be recorded before the measurement is executed, together with which reading decides and why.

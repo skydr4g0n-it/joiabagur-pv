@@ -387,19 +387,28 @@ def test_canonical_openapi_settings_pin_query_expansion_flag() -> None:
 
 FUSION_ENV = (
     "JPV_RRF_K",
+    "JPV_BRANCH_DEPTH",
+    "JPV_BRANCH_WEIGHT_LEXICAL",
+    "JPV_BRANCH_WEIGHT_VECTOR",
+)
+
+#: Retired by C25bis. Exporting any of them now does NOTHING, and that is deliberate: the
+#: composition they selected no longer exists, so an environment that still carries one is a
+#: stale belief rather than a misconfiguration — what a run actually composed is recorded in
+#: its provenance instead of inferred from the environment somebody intended.
+RETIRED_FUSION_ENV = (
+    "JPV_FUSION_MODE",
     "JPV_RRF_WEIGHT_TYPED",
     "JPV_RRF_WEIGHT_EXPANDED",
     "JPV_RRF_WEIGHT_VECTOR",
-    "JPV_BRANCH_DEPTH",
 )
 
 
 def _assert_fusion_defaults(settings) -> None:
     assert settings.jpv_rrf_k == 60
-    assert settings.jpv_rrf_weight_typed == 0.5
-    assert settings.jpv_rrf_weight_expanded == 0.5
-    assert settings.jpv_rrf_weight_vector == 0.33
     assert settings.jpv_branch_depth == 60
+    assert settings.jpv_branch_weight_lexical == 0.5
+    assert settings.jpv_branch_weight_vector == 0.5
 
 
 def test_settings_do_not_require_the_fusion_settings_to_boot(
@@ -426,15 +435,20 @@ def test_blank_fusion_settings_are_treated_as_the_defaults(
 
 
 def test_the_measured_default_weighting_is_preserved(monkeypatch: pytest.MonkeyPatch) -> None:
+    """What survived C25bis: the branch ratio and the depth-to-smoothing coupling.
+
+    The old pin — the vector weight below either lexical one — belonged to the per-LIST
+    weights, and C25 had already declared that requirement withdrawn when it adopted the
+    two-stage composition. C25bis removed the weights themselves, so the pin moved to what
+    exists: each branch holds one vote, and the depth stays of the order of `k`.
+    """
     _minimal_env(monkeypatch)
     for name in FUSION_ENV:
         monkeypatch.delenv(name, raising=False)
     get_settings.cache_clear()
     settings = get_settings()
 
-    assert settings.jpv_rrf_weight_vector < settings.jpv_rrf_weight_typed
-    assert settings.jpv_rrf_weight_vector < settings.jpv_rrf_weight_expanded
-    assert settings.jpv_rrf_weight_typed + settings.jpv_rrf_weight_expanded == 1.0
+    assert settings.jpv_branch_weight_lexical == settings.jpv_branch_weight_vector
     assert 0.5 * settings.jpv_rrf_k <= settings.jpv_branch_depth <= 2 * settings.jpv_rrf_k
 
 
@@ -443,14 +457,41 @@ def test_fusion_settings_can_be_overridden_by_environment(
 ) -> None:
     _minimal_env(monkeypatch)
     monkeypatch.setenv("JPV_RRF_K", "20")
-    monkeypatch.setenv("JPV_RRF_WEIGHT_VECTOR", "1.0")
+    monkeypatch.setenv("JPV_BRANCH_WEIGHT_VECTOR", "1.0")
     monkeypatch.setenv("JPV_BRANCH_DEPTH", "25")
     get_settings.cache_clear()
 
     settings = get_settings()
     assert settings.jpv_rrf_k == 20
-    assert settings.jpv_rrf_weight_vector == 1.0
+    assert settings.jpv_branch_weight_vector == 1.0
     assert settings.jpv_branch_depth == 25
+
+
+def test_a_retired_fusion_knob_no_longer_exists_and_exporting_it_does_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """C25bis D-G: the boot does NOT fail over a stale export, and the reason is asymmetry.
+
+    A retired knob that is ignored produces the RIGHT behaviour — the service composes the one
+    way it can — so what is left is a mistaken belief, not a mistaken result. Rejecting it
+    would mean turning a harmless leftover into a boot failure, a wider blast radius than the
+    defect it guards. Where a stale knob WOULD change a result is an evaluation configuration,
+    because it would publish a row that measured something else — and that is refused, by name,
+    in `test_a_misspelt_knob_is_refused_instead_of_silently_ignored`.
+
+    The precedent is the project's own: `JPV_BUSINESS_WEIGHT_ROTATION` was retired with a field,
+    a default, a blank fallback and its own validator, and got no guard either.
+    """
+    _minimal_env(monkeypatch)
+    for name in RETIRED_FUSION_ENV:
+        monkeypatch.setenv(name, "definitely-not-a-valid-value")
+    get_settings.cache_clear()
+
+    settings = get_settings()
+
+    for name in RETIRED_FUSION_ENV:
+        assert not hasattr(settings, name.lower()), f"{name} must not exist as a setting"
+    _assert_fusion_defaults(settings)
 
 
 def test_settings_reject_a_non_positive_smoothing_constant_or_depth(

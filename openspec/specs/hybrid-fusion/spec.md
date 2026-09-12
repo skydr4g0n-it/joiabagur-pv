@@ -1,11 +1,11 @@
 # hybrid-fusion Specification
 
 ## Purpose
-Rank-based fusion of the retrieval branches behind `POST /v1/retrieval/products`: a pure function that combines several ranked lists of candidate identifiers into one order from a weight per list and a smoothing constant, summing weight over smoothing plus position and never reading the raw scores the branches produced, which live on incomparable scales whose distributions change per query. Weights, the smoothing constant and the single depth at which every list is truncated are configuration with measured defaults, and their effective values travel as parameters of the orchestration call rather than as fields of the frozen request schema. The fusion is composed in two stages — the lexical lists are fused with each other first, and the one lexical list that results is then fused with the vector list under per-branch weights — so a branch's total vote is exactly its declared weight however many of its own lists matched, and the depth is honoured per branch rather than per list. The lexical branch's weight is then scaled down, by no configured parameter of its own, in proportion to how much of the query its best candidate actually matched. The single flat fusion over every list stays selectable so the published evaluation baseline remains reproducible, but it is not the default.
+Rank-based fusion of the retrieval branches behind `POST /v1/retrieval/products`: a pure function that combines several ranked lists of candidate identifiers into one order from a weight per list and a smoothing constant, summing weight over smoothing plus position and never reading the raw scores the branches produced, which live on incomparable scales whose distributions change per query. Weights, the smoothing constant and the single depth at which every list is truncated are configuration with measured defaults, and their effective values travel as parameters of the orchestration call rather than as fields of the frozen request schema. The fusion is composed in two stages — the lexical lists are fused with each other first, and the one lexical list that results is then fused with the vector list under per-branch weights — so a branch's total vote is exactly its declared weight however many of its own lists matched, and the depth is honoured per branch rather than per list. The lexical branch's weight is then scaled down, by no configured parameter of its own, in proportion to how much of the query its best candidate actually matched. The two-stage composition is the only one that exists: the single flat fusion over every list is not implemented at all, and the published evaluation baseline measured under it survives as an archived, non-re-executable row rather than as a selectable configuration.
 
 The lexical branch composes its query disjunctively from the equivalence groups the expansion produced, always with bound parameters and without a positional adjacency constraint, and orders its candidates first by how many counting groups they match, where only fields whose absence is evidence — well-covered vocabulary fields and literal words the operator typed — may count. Structural filters extracted by rule from the query text demote and never exclude, so the caller that owns the authoritative price and stock still sees the candidates; filters a person selected in the request body keep excluding. A ranking signal this capability does not own may reorder candidates inside one of those blocks but never across them, so what the operator typed always outranks a signal they did not ask about.
 
-Every candidate reports which branches produced it and at which position, a branch that did not see a candidate reports no diagnostic for it, and total disagreement between branches is marked low confidence only when more than one branch actually ran. The lexical, filter and fusion stages log beside expand, embed and search. The fusion opens no database session, calls no provider and knows nothing about products, so its tests run offline against injected fakes and pin the two defaults that are easy to undo by accident.
+Every candidate reports which branches produced it and at which position, a branch that did not see a candidate reports no diagnostic for it, and total disagreement between branches is marked low confidence only when more than one branch actually ran. The lexical, filter and fusion stages log beside expand, embed and search. The fusion opens no database session, calls no provider and knows nothing about products, so its tests run offline against injected fakes and pin the defaults that are easy to undo by accident, and pin the retired flat composition as a demonstration reachable by no configuration.
 
 ## Requirements
 
@@ -38,24 +38,37 @@ The service MUST provide a fusion function that takes several ranked lists of ca
 
 The per-**branch** weights and the smoothing constant MUST be read from settings and MUST NOT be written into the code. Their effective values MUST also travel as parameters of the retrieval orchestration call, so that several configurations can be evaluated in one process without restarting it and without adding a field to the retrieval request schema.
 
-**The fusion is composed in two stages.** The lists belonging to the lexical branch MUST first be fused with each other into one ranked lexical list, and that list MUST then be fused with the vector list under the per-branch weights. The consequence is normative: **a branch's total vote MUST be exactly its declared weight, whatever number of lists it is composed of and however many of them returned candidates.** A single flat fusion over every list is forbidden as the live path, because it makes the effective weight of a branch depend on how many of its own lists happened to match — a property of the query that no configuration declares.
+**The fusion is composed in two stages, and that is the only composition that exists.** The lists belonging to the lexical branch MUST first be fused with each other into one ranked lexical list, and that list MUST then be fused with the vector list under the per-branch weights. A branch's total vote MUST be exactly its declared weight, whatever number of lists it is composed of and however many of them returned candidates. **A single flat fusion over every list MUST NOT be implemented at all**, not merely be non-default, because it makes the effective weight of a branch depend on how many of its own lists happened to match — a property of the query that no configuration declares — and because it was measured to prevent the vector branch from placing any candidate the lexical branch did not also produce.
 
-The weights internal to the lexical branch MUST be equal and MUST NOT be swept, because the measured evidence establishes that both of its lists are necessary and not that either is worth more.
+**The weights internal to the lexical branch are not configuration.** They MUST be equal, MUST NOT be swept and MUST NOT be settable, because the measured evidence establishes that both of its lists are necessary and not that either is worth more. A value that the specification forbids moving is not a knob that happens to be fixed: it is an invitation to violate the requirement with nothing to detect it. Only their order reaches the second stage, so their common value cannot change any result.
+
+Per-list weights MUST NOT exist in settings, in an evaluation configuration or as parameters of the orchestration call.
+
+The earlier requirement that the vector weight be lower than either lexical weight was withdrawn when the two-stage composition was adopted, and the per-list weights it spoke of no longer exist; no test may pin it.
 
 Only the **ratio** of the branch weights may change the order, so a calibration sweep over them MUST be one-dimensional and MUST be expressed as that ratio. The default ratio MUST be declared with a rationale that can be stated in one sentence.
-
-The previous requirement that the vector weight be lower than either lexical weight is **withdrawn**: it was fixed under a rubric that its own report declared to be the lexical branch's objective function, and under the graded golden set it makes the vector branch unable to place a candidate that the lexical branch did not also produce.
 
 #### Scenario: Weights are not hardcoded
 - **WHEN** the fused retrieval runs
 - **THEN** the branch weights and the smoothing constant come from settings or from the call parameters
-- **AND** no weight value is written into the fusion module
+- **AND** no branch weight value is written into the fusion module
 
 #### Scenario: Two configurations run in one process
 - **GIVEN** the settings supply a default set of weights
 - **WHEN** the orchestration call is made once with those weights and once with different ones
 - **THEN** both calls succeed without restarting the process
 - **AND** neither call mutates the settings object
+
+#### Scenario: No flat fusion path exists
+- **WHEN** the fusion module and the settings are inspected
+- **THEN** no configuration selects a single-stage fusion over every list
+- **AND** no per-list weight is defined
+
+#### Scenario: An evaluation configuration naming a retired knob fails loudly
+- **GIVEN** an evaluation configuration that names a retired fusion knob
+- **WHEN** it is loaded
+- **THEN** the load fails and names the retired knob
+- **AND** no row of the ablation table is produced under a knob that was silently ignored
 
 #### Scenario: A branch's vote does not depend on how many of its lists matched
 - **GIVEN** a query for which both lexical lists return the same document
@@ -117,7 +130,8 @@ The scaling MUST NOT be derived from whether the branch's typed list is empty, b
 - **WHEN** the settings are inspected
 - **THEN** no parameter governs the strength of the coverage scaling
 - **AND** the scaling is the proportion itself
-- **AND** switching the rule off is available as a control and a rollback, which is not a strength
+- **AND** switching the rule off is available to the evaluation as a control arm, and is an on/off switch rather than a strength
+- **AND** it is not a deployment setting, so the live service composes under the adopted rule and a rollback of it is a code change
 
 #### Scenario: The scaling is measured against the rule switched off
 - **WHEN** the adaptive scaling is adopted
@@ -130,26 +144,6 @@ The scaling MUST NOT be derived from whether the branch's typed list is empty, b
 - **WHEN** coverage is computed
 - **THEN** it is computed from the coordination tally of the group-based list
 - **AND** the emptiness of the typed list does not lower it
-
-### Requirement: The flat fusion remains selectable so the published baseline stays reproducible
-
-The single-stage fusion over every list MUST remain selectable by configuration, with the weights that were in force before this change. It MUST NOT be the default. Its purpose is normative rather than operational: the evaluation's published baseline row was measured under it, and a configuration that can no longer be reproduced cannot serve as the row every other row is read against.
-
-The fusion mode in force MUST be recorded in the fusion stage log and in the provenance of any evaluation run.
-
-#### Scenario: The flat mode reproduces the published baseline
-- **GIVEN** the flat fusion mode and the weights in force before this change
-- **WHEN** the baseline configuration is evaluated against the same golden set version
-- **THEN** its metrics match the published baseline
-
-#### Scenario: The flat mode is not the default
-- **WHEN** the default configuration is loaded
-- **THEN** the two-stage fusion is in force
-
-#### Scenario: The mode in force is recorded
-- **WHEN** the fusion stage logs
-- **THEN** it names the fusion mode in force
-- **AND** an evaluation run records that mode in its provenance
 
 ### Requirement: All fused lists are truncated at the same depth, coupled to the smoothing constant
 
@@ -336,7 +330,9 @@ The retrieval pipeline MUST emit a structured log entry for the lexical stage, f
 
 ### Requirement: Fusion tests run offline and pin the measured defaults
 
-Tests for the fusion, the lexical branch and the structural filters MUST run without opening a socket to an embedding provider, an LLM provider or the database, using injected fakes. The suite MUST pin the two defaults that were measured and are easy to undo by accident: that the vector list weighs less than the lexical lists, and that a conjunction is not used between groups. No test may require the index to contain any particular number of rows.
+Tests for the fusion, the lexical branch and the structural filters MUST run without opening a socket to an embedding provider, an LLM provider or the database, using injected fakes. The suite MUST pin the defaults that were measured and are easy to undo by accident: that the weights internal to the lexical branch are equal and not settable, that the default ratio between the branch weights is the declared one, and that a conjunction is not used between groups. No test may require the index to contain any particular number of rows.
+
+**The suite MUST also pin what was retired**, because a path removed for having been measured as defective can be reintroduced by anybody who does not know it was measured. It MUST fail if a single-stage fusion over every list reappears, and it MUST keep, as pure arithmetic over the fusion primitive, the demonstration of why that composition was retired — with the retired weights as literals local to the test, so that they are a record and not a configuration, and reachable by no configuration at all.
 
 #### Scenario: The suite stays offline
 - **WHEN** the fusion and lexical tests run
@@ -345,8 +341,15 @@ Tests for the fusion, the lexical branch and the structural filters MUST run wit
 
 #### Scenario: The measured defaults are pinned
 - **WHEN** the suite runs
-- **THEN** a test fails if the default vector weight is raised to or above the lexical weight
+- **THEN** a test fails if the weights internal to the lexical branch stop being equal or become settable
+- **AND** a test fails if the default branch-weight ratio changes without the declared rationale changing with it
 - **AND** a test fails if the groups are combined conjunctively
+
+#### Scenario: The retired composition stays demonstrated and unreachable
+- **WHEN** the suite runs
+- **THEN** a test demonstrates, over the fusion primitive alone, that under the retired weights the whole lexical list outscores the vector branch's best candidate
+- **AND** that test reaches no setting and no orchestration path
+- **AND** a test fails if a single-stage fusion over every list is reintroduced
 
 ### Requirement: The lexical branch truncates under a total order, so ties do not decide silently
 

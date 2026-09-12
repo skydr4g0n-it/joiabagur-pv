@@ -145,13 +145,36 @@ The rest extends files that already existed:
 
 | file | what C25 added |
 |---|---|
-| `test_fusion.py` | that `fuse` composes with itself without touching the formula, and that the flat mode is bit-identical to C21's single stage |
+| `test_fusion.py` | that `fuse` composes with itself without touching the formula |
 | `test_orchestrator.py` | the two-stage fusion, the coverage rule and its **gate** |
 | `test_pos_scope.py` | the reading scope against the restricting one, and the business score |
 | `test_filters.py` | the ordering key with a continuous tail |
 | `test_sweep_phases.py` | capture and re-score, and that the second reaches no provider and no database |
 | `test_provenance_and_report.py` | the fusion mode as the sixth element of the provenance, the dirty-tree marker, and that the published table carries no withdrawn claim |
 | `test_golden_validation.py` | the out-of-domain category at its new floor of twenty |
+
+**What C25bis changed here.** Four tests went with the single-stage fusion and the per-list
+weights they exercised — `test_flat_fusion_mode_reproduces_the_published_baseline`,
+`test_vector_branch_weight_defaults_below_lexical`,
+`test_the_two_lexical_weights_sum_to_one_lexical_list` and
+`test_baseline_row_is_still_selectable_and_reproducible` — and seven arrived:
+
+| test | what it pins |
+|---|---|
+| `test_the_flat_arithmetic_that_was_retired_buried_the_vector_leader` | **the fossil**: why the composition was retired, over `fuse()` alone, with the retired weights as literals local to the test. Reachable by no configuration |
+| `test_no_flat_fusion_path_exists` | that it cannot come back through a setting or an orchestration parameter |
+| `test_the_internal_lexical_weights_are_equal_and_not_settable` | that no per-list weight survives, and that the lexical branch's internal split is a declared constant |
+| `test_the_default_branch_ratio_is_one_vote_each` | the pin that replaced "the vector weight is lower", whose subject no longer exists |
+| `test_the_retired_baseline_config_no_longer_loads` | that the archived configuration is preserved **and** refused, by the unknown-key guard that already existed |
+| `test_the_baseline_row_is_archived_rather_than_selectable` | conservation in place of reproducibility |
+| `test_a_retired_fusion_knob_no_longer_exists_and_exporting_it_does_nothing` | that a stale export is inert, and why the boot is not made to fail over it |
+
+Two tests were narrowed rather than removed, because the property they protect survived the
+composition they compared against: `test_vector_top_hit_reaches_the_top_five_without_lexical_
+consensus` and `test_low_confidence_means_branch_disagreement_and_not_list_disagreement`. Both
+lost their second arm — serving the same corpus under the retired composition — and both are
+stronger for it: what was a comparison between two compositions is now enforced by the shape of
+the code.
 
 **The gate is `test_full_coverage_leaves_the_lexical_weight_untouched`.** It covers five
 categories measured at coverage 1,00, and each of its five queries is a **real** query of the

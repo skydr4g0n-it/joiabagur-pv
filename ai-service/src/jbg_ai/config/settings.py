@@ -24,25 +24,31 @@ FUSION_DEFAULTS: dict[str, Any] = {
     # --- C25: the fusion is composed in two stages, and the per-BRANCH weights are the pair
     # the sweep explores. Only their RATIO changes the order (scaling both preserves it, which
     # was measured), so the grid is one-dimensional and is expressed as rho = w_vec / w_lex.
-    "jpv_fusion_mode": "branch",
     "jpv_branch_weight_lexical": 0.5,
     "jpv_branch_weight_vector": 0.5,
-    # --- C21: the three flat weights. In `branch` mode the first two are the FIXED internal
-    # split of the lexical branch (stage 1) and the third is unused; in `flat` mode the three
-    # are the weights of one single-stage fusion, which is what the published baseline was
-    # measured under. They keep C21's values so that baseline stays reproducible.
-    "jpv_rrf_weight_typed": 0.5,
-    "jpv_rrf_weight_expanded": 0.5,
-    "jpv_rrf_weight_vector": 0.33,
 }
 
-#: The two fusion modes. `branch` composes in two stages and is the default; `flat` is C21's
-#: single-stage fusion over every list, kept selectable because the evaluation's published
-#: baseline row was measured under it and a configuration that can no longer be reproduced
-#: cannot serve as the row every other row is read against. Its retirement is `clean-plain-fusion`.
-FUSION_MODE_BRANCH = "branch"
-FUSION_MODE_FLAT = "flat"
-FUSION_MODES = (FUSION_MODE_BRANCH, FUSION_MODE_FLAT)
+# --- C25bis retired four knobs from this block, and the reasons were not the same for all four.
+#
+# `JPV_FUSION_MODE` selected between the two-stage composition and C21's single fusion over
+# every list. The second was kept selectable only so the published baseline row could be
+# re-measured; once that table was published and frozen it became a dead path whose arithmetic
+# the project had measured as defective, and a dead path that can be switched on by accident is
+# how a corrected defect returns.
+#
+# `JPV_RRF_WEIGHT_TYPED` and `JPV_RRF_WEIGHT_EXPANDED` were NOT dead — they were the internal
+# split of the lexical branch, on the live path. They went because the specification requires
+# the two to be equal and forbids sweeping them, so a setting could only ever be moved into
+# violation with nothing to detect it. A knob the rules forbid touching is worse than a dead
+# one: it looks like a decision. They now live as `LEXICAL_INTERNAL_WEIGHT` in the orchestrator,
+# and the move could not change a result because only stage one's ORDER reaches stage two.
+#
+# `JPV_RRF_WEIGHT_VECTOR` was the only one genuinely without a reader outside the retired path.
+#
+# A deployment that still exports any of the four has NO effect: they no longer exist, and the
+# service composes the one way it can. Nothing is added to make the boot fail over them —
+# what a run actually composed is recorded in the provenance of an evaluation run, which is
+# where a reader can act on it, rather than inferred from the environment somebody intended.
 
 #: C25 business-signal weights. Two weights, and they are NOT the same kind of number.
 #:
@@ -285,63 +291,6 @@ class Settings(BaseSettings):
             "JPV_RAG_LLM_*, JPV_INDEX_FEED_*, JPV_CATALOG_LLM_*, "
             "JPV_RETRIEVAL_DISTANCE_THRESHOLD and JPV_QUERY_EXPANSION_ENABLED. Not required "
             "to boot /health."
-        ),
-    )
-
-    jpv_rrf_weight_typed: float = Field(
-        default=FUSION_DEFAULTS["jpv_rrf_weight_typed"],
-        ge=0,
-        description=(
-            "C21 fusion weight of the lexical list built from the operator's own text "
-            "(JPV_RRF_WEIGHT_TYPED). Optional at boot; a blank export means unset and falls "
-            "back to the default. Together with JPV_RRF_WEIGHT_EXPANDED it sums to one, so "
-            "disabling the expansion — which makes the two lexical lists identical — degrades "
-            "to exactly one lexical list at full weight. Supplies only the DEFAULT: the effective value travels as a "
-            "parameter of the retrieval orchestration call, because C24 sweeps configurations "
-            "in one process. Not required to boot /health."
-        ),
-    )
-
-    jpv_rrf_weight_expanded: float = Field(
-        default=FUSION_DEFAULTS["jpv_rrf_weight_expanded"],
-        ge=0,
-        description=(
-            "C21 fusion weight of the lexical list built from C20's equivalence groups "
-            "(JPV_RRF_WEIGHT_EXPANDED). Optional at boot; a blank export means unset and "
-            "falls back to the default. See JPV_RRF_WEIGHT_TYPED for why the two sum to one. Not required to boot /health."
-        ),
-    )
-
-    jpv_rrf_weight_vector: float = Field(
-        default=FUSION_DEFAULTS["jpv_rrf_weight_vector"],
-        ge=0,
-        description=(
-            "C21 fusion weight of the vector list (JPV_RRF_WEIGHT_VECTOR). Optional at boot; "
-            "a blank export means unset and falls back to the default. Deliberately BELOW "
-            "either lexical weight, and this is the default easiest to undo by accident: "
-            "giving the branches an equal say was measured as the WORST fused configuration "
-            "of those tried, because the distance threshold passes essentially the whole "
-            "corpus and the vector branch therefore returns a full list whether or not it "
-            "understood the query — a branch that always fills its list always votes at full "
-            "strength. Raising it back towards parity measurably sinks queries the lexical "
-            "branch gets right. The swept figures are in the C21 report. Not required to "
-            "boot /health."
-        ),
-    )
-
-    jpv_fusion_mode: str = Field(
-        default=FUSION_DEFAULTS["jpv_fusion_mode"],
-        description=(
-            "C25 how the ranked lists are composed (JPV_FUSION_MODE): 'branch' fuses the two "
-            "lexical lists into one and then fuses that against the vector list under the "
-            "per-branch weights; 'flat' is C21's single fusion over all three. Optional at "
-            "boot; a blank export means unset and falls back to the default. 'branch' is the "
-            "default because the flat mode does not fuse, it CONCATENATES: measured, with the "
-            "C21 weights the sixty lexical documents outscore the vector branch's best hit in "
-            "every query, so a document the vector branch ranks first lands at position 33. "
-            "'flat' stays selectable because the published baseline was measured under it. "
-            "Supplies only the DEFAULT: the effective value travels as a parameter of the "
-            "retrieval orchestration call. Not required to boot /health."
         ),
     )
 
@@ -677,11 +626,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "jpv_rrf_k",
-        "jpv_rrf_weight_typed",
-        "jpv_rrf_weight_expanded",
-        "jpv_rrf_weight_vector",
         "jpv_branch_depth",
-        "jpv_fusion_mode",
         "jpv_branch_weight_lexical",
         "jpv_branch_weight_vector",
         mode="before",
@@ -712,19 +657,6 @@ class Settings(BaseSettings):
         """A blank export means "unset". Read as 0 it would silently drop a signal."""
         if isinstance(value, str) and not value.strip():
             return BUSINESS_DEFAULTS[str(info.field_name)]
-        return value
-
-    @field_validator("jpv_fusion_mode")
-    @classmethod
-    def known_fusion_mode(cls, value: str) -> str:
-        """An unknown mode fails at boot rather than silently selecting one of the two.
-
-        The two modes produce different orderings, so a typo that fell back to a default
-        would publish an evaluation row under a fusion nobody chose — the exact confusion
-        the mode is recorded in the provenance to prevent.
-        """
-        if value not in FUSION_MODES:
-            raise ValueError(f"unknown fusion mode {value!r}, expected one of {FUSION_MODES}")
         return value
 
 

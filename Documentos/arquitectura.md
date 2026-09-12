@@ -431,10 +431,11 @@ joiabagur-pv/
 │   │   │                                #   degradan (filters) y caché acotado del singleton (cache)
 │   │   │                                # + C22 alcance por punto de venta (projection)
 │   │   │                                # + C24 desempate determinista en las dos sentencias
-│   │   │                                # + C25 fusión en dos etapas con pesos por rama (la plana
-│   │   │                                #   queda seleccionable), ponderación por cobertura, señal de
-│   │   │                                #   POS que lee sin restringir, score de negocio en el último
-│   │   │                                #   bloque y abstención relativa por consulta (abstention)
+│   │   │                                # + C25 fusión en dos etapas con pesos por rama (C25bis
+│   │   │                                #   retiró la plana y los pesos por lista), ponderación por
+│   │   │                                #   cobertura, señal de POS que lee sin restringir, score
+│   │   │                                #   de negocio en el último bloque y abstención relativa
+│   │   │                                #   por consulta (abstention)
 │   │   ├── families/                    # C18a agrupador + C18b auditoría de familias persistidas; offline
 │   │   ├── knowledge/                   # C23 segundo índice: corpus, troceado, indexador y búsqueda con citas
 │   │   ├── evals/                       # C24 arnés de evaluación: golden set, pooling, métricas, líneas

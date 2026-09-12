@@ -9,7 +9,7 @@ from uuid import UUID
 
 import pytest
 
-from jbg_ai.evals.configs import load_config
+from jbg_ai.evals.configs import ABLATION_ORDER, load_config
 from jbg_ai.evals.golden import load_golden_set
 from jbg_ai.evals.metrics import (
     aggregate,
@@ -377,30 +377,27 @@ def test_an_exhausted_top_hit_costs_the_operational_reading_and_not_the_graded_o
     assert mixed.ndcg_at_5 == stocked.ndcg_at_5, "and must not cost the graded one"
 
 
-def test_baseline_row_is_still_selectable_and_reproducible() -> None:
-    """The published baseline keeps its configuration after C25 moved the default.
+def test_the_baseline_row_is_archived_rather_than_selectable() -> None:
+    """C25bis replaced reproducibility with conservation, and declared the trade.
 
-    `v2-hibrido` pins `fusion: flat` explicitly. If it followed the new default instead, the
-    table would lose the row every other row is read against and would silently gain a second
-    copy of `v2b-fusion`.
+    `v2-hibrido` was measured under the single-stage composition. That composition was retired
+    for having been measured as defective, so the row can no longer be re-run — and the harness
+    does NOT restate the retired pipeline to keep it runnable, because a harness that restates
+    a pipeline measures the restatement.
+
+    What is guaranteed instead is that the row stays CITABLE: its figures and provenance in the
+    published report, its per-query detail in the run JSONL, and the configuration it was
+    measured under in `evals/configs/retired/`. `test_the_retired_baseline_config_no_longer_
+    loads` pins the last of the three.
+
+    The row that isolates the fusion keeps every knob it shared with the baseline, so the
+    comparison the published table records stays legible.
     """
-    baseline = load_config("v2-hibrido")
-
-    assert baseline.fusion == "flat", "the baseline must pin the fusion it was measured under"
-    assert baseline.weight_typed == 0.5
-    assert baseline.weight_expanded == 0.5
-    assert baseline.weight_vector == 0.33, "C21's vector weight, unchanged"
-    assert baseline.rrf_k == 60 and baseline.branch_depth == 60
-    # It reads no business signal, so it cannot be quietly reordered by one.
-    assert baseline.signal_pos_id is None
-    assert baseline.business_weight_availability is None
-
-    # And the row that isolates the fusion differs from it in the composition alone.
     fusion_row = load_config("v2b-fusion")
-    assert fusion_row.fusion == "branch"
-    assert fusion_row.pos_prefilter == baseline.pos_prefilter
-    assert fusion_row.branch_depth == baseline.branch_depth
-    assert fusion_row.rrf_k == baseline.rrf_k
+
+    assert "v2-hibrido" not in ABLATION_ORDER, "archived rows are cited, not run"
+    assert fusion_row.rrf_k == 60 and fusion_row.branch_depth == 60
+    assert fusion_row.pos_prefilter is False
     assert fusion_row.signal_pos_id is None, "v2b isolates the fusion, with no signals"
 
 
@@ -419,7 +416,7 @@ def test_the_signals_row_declares_its_reading_scope_and_its_weight() -> None:
     assert not hasattr(signals, "business_weight_rotation")
     # It is built on v2b, so the fusion must be the same one.
     fusion_row = load_config("v2b-fusion")
-    assert signals.fusion == fusion_row.fusion
+    # `fusion` is gone as a key: one composition exists, so the two rows cannot differ in it.
     assert signals.branch_weight_lexical == fusion_row.branch_weight_lexical
     assert signals.branch_weight_vector == fusion_row.branch_weight_vector
     assert signals.coverage_rule == fusion_row.coverage_rule
