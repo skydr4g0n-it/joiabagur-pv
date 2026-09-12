@@ -93,11 +93,15 @@ def test_terms_are_joined_so_that_matching_any_of_them_is_enough() -> None:
 
 
 def test_every_configuration_loads_and_the_table_is_in_order() -> None:
-    """Seven rows after C25, and the order is the reading order of the table.
+    """Six rows after C25bis, and the order is the reading order of the table.
 
-    `v2b-fusion` and `v3-senales` are the two the change adds, and they sit AFTER the
-    baseline they are read against. Without `v2b` an improvement in `v3` could belong to the
-    fusion or to the signals and nobody could attribute it.
+    `v2b-fusion` and `v3-senales` were added by C25, and they sit in the order they are read
+    in. Without `v2b` an improvement in `v3` could belong to the fusion or to the signals and
+    nobody could attribute it.
+
+    `v2-hibrido` left this tuple with C25bis. It was measured under a composition that no
+    longer exists, so it is no longer a row that can be run — it is a citation, archived with
+    its figures, its provenance and the configuration it was measured under.
     """
     configs = load_all()
 
@@ -121,6 +125,29 @@ def test_the_zero_cost_baselines_record_zero_and_not_an_absent_value() -> None:
     cost = 0.0 if not load_config("v0-fts").uses_provider else None
     assert cost == 0.0
     assert prices.cost("openai/text-embedding-3-small", input_tokens=0) == 0.0
+
+
+def test_the_retired_baseline_config_no_longer_loads() -> None:
+    """The published baseline's configuration is a RECORD, not a choice. C25bis D-E.
+
+    It is preserved because the published report carries the label, the provenance and the
+    figures but not the knob values: this file is the only artefact where the configuration
+    itself lives. It sits outside `evals/configs/` because the loader globs that directory
+    without recursing, so its inertness is structural rather than a naming convention.
+
+    And loading it must FAIL, naming what no longer exists. That is the same guard that stops
+    a misspelt knob from producing a row which measured something else — exercised here
+    against the one file that is supposed to trip it.
+    """
+    from jbg_ai.evals.configs import CONFIG_DIR
+
+    retired = CONFIG_DIR / "retired"
+
+    assert (retired / "v2-hibrido.yaml").is_file(), "the archived configuration must survive"
+    assert "v2-hibrido" not in {item.id for item in load_all()}, "and must not be runnable"
+
+    with pytest.raises(ConfigurationError, match="unknown keys"):
+        load_config("v2-hibrido", directory=retired)
 
 
 def test_a_misspelt_knob_is_refused_instead_of_silently_ignored() -> None:
@@ -159,22 +186,23 @@ def test_the_prices_carry_their_date_and_source() -> None:
 
 def test_only_a_hybrid_row_records_a_fusion_mode() -> None:
     """The provenance names how a row composed its lists, so a row that composed nothing must
-    say so. Defaulting the four non-fusing rows to the live mode would print a composition
-    rule on the degraded baselines and on the single-branch vector row, and the column would
-    stop meaning what it says. `v2-hibrido` pins `flat` because it reproduces the published
-    baseline; it is the reason the mode is provenance at all."""
-    from jbg_ai.evals.execute import harness_settings
-    from jbg_ai.evals.provenance import NO_FUSION
+    say so. Defaulting the four non-fusing rows to the live composition would print a rule on
+    the degraded baselines and on the single-branch vector row, and the column would stop
+    meaning what it says.
+
+    C25bis retired the choice and kept the record: the value now comes from a module constant
+    rather than from a setting, and this function survives because deciding that a row fuses
+    NOTHING is still a real decision."""
+    from jbg_ai.evals.provenance import BRANCH_FUSION, NO_FUSION
     from jbg_ai.evals.runner import _fusion_mode_of
 
-    settings = harness_settings(requires_database=False)
     modes = {
-        name: _fusion_mode_of(load_config(name), settings)
-        for name in ("v0-nombre", "v0-fts", "v1-vectorial", "v2-hibrido", "v2b-fusion")
+        name: _fusion_mode_of(load_config(name))
+        for name in ("v0-nombre", "v0-fts", "v1-vectorial", "v2b-fusion", "v3-senales")
     }
 
     assert modes["v0-nombre"] == NO_FUSION
     assert modes["v0-fts"] == NO_FUSION
     assert modes["v1-vectorial"] == NO_FUSION
-    assert modes["v2-hibrido"] == "flat"
-    assert modes["v2b-fusion"] == "branch"
+    assert modes["v2b-fusion"] == BRANCH_FUSION
+    assert modes["v3-senales"] == BRANCH_FUSION

@@ -108,7 +108,7 @@ def _embed() -> FrozenEmbeddingClient:
 async def _run_once(tmp_path: Path):
     golden = _golden(tmp_path)
     return await run_config(
-        load_config("v2-hibrido"),
+        load_config("v2b-fusion"),
         golden,
         settings=build_settings(
             stub_mode=False, jpv_embedding_model="openai/text-embedding-3-small"
@@ -118,7 +118,7 @@ async def _run_once(tmp_path: Path):
         prices=load_prices(),
         provenance=Provenance(
             golden_set_version=golden.version,
-            config_id="v2-hibrido",
+            config_id="v2b-fusion",
             index_set_hash="0" * 64,
             embedding_model_version_key="openai/text-embedding-3-small:1536",
             git_sha="a03b4ad",
@@ -208,7 +208,7 @@ def test_a_persisted_report_can_be_read_back_through_the_repository(
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     rows = asyncio.run(_round_trip())
 
-    assert [row["suite"] for row in rows] == ["v2-hibrido"]
+    assert [row["suite"] for row in rows] == ["v2b-fusion"]
     assert rows[0]["status"] == "completed"
     assert any(metric["name"] == "global.ndcg_at_5" for metric in rows[0]["metrics"])
 
@@ -272,7 +272,7 @@ def test_the_zero_cost_baselines_are_persisted_like_any_other_row(
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     rows = asyncio.run(_round_trip())
 
-    assert sorted(row["suite"] for row in rows) == ["v0-fts", "v2-hibrido"]
+    assert sorted(row["suite"] for row in rows) == ["v0-fts", "v2b-fusion"]
     costs = {
         row["suite"]: next(
             metric["value"]
@@ -292,4 +292,4 @@ def test_the_zero_cost_baselines_are_persisted_like_any_other_row(
             ).all()
         )
     assert stored["v0-fts"] is None
-    assert stored["v2-hibrido"] is not None
+    assert stored["v2b-fusion"] is not None

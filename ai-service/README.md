@@ -66,9 +66,6 @@ Boundary rule: *Python computes similarity and writes prose; .NET computes numbe
 | `JPV_RETRIEVAL_DISTANCE_THRESHOLD` | no | `0.65` | C14 cosine-distance cutoff `(0, 2]`. Absence does not block `/health`; blank → the default. Distinct from `JPV_EMBEDDING_*` |
 | `JPV_QUERY_EXPANSION_ENABLED` | no | `true` | C20 query-side synonym expansion. Supplies only the **default**: the effective value travels as a parameter of the retrieval orchestration call, so C24 can sweep configurations in one process without restarting and without moving the frozen `openapi.json`. Default on because, measured on the live index, the lexical branch answers **nothing at all** without it for ordinary surface-form variants of catalogue vocabulary. Turning it off is also the rollback for C20. Absence does not block `/health`, which never loads the dictionary |
 | `JPV_RRF_K` | no | `60` | C21 smoothing constant of the reciprocal rank fusion; blank → the default. **Not independent of `JPV_BRANCH_DEPTH`**: `k` governs how slowly a document's vote decays as its rank grows, so a deeper branch keeps more of its tail voting and the two are swept together, never separately. Absence does not block `/health` |
-| `JPV_RRF_WEIGHT_TYPED` | no | `0.5` | C21 weight of the lexical list built from the operator's own text. With `JPV_RRF_WEIGHT_EXPANDED` it sums to one, so disabling the expansion — which makes the two lexical lists identical — degrades to exactly one lexical list at full weight. Supplies only the **default**: the effective value travels as a parameter of the orchestration call, for C24 |
-| `JPV_RRF_WEIGHT_EXPANDED` | no | `0.5` | C21 weight of the lexical list built from C20's equivalence groups. See `JPV_RRF_WEIGHT_TYPED` for why the two sum to one |
-| `JPV_RRF_WEIGHT_VECTOR` | no | `0.33` | C21 weight of the vector list, deliberately **below** either lexical weight and the default easiest to undo by accident. Measured, giving the branches an equal say is the **worst** fused configuration of those tried: the threshold passes essentially the whole corpus, so the vector branch returns a full list whether or not it understood the query, and a branch that always fills its list always votes at full strength. Raising it back towards parity measurably sinks queries the lexical branch gets right. Swept figures in the C21 report |
 | `JPV_BRANCH_DEPTH` | no | `60` | C21 depth at which **every** fused list is truncated before fusing; blank → the default. One value shared by all three: cutting the lexical branches deeper than the vector one was measured to cost accuracy rather than buy it. Conceptually distinct from the over-retrieval window the endpoint returns, which follows `top_k`, even where the two happen to share a default |
 | `JPV_POS_PREFILTER_ENABLED` | no | `true` | C22 point-of-sale prefilter. Supplies only the **default**: the effective value travels as a parameter of the orchestration call, so C24 can sweep configurations in one process. Default on because, probed against the live index, **most** points of sale were left with a very short result page on a large share of ordinary searches once .NET had dropped what they do not carry — worst case **one** surviving product, and one query with **none**. Figures in the C22 report. Turning it off is the rollback for C22: retrieval returns to pre-change behaviour with no deploy, and `ai.pos_projection` can stay populated because nothing else reads it. Absence does not block `/health` |
 | `JPV_POS_PROJECTION_MAX_AGE_SECONDS` | no | `3600` | C22 staleness ceiling of the projection. Above it the scope is **not** applied for that request, the degradation is logged and `projection_age_seconds` still reports the age: a stale projection may leave the page short, but it must never hide a valid product from the .NET authority that hydrates it. Deliberately generous — the sync cadence is a cron, so an hour degrades only under sustained failure and not under ordinary lateness; degrading eagerly would surrender the whole benefit of the change on any transient. Measured from `ai.sync_checkpoint.last_incremental_sync_at`, **never** from `ai.pos_projection.refreshed_at`, which records when an assignment last changed — the feed is incremental, so that column would report months on a projection synchronised seconds ago |
@@ -414,7 +411,7 @@ cd ai-service
 uv run evals validate                                  # the set alone: no database, no provider
 uv run evals freeze-vectors                            # once, against the real provider
 uv run evals run --all --repeat 3 [--persist]          # the ablation table
-uv run evals run --config v2-hibrido                   # one row
+uv run evals run --config v2b-fusion                   # one row
 uv run evals sweep                                     # phase A: the branch-weight ratio
 uv run evals capture                                   # phase B: persist one window per query
 uv run evals rescore                                   # phase C: the weight grid, offline
@@ -473,7 +470,7 @@ report](../Documentos/Proyecto%20Final%20AIEng/informes/c24-implementation-measu
 | `v0-fts` | the degraded Spanish full-text searcher | 0,454 | $0 |
 | `v0-cag` | the whole catalogue in the context, no retrieval | — | $0,00267 |
 | `v1-vectorial` | the vector branch alone | 0,548 | $0,0000002 |
-| `v2-hibrido` | what ships today | **0,603** | $0,0000002 |
+| `v2-hibrido` | the single-stage fusion of C21 — **historical**, see below | **0,603** | $0,0000002 |
 
 Read in two steps: tokenising Spanish buys **+0,372** and is free; semantic retrieval on top of
 that buys **+0,149**. And the verdict of the earlier rubric is **reversed** — it gave the vector
@@ -523,8 +520,39 @@ branch ranked **first** landed at **position 33**. It was an arithmetic defect, 
 calibrated weight. The fusion is now composed in **two stages** — the two lexical lists into one
 ranked list, that list against the vector one under per-**branch** weights — so a branch's total
 vote is exactly its declared weight however many of its own lists matched, and the lexical branch
-stops contributing 120 candidates against the vector branch's 60. `JPV_FUSION_MODE=flat` restores
-C21's single-stage fusion exactly, and the published baseline row pins it.
+stops contributing 120 candidates against the vector branch's 60.
+
+**That single-stage fusion no longer exists (C25bis).** C25 kept it selectable so its published
+baseline row could be re-measured; with the table published and the configuration frozen, what
+was left was a dead path that could be switched on by accident and whose arithmetic the project
+had measured as defective. It went, along with the per-list weights `JPV_RRF_WEIGHT_TYPED`,
+`_EXPANDED` and `_VECTOR` — the first two were still read, as the fixed internal split of the
+lexical branch, but the specification requires them to be equal and forbids sweeping them, so a
+setting could only ever be moved into violation with nothing to detect it. They are now one
+declared constant in the orchestrator, and the change could not move a figure because only stage
+one's **order** reaches stage two.
+
+**The baseline row `v2-hibrido` is therefore historical and not re-executable**, which is
+declared rather than disguised. Three artefacts keep it citable: the published figures and
+provenance in [`evals/results/c25-baselines-2026-09-11.md`](evals/results/c25-baselines-2026-09-11.md),
+the per-query detail in [`evals/results/runs/d91d4864-ba84-40a0-b78f-acb0c461108f.jsonl`](evals/results/runs/),
+and the configuration it was measured under in
+[`evals/configs/retired/v2-hibrido.yaml`](evals/configs/retired/v2-hibrido.yaml) — which no longer
+loads, by design. The harness does **not** restate the retired pipeline to keep the row runnable:
+a harness that restates a pipeline measures the restatement.
+
+Why it was retired is still demonstrable, and cannot be switched on: `test_the_flat_arithmetic_
+that_was_retired_buried_the_vector_leader` proves the burial over the fusion primitive alone,
+with the retired weights as literals local to the test. A number in a settings module is a
+configuration somebody can set; the same number in a test is a record of what was measured.
+
+**A deployment that still exports any of the four retired variables has no effect** and the boot
+does not fail over it. The asymmetry is deliberate: an ignored retired knob produces the *right*
+behaviour, so what is left is a mistaken belief rather than a mistaken result, and rejecting it
+would turn a harmless leftover into an outage. Where a stale knob *would* change a result is an
+evaluation configuration — it would publish a row that measured something else — and there it is
+refused by name. What a run actually composed is read from its recorded provenance, never from
+the environment somebody intended.
 
 **The lexical branch now weighs less when its best candidate matched less of the query.** The
 coordination tally had been computed, carried on every hit and read by nobody — the fourth

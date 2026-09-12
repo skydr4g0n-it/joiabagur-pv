@@ -14,9 +14,9 @@ uses_provider: true
 mode: vector
 expand_synonyms: true
 rrf_k: 60
-weight_typed: 0.5
-weight_expanded: 0.5
-weight_vector: 0.33
+# C25bis retiró de aquí `weight_typed`, `weight_expanded` y `weight_vector`. **No mueve esta
+# fila ni un puesto**: corre con `mode: vector`, o sea con la rama léxica apagada, así que las
+# listas que esos pesos gobernaban no llegaban a existir. Eran inertes antes de retirarse.
 branch_depth: 60
 pos_prefilter: false
 max_results: 60

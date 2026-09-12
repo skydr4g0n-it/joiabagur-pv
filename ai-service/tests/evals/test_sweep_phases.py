@@ -34,14 +34,10 @@ from jbg_ai.retrieval.filters import BusinessWeights
 
 def _fingerprint(**overrides) -> FusionFingerprint:
     values = dict(
-        mode="branch",
         rrf_k=60,
         branch_depth=60,
         branch_weight_lexical=0.5,
         branch_weight_vector=0.5,
-        weight_typed=None,
-        weight_expanded=None,
-        weight_vector=None,
         coverage_rule="continuous",
         expand_synonyms=True,
         signal_pos_id=None,
@@ -183,7 +179,6 @@ def test_window_captured_under_a_different_fusion_is_refused() -> None:
     check_fusion_matches(captured, _fingerprint())
 
     for field, value in (
-        ("mode", "flat"),
         ("rrf_k", 40),
         ("branch_depth", 40),
         ("branch_weight_vector", 0.4),

@@ -14,6 +14,26 @@
 
 Este documento se escribió antes de implementar. Cuando una sesión de diseño de un change concreto altera lo que su ficha decía, el cambio se registra aquí con fecha y motivo, y la ficha afectada se corrige en el sitio.
 
+### 2026-09-12 — C25bis implementado: el andamio retirado, y tres puntos de su propia ficha refutados
+
+**El borrado no movió nada, y está demostrado y no argumentado.** Dos corridas completas del arnés, una antes y otra después, sobre el mismo golden set (`1:198c4af44506`) y la misma huella de índice (`051a6b06021efc3f…`): **las 315 filas por consulta de las cinco configuraciones supervivientes son idénticas**, listas de resultados incluidas. El listón se había subido antes de medir de *«cifras idénticas»* a *«líneas idénticas»*, porque seis agregados iguales pueden esconder reordenaciones que se compensan. El **único** elemento de la procedencia que difiere es la revisión del código, que es precisamente la hipótesis bajo prueba, y la excepción se declaró por escrito y acotada. Suite: **994 → 997, con cero fallos a los dos lados** (−4 tests retirados, +7 añadidos).
+
+**La ficha de este change describía un inventario supuesto, y la regla D3 de su propio diseño exigía uno comprobado. Al comprobarlo, tres de sus afirmaciones resultaron falsas:**
+
+- *«los pesos por lista que sólo ella consumía»* — **falso**: `weight_typed` y `weight_expanded` alimentaban también la etapa 1 **viva**. Se retiran igualmente, pero por ser **trampas** —la spec exige que sean iguales y prohíbe barrerlas, así que una perilla así sólo podía moverse hacia la violación sin que nada lo detectase— y no por estar muertas. Sólo `weight_vector` carecía realmente de lector.
+- *«retirar la variante de ponderación adaptativa que perdió el barrido»* — **pata vacía**: la forma binaria se implementó y se retiró **dentro de C25**, y hay un test que falla si vuelve. Se declara cumplida y se comprueba.
+- *«que el arranque falle al nombrar una perilla retirada»* — **inalcanzable por el mecanismo supuesto y peor que el mal**: con `extra="ignore"`, pasar a `forbid` no caza variables de entorno, y un validador que barra el entorno convertiría un residuo inofensivo en un fallo de arranque. La obligación se acota a la configuración de evaluación, donde el daño es de **medición** —una fila que mide otra cosa— y no de creencia; y ahí la guarda **ya existía**, así que el escenario se cumplió con **cero código nuevo**. El precedente decide: `JPV_BUSINESS_WEIGHT_ROTATION` se retiró el 11 de septiembre con campo, default, fallback y validador propio, y no llevó guarda alguna.
+
+**El principio que el change deja escrito, y que resuelve la mitad de sus dudas:** *una perilla es algo que se puede poner; un registro es algo que se escribe.* De ahí salen que `Provenance.fusion_mode` **sobreviva al selector** —una corrida archivada bajo la composición retirada debe seguir declarándose no comparable—, que `POOLED` pierda `v2-hibrido` mientras `judgements.jsonl` lo conserva en `pooled_in`, y que no haga falta rechazar la entrada equivocada si el registro dice siempre lo que ocurrió de verdad.
+
+**Lo que se conserva de la fila de referencia.** Deja de ser ejecutable y pasa a ser **citable** con tres artefactos versionados: su informe, su JSONL por consulta y **su propia configuración**, movida a `evals/configs/retired/` —porque el informe publicado lleva etiqueta, procedencia y cifras pero **no los valores de las perillas**, y el YAML es el único sitio donde vive la configuración misma—. Su inercia es estructural y no convencional: el cargador hace `glob("*.yaml")` sin recursión. Y **por qué se retiró sigue siendo demostrable sin ser activable**: un test de aritmética pura sobre `fuse()`, con los pesos de C21 como literales locales, prueba que el peor documento léxico (`1,00/120 = 0,008333`) gana al mejor vectorial (`0,33/61 = 0,005410`) y que el #1 vectorial cae al puesto 33.
+
+**Dos hallazgos que el plan no preveía.** La guarda de claves desconocidas disparó contra **tres configuraciones congeladas** —`v1-vectorial` seguía nombrando los pesos por lista, `v2b` y `v3` fijaban `fusion: branch`—, y las tres claves eran **inertes**: `v1-vectorial` corre con la rama léxica apagada y `branch` era el default vivo. Y la comprobación de despliegue no encontró ninguna perilla retirada en `.env`, `terraform/` ni compose, pero sí en **`openspec/config.yaml`**, el contexto que todo agente carga primero, que además describía la fusión plana como seleccionable. Corregido.
+
+**Una cautela propia, refutada:** la exploración advirtió que la tabla publicada de C25 no servía como referencia por haberse tomado `+dirty`. Medido, la corrida previa la **reproduce fila por fila**. La comparación se hizo igualmente contra la corrida previa, porque lo que la hace válida es salir del mismo árbol y no que coincida.
+
+Informes en [`c25bis-exploration-decisions.md`](informes/c25bis-exploration-decisions.md) y [`c25bis-implementation-measurements.md`](informes/c25bis-implementation-measurements.md).
+
 ### 2026-09-12 — C25 archivado, y el andamio que deja abierto entra en el plan como `C25bis`
 
 **C25 pasa a hecho** y con él la cadena crítica arranca en **C26**. Recuento: **27 archivadas, 11 pendientes**. Al archivarse **nacen dos capacidades vivas** — `business-signals-ranking`, la disponibilidad como reordenación blanda calibrada contra el golden set, y `retrieval-abstention`, la regla que decide **si** contestar — y se modifican `hybrid-fusion`, `pos-projection` y `retrieval-evaluation`. Esta última **pierde** un requisito: cae el de C24 que congelaba el umbral de distancia, sustituido por el que permite re-fijar la regla bajo un criterio escrito antes de medir.
@@ -664,7 +684,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 | **C23** | `add-knowledge-corpus-and-indexer` | Python | C11 | 🟢 | **archivado el 6 sep** · *zona, alcance y conflicto de zona de la ficha refutados por la implementación* |
 | **C24** | `add-eval-harness-golden-set-and-baselines` | Python | C14, C21 | ✅ | **archivado el 2026-09-11** · dec. 12 respondida: la vectorial bate a la léxica · etiquetado simple |
 | **C25** | `recalibrate-ranking-and-abstention` | Python | C21, C22, C24 | ✅ | **archivado el 2026-09-12** · renombrado desde `add-business-signals-ranking`; **3 puntos de la ficha retirados por medición** y un defecto de C21 corregido: la fusión concatenaba |
-| **C25bis** | `clean-plain-fusion` | Python | C25 | 🟢 | **creado el 2026-09-11**, desbloqueado el 12 · *retira el andamio de C25: la fusión plana y las perillas sin lector* |
+| **C25bis** | `clean-plain-fusion` | Python | C25 | ✅ | **implementado el 2026-09-12**, 45/45 · *retiró la fusión plana y los tres pesos por lista; las 315 filas por consulta, idénticas* |
 | **C26** | `add-substitutes-retrieval` | Python | C22, C25 | 🟢 | specs v2 §6.3.2 |
 | **C27** | `add-complementary-recommendations` | Python + .NET 🗄️ | C10, C25 | 🟢 | **rev. dec. 8** · **corte nº 1 pre-autorizado** |
 | **C28** | `add-profile-review-ui-and-metrics` | Frontend + .NET | C08 | 🟢 | **rev. dec. 5** · *lo pide el checklist §16* |
@@ -1101,7 +1121,7 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ---
 
-#### C25bis · `clean-plain-fusion` 🟢 *(creado el 2026-09-11, desbloqueado el 12)*
+#### C25bis · `clean-plain-fusion` ✅ *(creado el 2026-09-11, desbloqueado e implementado el 12)*
 
 > **Fuera de la numeración C por el mismo motivo que `FIX1`** *(fijado el 11 sep)*. No sale de la descomposición original del proyecto sino de una **consecuencia de C25**, y darle un número C sugeriría que estaba planificado. Lleva ficha porque **exige change propio**: retira requisitos de dos specs vivas —`hybrid-fusion` y `retrieval-evaluation`— y la única vía sancionada para mover una spec viva es una delta dentro de un change.
 
@@ -1111,7 +1131,13 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 **Acepta un coste y lo declara.** La fila de la línea base deja de poder re-medirse y pasa a ser **histórica y citable** —su informe y su JSONL por consulta quedan versionados—, porque la alternativa era mantener vivo un camino medido como roto, y un camino muerto que se puede activar por error es cómo un defecto corregido regresa.
 **No re-mide nada y no tiene autoridad para mover una cifra.** Su criterio de verificación es que las filas supervivientes den cifras **idénticas** tras el borrado; cualquier diferencia es un fallo del change que se revierte, no un resultado que discutir.
 **Cuándo, y por qué ahí.** Sólo cuando la decisión de fusión esté congelada y publicada, y lo está desde el archivado de C25. No antes: mientras la tabla siga pudiendo re-correrse, la fila plana es la referencia y no el andamio. Es una **hoja** —no abre ninguna arista—, así que por la regla 2 del §1 cede el turno a C26, que sí desbloquea.
-**Estado.** Artefactos generados *(proposal, design, tasks y specs)*, **0/29 tareas**. Change [`clean-plain-fusion`](../../openspec/changes/clean-plain-fusion/).
+**Tres puntos de su ficha, refutados por comprobación y no por argumento** *(2026-09-12)*. Los pesos por lista **no** los consumía sólo el modo plano —dos de los tres alimentaban la etapa 1 viva, y se retiran por ser **trampas** que la spec prohíbe mover, no por estar muertos—; la **variante adaptativa perdedora no existe**, porque se retiró dentro de C25 y hay un test que falla si vuelve; y el **fallo al arranque** no es alcanzable con `extra="ignore"` y tendría más radio de daño que el defecto que previene, así que la obligación se acota a la configuración de evaluación, donde ya estaba implementada. Detalle en [`c25bis-exploration-decisions.md`](informes/c25bis-exploration-decisions.md).
+
+**Lo entregado.** Retirados `JPV_FUSION_MODE` y los tres pesos por lista; la etapa 1 queda con pesos **iguales declarados en el módulo**; `Provenance.fusion_mode` **se conserva** poblado desde constante —*el selector muere, el registro vive*—; `v2-hibrido.yaml` se mueve a `evals/configs/retired/` y deja de cargar, por diseño; y la aritmética del defecto sobrevive como **fósil en un test** sobre `fuse()`, que ninguna configuración puede alcanzar. Seis deltas de specs vivas, ninguna perdiendo escenarios sin decirlo.
+
+**Verificado con las cifras delante.** Las **315 filas** por consulta de las cinco configuraciones supervivientes son **idénticas** antes y después, listas de resultados incluidas; el único elemento de la procedencia que difiere es la revisión del código. Suite **994 → 997 con cero fallos** a los dos lados. Sin migración, sin contrato, sin diff fuera de `ai-service/`, `Documentos/` y `openspec/`.
+
+**Estado.** **45/45 tareas**, pendiente de verificar y archivar. Change [`clean-plain-fusion`](../../openspec/changes/clean-plain-fusion/) · informe en [`c25bis-implementation-measurements.md`](informes/c25bis-implementation-measurements.md).
 
 ---
 

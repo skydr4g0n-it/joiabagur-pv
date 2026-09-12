@@ -114,10 +114,9 @@ def test_health_boots_and_answers_without_the_fusion_settings(
 
     for name in (
         "JPV_RRF_K",
-        "JPV_RRF_WEIGHT_TYPED",
-        "JPV_RRF_WEIGHT_EXPANDED",
-        "JPV_RRF_WEIGHT_VECTOR",
         "JPV_BRANCH_DEPTH",
+        "JPV_BRANCH_WEIGHT_LEXICAL",
+        "JPV_BRANCH_WEIGHT_VECTOR",
     ):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("APP_ENV", "test")
@@ -128,8 +127,8 @@ def test_health_boots_and_answers_without_the_fusion_settings(
 
     settings = get_settings()
     assert settings.jpv_rrf_k == 60
-    assert settings.jpv_rrf_weight_vector == 0.33
     assert settings.jpv_branch_depth == 60
+    assert settings.jpv_branch_weight_vector == 0.5
 
     load_query_dictionary.cache_clear()
     with TestClient(create_app(settings)) as client:

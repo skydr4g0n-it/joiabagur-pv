@@ -761,30 +761,24 @@ def _buried_corpus(decoy_word: str, *, decoys: int = 60):
 def test_vector_top_hit_reaches_the_top_five_without_lexical_consensus(
     query: str, decoy_word: str
 ) -> None:
-    """The correction, stated as the property the baseline fails. C25 D5.
+    """The correction, stated as the property the baseline failed. C25 D5.
 
-    Under the flat fusion the sixty lexical documents outscore the vector branch's best hit
-    every time, so the document lands behind all of them. Under the two-stage fusion each
-    branch holds one vote and the best hit of each takes one of the first two places.
+    Under the retired single-stage fusion the sixty lexical documents outscored the vector
+    branch's best hit every time, so the document landed behind all of them. Under the
+    two-stage composition each branch holds one vote and the best hit of each takes one of the
+    first two places.
+
+    C25bis removed the second arm — serving the same corpus under the retired composition to
+    witness the burial. That contrast now lives where it cannot be switched on: as pure
+    arithmetic over `fuse()` in `test_the_flat_arithmetic_that_was_retired_buried_the_vector_
+    leader`. What is asserted here is the property in force, which is what this test is for.
     """
     payload = _request(query=query, top_k=5)
 
     branch = _serve(FakeProductSearch(_buried_corpus(decoy_word)), payload=payload)
-    flat = _serve(
-        FakeProductSearch(_buried_corpus(decoy_word)),
-        payload=payload,
-        fusion="flat",
-        weight_typed=0.5,
-        weight_expanded=0.5,
-        weight_vector=0.33,
-    )
 
     top_five = [item.sku for item in branch.results[:5]]
     assert "vector-top-hit" in top_five, f"buried under the two-stage fusion: {top_five}"
-    assert "vector-top-hit" not in [item.sku for item in flat.results[:5]], (
-        "the flat mode is supposed to bury it — if it no longer does, the baseline row "
-        "has changed and the comparison this change rests on is gone"
-    )
 
 
 def test_branch_vote_is_independent_of_how_many_of_its_lists_matched() -> None:
@@ -806,7 +800,6 @@ def test_branch_vote_is_independent_of_how_many_of_its_lists_matched() -> None:
         k=60,
         depth=60,
         branch_weights=(0.5, 0.5),
-        internal_weights=(0.5, 0.5),
     )
     one_list_only = _fuse_two_stage(
         [],
@@ -815,7 +808,6 @@ def test_branch_vote_is_independent_of_how_many_of_its_lists_matched() -> None:
         k=60,
         depth=60,
         branch_weights=(0.5, 0.5),
-        internal_weights=(0.5, 0.5),
     )
 
     def position_of(fused) -> int:
@@ -850,7 +842,6 @@ def test_multi_list_branch_contributes_no_more_candidates_than_a_single_list_one
         k=60,
         depth=60,
         branch_weights=(0.5, 0.5),
-        internal_weights=(0.5, 0.5),
     )
 
     from_lexical = [item for item in fused if LEXICAL_BRANCH_LIST in item.ranks]
@@ -860,40 +851,38 @@ def test_multi_list_branch_contributes_no_more_candidates_than_a_single_list_one
     assert len(from_lexical) == len(from_vector) == 60
 
 
-def test_low_confidence_means_the_same_under_both_fusion_modes() -> None:
+def test_low_confidence_means_branch_disagreement_and_not_list_disagreement() -> None:
     """Stage 2 has exactly two lists, and they are exactly the two branches. C25 D5(c).
 
-    Under the flat fusion, `len(reasons) > 1` needed a written nuance: a candidate seen by
-    both LEXICAL lists is not cross-branch, because with the expansion disabled the two lists
-    are identical and every lexical hit would qualify. Under the two-stage fusion the nuance
-    is structural rather than explained — the lexical branch presents ONE list — so the
-    signal cannot drift back to meaning "two lists agreed".
+    Under the retired single-stage fusion, `len(reasons) > 1` needed a written nuance: a
+    candidate seen by both LEXICAL lists is not cross-branch, because with the expansion
+    disabled the two lists are identical and every lexical hit would qualify. With one
+    composition left the nuance is STRUCTURAL rather than explained — the lexical branch
+    presents one list — so the signal cannot drift back to meaning "two lists agreed".
 
-    The requirement is unchanged, so the behaviour must be unchanged too.
+    C25bis removed the second arm of this test with the mode it exercised. What it protected
+    survives, and survives better: the property is now enforced by the shape of the code
+    instead of by a comparison between two compositions.
     """
     agreeing = [_row(A, "both", 0.1)]
     disagreeing = [_blind_row(B, "vector-only", 0.1), _row(C, "lexical-only", 0.9)]
-    flat = dict(fusion="flat", weight_typed=0.5, weight_expanded=0.5, weight_vector=0.33)
 
     for rows, expected in ((agreeing, False), (disagreeing, True)):
-        branch_mode = _serve(FakeProductSearch(list(rows)))
-        flat_mode = _serve(FakeProductSearch(list(rows)), **flat)
-        assert branch_mode.low_confidence is expected
-        assert flat_mode.low_confidence is expected, "the signal changed meaning with the mode"
+        assert _serve(FakeProductSearch(list(rows))).low_confidence is expected
 
 
 def test_a_candidate_seen_by_both_lexical_lists_alone_is_not_cross_branch() -> None:
-    """The nuance that justified the rule, now witnessed under the live fusion.
+    """The nuance that justified the rule, witnessed under the live fusion.
 
     `both-lexical-lists` matches the operator's literal text AND the equivalence groups, and
-    the vector branch cannot see it. It must NOT count as consensus, in either mode.
+    the vector branch cannot see it. It must NOT count as consensus.
     """
     rows = [_row(A, "both-lexical-lists", 0.9)]  # above threshold: the vector branch is blind
 
-    for kwargs in ({}, dict(fusion="flat", weight_typed=0.5, weight_expanded=0.5, weight_vector=0.33)):
-        response = _serve(FakeProductSearch(list(rows)), **kwargs)
-        assert response.low_confidence is True, "two lexical lists are not two branches"
-        assert [item.sku for item in response.results] == ["both-lexical-lists"]
+    response = _serve(FakeProductSearch(list(rows)))
+
+    assert response.low_confidence is True, "two lexical lists are not two branches"
+    assert [item.sku for item in response.results] == ["both-lexical-lists"]
 
 
 # --------------------------------------------------------------------------------------

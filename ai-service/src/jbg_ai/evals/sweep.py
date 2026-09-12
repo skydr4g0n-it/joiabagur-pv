@@ -323,14 +323,16 @@ class FusionFingerprint:
     second phase can run offline.
     """
 
-    mode: str
+    #: `mode` and the three per-list weights left this fingerprint with C25bis: one composition
+    #: exists and no per-list weight does, so neither can differ between a capture and a
+    #: re-score. A capture file written before that change no longer loads here, which is the
+    #: correct outcome — its window was produced under a composition the code cannot reproduce,
+    #: and re-scoring it would rank a window the live fusion no longer produces. Captures are
+    #: not versioned artefacts: re-run the capture phase.
     rrf_k: int
     branch_depth: int
     branch_weight_lexical: float
     branch_weight_vector: float
-    weight_typed: float | None
-    weight_expanded: float | None
-    weight_vector: float | None
     coverage_rule: str
     expand_synonyms: bool | None
     signal_pos_id: str | None
@@ -340,7 +342,6 @@ class FusionFingerprint:
     def of(cls, config: EvalConfig, settings: Settings) -> "FusionFingerprint":
         """Resolve every knob to its EFFECTIVE value, so two equivalent configurations match."""
         return cls(
-            mode=config.fusion or settings.jpv_fusion_mode,
             rrf_k=config.rrf_k if config.rrf_k is not None else settings.jpv_rrf_k,
             branch_depth=(
                 config.branch_depth
@@ -357,9 +358,6 @@ class FusionFingerprint:
                 if config.branch_weight_vector is not None
                 else settings.jpv_branch_weight_vector
             ),
-            weight_typed=config.weight_typed,
-            weight_expanded=config.weight_expanded,
-            weight_vector=config.weight_vector,
             coverage_rule=config.coverage_rule or COVERAGE_CONTINUOUS_RULE,
             expand_synonyms=config.expand_synonyms,
             signal_pos_id=config.signal_pos_id,
@@ -644,10 +642,6 @@ async def capture(
             search=search,
             expand_synonyms=config.expand_synonyms,
             rrf_k=config.rrf_k,
-            weight_typed=config.weight_typed,
-            weight_expanded=config.weight_expanded,
-            weight_vector=config.weight_vector,
-            fusion=config.fusion,
             branch_weight_lexical=config.branch_weight_lexical,
             branch_weight_vector=config.branch_weight_vector,
             coverage_rule=config.coverage_rule or COVERAGE_CONTINUOUS_RULE,

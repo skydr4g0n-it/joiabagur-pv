@@ -1,0 +1,53 @@
+# ============================================================================================
+# RETIRADA — HISTÓRICA Y NO EJECUTABLE. Retirada por C25bis (`clean-plain-fusion`).
+#
+# Este fichero NO es una configuración: es el REGISTRO de bajo qué valores exactos se midió la
+# fila de referencia de la tabla de ablations. Nombra `fusion` y los tres pesos por lista, que
+# ya no existen, así que cargarlo falla nombrándolos — y eso es lo correcto, no un defecto.
+#
+# Vive fuera de `evals/configs/` porque el cargador hace `glob("*.yaml")` NO recursivo: la
+# inercia es estructural y no un acuerdo sobre nombres de fichero.
+#
+# Se conserva porque el informe publicado lleva la etiqueta, la procedencia y las cifras, pero
+# NO los valores de las perillas: éste es el único artefacto donde vive la configuración misma.
+#
+#   cifras y procedencia : ../../results/c25-baselines-2026-09-11.md
+#   detalle por consulta : ../../results/runs/d91d4864-ba84-40a0-b78f-acb0c461108f.jsonl
+#
+# La fila deja de poder re-medirse porque la composición que la produjo se midió como
+# defectuosa: con estos pesos, los sesenta documentos léxicos ganan al mejor candidato
+# vectorial en toda consulta. La demostración de esa aritmética sobrevive como test puro sobre
+# `fuse()`, donde ninguna configuración puede alcanzarla.
+# ============================================================================================
+
+# Lo que se desplegaba entonces: el pipeline fusionado con los defaults de C21.
+#
+# `pos_prefilter` is off, and this is the one place the configuration departs from production.
+# The golden set is labelled UNSCOPED, a decision taken in C22 so that retrieval quality and
+# assortment coverage are not measured as one number. The consequence is declared rather than
+# hidden: what the prefilter costs in recall is not measured by this change.
+id: v2-hibrido
+kind: pipeline
+label: "Híbrido (configuración viva)"
+rationale: >-
+  El orquestador vivo con los defaults de C21: expansión activa, fusión RRF de las tres listas
+  con wC=0,33 y profundidad 60. Es la fila contra la que se leen todas las demás.
+uses_provider: true
+mode: hybrid
+expand_synonyms: true
+# `fusion: flat` is pinned EXPLICITLY and is the point of this row after C25. The live
+# default is the two-stage fusion; this row is the published baseline and must keep being
+# measured under the single-stage one it was measured under. Following the default here
+# would silently turn the reference row into a second copy of `v2b-fusion`.
+fusion: flat
+# Y la abstencion apagada, por la misma razon que la fusion plana: esta fila reproduce la
+# configuracion publicada ANTES de C25, y la regla de abstencion no existia entonces. Sin
+# esto la fila marcaria una tasa de abstencion que C24 nunca midio.
+abstain: false
+rrf_k: 60
+weight_typed: 0.5
+weight_expanded: 0.5
+weight_vector: 0.33
+branch_depth: 60
+pos_prefilter: false
+max_results: 60

@@ -157,7 +157,12 @@ def _validate(_args: argparse.Namespace) -> int:
 async def _sweep(args: argparse.Namespace) -> int:
     from jbg_ai.db.engine import dispose_engine
     from jbg_ai.evals.execute import build_search, harness_settings
-    from jbg_ai.evals.provenance import Provenance, current_git_sha, index_set_hash
+    from jbg_ai.evals.provenance import (
+        BRANCH_FUSION,
+        Provenance,
+        current_git_sha,
+        index_set_hash,
+    )
     from jbg_ai.evals.runner import corpus_snapshot
     from jbg_ai.evals.sweep import decide, sweep
     from jbg_ai.evals.vectors import FrozenEmbeddingClient
@@ -174,7 +179,7 @@ async def _sweep(args: argparse.Namespace) -> int:
         index_set_hash=index_set_hash(ids),
         embedding_model_version_key=embed.model_version_key,
         git_sha=current_git_sha(),
-        fusion_mode=config.fusion or settings.jpv_fusion_mode,
+        fusion_mode=BRANCH_FUSION,
     )
     baseline, candidates = await sweep(
         config,

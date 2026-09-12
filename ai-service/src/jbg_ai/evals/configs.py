@@ -12,9 +12,12 @@ and that question has no answer unless what she had is in the table.
   reading of the table: how much of the gain is tokenising Spanish, which is free, and how much
   is semantic retrieval, which is not.
 * `v0-cag` — the whole catalogue in the model's context, no retrieval. Bounded and dated.
-* `v1-vectorial` / `v2-hibrido` — the live orchestrator, parameterised. Not a copy of it: a
-  harness that re-implemented the pipeline would measure the copy, which is the subtle form of
-  the mistake the offline stand-in embedder made in the previous change.
+* `v1-vectorial` / `v2b-fusion` / `v3-senales` — the live orchestrator, parameterised. Not a
+  copy of it: a harness that re-implemented the pipeline would measure the copy, which is the
+  subtle form of the mistake the offline stand-in embedder made in an earlier change. That rule
+  is also why `v2-hibrido` is not kept runnable here now that its composition is gone:
+  restating a retired pipeline inside the harness to preserve a row would measure the
+  restatement. The row survives as an archived artefact instead.
 
 A configuration is a file so that adding one — a reranker, say — is a YAML plus a run rather
 than a patch, which is what makes the reranking protocol executable instead of rhetorical.
@@ -42,12 +45,17 @@ KIND_CONTEXT_ONLY = "context-only"
 KINDS = (KIND_NAME_SUBSTRING, KIND_FULL_TEXT, KIND_PIPELINE, KIND_CONTEXT_ONLY)
 
 #: The order the ablation table is read in, from what existed before to what ships today.
+#:
+#: `v2-hibrido` left this tuple with C25bis. It was the published baseline row, and it was
+#: measured under a composition that no longer exists, so it is no longer a row that can be
+#: run: it is a CITATION. Its figures, its provenance and the configuration it was measured
+#: under are versioned — the report and the per-query JSONL in `evals/results/`, the YAML in
+#: `evals/configs/retired/` — and every citation of it says historical and not re-executable.
 ABLATION_ORDER = (
     "v0-nombre",
     "v0-fts",
     "v0-cag",
     "v1-vectorial",
-    "v2-hibrido",
     "v2b-fusion",
     "v3-senales",
 )
@@ -56,11 +64,15 @@ ABLATION_ORDER = (
 #: judgement pool. `v0-cag` does not: it answers in prose over a context window, so there is no
 #: list of its own to pool, and pooling from it would put documents in the set that no
 #: retriever ever ranked.
+#:
+#: This tuple says who ENTERS the next pooling run, which is not the same question as who
+#: entered the last one. `judgements.jsonl` keeps naming `v2-hibrido` in the `pooled_in` of
+#: every document it contributed, and that is correct and must not be edited: the tuple is a
+#: knob, the judgement is a record.
 POOLED = (
     "v0-nombre",
     "v0-fts",
     "v1-vectorial",
-    "v2-hibrido",
     "v2b-fusion",
     "v3-senales",
 )
@@ -80,13 +92,11 @@ class EvalConfig:
     mode: str | None = None
     expand_synonyms: bool | None = None
     rrf_k: int | None = None
-    weight_typed: float | None = None
-    weight_expanded: float | None = None
-    weight_vector: float | None = None
-    #: C25. `fusion` selects the composition: 'branch' (two stages, the live default) or
-    #: 'flat' (C21's single stage). The baseline row pins 'flat' explicitly, because a row
-    #: that silently followed the default would stop being the row it was measured as.
-    fusion: str | None = None
+    #: C25bis retired `fusion`, `weight_typed`, `weight_expanded` and `weight_vector`. There is
+    #: one composition and no per-list weights, so a configuration naming any of them now fails
+    #: the unknown-key check below rather than quietly producing a row that measured something
+    #: else. `evals/configs/retired/v2-hibrido.yaml` is exactly such a file, kept as the record
+    #: of what the published baseline was measured under — and it no longer loads, by design.
     branch_weight_lexical: float | None = None
     branch_weight_vector: float | None = None
     #: C25 coverage rule: `continuous` (adopted) or `none` (the control arm, and the rollback).
