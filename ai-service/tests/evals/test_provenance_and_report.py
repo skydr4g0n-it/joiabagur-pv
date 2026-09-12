@@ -91,15 +91,26 @@ def test_an_unavailable_revision_is_recorded_as_unknown_and_never_guessed() -> N
 
 
 def test_the_fusion_mode_is_recorded_in_the_provenance() -> None:
-    """The spec asks for it by name: the flat fusion stays selectable, so the mode is no longer
-    implied by the revision and two runs of one configuration can compose their lists two ways.
+    """Recorded although nothing can select it. C25bis.
+
+    C25 made the composition the sixth element because the single-stage fusion was selectable,
+    so two runs of one configuration at one revision could compose their lists two ways. C25bis
+    retired that choice — and the element stays, because selecting and recording are different
+    things: a run must declare what it actually composed, and an archived run under the retired
+    composition must stay distinguishable from a current one.
     """
-    assert _provenance().as_dict()["fusion_mode"] == "branch"
+    from jbg_ai.evals.provenance import BRANCH_FUSION
+
+    assert _provenance().as_dict()["fusion_mode"] == BRANCH_FUSION
 
 
 def test_two_runs_that_fused_differently_are_not_comparable() -> None:
-    """Same golden set, same index, same revision, same configuration — and different numbers,
-    because the flat mode concatenates where the branch mode fuses. Naming it is the point."""
+    """The archived baseline against a current row — which is now the case that matters.
+
+    Same golden set, same index, same revision, same configuration, and different numbers,
+    because the retired single-stage composition concatenated where the live one fuses. The
+    published baseline carries `flat` in its own provenance for good, so this is what stops it
+    being compared with a row taken today as if nothing had changed."""
     flat = _provenance(fusion_mode="flat")
 
     assert not _provenance().comparable_with(flat)

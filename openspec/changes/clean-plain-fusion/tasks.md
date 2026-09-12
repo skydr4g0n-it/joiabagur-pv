@@ -25,7 +25,7 @@
 - [x] 3.7 `evals/provenance.py` — **conservar** `fusion_mode`, poblado desde constante de módulo, y reescribir el docstring: deja de justificarse por la existencia del modo plano y pasa a justificarse por que una corrida archivada bajo otra composición debe seguir declarándose no comparable
 - [x] 3.8 Mover `evals/configs/v2-hibrido.yaml` a `evals/configs/retired/v2-hibrido.yaml`, con cabecera que lo declara **histórico y no ejecutable** y remite a su informe y a su JSONL
 - [x] 3.9 Retirar los tests del comportamiento retirado: `test_flat_fusion_mode_reproduces_the_published_baseline` y los tres usos de `fusion="flat"` como testigo diferencial; las aserciones sobre los pesos por lista en `test_settings.py` y `test_health.py`; y las que fijan `fusion`/`weight_*` de `v2-hibrido` en `test_baselines_and_configs.py`, `test_metrics.py`, `test_reproducibility.py` y `test_sweep_phases.py`
-- [x] 3.10 Añadir `test_no_flat_fusion_path_exists` y `test_no_per_list_weight_is_defined`
+- [x] 3.10 Añadir `test_no_flat_fusion_path_exists` ~~y `test_no_per_list_weight_is_defined`~~ — **consolidados en uno**: el escenario `No flat fusion path exists` tiene dos mitades (*ninguna configuración selecciona una fusión de una etapa* y *no hay peso por lista definido*) y las dos se afirman en el mismo test, para que el requisito mapee a un solo sitio. El segundo nombre no existe, y se dice aquí en vez de darse por entregado
 - [x] 3.11 Añadir `test_the_retired_baseline_config_no_longer_loads`, que carga el YAML retirado y exige que falle por **claves desconocidas** — la guarda que ya existe en `configs.py`, ahora ejercitada contra el artefacto archivado
 - [x] 3.12 Añadir el fósil de D-F, `test_the_flat_arithmetic_that_was_retired_buried_the_vector_leader`: aritmética pura sobre `fuse()`, sin orquestador, sin ajustes y sin modo, con los pesos de C21 como literales locales comentados como históricos
 
@@ -59,5 +59,5 @@
 - [x] 6.5 Informe de implementación en `Documentos/Proyecto Final AIEng/informes/` con el inventario retirado, el diff de 4.3 y el hueco declarado del brazo de control
 - [x] 6.6 Entrada fechada en el §0 y actualización de la ficha en `Documentos/Proyecto Final AIEng/proyecto-final-plan-changes-openspec.md`
 - [x] 6.7 Actualizar `Documentos/epicas.md` (estado del change, recuento y cierre de EP14)
-- [ ] 6.8 `/opsx:verify` antes de archivar, con atención a que ninguna cifra se haya movido
+- [x] 6.8 `/opsx:verify` antes de archivar, con atención a que ninguna cifra se haya movido
 - [x] 6.9 `openspec/config.yaml` — el párrafo de contexto todavía enumera `JPV_FUSION_MODE`, `JPV_RRF_WEIGHT_TYPED`, `_EXPANDED` y `_VECTOR`, y describe la fusión plana como seleccionable. **Encontrado por la tarea 4.7**, que lo buscaba como configuración de despliegue y lo halló como documentación

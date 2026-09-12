@@ -357,3 +357,15 @@ def test_no_flat_fusion_path_exists() -> None:
     signature = inspect.signature(orchestrator.retrieve_products)
     for gone in ("fusion", "weight_typed", "weight_expanded", "weight_vector"):
         assert gone not in signature.parameters, f"`{gone}` must not be an orchestration knob"
+
+    # The second half of the scenario, asserted in the same test so that the requirement maps
+    # to one place: no per-list weight is defined anywhere a configuration could reach.
+    from jbg_ai.evals.configs import EvalConfig
+
+    for gone in ("jpv_rrf_weight_typed", "jpv_rrf_weight_expanded", "jpv_rrf_weight_vector"):
+        assert gone not in FUSION_DEFAULTS
+        assert not hasattr(build_settings(), gone)
+    for gone in ("weight_typed", "weight_expanded", "weight_vector", "fusion"):
+        assert gone not in EvalConfig.__dataclass_fields__, (
+            f"`{gone}` must not be an evaluation configuration key"
+        )

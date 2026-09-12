@@ -719,7 +719,7 @@ def test_the_search_stage_does_not_borrow_the_response_confidence_field(
 
 
 # --------------------------------------------------------------------------------------
-# C25 — fusion in two stages, with the flat mode conserved.
+# C25 — fusion in two stages. The single-stage mode it conserved was retired by C25bis.
 # --------------------------------------------------------------------------------------
 
 #: The three queries of `descripcion-sin-anclaje` where the grade-2 document the vector branch
@@ -1105,6 +1105,14 @@ def test_the_control_arm_switches_the_rule_off_without_a_parameter() -> None:
     from jbg_ai.retrieval.orchestrator import COVERAGE_RULES, _scaled_lexical_weight
 
     assert COVERAGE_RULES == ("continuous", "none"), "no third form, and no strength parameter"
+
+    # C25bis corrected one clause of this requirement, and this pins the correction: switching
+    # the rule off is a control arm available to the EVALUATION, not a deployment setting. The
+    # specification used to promise a rollback the code never offered — `coverage_rule` is not a
+    # settings field and the route does not pass it, so the live service composes under the
+    # adopted rule and turning it off is a code change. Saying so is the honest version.
+    assert not hasattr(build_settings(), "jpv_coverage_rule")
+    assert not any("coverage" in name for name in type(build_settings()).model_fields)
 
     # The rule on: the scaling IS the proportion.
     assert _scaled_lexical_weight(0.5, 0.25, rule="continuous") == pytest.approx(0.125)

@@ -213,6 +213,30 @@ previene—, y se pudre en cuanto alguien retire otra perilla sin ampliarlo.
 *Rollback* de este documento decían *«el arranque debe fallar nombrándola»*. **Cambian en el mismo
 commit**, o la delta se contradice a sí misma.
 
+### D-I · Desviación declarada: tres configuraciones congeladas hubo que editarlas
+
+**Este change cruzó uno de sus propios *non-goals***, y se declara en vez de disimularse, como C22
+declaró la revisión de Alembic que su ficha decía no necesitar.
+
+El *non-goal* dice: *«Retirar el golden set, `v2b-fusion`, `v3-senales`, o cualquier artefacto de
+evaluación distinto de la fila que deja de ser ejecutable»*. No se retiró ninguno, pero **se
+editaron tres**: `v1-vectorial.yaml` perdió los tres pesos por lista, y `v2b-fusion.yaml` y
+`v3-senales.yaml` perdieron `fusion: branch`.
+
+*Por qué era inevitable:* la guarda de claves desconocidas de `configs.py` —que existe desde C24 y
+que este mismo change apoya como mecanismo del escenario de fallo ruidoso— **rechaza cualquier
+fichero que nombre una clave retirada**. Dejar las claves habría dejado las tres configuraciones
+sin poder cargarse, que es precisamente el defecto que la guarda existe para señalar.
+
+*Por qué no mueve ninguna cifra, y está medido:* las tres claves eran **inertes**. `v1-vectorial`
+corre con `mode: vector`, es decir con la rama léxica apagada, así que las listas que esos pesos
+gobernaban no llegaban a existir; y `branch` era el valor vivo por defecto, de modo que fijarlo
+sólo repetía lo que ya ocurría. El diff de las 315 filas por consulta lo confirma después del
+hecho: idénticas.
+
+*Qué se hizo con ello:* cada uno de los tres ficheros lleva escrito, en su cabecera, por qué la
+retirada no lo mueve. Lo que ninguno pierde es una sola clave de las que deciden su orden.
+
 ### D-H · El orden es medir, borrar, verificar y sólo entonces documentar
 
 Primero la corrida de referencia **antes de tocar nada**; después el borrado con los tests en verde;

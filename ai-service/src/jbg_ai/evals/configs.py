@@ -1,9 +1,14 @@
 """The configurations under evaluation, declared as files rather than written as code. C24.
 
-Five rows of one ablation table, and only two of them are the live pipeline with different
-knob values. The other three exist because the question the project has to answer is not
-"which fusion weight is best" but **"does semantic search beat what the jeweller already had"**,
-and that question has no answer unless what she had is in the table.
+Six rows of one ablation table, and three of them are the live pipeline with different knob
+values. The other three exist because the question the project has to answer is not "which
+fusion weight is best" but **"does semantic search beat what the jeweller already had"**, and
+that question has no answer unless what she had is in the table.
+
+The count was written at five and stayed there while the table went to seven and back to six:
+C25 added two rows without touching it, and C25bis retired one. Corrected on the second pass,
+and worth a line because it is the failure mode this module's own comments warn about — a
+figure copied into prose is a snapshot that nothing re-measures.
 
 * `v0-nombre` — the product search that existed before any of this: substring match over the
   name plus an exact code, alphabetical. It is the baseline of decision 12.
@@ -108,9 +113,9 @@ class EvalConfig:
     #: both is exactly why the demotion C22 shipped never fired in the published run.
     signal_pos_id: str | None = None
     business_weight_availability: float | None = None
-    #: C25 abstention. `None` follows the live default (on); the baseline row pins it OFF, the
-    #: same way it pins the flat fusion, because it exists to reproduce the configuration that
-    #: was published BEFORE this change and the rule did not exist then.
+    #: C25 abstention. `None` follows the live default (on). The retired baseline row pinned it
+    #: OFF, because it reproduced the configuration published BEFORE that change, when the rule
+    #: did not exist; that row is now archived and no longer loads.
     abstain: bool | None = None
     branch_depth: int | None = None
     pos_prefilter: bool = False
