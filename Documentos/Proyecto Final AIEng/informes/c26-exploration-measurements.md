@@ -1,6 +1,6 @@
 # C26 — mediciones de exploración: sustitutos, y por qué la familia no va primero
 
-**Change:** [`add-substitutes-retrieval`](../../../openspec/changes/add-substitutes-retrieval/) · **Fecha:** 2026-09-12
+**Change:** [`add-substitutes-retrieval`](../../../openspec/changes/archive/2026-09-12-add-substitutes-retrieval/) · **Fecha:** 2026-09-12
 **Árbol explorado:** `ai-eng` en `d825a8d` · **Rama de implementación:** `c26-add-substitutes-retrieval`
 **Corpus:** Postgres local `:5433/joiabagur_pv` · 1.168 documentos vivos · huella `e46249874fbc6ff2140e8c00ad19874e`
 

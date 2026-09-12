@@ -158,7 +158,7 @@ Detalle completo y SQL reproducible en
 
 ### Referencias
 
-- Change: [`add-substitutes-retrieval`](../../../openspec/changes/add-substitutes-retrieval/) · rama `c26-add-substitutes-retrieval`
+- Change: [`add-substitutes-retrieval`](../../../openspec/changes/archive/2026-09-12-add-substitutes-retrieval/) · rama `c26-add-substitutes-retrieval`
 - Mediciones: [`c26-exploration-measurements.md`](../../Proyecto%20Final%20AIEng/informes/c26-exploration-measurements.md)
 - Plan de changes: [`proyecto-final-plan-changes-openspec.md`](../../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md), ficha C26
 - Diseño RAG: [`proyecto-final-diseno-rag-joiabagur.md`](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) §4 (fila 6, **Núcleo**), §6.2, §7.6, §15.10
@@ -308,7 +308,7 @@ Detalle completo y SQL reproducible en
 - **Tentación que el diseño convierte en fallo**: hacer que la talla sea un bloque entero «porque es
   más fácil de testear». C25 ya midió a dónde lleva eso.
 - **Change de OpenSpec por el que se implementa**:
-  [`add-substitutes-retrieval`](../../../openspec/changes/add-substitutes-retrieval/), sobre la rama
+  [`add-substitutes-retrieval`](../../../openspec/changes/archive/2026-09-12-add-substitutes-retrieval/), sobre la rama
   `c26-add-substitutes-retrieval`.
 
 ---

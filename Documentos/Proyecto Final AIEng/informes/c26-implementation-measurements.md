@@ -1,6 +1,6 @@
 # C26 — mediciones de implementación: sustitutos sobre el embedding almacenado
 
-**Change:** [`add-substitutes-retrieval`](../../../openspec/changes/add-substitutes-retrieval/) · **Fecha:** 2026-09-12
+**Change:** [`add-substitutes-retrieval`](../../../openspec/changes/archive/2026-09-12-add-substitutes-retrieval/) · **Fecha:** 2026-09-12
 **Rama:** `c26-add-substitutes-retrieval` · **Punto de nacimiento:** `b6fe67c`
 **Exploración previa:** [c26-exploration-measurements.md](c26-exploration-measurements.md)
 **Rebanada publicada:** [`ai-service/evals/results/c26-substitutes-slice.md`](../../../ai-service/evals/results/c26-substitutes-slice.md)
