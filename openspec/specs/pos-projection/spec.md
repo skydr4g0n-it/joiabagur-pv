@@ -1,7 +1,7 @@
 # pos-projection Specification
 
 ## Purpose
-Point-of-sale availability projection and the soft prefilter that reads it. `python -m jbg_ai.indexing sync-pos` drains `GET /api/ai/index-feed/pos-availability` into `ai.pos_projection` under its own `pos-availability` checkpoint in `ai.sync_checkpoint`, storing quantity buckets and never exact quantities, the assignment hint, the sales aggregates and the reference instant that produced them, and soft-deleting on an `unassigned` tombstone instead of removing the row. Retrieval then scopes every candidate branch in SQL to the point of sale of the token claim as its only hard filter, demotes zero-stock candidates below the constraints read from the query text rather than removing them, reports `projection_age_seconds` from the checkpoint, answers 503 when the projection holds no assigned row instead of an empty 200, and drops the scope when the projection is staler than the configured ceiling. The prefilter and that ceiling travel as parameters of the orchestration call, so the frozen request schema of `POST /v1/retrieval/products` does not move. No route under `/v1`, no scheduler, no EF Core migration, and a single additive Alembic revision adding a nullable `computed_as_of` column. Python does not read schema `public` by SQL.
+Point-of-sale availability projection and the soft prefilter that reads it. `python -m jbg_ai.indexing sync-pos` drains `GET /api/ai/index-feed/pos-availability` into `ai.pos_projection` under its own `pos-availability` checkpoint in `ai.sync_checkpoint`, storing quantity buckets and never exact quantities, the assignment hint, the sales aggregates and the reference instant that produced them, and soft-deleting on an `unassigned` tombstone instead of removing the row. Retrieval then scopes every candidate branch in SQL to the point of sale of the token claim as its only hard filter, demotes zero-stock candidates as a weighted score within the last block of the ordering, ranking below the constraints read from the query text and never removing them, reports `projection_age_seconds` from the checkpoint, answers 503 when the projection holds no assigned row instead of an empty 200, and drops the scope when the projection is staler than the configured ceiling. The sales aggregates this capability stores are read by nothing inside it: `sales_30d` alone may reach the retrieval path of the ranking it feeds, for diagnosis, counted against the reference instant recorded on its own row and consumed by no ordering rule, while `sales_90d` and `last_sale_at` stay persisted and unread. The prefilter and that ceiling travel as parameters of the orchestration call, so the frozen request schema of `POST /v1/retrieval/products` does not move. No route under `/v1`, no scheduler, no EF Core migration, and a single additive Alembic revision adding a nullable `computed_as_of` column. Python does not read schema `public` by SQL.
 
 ## Requirements
 
@@ -82,7 +82,13 @@ When the prefilter is enabled and the projection is usable, product retrieval MU
 - **AND** no retrieval is served over the unscoped catalogue
 
 ### Requirement: Availability demotes a candidate and never removes it
-A candidate whose projection row reports `qty_bucket` of `0` MUST be ordered after otherwise comparable candidates and MUST remain inside the over-retrieval window. The demotion MUST be applied as an additional component of the single stable ordering key that already demotes on constraints read from the query text, and MUST rank below all of them, so a constraint the operator expressed outranks a signal they did not ask for. The distinction MUST be binary between `0` and any other bucket; `1-2` and `3+` MUST NOT be ordered against each other by this capability. No stock value may reach the response as an exact quantity.
+A candidate whose projection row reports `qty_bucket` of `0` MUST be ordered after otherwise comparable candidates and MUST remain inside the over-retrieval window. The demotion MUST rank below every block produced by a constraint read from the query text, so a constraint the operator expressed outranks a signal they did not ask for.
+
+**The demotion is applied as a weighted score within the last block of the ordering, not as a component of the lexicographic key.** The weight MUST be configuration and MUST be decided against the golden set under the operational metric and the relevance guardrail that the business-signals ranking capability defines; setting it to zero MUST reproduce the order that the fusion and the typed-constraint blocks alone produce. Because the signal has two states, what that measurement decides is the weight's **sign** and not its magnitude, and the report MUST say so rather than presenting an invariant figure as a fitted one. A candidate whose projection row is absent — because the query ran without a reading scope, or because that point of sale does not carry the product — MUST NOT be demoted, since an absent signal is not evidence of zero stock.
+
+The distinction MUST remain binary between `0` and any other bucket; `1-2` and `3+` MUST NOT be ordered against each other. **That is now a measured conclusion rather than a deferral:** under the operational metric neither non-zero bucket loses gain, so no objective function can order them, and the two business readings of the distinction point in opposite directions. The report MUST publish the distribution of the two non-zero buckets so the decision rests on a figure.
+
+No stock value may reach the response as an exact quantity.
 
 #### Scenario: An out-of-stock product is demoted, not removed
 - **GIVEN** a point of sale holding both in-stock and zero-stock assigned products that match a query
@@ -101,6 +107,22 @@ A candidate whose projection row reports `qty_bucket` of `0` MUST be ordered aft
 - **GIVEN** two candidates whose buckets are `1-2` and `3+` and which the other blocks rank equally
 - **WHEN** the candidates are ordered
 - **THEN** their relative order is the one the fusion produced
+
+#### Scenario: The distribution of the two non-zero buckets is published
+- **WHEN** the calibration report completes
+- **THEN** it states how many assigned pairs carry `1-2` and how many carry `3+`
+- **AND** cites that figure as the reason the distinction stays binary
+
+#### Scenario: The availability weight is configuration and zero restores the previous order
+- **WHEN** the availability weight is set to zero
+- **THEN** the order is the one the fusion and the typed-constraint blocks alone produce
+- **AND** no weight value is written into the ordering module
+
+#### Scenario: An absent projection row does not demote
+- **GIVEN** a candidate for which no projection row is read, because the query ran without a reading scope
+- **WHEN** the candidates are ordered
+- **THEN** that candidate is not demoted on availability grounds
+- **AND** the absence is not treated as a bucket of zero
 
 ### Requirement: The response reports projection freshness taken from the checkpoint
 The retrieval response SHALL carry an optional `projection_age_seconds`, computed as the elapsed time since `ai.sync_checkpoint.last_incremental_sync_at` for `feed` value `pos-availability`. It MUST NOT be derived from `ai.pos_projection.refreshed_at` in any form, because the feed is incremental and an assignment that never changes is never re-emitted, so that column records when an assignment last changed rather than when the projection was last read. The value MUST be read through a short-lived cache so repeated retrievals do not consume the connection pool. Adding the field regenerates `ai-service/openapi.json`.
@@ -163,13 +185,38 @@ The drain and the retrieval MUST emit structured logs carrying `trace_id`. Retri
 - **AND** no embedding vector appears in any log entry
 
 ### Requirement: Sales aggregates are stored by this capability and read by none of it
-The projection SHALL persist `sales_30d`, `sales_90d`, `last_sale_at` and the reference instant reported by the feed. This capability MUST NOT use any of them to order, filter or score candidates; they exist for the business-signals ranking that follows. The reference instant MUST be stored **on each row** so a later consumer can tell what clock produced that row's figures. Storing it once per synchronisation instead is insufficient, because the feed is incremental: a pair the feed does not re-emit keeps the figures the run that wrote it computed, so one projection can hold rows counted against different instants.
+The projection SHALL persist `sales_30d`, `sales_90d`, `last_sale_at` and the reference instant reported by the feed. The reference instant MUST be stored **on each row** so a later consumer can tell what clock produced that row's figures. Storing it once per synchronisation instead is insufficient, because the feed is incremental: a pair the feed does not re-emit keeps the figures the run that wrote it computed, so one projection can hold rows counted against different instants.
 
-#### Scenario: Sales figures are persisted without influencing the ranking
-- **GIVEN** two assigned candidates identical except for their sales figures
+**`sales_30d` MAY now be read by the ranking that this capability feeds, for diagnosis only.** It may travel on a retrieved candidate and be persisted by an evaluation so its distribution can be published, and **no ordering rule may consume it** — a prohibition the business-signals ranking capability makes structural by keeping the field off the interface its ordering reads. When it is read, it MUST be read against the reference instant recorded on that row and never against the wall clock, so that the same configuration yields the same figure on different days. `sales_90d` and `last_sale_at` remain persisted and unread, and MUST NOT reach the retrieval path at all.
+
+This capability itself MUST NOT use any of these figures to order, filter or score candidates.
+
+#### Scenario: Sales figures are persisted with their reference instant
+- **GIVEN** the drain writes a projection row
+- **WHEN** the row is inspected
+- **THEN** it carries its sales windows, its last sale instant and the reference instant the feed reported
+
+#### Scenario: The unread figures stay unread
+- **GIVEN** two assigned candidates identical except for their `sales_90d` and `last_sale_at`
 - **WHEN** a product retrieval is served
 - **THEN** their relative order is the one produced by fusion and the demotion blocks
-- **AND** both rows carry their sales figures and the reference instant in the projection
+- **AND** no ordering rule consumed any sales figure
+
+#### Scenario: The drain does not order anything
+- **WHEN** the drain runs
+- **THEN** it writes the projection and computes no ranking
+- **AND** no ordering decision is taken inside this capability
+
+#### Scenario: The sales window is read against the row's reference instant
+- **GIVEN** a projection whose rows carry a reference instant earlier than today
+- **WHEN** `sales_30d` is read for diagnosis
+- **THEN** the window is counted against that instant
+- **AND** the figure is unchanged when the same configuration runs on a later day
+
+#### Scenario: The sales window does not reorder anything
+- **GIVEN** two assigned candidates identical except for their `sales_30d`
+- **WHEN** a product retrieval is served
+- **THEN** their relative order is the one the fusion produced
 
 ### Requirement: Retrieval unit tests reach no provider, no public schema and no network
 Tests for this capability MUST run offline with injected fakes. They MUST NOT call an embedding provider, an LLM or a remote database, and MUST NOT read schema `public` by SQL. Database-backed tests MUST use an ephemeral PostgreSQL with pgvector and skip when it is unreachable.
