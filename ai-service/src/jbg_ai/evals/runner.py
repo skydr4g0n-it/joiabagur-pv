@@ -160,7 +160,7 @@ async def judged_distances(
     either answer is a finding rather than a pending task.
     """
     pairs: list[tuple[int, float]] = []
-    for query in golden.judged_queries:
+    for query in golden.retrieval_queries:
         judgements = golden.judgements_for(query.id)
         if not judgements:
             continue
@@ -201,7 +201,7 @@ async def best_hit_distances(
     the best hit a query really has — including the queries that today would return nothing.
     """
     out: dict[str, list[float]] = {"answerable": [], "out_of_domain": []}
-    for query in golden.judged_queries:
+    for query in golden.retrieval_queries:
         vector = (await embed.embed([query.text])).vectors[0]
         literal = "[" + ",".join(str(value) for value in vector) + "]"
         async with session_scope(settings) as session:
@@ -275,7 +275,7 @@ async def run_config(
     repeat: int = DEFAULT_REPEAT,
 ) -> ConfigReport:
     """Evaluate one configuration over the whole judged set."""
-    queries = list(golden.judged_queries)
+    queries = list(golden.retrieval_queries)
     # The operational reading needs the bucket of every JUDGED document, not only of the ones
     # this configuration retrieved, because the ideal ordering is built from the same gain
     # function. One statement per run, and `None` for a configuration that reads no signal —

@@ -76,7 +76,7 @@ async def measure(args: argparse.Namespace) -> int:
     catalogue = build_context(rows, budget_tokens=budget, count_tokens=_count_tokens(model))
     queries = [
         item
-        for item in golden.judged_queries
+        for item in golden.retrieval_queries
         if item.category == (config.subset_category or "descripcion-sin-anclaje")
     ]
 

@@ -522,7 +522,7 @@ def rescore(
     is STRUCTURAL rather than a promise about seeds: the input is a file, the ordering is a
     stable sort over it, and nothing in the path can vary.
     """
-    by_query = {query.id: query for query in golden.judged_queries}
+    by_query = {query.id: query for query in golden.retrieval_queries}
     cases = []
     for window in capture.windows:
         if window.query_id not in by_query:
@@ -543,7 +543,7 @@ def rescore(
     # every difference without carrying any information about ranking.
     answerable = {
         query.id
-        for query in golden.judged_queries
+        for query in golden.retrieval_queries
         if query.category != OUT_OF_DOMAIN
     }
     scored = [case for case in cases if case.query_id in answerable]
@@ -554,16 +554,16 @@ def rescore(
     ):
         members = {
             query.id
-            for query in golden.judged_queries
+            for query in golden.retrieval_queries
             if bool(query.in_tuning_set) is wanted
         }
         readings[name] = aggregate(
             [case for case in scored if case.query_id in members]
         )
-    for category in sorted({query.category for query in golden.judged_queries}):
+    for category in sorted({query.category for query in golden.retrieval_queries}):
         members = {
             query.id
-            for query in golden.judged_queries
+            for query in golden.retrieval_queries
             if query.category == category
         }
         readings[f"category:{category}"] = aggregate(
@@ -609,7 +609,7 @@ async def capture(
     fingerprint = FusionFingerprint.of(config, settings)
     windows: list[CapturedWindow] = []
 
-    for query in golden.judged_queries:
+    for query in golden.retrieval_queries:
         seen: list[CapturedCandidate] = []
 
         def sink(candidates, _seen=seen) -> None:

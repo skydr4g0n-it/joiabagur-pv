@@ -195,11 +195,20 @@ def business_score(item: Constrained, weights: BusinessWeights) -> float:
     bonus-shaped term cost 0,244 of pure relevance, because it sorted the assortment above
     everything outside it instead of sorting the exhausted below the available.
 
-    **The value of the weight does not change the order, only its sign does.** With a single
-    binary term the score takes two values, so any positive weight yields the same ranking;
-    the sweep measured exactly that. The weight stays a configured float because zero is the
-    rollback, but the calibration report says plainly that `1.0` is a declared unit and not a
-    fitted figure.
+    **Inside the C25 key the value of the weight does not change the order, only its sign
+    does.** There this score is the last component of a LEXICOGRAPHIC key and takes two
+    values, so any positive weight yields the same ranking; the sweep measured exactly that.
+    The weight stays a configured float because zero is the rollback, and the calibration
+    report says plainly that `1.0` is a declared unit and not a fitted figure.
+
+    **That conclusion is local to that key and does not travel to every caller**, which is why
+    the sentence above now names the one it was measured in. C26 adds this score to a
+    CONTINUOUS cosine similarity in `[0, 1]`, where a weight of `1.0` spans the whole range
+    and therefore orders every out-of-stock candidate behind every available one — a partition
+    in effect, accepted and declared in that capability's spec rather than discovered by
+    whoever measures next. Nothing about this function is wrong in either caller: what the
+    weight means depends on what it is added to, so a claim about the weight has to name the
+    key. Checked against both callers, not remembered.
     """
     if _out_of_stock(item):
         return -weights.availability

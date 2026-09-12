@@ -71,6 +71,25 @@ BUSINESS_DEFAULTS: dict[str, Any] = {
     "jpv_business_weight_availability": 1.0,
 }
 
+#: C26 substitutes. ONE weight, and it is NOT the same kind of number as the availability
+#: one above even though both ride in the same tail.
+#:
+#: `availability` there is binary against a key that was otherwise lexicographic, so its
+#: value could not change the order — only its sign could, and the C25 sweep measured exactly
+#: that. **That conclusion does not travel here.** In this ordering a binary size term is
+#: mixed with a CONTINUOUS cosine similarity, so the weight fixes a real exchange rate — how
+#: much similarity a wrong size is worth — and three values produce three different orders.
+#: It is therefore swept, and the sweep is what fixes it; the figure of the last one is in
+#: the C26 implementation report rather than here, where nothing would re-measure it.
+#:
+#: Zero is the rollback and reproduces exactly the ordering the remaining terms produce
+#: alone. The term is inert whenever either side declares no size, because an absent size is
+#: not a mismatch — 54 % of the rings carry none, so without that guard half the population
+#: of the most affected piece type would be ordered by a mismatch that does not exist.
+SUBSTITUTE_DEFAULTS: dict[str, Any] = {
+    "jpv_substitute_weight_size": 0.05,
+}
+
 #: C25 abstention. The FORM was selected by a measurement under a criterion written before it
 #: — the two populations of best-hit distance overlap completely, so a scalar bound cannot
 #: separate them — and the relative rule reads the SHAPE of the distance profile instead: an
@@ -351,6 +370,27 @@ class Settings(BaseSettings):
             "fusion and the typed-constraint blocks produce on their own, which makes it the "
             "rollback for the business signals. Supplies only the DEFAULT: the effective value "
             "travels as a parameter of the orchestration call. Not required to boot /health."
+        ),
+    )
+
+    jpv_substitute_weight_size: float = Field(
+        default=SUBSTITUTE_DEFAULTS["jpv_substitute_weight_size"],
+        ge=0,
+        description=(
+            "C26 weight of the size-mismatch term in the substitutes ordering "
+            "(JPV_SUBSTITUTE_WEIGHT_SIZE). Optional at boot; a blank export means unset and "
+            "falls back to the default. Unlike JPV_BUSINESS_WEIGHT_AVAILABILITY its VALUE is "
+            "what the calibration decided and not merely its sign: this key mixes a binary "
+            "size term with a continuous cosine similarity, so the weight fixes an exchange "
+            "rate — how much similarity a wrong size is worth — and different values produce "
+            "different orders. It is a CONTINUOUS term and never an integer block, because a "
+            "block would send every candidate of another size behind every candidate of the "
+            "right one instead of breaking a tie. The term is inert unless both the source "
+            "product and the candidate declare a size, since an absent size is not a "
+            "mismatch. Zero is the rollback and reproduces exactly the ordering the "
+            "remaining terms produce alone. Supplies only the DEFAULT: the effective value "
+            "travels as a parameter of the call, so a sweep needs no restart. Not required "
+            "to boot /health."
         ),
     )
 
@@ -657,6 +697,16 @@ class Settings(BaseSettings):
         """A blank export means "unset". Read as 0 it would silently drop a signal."""
         if isinstance(value, str) and not value.strip():
             return BUSINESS_DEFAULTS[str(info.field_name)]
+        return value
+
+    @field_validator("jpv_substitute_weight_size", mode="before")
+    @classmethod
+    def blank_substitute_setting_is_default(
+        cls, value: object, info: ValidationInfo
+    ) -> object:
+        """A blank export means "unset". Read as 0 it would silently take the term out."""
+        if isinstance(value, str) and not value.strip():
+            return SUBSTITUTE_DEFAULTS[str(info.field_name)]
         return value
 
 

@@ -6,7 +6,7 @@ Vector retriever behind `POST /v1/retrieval/products` when `STUB_MODE` is off: e
 ## Requirements
 
 ### Requirement: Real product retrieval replaces the stub when stub mode is off
-When `STUB_MODE` is disabled, `POST /v1/retrieval/products` MUST run the vector retrieval pipeline and MUST return a body that validates against the frozen `RetrievalResponse` model. It MUST NOT return HTTP 501 naming a later change and MUST NOT return the C02 fixture cycle. When `STUB_MODE` is enabled, the existing C02 stub MUST remain the handler so committed contract tests stay green. `POST /v1/retrieval/substitutes` MUST keep returning 501 when stubs are off. The OpenAPI snapshot MUST NOT be regenerated. The products handler MUST be asynchronous.
+When `STUB_MODE` is disabled, `POST /v1/retrieval/products` MUST run the vector retrieval pipeline and MUST return a body that validates against the frozen `RetrievalResponse` model. It MUST NOT return HTTP 501 naming a later change and MUST NOT return the C02 fixture cycle. When `STUB_MODE` is enabled, the existing C02 stub MUST remain the handler so committed contract tests stay green. `POST /v1/retrieval/substitutes` MUST NOT return 501 when stubs are off either; its behaviour is owned by `substitutes-retrieval`. The OpenAPI snapshot MUST NOT be regenerated. The products handler MUST be asynchronous.
 
 #### Scenario: Stub mode keeps the C02 fixtures
 - **GIVEN** `STUB_MODE` is enabled
@@ -22,11 +22,11 @@ When `STUB_MODE` is disabled, `POST /v1/retrieval/products` MUST run the vector 
 - **AND** the status is not 501 claiming the implementation has not arrived
 - **AND** a 200 body validates against `RetrievalResponse`
 
-#### Scenario: Substitutes stay unimplemented
+#### Scenario: No retrieval route is left answering 501
 - **GIVEN** `STUB_MODE` is disabled
 - **WHEN** an authenticated client with `pos_id` calls `POST /v1/retrieval/substitutes`
-- **THEN** the response status is 501
-- **AND** the message indicates the implementation is delivered in a later change
+- **THEN** the response status is not 501
+- **AND** no message claims the implementation is delivered in a later change
 
 #### Scenario: OpenAPI snapshot stays frozen
 - **WHEN** `test_openapi_snapshot_is_stable` runs against this change

@@ -32,6 +32,7 @@ from functools import lru_cache
 from importlib.resources import files
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from jbg_ai.data.paths import AI_SERVICE_ROOT
 from jbg_ai.enrichment.vocab import fold
@@ -109,6 +110,10 @@ MINIMUM_SYNONYM_PER_KIND = 2
 #: The category name a query carries when the catalogue cannot answer it at all.
 OUT_OF_DOMAIN = "fuera-de-dominio"
 
+#: The category whose queries are answered by the substitutes endpoint and not by the
+#: product retriever. C26 made them measurable by anchoring each to a source product.
+SUBSTITUTE = "sustituto"
+
 #: How many out-of-domain queries the set must carry for an abstention rate to be a figure
 #: anybody can act on. Raised from 5 to 20 by C25: with five, the only reachable acceptance
 #: number is not credible, and a rule with two parameters fitted against five points is fitted
@@ -137,6 +142,15 @@ class GoldenQuery:
     synonym_kind: str | None = None
     literal_of: str | None = None
     note: str | None = None
+    #: The product a `sustituto` query is anchored to. C26.
+    #:
+    #: The substitutes endpoint receives a `product_id` and these queries are TEXT, so the
+    #: anchor has to be declared rather than resolved: resolving the text with the product
+    #: retriever and chaining would measure the CHAIN — which is C32's — and would charge
+    #: this capability with the first step's failures. The identifier is an `ai.product_document`
+    #: `product_id`; the SKU it corresponds to is recorded in the query's note so a human can
+    #: read the row without a database.
+    source_product_id: str | None = None
 
     @classmethod
     def from_json(cls, payload: dict[str, Any], *, where: str) -> "GoldenQuery":
@@ -154,6 +168,7 @@ class GoldenQuery:
                 synonym_kind=_optional_str(payload.get("synonym_kind")),
                 literal_of=_optional_str(payload.get("literal_of")),
                 note=_optional_str(payload.get("note")),
+                source_product_id=_optional_str(payload.get("source_product_id")),
             )
         except KeyError as exc:
             raise GoldenSetError(f"{where}: query is missing field {exc}") from exc
@@ -229,7 +244,26 @@ class GoldenSet:
 
     @property
     def judged_queries(self) -> tuple[GoldenQuery, ...]:
+        """Every query that carries labels. The COMPOSITION of the set, not a run's scope."""
         return tuple(item for item in self.queries if item.judged)
+
+    @property
+    def retrieval_queries(self) -> tuple[GoldenQuery, ...]:
+        """The judged queries the PRODUCT RETRIEVER is measured over. C26.
+
+        Substitutes are excluded, and the exclusion is the point rather than a detail. Those
+        queries are answered by `POST /v1/retrieval/substitutes`, which takes a `product_id`:
+        two rows of the published ablation table — `v0-fts` and `v0-nombre` — could not
+        execute them at all, and the pipeline rows would be answering a different question.
+        Letting them into this tuple would move the DENOMINATOR of a table that has been
+        published twice, so its figures would change with nothing about any configuration
+        having changed, which is worse than a figure that is missing.
+
+        The separation is here, in code, and not in a convention the next runner has to
+        remember: before C26 the two tuples were the same set, so `judged_queries` was the
+        right scope by accident, and an accident is not a guarantee.
+        """
+        return tuple(item for item in self.judged_queries if item.category != SUBSTITUTE)
 
     def judgements_for(self, query_id: str) -> tuple[Judgement, ...]:
         return self.by_query.get(query_id, ())
@@ -500,6 +534,33 @@ def _validate_structure(golden: GoldenSet) -> None:
                 "configuration retrieves them, so labelling them now would record what the "
                 "general retriever happened to return."
             )
+
+    for item in golden.queries:
+        if item.category != SUBSTITUTE:
+            if item.source_product_id is not None:
+                raise GoldenSetError(
+                    f"{item.id}: declares a source product and is not a substitutes "
+                    f"query (category {item.category!r}). The anchor is what makes the "
+                    "substitutes endpoint callable; on any other category it names a "
+                    "pipeline that will never be run with it"
+                )
+            continue
+        if item.source_product_id is None:
+            raise GoldenSetError(
+                f"{item.id}: a substitutes query must declare `source_product_id`. The "
+                "endpoint receives a product identifier and this query is text; without "
+                "the anchor the only way to run it is to resolve the text with the "
+                "product retriever first, which measures the chain (C32) and charges "
+                "this capability with the first step's failures"
+            )
+        try:
+            UUID(item.source_product_id)
+        except ValueError as exc:
+            raise GoldenSetError(
+                f"{item.id}: `source_product_id` is not a UUID: "
+                f"{item.source_product_id!r}. It is an `ai.product_document` identifier, "
+                "not a SKU — the SKU belongs in the note, where a human can read it"
+            ) from exc
 
     judged = len(golden.judged_queries)
     if judged < MINIMUM_JUDGED_QUERIES:

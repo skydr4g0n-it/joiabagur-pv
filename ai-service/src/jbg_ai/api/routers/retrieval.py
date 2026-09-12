@@ -1,4 +1,8 @@
-"""Retrieval routes. Products are real when stub mode is off (C14); substitutes stay C26."""
+"""Retrieval routes. Both are real when stub mode is off: products (C14), substitutes (C26).
+
+The stub survives for each of them under `STUB_MODE`, which is what keeps the committed
+C02 contract tests measuring the contract rather than the index.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +13,6 @@ from jbg_ai.api.deps import (
     V1_RESPONSES,
     get_app_settings,
     get_service_principal,
-    require_stub_mode,
 )
 from jbg_ai.api.schemas.retrieval import (
     RetrievalRequest,
@@ -24,6 +27,7 @@ from jbg_ai.retrieval.errors import (
     InvalidFamilyIdError,
     InvalidPosIdError,
     RetrievalDependencyError,
+    UnusableSourceProductError,
 )
 from jbg_ai.retrieval.orchestrator import (
     build_retrieval_embed_client,
@@ -32,9 +36,14 @@ from jbg_ai.retrieval.orchestrator import (
 from jbg_ai.retrieval.ports import ProductSearchPort
 from jbg_ai.retrieval.projection import ProjectionFreshness
 from jbg_ai.retrieval.search import SqlAlchemyProductSearch
+from jbg_ai.retrieval.substitutes import (
+    retrieve_substitutes as run_substitutes_retrieval,
+)
 from jbg_ai.stubs import retrieval_products_stub, retrieval_substitutes_stub
 
-SUBSTITUTES_DELIVERED_BY = "C26 (add-substitutes-retrieval)"
+# `SUBSTITUTES_DELIVERED_BY` lived here to name the change in a 501. It went with the 501:
+# the route is served, and a constant announcing a future delivery would now be a lie the
+# next reader has to disprove. Checked by search before removing it, not by memory.
 
 router = APIRouter(prefix="/v1/retrieval", tags=["retrieval"], responses=V1_RESPONSES)
 
@@ -147,15 +156,70 @@ async def retrieve_products(
         ) from exc
 
 
+# Substitutes over the STORED embedding: no provider is called on this path.
+#
+# `payload.pos_id` is ignored on purpose, like the products route: the scope comes from the
+# token. The scope is read as a SIGNAL only — availability demotes a candidate and never
+# removes it, and excluding on stock belongs to .NET, which owns the stock (C34).
+#
+# **The projection age travels in each result's `debug.notes`** and not in a response field.
+# `RetrievalResponse` carries `projection_age_seconds`; `SubstitutesResponse` does not, and
+# `ai-service/openapi.json` is frozen — adding the field would regenerate the snapshot that
+# `test_openapi_snapshot_is_stable` guards. `debug` is in the frozen contract already, which
+# makes it the one place the age can be declared without moving anything.
+#
+# No embedding settings are required here, only the database: the route that needs a
+# provider is the one that embeds a query, and this one embeds nothing.
+#
+# **This is a comment and not a docstring, which is not a style choice.** FastAPI publishes a
+# handler's docstring as the operation's `description`, and this operation has none in the
+# frozen snapshot — it was written when the handler was a two-line stub. Writing the
+# explanation here caught exactly that: the snapshot test went red on a `description` that
+# appeared out of nowhere. The sibling handler above keeps its docstring because the snapshot
+# already carries it.
 @router.post(
     "/substitutes",
     response_model=SubstitutesResponse,
     summary="Retrieve interchangeable products for a reference product",
 )
-def retrieve_substitutes(
+async def retrieve_substitutes(
     payload: SubstitutesRequest,
+    request: Request,
     principal: ServicePrincipal = Depends(get_service_principal),
     settings: Settings = Depends(get_app_settings),
 ) -> SubstitutesResponse:
-    require_stub_mode(settings, SUBSTITUTES_DELIVERED_BY)
-    return retrieval_substitutes_stub(payload, principal)
+    if settings.stub_mode:
+        return retrieval_substitutes_stub(payload, principal)
+
+    injected_search = getattr(request.app.state, "retrieval_search", None)
+    if injected_search is None and not settings.database_url:
+        raise _missing("DATABASE_URL")
+
+    try:
+        return await run_substitutes_retrieval(
+            payload,
+            principal,
+            settings=settings,
+            search=_resolve_search(request, settings),
+            freshness=_resolve_freshness(request),
+        )
+    except UnusableSourceProductError as exc:
+        # 422 and not 404: the status is already documented for this route in the frozen
+        # snapshot, and it is what its two sibling errors use — the body named something
+        # this service cannot process. Never a 200 with an empty list; the detail names
+        # which of the three causes applies.
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except InvalidFamilyIdError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except InvalidPosIdError as exc:
+        # A token whose point of sale cannot be read is a mis-issued token; the products
+        # route refuses it for the same reason and must not be contradicted here.
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except DatabaseNotConfiguredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
+    except RetrievalDependencyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc

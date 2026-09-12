@@ -2,9 +2,16 @@
 
 Pure and domain-free on purpose, and it has paid off twice already: C23 (knowledge corpus)
 imports it, and C25 composes it **with itself** — stage one inside the lexical branch, stage
-two between the branches — without a line of this module changing. C26 (substitutes) is the
-next caller. Nothing here opens a session, calls a provider or knows what a product, a
-material or a word is: it sees ordered identifiers and weights, and nothing else.
+two between the branches — without a line of this module changing. Nothing here opens a
+session, calls a provider or knows what a product, a material or a word is: it sees ordered
+identifiers and weights, and nothing else.
+
+This docstring used to predict C26 (substitutes) as the next caller. **The prediction was
+false and is recorded rather than quietly deleted**: substitutes produce ONE list, and a
+fusion over one list is the identity map plus a rank-reciprocal rounding error. Two things
+follow. Nothing about this module was wrong — the caller was imagined, not the arithmetic —
+and a comment that names a future consumer is a claim nothing re-checks, so the next one
+should be written only where a test would notice it going stale.
 
 `score(d) = sum over lists i of w_i / (k + rank_i(d))`, with `rank` one-based.
 

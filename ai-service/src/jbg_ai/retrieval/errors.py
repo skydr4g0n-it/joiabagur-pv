@@ -26,3 +26,25 @@ class InvalidPosIdError(ValueError):
     with an unscoped search over the whole catalogue would turn a broken claim into every
     other shop’s assortment on someone’s screen.
     """
+
+
+class UnusableSourceProductError(ValueError):
+    """The `product_id` of a substitutes request cannot anchor a search. Delivered by C26.
+
+    Three causes reach it — absent from the index, present but inactive, indexed but without
+    an embedding — and the message names which one, because the three are three different
+    things for whoever has to fix them.
+
+    The router translates this to HTTP 422, the status the frozen contract already documents
+    for this route and the one its two sibling errors already use: the body named something
+    this service cannot process. It is deliberately **not** a 200 with an empty candidate
+    list. An empty success is indistinguishable from a catalogue that holds no substitute at
+    all, and the panel paints the same "nothing found" screen over both.
+    """
+
+    def __init__(self, product_id: str, cause: str) -> None:
+        self.product_id = product_id
+        self.cause = cause
+        super().__init__(
+            f"no substitutes can be retrieved for product_id {product_id}: {cause}"
+        )

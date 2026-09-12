@@ -333,8 +333,12 @@ def test_the_capture_phase_runs_end_to_end_against_the_ports() -> None:
     )
 
     assert result.version == CAPTURE_VERSION
-    assert len(result.windows) == len(load_golden_set().judged_queries), (
-        "one window per judged query"
+    # `retrieval_queries` and not `judged_queries`: C26 added five judged SUBSTITUTES
+    # queries, which this sweep does not and must not run — they are answered by a route
+    # that takes a product identifier, and counting them here would move the denominator
+    # of the published ablation table.
+    assert len(result.windows) == len(load_golden_set().retrieval_queries), (
+        "one window per judged query of the product retriever"
     )
     assert result.fusion.signal_pos_id == str(pos)
     assert result.buckets, "the assortment's buckets must be persisted for the operational metric"
