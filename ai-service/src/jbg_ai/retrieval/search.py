@@ -19,6 +19,7 @@ a slot in the window for nothing.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from uuid import UUID
 
@@ -29,7 +30,13 @@ from jbg_ai.config.settings import Settings
 from jbg_ai.db.engine import session_scope
 from jbg_ai.retrieval.errors import RetrievalDependencyError
 from jbg_ai.retrieval.lexical import LexicalRequest, build_fragments
-from jbg_ai.retrieval.ports import LexicalHit, SearchFilters, SearchHit
+from jbg_ai.retrieval.ports import (
+    LexicalHit,
+    NeighbourHit,
+    SearchFilters,
+    SearchHit,
+    SourceDocument,
+)
 
 #: `feed` value of the POS drain. Duplicated from the indexing package rather than imported,
 #: so the retrieval path does not depend on the indexer to answer a query.
@@ -246,6 +253,109 @@ def compile_lexical_sql(
     )
 
 
+# ---------------------------------------------------------------------------------------
+# C26 substitutes. Product -> product, so the anchor is a STORED embedding and no provider
+# is called: the vector the k-NN ranks against is read from the source row inside the same
+# statement. That is also why there is no `threshold` and no model-compatibility predicate
+# here — both belong to a query the provider just embedded, and there is no query.
+# ---------------------------------------------------------------------------------------
+
+SOURCE_DOCUMENT_SQL = """
+SELECT
+  d.product_id,
+  d.sku,
+  d.piece_type,
+  d.size_label,
+  d.materials,
+  d.style_tags,
+  d.family_id,
+  d.price_band,
+  d.is_active,
+  (d.embedding IS NOT NULL) AS has_embedding
+FROM ai.product_document d
+WHERE d.product_id = :source_id
+"""
+
+# An UNCORRELATED scalar subquery on the primary key, written once and substituted into both
+# the projection and the ordering. The planner lifts it to an InitPlan and evaluates it once,
+# so the distance operator sees a constant on the right — the shape an index scan needs —
+# rather than a per-row lookup. Binding the vector from Python instead would ship 1.536
+# floats across the wire twice to say what the row already says.
+_SOURCE_EMBEDDING = (
+    "(SELECT src.embedding FROM ai.product_document src WHERE src.product_id = :source_id)"
+)
+
+# `piece_type` is the ONLY hard filter, and `IS NOT DISTINCT FROM` rather than `=` because
+# one live document carries none: with `=` a null source type would match nothing through an
+# unknown comparison, silently, which is the failure mode this module opens by describing.
+# Null matches null, so an untyped source is offered untyped candidates and never a ring.
+#
+# Availability is absent from this WHERE clause on purpose and the join below is the reason.
+_NEIGHBOURS_SELECT = """SELECT
+  d.product_id,
+  d.sku,
+  (d.embedding <=> {source_embedding}) AS distance,
+  d.materials,
+  d.style_tags,
+  d.family_id,
+  d.variant_label,
+  d.piece_type,
+  d.size_label,
+  d.price_band,
+  d.price,
+  {qty_bucket},
+  {sales_30d}
+FROM ai.product_document d
+{scope_join}
+WHERE d.embedding IS NOT NULL
+  AND d.is_active IS TRUE
+  AND d.product_id <> :source_id
+  AND d.piece_type IS NOT DISTINCT FROM :piece_type
+"""
+
+# The same deterministic tiebreak C24 put on every other statement, and for the same reason:
+# without it the ordering is not a total order, `LIMIT` cuts inside a tie, and which rows
+# survive is whatever the plan produced. Two identical runs would then disagree, which is
+# fatal to a harness whose job is to attribute a moved metric to a change rather than to luck.
+_NEIGHBOURS_ORDER_LIMIT = """
+ORDER BY d.embedding <=> {source_embedding} ASC, d.product_id ASC
+LIMIT :depth
+"""
+
+
+def compile_neighbours_sql(
+    *, reads: bool = False, exclude_product_ids: bool = False
+) -> str:
+    """Return the substitutes k-NN statement.
+
+    `reads` attaches the projection through `_SIGNAL_JOIN` — a `LEFT JOIN`, never
+    `_SCOPE_JOIN`. The restricting join has no caller here and must not acquire one: in
+    substitutes the availability of a candidate demotes it and never removes it, so a
+    candidate this point of sale does not carry still has to come back. Excluding on stock
+    is C34's, on the .NET side, which is where the authority over stock lives.
+    """
+    cte = _SCOPE_CTE if reads else ""
+    extra = (
+        "  AND d.product_id <> ALL(CAST(:exclude_ids AS uuid[]))\n"
+        if exclude_product_ids
+        else ""
+    )
+    # `{source_embedding}` is substituted BEFORE `_scoped`, which runs `str.format` over its
+    # own three holes and would raise on a fourth it does not know. Same order as
+    # `compile_lexical_sql`, which fills its fragments before handing the head on.
+    head = _scoped(
+        _NEIGHBOURS_SELECT.replace("{source_embedding}", _SOURCE_EMBEDDING),
+        restricts=False,
+        reads=reads,
+    )
+    return (
+        cte
+        + head
+        + extra
+        + _NEIGHBOURS_ORDER_LIMIT.replace("{source_embedding}", _SOURCE_EMBEDDING)
+    )
+
+
 def _vector_literal(embedding: list[float]) -> str:
     return "[" + ",".join(str(value) for value in embedding) + "]"
 
@@ -420,6 +530,81 @@ class SqlAlchemyProductSearch:
                 variant_label=_optional_str(row["variant_label"]),
                 price=_optional_float(row["price"]),
                 size_label=_optional_str(row["size_label"]),
+                qty_bucket=_optional_str(row["qty_bucket"]),
+                sales_30d=_optional_int(row["sales_30d"]),
+            )
+            for row in rows
+        ]
+
+    async def source_document(self, product_id: UUID) -> SourceDocument | None:
+        """Read the reference product. Absence comes back as `None`, never as an exception."""
+        try:
+            async with session_scope(self._settings) as session:
+                row = (
+                    await session.execute(
+                        text(SOURCE_DOCUMENT_SQL), {"source_id": product_id}
+                    )
+                ).mappings().first()
+        except SQLAlchemyError as exc:
+            raise RetrievalDependencyError(f"database query failed: {exc}") from exc
+        if row is None:
+            return None
+        return SourceDocument(
+            product_id=UUID(str(row["product_id"])),
+            sku=str(row["sku"]),
+            piece_type=_optional_str(row["piece_type"]),
+            size_label=_optional_str(row["size_label"]),
+            materials=_materials_list(row["materials"]),
+            style_tags=_materials_list(row["style_tags"]),
+            family_id=_optional_uuid(row["family_id"]),
+            price_band=_optional_str(row["price_band"]),
+            is_active=bool(row["is_active"]),
+            has_embedding=bool(row["has_embedding"]),
+        )
+
+    async def neighbours_of(
+        self,
+        product_id: UUID,
+        *,
+        piece_type: str | None,
+        depth: int,
+        exclude_product_ids: Sequence[UUID] = (),
+        signal_pos_id: UUID | None = None,
+    ) -> list[NeighbourHit]:
+        """Neighbours of the stored embedding. One statement, one connection, no provider."""
+        params: dict[str, object] = {
+            "source_id": product_id,
+            "piece_type": piece_type,
+            "depth": depth,
+        }
+        if exclude_product_ids:
+            params["exclude_ids"] = [str(item) for item in exclude_product_ids]
+        if signal_pos_id is not None:
+            params["pos_id"] = signal_pos_id
+
+        sql = compile_neighbours_sql(
+            reads=signal_pos_id is not None,
+            exclude_product_ids=bool(exclude_product_ids),
+        )
+        try:
+            async with session_scope(self._settings) as session:
+                rows = (await session.execute(text(sql), params)).mappings().all()
+        except SQLAlchemyError as exc:
+            raise RetrievalDependencyError(f"database query failed: {exc}") from exc
+
+        return [
+            NeighbourHit(
+                product_id=UUID(str(row["product_id"])),
+                sku=str(row["sku"]),
+                distance=float(row["distance"]),
+                materials=_materials_list(row["materials"]),
+                style_tags=_materials_list(row["style_tags"]),
+                family_id=_optional_uuid(row["family_id"]),
+                variant_label=_optional_str(row["variant_label"]),
+                piece_type=_optional_str(row["piece_type"]),
+                size_label=_optional_str(row["size_label"]),
+                price_band=_optional_str(row["price_band"]),
+                price=_optional_float(row["price"]),
                 qty_bucket=_optional_str(row["qty_bucket"]),
                 sales_30d=_optional_int(row["sales_30d"]),
             )

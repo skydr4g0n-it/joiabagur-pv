@@ -12,7 +12,7 @@ Python FastAPI microservice for the JoiaBagur Proyecto Final RAG.
 - **C10** (HU-AIENG-010) adds nested CLI `python -m jbg_ai.data world simulate|ingest` under `jbg_ai.data.world`. Simulate is offline (YAML of 12 POS, no Postgres, no LLM). Ingest uses `JPV_PG*` against local Docker and does not touch `"Products"` / `"Collections"` / schema `ai`. Recipe: [`../data/world/pos-profiles.yaml`](../data/world/pos-profiles.yaml). See [`src/jbg_ai/data/README.md`](src/jbg_ai/data/README.md).
 - **C11** (HU-AIENG-011) adds the library `jbg_ai.indexing`: canonical `source-text/v1` (`build_source_text` / `hash_source_text`) and an injectable LiteLLM embedding client (`aembedding`, 1536-d, in-memory cache, batch 64). `api.main` does not import it. `JPV_EMBEDDING_*` are optional at boot; embedding requires its own key and does not fall back to `JPV_RAG_LLM_API_KEY`.
 - **C13** (HU-AIENG-013) replaces the `/v1/index/*` stub when `STUB_MODE=false`: catalog feed pull (`X-Index-Feed-Key`, keyset `since`/`since_id`), committed `src/jbg_ai/indexing/sku_provenance.json`, skip-embed upsert, tombstones, checkpoint, CLI `python -m jbg_ai.indexing sync [--full]`. Auth is `get_catalog_principal` (no `pos_id`). The POS feed method exists on the client and is **not** called. `indexing/embeddings.py` is not edited. OpenAPI adds `since_id` / `cursor_id`.
-- **C14** (HU-AIENG-014) replaces the `/v1/retrieval/products` stub when `STUB_MODE=false`: query embed with the C11 `LiteLlmEmbeddingClient` (`max_attempts=1`; `indexing/embeddings.py` unchanged), cosine `<=>` over HNSW, distance threshold `JPV_RETRIEVAL_DISTANCE_THRESHOLD` (default 0.65), overfetch after the threshold. `mode=hybrid`/`lexical` run the vector branch until C21. Missing key, `DATABASE_URL` or compatible index → 503, not 501. Substitutes stay 501 (C26). OpenAPI snapshot is not regenerated.
+- **C14** (HU-AIENG-014) replaces the `/v1/retrieval/products` stub when `STUB_MODE=false`: query embed with the C11 `LiteLlmEmbeddingClient` (`max_attempts=1`; `indexing/embeddings.py` unchanged), cosine `<=>` over HNSW, distance threshold `JPV_RETRIEVAL_DISTANCE_THRESHOLD` (default 0.65), overfetch after the threshold. `mode=hybrid`/`lexical` run the vector branch until C21. Missing key, `DATABASE_URL` or compatible index → 503, not 501. **Substitutes are real since C26.** OpenAPI snapshot is not regenerated.
 
 - **C18a** (HU-AIENG-018a) adds the library `jbg_ai.families` and the **ninth** `/v1` route, `POST /v1/families/suggest` — the first addition since C02 froze the surface, so `openapi.json` was regenerated in the same change. Grouping is deterministic and offline: no LLM, no embedding provider call, no SQL against schema `public`. The name root groups and the embedding **vetoes**, relative to the other proposed families rather than by any absolute cutoff (`JPV_FAMILY_VETO_MARGIN`), and a vetoed member is **marked for review, never removed**. Vocabularies are reused from `enrichment/vocabularies.yaml`, not redeclared. The route proposes and writes nothing; approving is .NET's, through `ProductFamilyService`.
 - **C18b** (HU-AIENG-018b) adds `POST /v1/families/audit`, the **tenth** `/v1` route, and regenerates `openapi.json` in the same change as C18a did for the ninth. It audits the families that **already exist** rather than proposing new ones: it reports members the vectors do not support — a product of another family sits closer than the member's own worst sibling — and, in the same call, unassigned products that look like they belong to one. The two are the same comparison read from opposite sides of the membership line, which is why there is one route and not two. Orphans are nominated by **margin relative to the target family's own cohesion** (`JPV_FAMILY_ORPHAN_MARGIN`), never by an absolute cutoff: measured over the corpus, neighbourhood purity fires overwhelmingly on synthetic near-duplicates built to be distinct families, while relative margin fires almost entirely on real catalogue gaps — so purity is kept as a **ranking signal only**. The relative veto is reused from C18a with a different universe (persisted families instead of proposed ones), not reimplemented. Like every route here it reads **only `ai.product_document`** and never schema `public`, so the memberships it audits are the ones the index projection holds as of the last sync. It writes nothing: the verdict is .NET's, in `FamilyReviewVerdict`.
@@ -119,7 +119,7 @@ Rules that C03 must rely on:
 
 With `STUB_MODE=true` (the local and test default) every `/v1` route answers from deterministic fixtures: no LLM, no embeddings, no database, no clock. The same request always returns the same body, so the .NET client can assert its mapping against them.
 
-With `STUB_MODE=false` a route whose real logic does not exist yet answers **501** naming the change that will deliver it (C24 evals, C26 substitutes, C30 assist, C35 inventory). `POST /v1/enrich/products` is C09: the real pipeline, or 503 if `JPV_RAG_LLM_API_KEY` is missing — never 501. `POST /v1/index/sync` and `GET /v1/index/status` are C13: the catalog drain, or 503 if feed/embed settings or `sku_provenance.json` are missing — never 501. `POST /v1/retrieval/products` is C14: the vector retriever, or 503 if `JPV_EMBEDDING_API_KEY`, `DATABASE_URL` or a compatible index is missing — never 501. Substitutes stay 501 until C26. Later changes replace remaining handlers one at a time; the contract frozen here is the one they must respect.
+With `STUB_MODE=false` a route whose real logic does not exist yet answers **501** naming the change that will deliver it (C30 assist, C35 inventory). `POST /v1/enrich/products` is C09: the real pipeline, or 503 if `JPV_RAG_LLM_API_KEY` is missing — never 501. `POST /v1/index/sync` and `GET /v1/index/status` are C13: the catalog drain, or 503 if feed/embed settings or `sku_provenance.json` are missing — never 501. `POST /v1/retrieval/products` is C14: the vector retriever, or 503 if `JPV_EMBEDDING_API_KEY`, `DATABASE_URL` or a compatible index is missing — never 501. `POST /v1/retrieval/substitutes` is C26: the substitutes engine over the stored embedding, or 503 if `DATABASE_URL` is missing — never 501, and **never a provider key**, because that route embeds nothing. It is the last 501 the service could close: `/v1/inventory/propose` also answers 501, but its branch was cancelled on 2026-08-31 and that is declared as a limitation rather than as pending work. Later changes replace remaining handlers one at a time; the contract frozen here is the one they must respect.
 
 ## Enrichment prompt versions
 
@@ -602,6 +602,114 @@ the **shape** of the distance profile — an impossible query is flat, because n
    answerable; 12 of the 20 queries name one, because the five inherited from C24 all do and
    rewriting them would falsify the comparison with the published baseline.
 
+## Out-of-stock substitutes (C26)
+
+`POST /v1/retrieval/substitutes` was the last closeable 501 of the frozen contract. It answers
+the question the retriever could not: *this piece cannot be sold — what do I show instead?*
+
+**It calls no provider.** Substitutes are product to product, the anchor is a `product_id`, and
+that product's embedding is already stored, so the whole capability is one SQL statement: no
+query to embed, no lexical branch, no synonym expansion and no rank fusion. `fuse()` is not
+called, because there is a single candidate list and a fusion over one list is the identity
+map. A test asserts the provider is never touched.
+
+**The candidate universe has exactly one hard filter: `piece_type`.** A ring is not a
+second-best pendant, and the raw vector violates the type in 2 of the 4 measured cases. The
+source product itself and anything in `filters.exclude_product_ids` are removed too. Nothing
+else removes a candidate — in particular **availability never does**.
+
+**The order is three continuous terms and no integer block:**
+
+```
+  orden(c) = sim(c)                              sim = 1 - distancia coseno
+           - w_size          · [talla distinta]  sólo si AMBAS declaran talla
+           - w_availability  · [qty_bucket = 0]  business_score de C25, reutilizado
+```
+
+`demotion_rank` is deliberately **not** reused. Its size component is an integer block, and a
+block does not break a tie — it PARTITIONS, sending every candidate of another size behind
+every candidate of the right one. That is the shape C25 measured with its rotation term
+(11.067 inverted pairs, 71,2 % of them more than ten positions apart) and withdrew. Measured
+here on the live `SKU13` neighbours: under a block the nearest sibling falls from position 1
+to position 4 and the furthest leaves the top five; under the continuous term both stay
+visible. `test_different_size_sibling_stays_inside_the_visible_window` is the guard.
+
+**The size term is inert unless both sides declare a size.** An absent size is not a mismatch,
+and it is not a corner case: **54 % of the rings carry no `size_label`**.
+
+**The family is guaranteed, not privileged.** Every live member of the source product's family
+comes back and reports `family_match`, but membership buys no position: measured over the four
+reserved queries, "same family first" leads with the unsellable candidates, because a family
+is by construction the set of pieces that differ in exactly the attribute that disqualifies.
+
+**Availability demotes and never eliminates**, the §15.10 invariant: the projection can lag
+minutes behind the counter, so a candidate it reports as exhausted is ranked below its
+available peers and still returned. **Excluding on stock is C34's**, on the .NET side, which is
+where the authority over stock lives. The projection age travels in each result's
+`debug.notes`, because `SubstitutesResponse` has no field for it and the snapshot is frozen.
+
+**An unusable source product is an explicit error, never an empty success.** Absent from the
+index, inactive, or indexed without an embedding → **422 naming the cause**. A 200 with an
+empty list is indistinguishable from a catalogue that holds no substitute.
+
+**The endpoint does not abstain, and that is measured.** Over a sample of 300 documents the
+distance to the nearest neighbour tops out at 0,123 with a family and 0,255 without one, and
+the second range contains the first — the containment that stopped C25 re-fixing its scalar
+threshold. In a catalogue of 1.168 Menorcan sea-jewellery pieces everything resembles
+something, so `low_confidence` is emitted false by decision rather than by deferral.
+
+### The setting
+
+`JPV_SUBSTITUTE_WEIGHT_SIZE` (default **0,05**, optional at boot, blank means unset). Unlike
+`JPV_BUSINESS_WEIGHT_AVAILABILITY`, **its value matters and not only its sign**: that one is a
+binary term at the end of an otherwise lexicographic key, so the score took two values and any
+positive weight gave the same order. Here a binary size term is mixed with a continuous cosine
+similarity, so the weight fixes a real exchange rate. Zero is the rollback and restores exactly
+the ordering the remaining terms produce alone.
+
+The default comes from the sweep in
+[`evals/results/c26-substitutes-slice.md`](evals/results/c26-substitutes-slice.md), not from an
+argument. Eleven grid points over the five anchored queries: graded nDCG@5 peaks at `0,075`
+(0,8785), but from `0,07` upward the **binary** reading falls from 1,0000 to 0,9738 and
+Recall@5 from 0,4241 to 0,4135 — a grade-0 document (`SKU334 Anillo plata M`, the right size
+and nothing else) enters a top five. Under C25's precedent of optimising with pure relevance as
+the guardrail, the largest weight that holds every guardrail at its maximum is `0,06`, and
+`0,06` beats `0,05` by **0,0051 of nDCG@5** on a single position swap in one query. That is
+below noise, so the declared rule applies and **`0,05` is adopted** — measured, not assumed.
+
+### Two limitations, both measured
+
+1. **`style_similarity` is structurally near zero on the real catalogue.** Only **1 of 404**
+   real products has any same-type candidate to share a style tag with, against **97,8 %** by
+   material. The contract declares the field required and not nullable, so the Jaccard is
+   emitted and **the absence is declared in `match_reasons`** — a zero over two untagged pieces
+   must never be read as "different styles". It is deliberately **not** derived from the
+   embedding: that would give it 100 % coverage and make it a copy of `score`, which is the
+   second-definition-that-diverges mistake C19 was annulled for.
+2. **The evaluation isolates the quality of the substitute GIVEN the correct source product.**
+   The golden-set queries are text and the endpoint takes a `product_id`, so each query
+   declares an explicit `source_product_id`. The full chain «operator's text → product →
+   substitutes» is **C32's** and is not measured here; chaining it would have charged this
+   capability with the first step's failures. Two further limits of the slice: it is five
+   queries, and only **two of them move at all** under the weight — the other three name no
+   size or have none — so the sweep is decided by a narrow base; and the annotator is the same
+   agent that designed the ordering, which is declared exactly as the README already declares
+   the absence of inter-annotator agreement for the golden set as a whole.
+
+### Running the slice
+
+```bash
+cd ai-service
+DATABASE_URL=... uv run --system-certs evals substitutes
+DATABASE_URL=... uv run --system-certs evals substitutes --weights 0,0.05,0.08
+```
+
+It is a **subcommand of its own and never a row of `run --all`**: the endpoint takes a product
+identifier, so `v0-fts` and `v0-nombre` could not execute it, and a row would move the
+denominator of a table published twice. `GoldenSet.retrieval_queries` enforces that split in
+code — the ablation runner and the sweep measure it, `judged_queries` stays the composition of
+the set — and `test_the_published_ablation_denominator_is_the_one_c25_measured` pins it at 63.
+
 ## Tests
 
 ```bash
@@ -630,7 +738,7 @@ These four tests exist to catch failures that produce **no error at all**: an HN
 
 ## Explicit non-goals
 
-- No real retrieval or agent loops — stubs are replaced route by route in later changes. Enrichment is real when `STUB_MODE=false` (C09). Catalog index sync is real when `STUB_MODE=false` (C13). Product retrieval is real when `STUB_MODE=false` (C14), **hybrid since C21** and **fused in two stages since C25**: the two lexical lists are fused with each other and the result with the vector list under per-branch weights, so a branch's vote is the one declared however many of its lists matched. The scalar distance threshold 0.65 remains a floor rather than a discriminator, and C25 answers that with a relative per-query rule instead of moving it. No `query_log`, `indexing/embeddings.py` and `openapi.json` unchanged. Substitutes stay stub/501 (C26)
+- No real retrieval or agent loops — stubs are replaced route by route in later changes. Enrichment is real when `STUB_MODE=false` (C09). Catalog index sync is real when `STUB_MODE=false` (C13). Product retrieval is real when `STUB_MODE=false` (C14), **hybrid since C21** and **fused in two stages since C25**: the two lexical lists are fused with each other and the result with the vector list under per-branch weights, so a branch's vote is the one declared however many of its lists matched. The scalar distance threshold 0.65 remains a floor rather than a discriminator, and C25 answers that with a relative per-query rule instead of moving it. Substitutes are real when `STUB_MODE=false` (C26), over the embedding the index already holds. No `query_log`, `indexing/embeddings.py` and `openapi.json` unchanged
 - No `POST /v1/retrieval/complementary` — later OpenAPI negotiation. `POST /v1/families/suggest` **exists since C18a**, which is the change that first called it; `POST /v1/families/audit` since C18b, for the same reason
 - `ai.product_document` is written by C13 from the catalog feed; `ai.pos_projection` is **written by C22** from the POS availability feed; `ai.knowledge_document` and `ai.knowledge_chunk` are **written by C23**, by `python -m jbg_ai.indexing sync-knowledge`, from the corpus in `data/knowledge/`
 - No `ai.query_log` (unassigned; the pipeline logs `stage=expand|embed|search|lexical|filters|fuse` with `trace_id` instead). The `ai.eval_*` tables **exist since C24** and are written only with `--persist`

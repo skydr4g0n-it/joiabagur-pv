@@ -46,10 +46,10 @@ parallel taxonomy later.
 | `enrichment/` | C09, FIX1 (landed: the four widened `piece_type` canonicals and their folding, the prompt whose heading must match `PROMPT_VERSION`, the prompt list pinned against the YAML, and the null that is an outcome and not a rejected extraction) |
 | `families/` | C18a (landed: root grouping, material fusion, guards, relative veto, `POST /v1/families/suggest`), C18b (landed: audit over persisted families, orphan nomination by relative margin, source guards that the audit writes nothing and calls no provider) |
 | `indexing/` | C11 (landed: source-text/v1 + embeddings), C13 (landed: catalog drain + `sku_provenance.json`), C22 (landed: typed POS feed items, the `ai.pos_projection` repository whose tombstone is a soft delete, and the POS drain with its own `pos-availability` checkpoint and per-page failures), C23 (landed: the `sync-knowledge` subcommand only — everything it drives is tested in `knowledge/`) |
-| `retrieval/` | C14, C20 (landed: two-layer synonym dictionary, equivalence-group expansion, directional bridges, the enable flag swept in-process, and the measurement CLI's safe `tsquery` composition), C21 (landed: safe `tsquery` composition with coordination ordering, weighted RRF over three ranked lists, structural filters that demote and never exclude, and the bounded cache of the embedding singleton), C22 (landed: the point-of-sale scope as the only hard filter, availability as the last demotion block, freshness read from the checkpoint and never from the rows, and the 503-on-empty / degrade-on-stale pair), FIX1 (landed: the four closed gaps gone from the exclusions, the guard test re-aimed at `filigrana`, and the plural canonical reached from its singular), C24 (landed: the deterministic tiebreak both statements needed — the compiled `ORDER BY` asserted key by key so removing it from the SQL breaks the test, and truncation proved stable where distance ties and where `coordination` and `ts_rank` tie together), C25, C26, C27 |
+| `retrieval/` | C14, C20 (landed: two-layer synonym dictionary, equivalence-group expansion, directional bridges, the enable flag swept in-process, and the measurement CLI's safe `tsquery` composition), C21 (landed: safe `tsquery` composition with coordination ordering, weighted RRF over three ranked lists, structural filters that demote and never exclude, and the bounded cache of the embedding singleton), C22 (landed: the point-of-sale scope as the only hard filter, availability as the last demotion block, freshness read from the checkpoint and never from the rows, and the 503-on-empty / degrade-on-stale pair), FIX1 (landed: the four closed gaps gone from the exclusions, the guard test re-aimed at `filigrana`, and the plural canonical reached from its singular), C24 (landed: the deterministic tiebreak both statements needed — the compiled `ORDER BY` asserted key by key so removing it from the SQL breaks the test, and truncation proved stable where distance ties and where `coordination` and `ts_rank` tie together), C25, C26 (landed: `test_substitutes.py` — the hard filter, the continuous ordering key and the block it must not be, the inert size term, the declared signals and the provider that is never called), C27 |
 | `knowledge/` | C23 (landed: the seven authoring rules and the coverage invariant derived from the enrichment vocabulary, pure section chunking, deterministic `uuid5` identity whose citations resolve to a file and a heading of `data/knowledge/`, idempotent indexing that re-embeds nothing unchanged, the callable search with its own abstention threshold, the D16 ring-size table, and the offline fixture measurement) |
 | `assist/` | C30, C31, C32, C33, C35 |
-| `evals/` | C24 (landed: the golden set validation that **fails the load** when the composition stops being able to arbitrate what the set exists for, adaptive-depth pooling with appendable judgements, nDCG against a hand-computed fixture with the binary reading beside it, the two `v0` baselines and the guard that breaks when the canonical renderer drifts, deterministic truncation of the context-only catalogue with the omitted count recorded, provenance-gated comparability over frozen query vectors, and the default-change rule exercised in all four of its outcomes), C38 |
+| `evals/` | C24 (landed: the golden set validation that **fails the load** when the composition stops being able to arbitrate what the set exists for, adaptive-depth pooling with appendable judgements, nDCG against a hand-computed fixture with the binary reading beside it, the two `v0` baselines and the guard that breaks when the canonical renderer drifts, deterministic truncation of the context-only catalogue with the omitted count recorded, provenance-gated comparability over frozen query vectors, and the default-change rule exercised in all four of its outcomes), C26 (landed: `test_substitutes_slice.py` — the anchored queries and the split that keeps the published ablation denominator from moving), C38 |
 
 Changes with no Python zone (C03, C04, C07, C08, C12, C15, C16, C19, C28, C29,
 C34, C36, C37) are tested on the .NET or frontend side. C17 also ships a post-deploy smoke
@@ -116,7 +116,7 @@ uv run --system-certs pytest
 
 ## Current state
 
-Populated after C24: `api/`, `config/`, `db/`, `migrations/` (C05 + C13 + C18b + C22 + C24), `data/` (C06b/C10), `enrichment/` (C09 + FIX1), `indexing/` (C11 + C13 + C22), `families/` (C18a + C18b), `retrieval/` (C14 + C20 + C21 + C22 + FIX1 + C24), `knowledge/` (C23), `evals/` (C24) and `support/`. Remaining folders are reserved names. Two settings in
+Populated after C24: `api/`, `config/`, `db/`, `migrations/` (C05 + C13 + C18b + C22 + C24), `data/` (C06b/C10), `enrichment/` (C09 + FIX1), `indexing/` (C11 + C13 + C22), `families/` (C18a + C18b), `retrieval/` (C14 + C20 + C21 + C22 + FIX1 + C24 + C26), `knowledge/` (C23), `evals/` (C24 + C26) and `support/`. Remaining folders are reserved names. Two settings in
 `pyproject.toml` hold the layout together:
 
 - `pythonpath = ["src", "tests"]` — makes `support/` importable from any subfolder.
@@ -133,6 +133,44 @@ not decoration: pydantic reads unset fields from the environment, so without the
 pin a developer with `DATABASE_URL` exported would see tests build engines against
 their own database — and the cases that assert "no database configured" would
 quietly stop failing when they should.
+
+## C26 — out-of-stock substitutes
+
+Two new files and one extended double.
+
+| file | what it owns |
+|---|---|
+| `retrieval/test_substitutes.py` | the engine: hard filter on `piece_type`, the three exclusions, family recall without family priority, the continuous ordering key, the inert size term, availability that demotes and never removes, the four signals, `match_reasons`, the absence of abstention, the three unusable-source errors, and the provider that is never called |
+| `api/test_substitutes_route.py` | the route: the C02 stub still served under `STUB_MODE`, 200 instead of 501 in real mode, 422 naming the cause for an unusable source, 503 without a database and **no provider key demanded**, and the token scope winning over the body |
+| `evals/test_substitutes_slice.py` | the slice: every substitutes query anchored, one anchor with no family, and the split that stops the published ablation denominator moving |
+| `support/fake_product_search.py` | extended with `source_document` and `neighbours_of`, plus `style_tags` and `price_band` on `FakeIndexedRow`. The fake mirrors the statement predicate for predicate and has **no restricting scope**, because there is none in the SQL either: a fake that dropped an unstocked candidate would make the invariant untestable |
+
+**The fixture is measured, not invented.** `SKU13_NEIGHBOURS` in `test_substitutes.py` holds
+the ten real cosine distances the live index returns for `SKU13 Anillo erizo de mar M` after
+the `piece_type` filter. Round numbers would let the ordering tests pass on arithmetic the
+catalogue does not produce; two of these scenarios only discriminate because the real gaps are
+as narrow as they are.
+
+**`test_different_size_sibling_stays_inside_the_visible_window` is the one that matters.**
+Every other scenario here would also pass under an integer-block size term — the shortcut
+`demotion_rank` invites, since it has one written already. This one does not. Re-ordering the
+same fixture under a block: the nearest sibling `SKU14` falls from position 1 to position 4,
+behind all three size matches, and `SKU15` leaves the top five. Both assertions fail. It is not
+enough that the right size rises; the demoted sibling has to stay visible.
+
+**Two existing tests moved rather than disappeared.** `test_stub_mode.py` had
+`/v1/retrieval/substitutes` in its 501 parametrisation and asserted the string `"C26"` in the
+detail. The route answers now, so the 501 property was **re-homed onto `/v1/assist/sale`**
+(waiting on C30) instead of being deleted, and a new
+`test_no_retrieval_route_is_left_answering_501` asserts the obligation C26 lifted, in the
+negative.
+
+**A trap this change walked into, recorded so the next route does not.** FastAPI publishes a
+handler's **docstring** as the operation `description`. `retrieve_substitutes` had none in the
+frozen snapshot — it was written as a two-line stub — so adding one turned
+`test_openapi_snapshot_is_stable` red on a field that appeared out of nowhere. The explanation
+lives in a comment above the decorator instead. `retrieve_products` keeps its docstring because
+the snapshot already carries it.
 
 ## C25 — ranking, business signals and abstention
 

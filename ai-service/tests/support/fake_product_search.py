@@ -1,14 +1,24 @@
-"""In-memory product search port. No sockets, no RDS. Delivered by C14, extended by C21 and C22."""
+"""In-memory product search port. No sockets, no RDS.
+
+Delivered by C14, extended by C21, C22 and C26.
+"""
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import UUID
 
 from jbg_ai.enrichment.vocab import fold
 from jbg_ai.retrieval.lexical import LexicalRequest
-from jbg_ai.retrieval.ports import LexicalHit, SearchFilters, SearchHit
+from jbg_ai.retrieval.ports import (
+    LexicalHit,
+    NeighbourHit,
+    SearchFilters,
+    SearchHit,
+    SourceDocument,
+)
 
 #: What an unspecified projection means here: this point of sale carries the whole indexed
 #: set, in stock. A legitimate world state, and the one that leaves a test about fusion or
@@ -62,7 +72,11 @@ class FakeIndexedRow:
     variant_label: str | None = None
     piece_type: str | None = None
     price: float | None = None
+    price_band: str | None = None
     size_label: str | None = None
+    #: C26 reads them for `style_similarity`. Empty is the ordinary case and not a gap:
+    #: 131 documents of 1.168 carry any style tag at all.
+    style_tags: list[str] = field(default_factory=list)
     doc_text: str = ""
     is_active: bool = True
     has_embedding: bool = True
@@ -95,6 +109,8 @@ class FakeProductSearch:
         self.lexical_calls: list[dict[str, object]] = []
         self.scope_calls: list[UUID] = []
         self.synced_at_calls = 0
+        self.source_document_calls: list[UUID] = []
+        self.neighbour_calls: list[dict[str, object]] = []
 
     def _scope(self, pos_id: UUID) -> dict[UUID, FakeAssignment]:
         """What this point of sale actually carries, by product identifier."""
@@ -305,3 +321,90 @@ class FakeProductSearch:
     def _group_matches(row: FakeIndexedRow, group: tuple[str, ...]) -> bool:
         haystack = fold(row.doc_text)
         return any(fold(form) in haystack for form in group if form.strip())
+
+    # --- C26 substitutes ----------------------------------------------------------------
+
+    async def source_document(self, product_id: UUID) -> SourceDocument | None:
+        """Mirrors the statement: the row is returned whether or not it is usable.
+
+        Inactive and embedding-less rows come back as VALUES rather than as `None`, because
+        the three unusable cases are three different errors and a fake that collapsed them
+        would let a test pass without distinguishing them.
+        """
+        self.source_document_calls.append(product_id)
+        for row in self.rows:
+            if row.product_id != product_id:
+                continue
+            return SourceDocument(
+                product_id=row.product_id,
+                sku=row.sku,
+                piece_type=row.piece_type,
+                size_label=row.size_label,
+                materials=list(row.materials),
+                style_tags=list(row.style_tags),
+                family_id=row.family_id,
+                price_band=row.price_band,
+                is_active=row.is_active,
+                has_embedding=row.has_embedding,
+            )
+        return None
+
+    async def neighbours_of(
+        self,
+        product_id: UUID,
+        *,
+        piece_type: str | None,
+        depth: int,
+        exclude_product_ids: Sequence[UUID] = (),
+        signal_pos_id: UUID | None = None,
+    ) -> list[NeighbourHit]:
+        """Applies the same three predicates as the statement, and no fourth.
+
+        There is no restricting scope here and there must never be one: `signal_pos_id` only
+        reads, so a candidate this point of sale does not carry still comes back with its
+        bucket absent. A fake that dropped it would make the invariant untestable.
+        """
+        self.neighbour_calls.append(
+            {
+                "product_id": product_id,
+                "piece_type": piece_type,
+                "depth": depth,
+                "exclude_product_ids": list(exclude_product_ids),
+                "signal_pos_id": signal_pos_id,
+            }
+        )
+        _, reading = self._scopes(None, signal_pos_id)
+        excluded = set(exclude_product_ids)
+
+        hits: list[NeighbourHit] = []
+        for row in self.rows:
+            if not row.is_active or not row.has_embedding:
+                continue
+            if row.product_id == product_id or row.product_id in excluded:
+                continue
+            # `IS NOT DISTINCT FROM`: null matches null, so an untyped source is offered
+            # untyped candidates and never a ring.
+            if row.piece_type != piece_type:
+                continue
+            hits.append(
+                NeighbourHit(
+                    product_id=row.product_id,
+                    sku=row.sku,
+                    distance=row.distance,
+                    materials=list(row.materials),
+                    style_tags=list(row.style_tags),
+                    family_id=row.family_id,
+                    variant_label=row.variant_label,
+                    piece_type=row.piece_type,
+                    size_label=row.size_label,
+                    price_band=row.price_band,
+                    price=row.price,
+                    qty_bucket=self._bucket(reading, row.product_id),
+                    sales_30d=self._sales(reading, row.product_id),
+                )
+            )
+        # Same final key as `_NEIGHBOURS_ORDER_LIMIT`, tiebreak included: a fake that
+        # truncated under a weaker order would let a test about truncation pass while the
+        # real statement cut arbitrarily.
+        hits.sort(key=lambda item: (item.distance, item.product_id))
+        return hits[:depth]

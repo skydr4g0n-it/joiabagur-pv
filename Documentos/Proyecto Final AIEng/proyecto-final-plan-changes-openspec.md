@@ -707,7 +707,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 | **C24** | `add-eval-harness-golden-set-and-baselines` | Python | C14, C21 | ✅ | **archivado el 2026-09-11** · dec. 12 respondida: la vectorial bate a la léxica · etiquetado simple |
 | **C25** | `recalibrate-ranking-and-abstention` | Python | C21, C22, C24 | ✅ | **archivado el 2026-09-12** · renombrado desde `add-business-signals-ranking`; **3 puntos de la ficha retirados por medición** y un defecto de C21 corregido: la fusión concatenaba |
 | **C25bis** | `clean-plain-fusion` | Python | C25 | ✅ | **implementado el 2026-09-12**, 45/45 · *retiró la fusión plana y los tres pesos por lista; las 315 filas por consulta, idénticas* |
-| **C26** | `add-substitutes-retrieval` | Python | C22, C25 | 🟢 | specs v2 §6.3.2 |
+| **C26** | `add-substitutes-retrieval` | Python | C22, C25 | 🟢 | specs v2 §6.3.2 · *implementado, pendiente de archivar* |
 | ~~**C27**~~ | ~~`add-complementary-recommendations`~~ | ~~Python + .NET 🗄️~~ | C10, C25 | ⛔ | **rev. dec. 8** · **corte nº 1 disparado el 2026-09-12** con cinco mediciones (§0) |
 | **C28** | `add-profile-review-ui-and-metrics` | Frontend + .NET | C08 | 🟢 | **rev. dec. 5** · *lo pide el checklist §16* |
 | ~~**C29**~~ | ~~`add-inventory-recommendation-entity`~~ | .NET 🗄️ | C19 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
@@ -1165,7 +1165,7 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ---
 
-#### C26 · `add-substitutes-retrieval` 🟠 *(en curso desde el 2026-09-12)*
+#### C26 · `add-substitutes-retrieval` 🟢 *(implementado el 2026-09-12; pendiente de archivar)*
 
 **Objetivo.** Sustitutos por falta de stock, con señales explicables. Cierra el último **501 cerrable** del contrato congelado y hace real la tool `buscar_sustitutos` de C32.
 **Prereq.** C22, C25, ambos archivados · **Zona.** `ai-service/src/jbg_ai/retrieval/` **+ `evals/` + `evals/golden/`** — **decimocuarta vez** que la zona de una ficha se queda corta. Sin migración, sin mover `openapi.json`, sin diff fuera de `ai-service/`, `Documentos/` y `openspec/`, y **sin una sola llamada al proveedor**: sustituto es producto→producto y el embedding de origen ya está almacenado.
@@ -1173,9 +1173,47 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 > **Tres puntos de esta ficha, refutados por medición** *(2026-09-12)*. **«Misma familia primero» está invertida**: la familia es, por construcción, el conjunto de piezas que se diferencian **justo en el atributo que descalifica** —la talla—, y para `SKU13` el top-5 del vector puro **no contiene un solo sustituto usable**. Pero excluirla perdería el #1 de `SKU159`, que es su hermano de **misma talla y otro material**: la pertenencia a familia es **ortogonal** y el discriminante es la talla. Lo confirma `criterion.md`, que ya clasificaba «falla la talla nombrada» como **grado 1 — segunda opción**. La familia entra en el conjunto **sin imponer orden**, y la talla va como **término continuo en la cola** (`w ≈ 0,05`, barrido), **inerte si alguna de las dos piezas no declara talla** —el 54 % de los anillos no tiene `size_label`—. **No se reutiliza `demotion_rank`**: su bloque entero de talla particiona, el fallo exacto que C25 midió con la rotación. Y **la exclusión por stock sale de aquí**: estaba especificada dos veces y la cubre C34, donde vive la autoridad sobre el stock. Detalle en [`c26-exploration-measurements.md`](informes/c26-exploration-measurements.md).
 
-**Tests.** `test_no_live_family_member_is_dropped_from_the_result` *(sustituye a `test_same_family_variant_ranks_first_when_available`)*; `test_same_size_candidate_outranks_same_family_different_size`; `test_different_size_sibling_stays_inside_the_visible_window`; `test_size_term_is_inert_when_either_side_declares_no_size`; `test_never_returns_a_different_piece_type`; `test_material_overlap_increases_similarity_score`; `test_out_of_stock_candidate_is_demoted_and_never_removed`; `test_substitutes_never_abstains_and_says_so`; `test_style_similarity_absence_is_declared_in_match_reasons`; `test_no_embedding_provider_call_is_made`; `test_unknown_or_unindexed_source_product_is_an_explicit_error`; `test_source_product_never_returned_as_own_substitute`. **`test_excludes_out_of_stock_when_flag_enabled` no se escribe**: su requisito se retiró.
+> **Lo entregado, y en qué se desvía de la ficha** *(2026-09-12)*. Detalle y cifras en
+> [`c26-implementation-measurements.md`](informes/c26-implementation-measurements.md).
+>
+> - **`w_size = 0,05` sale del barrido y no del argumento**, once puntos de rejilla sobre las
+>   cinco consultas. El término hace algo —de `0` a `0,05`, **+0,1039 de nDCG@5**—, con lo que
+>   la conclusión de C25 *«el valor del peso no cambia el orden, sólo su signo»* queda
+>   confirmada como **no trasladable**. Las dos lecturas **discrepan**: el nDCG graduado premia
+>   `0,075`, pero a partir de `0,07` la lectura binaria cae de 1,0000 a 0,9738 y `Recall@5` de
+>   0,4241 a 0,4135, porque entra `SKU334 Anillo plata M` —talla correcta y nada más, el grado 0
+>   explícito de `criterion.md`— en un top-5. Bajo el guardarraíl de C25 el mejor punto que no
+>   degrada es `0,06`, que supera a `0,05` en **0,0051** por un solo intercambio de posiciones
+>   en una consulta: bajo el ruido, así que se aplica la regla declarada y gana `0,05`.
+> - **El bloque entero, medido.** Reordenando los diez vecinos reales de `SKU13` con la clave de
+>   bloque, el hermano más cercano cae del puesto 1 al **4** —detrás de un anillo que está al
+>   doble de distancia— y el más lejano sale de la ventana. Con el término continuo, puestos 1 y
+>   5. `test_different_size_sibling_stays_inside_the_visible_window` falla las dos aserciones
+>   bajo el bloque, que es lo que lo hace un test y no una decoración.
+> - **La tarea 6.7 pasó de verificar a corregir.** Los ficheros publicados no cambian, pero el
+>   *runner* iteraba `judged_queries`, que subió de **63 a 68** al etiquetar las cinco consultas:
+>   una re-ejecución de la tabla de C24/C25 habría absorbido consultas que `v0-fts` y `v0-nombre`
+>   **no pueden ejecutar**. Se añadió `GoldenSet.retrieval_queries` y la separación queda en
+>   código, no en una convención. Antes de C26 los dos conjuntos coincidían, así que el alcance
+>   era correcto **por accidente**.
+> - **La edad de la proyección viaja en `debug.notes`**, no en un campo de respuesta:
+>   `SubstitutesResponse` no tiene `projection_age_seconds` —`RetrievalResponse` sí— y el
+>   contrato no se mueve. `debug` ya está en el contrato congelado.
+> - **`match_reasons` declara además la banda de precio cuando difiere**, que es la decisión
+>   aplicada de la pregunta abierta 2; sin ella `price_band` no tendría lector. Y
+>   **`material_overlap` entra como desempate estricto**, no como cuarto término: fijar cuánta
+>   similitud vale un material compartido es un peso que ninguna consulta puede calibrar.
+> - **Sesgo declarado:** el etiquetado de las 126 parejas lo hizo quien diseñó el orden. Lo
+>   acota que la rúbrica es del 2026-09-07 —anterior al change, y ya nombraba la talla como
+>   degradador a grado 1— y que se etiquetó sobre **atributos** y nunca sobre posiciones. No lo
+>   elimina. Y el barrido lo deciden **2 de las 5 consultas**: las otras tres no tienen talla.
+> - **Suite:** 997 → **1038 passed, 0 failed**. `openspec validate --all --strict`: **55/0**.
+>   `openapi.json`, `evals/results/` y `evals/configs/` **sin diff**; 126 juicios añadidos y
+>   **0 borrados**.
 
-**Artefactos.** Historia [HU-AIENG-026](../../Historias/AI-Eng/HU-AIENG-026.md) · ticket [T-AIENG-026](../../../openspec/changes/add-substitutes-retrieval/ticket.md) · mediciones [`c26-exploration-measurements.md`](informes/c26-exploration-measurements.md) · change [`add-substitutes-retrieval`](../../../openspec/changes/add-substitutes-retrieval/), rama `c26-add-substitutes-retrieval`.
+**Tests.** `test_no_live_family_member_is_dropped_from_the_result` *(sustituye a `test_same_family_variant_ranks_first_when_available`)*; `test_same_size_candidate_outranks_same_family_different_size`; `test_different_size_sibling_stays_inside_the_visible_window`; `test_size_term_is_inert_when_either_side_declares_no_size`; `test_never_returns_a_different_piece_type`; `test_material_overlap_increases_similarity_score`; `test_out_of_stock_candidate_is_demoted_and_never_removed`; `test_substitutes_never_abstains_and_says_so`; `test_style_similarity_absence_is_declared_in_match_reasons`; `test_no_embedding_provider_call_is_made`; `test_unknown_or_unindexed_source_product_is_an_explicit_error`; `test_source_product_never_returned_as_own_substitute`. **`test_excludes_out_of_stock_when_flag_enabled` no se escribe**: su requisito se retiró. Entregados **los doce**, en `tests/retrieval/test_substitutes.py`, más `tests/api/test_substitutes_route.py` y `tests/evals/test_substitutes_slice.py`.
+
+**Artefactos.** Historia [HU-AIENG-026](../../Historias/AI-Eng/HU-AIENG-026.md) · ticket [T-AIENG-026](../../../openspec/changes/add-substitutes-retrieval/ticket.md) · mediciones [`c26-exploration-measurements.md`](informes/c26-exploration-measurements.md) y [`c26-implementation-measurements.md`](informes/c26-implementation-measurements.md) · rebanada [`c26-substitutes-slice.md`](../../../ai-service/evals/results/c26-substitutes-slice.md) · change [`add-substitutes-retrieval`](../../../openspec/changes/add-substitutes-retrieval/), rama `c26-add-substitutes-retrieval`.
 
 ---
 
@@ -1271,6 +1309,22 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 **Alcance.** `GET /api/ai/products/{id}/sales-assist` y `.../substitutes?pointOfSaleId=`; **sustitución de `{{price}}`/`{{stock}}`** por valores reales; **rechazo de la respuesta si queda algún placeholder sin resolver**.
 **Tests.** `SalesAssist_ReplacesPlaceholdersWithRealValues`; `SalesAssist_WhenPlaceholderUnresolved_ReturnsErrorInsteadOfRawTemplate`; `Substitutes_ExcludeProductsWithoutStockAtTargetPos`; `SalesAssist_AsOperatorOfAnotherPos_Returns403`. *(`Recommendations_ManualPairsRankedFirst` no se escribe: su ruta se retiró con C27.)*
 **Conflicto de zona.** Mismo controlador que C15 → nunca simultáneos.
+
+> **La exclusión por falta de stock es de este change, y no está en C26** *(anotado el
+> 2026-09-12, al implementar C26)*. Estaba especificada **dos veces** —en la ficha de C26 y
+> aquí— y C26 la retiró de la suya al implementarse: excluir en Python rompería el
+> invariante del §15.10, donde la proyección de disponibilidad **degrada y nunca elimina**
+> porque puede desfasarse minutos, y ocultaría piezas que la tienda sí puede vender.
+> `POST /v1/retrieval/substitutes` **sobre-recupera a propósito** y lo declara en
+> `candidates_returned`, precisamente para que quien filtre aquí tenga de dónde llenar la
+> página. La autoridad sobre el stock es de .NET y el test que lo fija es el que esta ficha
+> ya lleva: `Substitutes_ExcludeProductsWithoutStockAtTargetPos`. **No se busque en Python.**
+>
+> Un aviso medido que viene con ello: el término de disponibilidad de C26 reutiliza
+> `w_availability = 1,0` de C25, y ahí la similitud vive en `[0, 1]`, así que en la práctica
+> ese peso **particiona** — agotados detrás de disponibles, siempre. No elimina nada y por
+> eso se deja, pero conviene saberlo antes de medir aquí. Está en el §7 de
+> [`c26-implementation-measurements.md`](informes/c26-implementation-measurements.md).
 
 ---
 

@@ -20,6 +20,7 @@ import sys
 from collections.abc import Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
+from uuid import UUID
 from pathlib import Path
 
 from jbg_ai.evals.configs import ABLATION_ORDER, load_all, load_config
@@ -342,6 +343,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     provider.add_argument("--limit", type=int, default=48)
 
+    # A subcommand of its own, and NOT a row of `run --all`: this endpoint takes a product
+    # identifier, so two configurations of the ablation table could not execute it, and a
+    # row here would move a denominator that has been published twice.
+    substitutes_cmd = sub.add_parser(
+        "substitutes",
+        help="C26 slice: the anchored substitutes queries, with the size-weight sweep",
+    )
+    substitutes_cmd.add_argument(
+        "--weights",
+        default=None,
+        help="Comma-separated size weights to sweep. Default: the declared grid",
+    )
+    substitutes_cmd.add_argument("--out", default=None)
+    substitutes_cmd.add_argument("--name", default=None)
+
     sub.add_parser("freeze-vectors", help="Freeze the query vectors against the real provider")
     sub.add_parser("validate", help="Load and validate the golden set. No database, no provider")
     return parser
@@ -369,6 +385,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return asyncio.run(_capture(args))
         if args.command == "rescore":
             return _rescore(args)
+        if args.command == "substitutes":
+            return asyncio.run(_substitutes(args))
         if args.command == "provider-latency":
             return asyncio.run(_provider_latency(args))
         return asyncio.run(_run(args))
@@ -514,3 +532,173 @@ def run_module(argv: Sequence[str] | None = None) -> int:
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     return main(argv)
+
+
+async def _substitutes(args: argparse.Namespace) -> int:
+    """C26: run the anchored substitutes queries over the size-weight grid.
+
+    A slice, with its own report. It shares the golden set and the metric functions with the
+    ablation table and shares nothing else — no configuration file, no row, no denominator.
+    """
+    from jbg_ai.db.engine import dispose_engine
+    from jbg_ai.evals.cag_run import RESULTS_DIR
+    from jbg_ai.evals.execute import build_search, harness_settings
+    from jbg_ai.evals.metrics import aggregate
+    from jbg_ai.evals.provenance import (
+        NO_FUSION,
+        Provenance,
+        current_git_sha,
+        index_set_hash,
+    )
+    from jbg_ai.evals.substitutes_slice import (
+        SWEEP_WEIGHTS,
+        config_id,
+        run_slice,
+        substitute_queries,
+    )
+
+    weights = (
+        tuple(float(item) for item in args.weights.split(",") if item.strip())
+        if args.weights
+        else SWEEP_WEIGHTS
+    )
+    settings = harness_settings()
+    search = build_search(settings)
+    golden = load_golden_set()
+
+    cases = await run_slice(golden, settings=settings, search=search, weights=weights)
+    ids = await _indexed_product_ids(settings)
+    await dispose_engine()
+
+    provenance = Provenance(
+        golden_set_version=golden.version,
+        config_id="c26-substitutes-slice",
+        index_set_hash=index_set_hash(ids),
+        # None is an ANSWER here and not a gap: the slice calls no embedder, so a change of
+        # embedding model does not make a run incomparable with its own earlier runs.
+        embedding_model_version_key=None,
+        git_sha=current_git_sha(),
+        fusion_mode=NO_FUSION,
+    )
+
+    queries = substitute_queries(golden)
+    lines = [
+        "# C26 — rebanada de sustitutos",
+        "",
+        "| Procedencia | Valor |",
+        "|---|---|",
+    ]
+    lines += [
+        f"| {key} | `{value}` |" for key, value in provenance.as_dict().items()
+    ]
+    lines += [
+        "",
+        f"{len(queries)} consultas ancladas · {len(weights)} pesos · "
+        f"**cero llamadas al proveedor**.",
+        "",
+        "| `w_size` | nDCG@5 | nDCG@5 binario | Recall@5 | P@3 | MRR | unjudged@5 |",
+        "|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for weight in weights:
+        values = aggregate(
+            [case.metrics for case in cases if case.weight_size == weight]
+        ).values
+        lines.append(
+            f"| `{weight:g}` | {values['ndcg_at_5']:.4f} | "
+            f"{values['ndcg_at_5_binary']:.4f} | {values['recall_at_5']:.4f} | "
+            f"{values['precision_at_3']:.4f} | {values['mrr']:.4f} | "
+            f"{values['unjudged_at_5']:.4f} |"
+        )
+
+    lines += ["", "## nDCG@5 por consulta", "", "| `w_size` | " + " | ".join(
+        item.id for item in queries
+    ) + " |", "|---:|" + "---:|" * len(queries)]
+    for weight in weights:
+        row = {
+            case.query_id: case.metrics.ndcg_at_5
+            for case in cases
+            if case.weight_size == weight
+        }
+        lines.append(
+            f"| `{weight:g}` | "
+            + " | ".join(f"{row[item.id]:.4f}" for item in queries)
+            + " |"
+        )
+
+    # The decision RULE, applied by the program rather than narrated afterwards: C25's
+    # precedent is to optimise the headline metric with pure relevance as a GUARDRAIL. Here
+    # the guardrail is the binary reading plus Recall@5 and P@3 — a weight that starts
+    # admitting a grade-zero document into a top five has stopped buying relevance and
+    # started buying the metric.
+    by_weight = {
+        weight: aggregate(
+            [case.metrics for case in cases if case.weight_size == weight]
+        ).values
+        for weight in weights
+    }
+    guardrails = ("ndcg_at_5_binary", "recall_at_5", "precision_at_3")
+    ceiling = {
+        name: max(values[name] for values in by_weight.values()) for name in guardrails
+    }
+    safe = [
+        weight
+        for weight in weights
+        if all(by_weight[weight][name] >= ceiling[name] for name in guardrails)
+    ]
+    argmax = max(weights, key=lambda weight: by_weight[weight]["ndcg_at_5"])
+    best_safe = max(safe, key=lambda weight: by_weight[weight]["ndcg_at_5"]) if safe else None
+
+    lines += [
+        "",
+        "## El recorrido y la decisión",
+        "",
+        f"- **Máximo de nDCG@5 graduado:** `{argmax:g}` "
+        f"({by_weight[argmax]['ndcg_at_5']:.4f}).",
+        f"- **Guardarraíl** (lectura binaria, Recall@5 y P@3 en su máximo): se mantiene hasta "
+        f"`{best_safe:g}` inclusive y se rompe a partir de ahí."
+        if best_safe is not None
+        else "- **Guardarraíl:** ningún peso lo mantiene.",
+    ]
+    if best_safe is not None and argmax != best_safe:
+        lines.append(
+            f"- Las dos lecturas **discrepan**, y `criterion.md` dice que eso es un hallazgo "
+            f"y se publica: el graduado premia `{argmax:g}` "
+            f"(+{by_weight[argmax]['ndcg_at_5'] - by_weight[best_safe]['ndcg_at_5']:.4f}), "
+            f"pero ahí la lectura binaria cae "
+            f"{by_weight[best_safe]['ndcg_at_5_binary'] - by_weight[argmax]['ndcg_at_5_binary']:.4f} "
+            f"y Recall@5 "
+            f"{by_weight[best_safe]['recall_at_5'] - by_weight[argmax]['recall_at_5']:.4f}: "
+            "entra un documento de grado 0 en un top-5. Gana el guardarraíl.",
+        )
+
+    lines += [
+        "",
+        "Configuraciones: "
+        + ", ".join(f"`{config_id(weight)}`" for weight in weights)
+        + ".",
+        "",
+        "> Mide la calidad del sustituto **dado el producto origen correcto**. La cadena "
+        "completa «texto del operador → producto → sustitutos» es de C32 y no se mide aquí.",
+    ]
+
+    name = args.name or "c26-substitutes-slice.md"
+    out = (Path(args.out) if args.out else RESULTS_DIR) / name
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    sys.stdout.write(f"wrote {out}\n")
+    return 0
+
+
+async def _indexed_product_ids(settings) -> list[UUID]:
+    """The live set, for the provenance fingerprint. One statement, read-only."""
+    from sqlalchemy import text as sql_text
+
+    from jbg_ai.db.engine import session_scope
+
+    async with session_scope(settings) as session:
+        rows = (
+            await session.execute(
+                sql_text("SELECT product_id FROM ai.product_document WHERE is_active")
+            )
+        ).all()
+    return [UUID(str(row[0])) for row in rows]
