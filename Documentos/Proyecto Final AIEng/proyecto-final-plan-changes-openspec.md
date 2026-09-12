@@ -1165,12 +1165,17 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ---
 
-#### C26 · `add-substitutes-retrieval` 🟢
+#### C26 · `add-substitutes-retrieval` 🟠 *(en curso desde el 2026-09-12)*
 
-**Objetivo.** Sustitutos por falta de stock, con señales explicables.
-**Prereq.** C22, C25 · **Zona.** `ai-service/src/jbg_ai/retrieval/`
-**Alcance.** `POST /v1/retrieval/substitutes`: **misma familia primero**, luego similitud sobre el documento; criterios de las specs v2 §6.3.2 (tipo, familia, **materiales coincidentes**, color, banda de precio, disponibilidad en POS destino); `similarity_signals` por candidato.
-**Tests.** `test_same_family_variant_ranks_first_when_available`; `test_material_overlap_increases_similarity_score`; `test_excludes_out_of_stock_when_flag_enabled`; `test_source_product_never_returned_as_own_substitute`.
+**Objetivo.** Sustitutos por falta de stock, con señales explicables. Cierra el último **501 cerrable** del contrato congelado y hace real la tool `buscar_sustitutos` de C32.
+**Prereq.** C22, C25, ambos archivados · **Zona.** `ai-service/src/jbg_ai/retrieval/` **+ `evals/` + `evals/golden/`** — **decimocuarta vez** que la zona de una ficha se queda corta. Sin migración, sin mover `openapi.json`, sin diff fuera de `ai-service/`, `Documentos/` y `openspec/`, y **sin una sola llamada al proveedor**: sustituto es producto→producto y el embedding de origen ya está almacenado.
+**Alcance.** `POST /v1/retrieval/substitutes` en módulo nuevo `substitutes.py`: **filtro duro por `piece_type`**, orden por similitud vectorial sobre el embedding almacenado, **degradación suave por talla** y degradación por disponibilidad reutilizando `business_score` de C25; `similarity_signals` y `match_reasons` por candidato. Cinco consultas del golden set ancladas con `source_product_id` y medidas en **rebanada separada**.
+
+> **Tres puntos de esta ficha, refutados por medición** *(2026-09-12)*. **«Misma familia primero» está invertida**: la familia es, por construcción, el conjunto de piezas que se diferencian **justo en el atributo que descalifica** —la talla—, y para `SKU13` el top-5 del vector puro **no contiene un solo sustituto usable**. Pero excluirla perdería el #1 de `SKU159`, que es su hermano de **misma talla y otro material**: la pertenencia a familia es **ortogonal** y el discriminante es la talla. Lo confirma `criterion.md`, que ya clasificaba «falla la talla nombrada» como **grado 1 — segunda opción**. La familia entra en el conjunto **sin imponer orden**, y la talla va como **término continuo en la cola** (`w ≈ 0,05`, barrido), **inerte si alguna de las dos piezas no declara talla** —el 54 % de los anillos no tiene `size_label`—. **No se reutiliza `demotion_rank`**: su bloque entero de talla particiona, el fallo exacto que C25 midió con la rotación. Y **la exclusión por stock sale de aquí**: estaba especificada dos veces y la cubre C34, donde vive la autoridad sobre el stock. Detalle en [`c26-exploration-measurements.md`](informes/c26-exploration-measurements.md).
+
+**Tests.** `test_no_live_family_member_is_dropped_from_the_result` *(sustituye a `test_same_family_variant_ranks_first_when_available`)*; `test_same_size_candidate_outranks_same_family_different_size`; `test_different_size_sibling_stays_inside_the_visible_window`; `test_size_term_is_inert_when_either_side_declares_no_size`; `test_never_returns_a_different_piece_type`; `test_material_overlap_increases_similarity_score`; `test_out_of_stock_candidate_is_demoted_and_never_removed`; `test_substitutes_never_abstains_and_says_so`; `test_style_similarity_absence_is_declared_in_match_reasons`; `test_no_embedding_provider_call_is_made`; `test_unknown_or_unindexed_source_product_is_an_explicit_error`; `test_source_product_never_returned_as_own_substitute`. **`test_excludes_out_of_stock_when_flag_enabled` no se escribe**: su requisito se retiró.
+
+**Artefactos.** Historia [HU-AIENG-026](../../Historias/AI-Eng/HU-AIENG-026.md) · ticket [T-AIENG-026](../../../openspec/changes/add-substitutes-retrieval/ticket.md) · mediciones [`c26-exploration-measurements.md`](informes/c26-exploration-measurements.md) · change [`add-substitutes-retrieval`](../../../openspec/changes/add-substitutes-retrieval/), rama `c26-add-substitutes-retrieval`.
 
 ---
 
