@@ -3,9 +3,9 @@
 ## Purpose
 How retrieval quality is measured in this service, and what makes one measurement comparable to another. The yardstick is a golden set versioned in the repository under `ai-service/evals/golden/` — the queries, the graded judgements, the frozen query vectors and the written annotation criterion that predates the first judgement — and never a database table, so moving the yardstick costs a code review and every figure taken before a move stays interpretable against the version it used. Its composition is not a documented intention but an executable validation that fails the load: queries whose best document shares no term with them after synonym expansion, queries that resolve only to fields of low corpus coverage, stone-value queries the piece type does not discriminate, the three classes of synonym dictionary entry, out-of-domain queries plausible within the jewellery domain rather than nonsense every configuration abstains on, literal code and product-name queries, and anchoring to real products evaluated per category so that no category is composed entirely of synthetic ones. Queries that were used to fix the fusion weights, the branch depth or the coordination rule carry a mark, and every metric is published three times — whole set, tuning subset, new queries — because a result visible only on the first is not a confirmation but a candidate for overfitting.
 
-Judgements are graded on three levels and published on both scales under one declared binarisation rule, with a divergence between the two readings reported as a finding rather than resolved by picking one. They are keyed by the pair of query and document, so a later configuration appends to them instead of re-recording what exists, and each carries the content hash of the text it was made against, so labels resting on since-changed documents are counted beside the metrics and not in a separate log. The judged pool is the union of what the indexed configurations return, deepened in blocks while the previous block still contributed a relevant document and stopped at the branch depth beyond which the live retriever cannot surface anything; the depth reached is recorded per query, everything outside the pool is declared irrelevant by assumption, and the unjudged share of a configuration's top results marks that row not comparable instead of scoring it silently. Retrieval always executes over the complete indexed catalogue — restricting the corpus by data origin is not an available configuration — while the breakdown by origin counts only the relevant documents of each, and the report records how often an irrelevant synthetic product outranks the first relevant real one, so that interference is measured rather than assumed.
+Judgements are graded on three levels and published on both scales under one declared binarisation rule, with a divergence between the readings reported as a finding rather than resolved by picking one; a third, operational reading joins them whenever a configuration under evaluation reorders by a business signal, its gain function of labelled grade and availability declared before the measurement and never modifying what was recorded. They are keyed by the pair of query and document, so a later configuration appends to them instead of re-recording what exists, and each carries the content hash of the text it was made against, so labels resting on since-changed documents are counted beside the metrics and not in a separate log. The judged pool is the union of what the indexed configurations return, deepened in blocks while the previous block still contributed a relevant document and stopped at the branch depth beyond which the live retriever cannot surface anything; the depth reached is recorded per query, everything outside the pool is declared irrelevant by assumption, and the unjudged share of a configuration's top results marks that row not comparable instead of scoring it silently. Retrieval always executes over the complete indexed catalogue — restricting the corpus by data origin is not an available configuration — while the breakdown by origin counts only the relevant documents of each, and the report records how often an irrelevant synthetic product outranks the first relevant real one, so that interference is measured rather than assumed.
 
-The comparison is against baselines that replicate what they claim to replicate: the substring-over-name plus exact-code product search that preceded this project's AI work, the degraded Spanish full-text searcher composed over the same text the .NET side indexes rather than over the richer canonical document — an equivalence an automated test breaks when the renderer drifts — and a context-only configuration that places the whole catalogue in the model context without retrieval, priced per query, carrying no product price, truncating deterministically with the omitted count recorded, and projected to the catalogue size at which it no longer fits. Every run records its provenance — golden set version, configuration, index fingerprint, embedding model version and code revision — and two runs whose provenance differs are reported as not comparable rather than compared; query embeddings are frozen per embedding model version so that repeating a run does not depend on a provider answering identically. Latency is two figures, retrieval and end-to-end, measured warm with the first execution discarded, and cost comes from a versioned price list, recorded as zero rather than absent for a configuration that calls no paid provider and declared unverified when the source cannot be reached. Abstention is measured over the out-of-domain category with its distance distribution published, and its figures stay provisional while this capability leaves the live distance threshold untouched. A configured default moves only under a rule written before the measurement, and the outcome is documented whether or not anything moves. The normative output is the versioned report and the per-query detail under `ai-service/evals/results/`, written on every run; persistence to the evaluation tables is optional and the component that produces the results does not depend on the one that stores them. The harness tests run offline against fixtures, with no provider and no production database.
+The comparison is against baselines that replicate what they claim to replicate: the substring-over-name plus exact-code product search that preceded this project's AI work, the degraded Spanish full-text searcher composed over the same text the .NET side indexes rather than over the richer canonical document — an equivalence an automated test breaks when the renderer drifts — and a context-only configuration that places the whole catalogue in the model context without retrieval, priced per query, carrying no product price, truncating deterministically with the omitted count recorded, and projected to the catalogue size at which it no longer fits. Every run records its provenance — golden set version, configuration, index fingerprint, embedding model version and code revision — and two runs whose provenance differs are reported as not comparable rather than compared; query embeddings are frozen per embedding model version so that repeating a run does not depend on a provider answering identically. Latency is two figures, retrieval and end-to-end, measured warm with the first execution discarded, and cost comes from a versioned price list, recorded as zero rather than absent for a configuration that calls no paid provider and declared unverified when the source cannot be reached. Abstention is measured over the out-of-domain category with both the per-document distance distribution and the per-query best-hit distribution published, and the live distance threshold and the abstention rule may be re-fixed under a rule recorded before the measurement, justified from the per-query distribution rather than the per-document one and reported with both sides of the trade: the rate gained over out-of-domain queries and the answerable queries the rule silenced. A configured default moves only under a rule written before the measurement, in the reading that decides — the queries no calibration has seen, because the tuning subset is saturated and contaminated and is published as a diagnostic that cannot veto a change — and the outcome is documented whether or not anything moves. An evaluation reporting more than one change publishes a row isolating each of them beside the combined one and keeps the previous baseline selectable; deepening the golden set re-runs every row so the table carries one provenance tuple and re-confirms the decision against the incumbent; and an absolute acceptance criterion the evidence cannot reach is restated as a relative one with the gap declared, never met by relabelling or by weakening the criterion after the fact. The normative output is the versioned report and the per-query detail under `ai-service/evals/results/`, written on every run; persistence to the evaluation tables is optional and the component that produces the results does not depend on the one that stores them. The harness tests run offline against fixtures, with no provider and no production database.
 
 ## Requirements
 
@@ -50,31 +50,57 @@ Anchoring to real products MUST be evaluated per category, so that no category i
 ### Requirement: Relevance is graded, and both the graded and the binary readings are published
 Each judgement MUST take one of three grades. The report MUST publish every ranking metric twice: once using the grades and once using the binary reading derived from them, where a document is relevant when its grade is at least the intermediate one. The binarisation rule MUST be fixed and declared, never chosen per configuration.
 
-When the two readings order the configurations differently, the report MUST state it as a finding.
+**A third, operational reading MUST be published whenever a configuration under evaluation reorders candidates by a business signal.** Its gain function MUST be a declared function of the labelled grade and the availability signal, MUST be declared before the measurement is executed, and MUST NOT modify the recorded judgements. It MUST be justified from the annotation criterion's own scale rather than from a new constant, because the criterion judges what a piece **is** and never what the shop **has**, so a metric computed over labelled relevance alone is at best orthogonal to availability.
+
+When the readings order the configurations differently, the report MUST state it as a finding.
 
 #### Scenario: Both readings appear in the report
 - **WHEN** an evaluation run completes
 - **THEN** the report contains the graded metrics and the binary metrics for every configuration
 - **AND** the binarisation rule is stated once and applies to all of them
 
+#### Scenario: The operational reading appears when business signals are evaluated
+- **WHEN** an evaluation run includes a configuration that reorders by a business signal
+- **THEN** the report contains the operational metric alongside the graded and binary ones
+- **AND** the gain function is stated once and applies to every configuration
+
+#### Scenario: The operational reading does not alter the judgements
+- **GIVEN** a judged document whose availability signal lowers its effective gain
+- **WHEN** the operational metric is computed
+- **THEN** the judgement file is unchanged
+- **AND** the labelled grade is still the one that was recorded
+
 #### Scenario: Divergence between readings is surfaced
-- **WHEN** the graded reading and the binary reading rank two configurations in opposite order
+- **WHEN** two readings rank two configurations in opposite order
 - **THEN** the report states that the comparison is not robust to the choice of scale
 
 ### Requirement: Queries used to calibrate the retriever are marked and reported separately
 Queries that were used to fix the fusion weights, the branch depth or the coordination rule MUST be marked in the golden set. Every metric MUST be reported three times: over the whole set, over the marked subset only, and over the unmarked subset only.
 
-A configuration decision MUST NOT be presented as confirmed unless the result points the same way in the three readings.
+**The reading that decides is the unmarked subset.** The marked subset MUST be reported as a diagnostic of contamination and MUST NOT veto a decision. The reason is a property of that subset and not of any result taken over it: it is the set of queries selected to calibrate one branch, so using it to arbitrate that branch's weight is validating a model on its training set; and its metrics are saturated, so it cannot register an improvement at all. Whenever the marked subset disagrees with the unmarked one, the report MUST state the disagreement and MUST state which queries are saturated.
+
+The marked subset MUST be reported with the count of its queries that sit at the ceiling of the deciding metric, so a reader can see whether it had room to move.
 
 #### Scenario: The three readings are published
 - **WHEN** an evaluation run completes
 - **THEN** each metric appears for the whole set, for the tuning subset and for the new queries
 - **AND** queries carry the mark that assigns them to a subset
 
-#### Scenario: A result that only holds on the tuning subset is not a confirmation
-- **WHEN** a configuration wins on the tuning subset and loses on the new queries
+#### Scenario: The unmarked subset decides
+- **GIVEN** a configuration that improves on the new queries and does not improve on the tuning subset
+- **WHEN** the decision rule is applied
+- **THEN** the decision is taken on the new queries
+- **AND** the report states the disagreement and names it as contamination of the tuning subset
+
+#### Scenario: Saturation is reported
+- **WHEN** the tuning subset is reported
+- **THEN** the report states how many of its queries sit at the ceiling of the deciding metric
+- **AND** a reader can tell whether that subset had room to improve
+
+#### Scenario: A result that holds on neither subset is not a confirmation
+- **WHEN** a configuration fails to improve on the new queries
 - **THEN** the report states that the decision is not confirmed
-- **AND** identifies the divergence as possible overfitting
+- **AND** the configuration is not adopted
 
 ### Requirement: Pooling deepens where relevant documents keep appearing and declares how far it judged
 The set of documents to judge MUST be the union, without repetition, of what each indexed configuration returns. Documents outside that union MUST be treated as irrelevant, and that assumption MUST be declared in the report.
@@ -174,20 +200,59 @@ Query embeddings MUST be frozen as a versioned artefact keyed by the embedding m
 - **WHEN** the indexed document set changes and a run is compared with an earlier one
 - **THEN** the report states that the two are not comparable and names the differing element
 
-### Requirement: Abstention is measured and its distance distribution published, and the threshold is not changed
+### Requirement: Deepening the golden set re-runs every row and re-confirms the decision
+When an evaluation appends judgements or adds queries, the golden set version changes and every previously published figure stops being comparable. Every row of the table MUST therefore be re-run under the new version, so that the published table carries **one** provenance tuple.
+
+A decision taken against the previous version MUST be **re-confirmed** against the new one before it is fixed. Re-confirmation MUST compare the winning configuration against the incumbent; it MUST NOT require re-running the whole calibration grid.
+
+A configuration whose results were substantially unjudged MUST be marked not comparable rather than presented alongside the others.
+
+#### Scenario: Every row shares one provenance
+- **GIVEN** judgements were appended and queries were added
+- **WHEN** the table is published
+- **THEN** every row reports the same golden set version and the same provenance tuple
+- **AND** figures from the previous version are cited as historical rather than as comparable rows
+
+#### Scenario: The winner is re-confirmed on the new version
+- **GIVEN** a configuration chosen by a sweep run against the previous version
+- **WHEN** the golden set version changes
+- **THEN** that configuration is compared against the incumbent under the new version before the default is fixed
+- **AND** the full grid is not re-run
+
+#### Scenario: An unjudged row is marked not comparable
+- **GIVEN** a configuration promoting documents that carry no judgement
+- **WHEN** the table is published
+- **THEN** its unjudged proportion is reported
+- **AND** the row is marked not comparable when that proportion exceeds the declared threshold
+
+### Requirement: The abstention behaviour may be re-fixed under a rule written before the measurement, justified from the per-query distribution
 The evaluation MUST measure abstention over the out-of-domain category and MUST publish the distribution of retrieval distances separating relevant from irrelevant documents.
 
-The report MUST state that the abstention figures are provisional, because the live distance threshold admits substantially the whole catalogue and the observed abstention therefore reflects branch mechanics rather than a confidence decision. This change MUST NOT modify the live distance threshold.
+The live distance threshold and the abstention rule MAY be changed by an evaluation, under a rule recorded **before** the measurement is executed.
+
+A change to the abstention behaviour MUST be justified from the distribution of the **best distance per query**, separating answerable queries from out-of-domain ones, and MUST NOT be justified from the per-document distribution alone, because the two answer different questions: a total overlap between the distances of relevant and irrelevant documents does not imply that the best hit of an answerable query cannot be separated from the best hit of an out-of-domain one. The report MUST publish both distributions, MUST state whether a single value separates the per-query populations, and MUST state whether the adopted rule alters the candidate set or only the decision to serve it.
+
+The report MUST publish, for every candidate rule, the abstention rate over out-of-domain queries **and** the number of answerable queries the rule turned into abstentions.
 
 #### Scenario: The distribution is published per grade
 - **WHEN** an evaluation run completes
 - **THEN** the report contains the distance distribution of relevant documents and of irrelevant ones
 - **AND** states whether the two are separable by a single value
 
-#### Scenario: Abstention figures are marked provisional
-- **WHEN** abstention is reported
-- **THEN** the report states that recalibration of the threshold belongs to a later change
-- **AND** the configured threshold is unchanged by this one
+#### Scenario: The per-query distribution is published and decides
+- **WHEN** an abstention rule is adopted
+- **THEN** the report contains the best-distance distribution of answerable queries and of out-of-domain ones
+- **AND** the justification rests on that distribution rather than on the per-document one
+
+#### Scenario: A threshold change cites a rule written beforehand
+- **WHEN** the live distance threshold or the abstention rule is changed
+- **THEN** the report cites a rule recorded before the measurement was executed
+- **AND** states whether the change alters the candidate set
+
+#### Scenario: Both sides of the abstention trade are published
+- **WHEN** a candidate abstention rule is reported
+- **THEN** its abstention rate over out-of-domain queries appears
+- **AND** the number of answerable queries it turned into abstentions appears
 
 ### Requirement: Judgements record the document text they were made against
 Every judgement MUST record the content hash the document carried when it was judged. Each run MUST report how many judgements rest on a document whose text has since changed, and that figure MUST appear alongside the metrics rather than in a separate log.
@@ -241,20 +306,84 @@ When the price source cannot be verified at measurement time, the file MUST reco
 - **THEN** the price file records an unknown date
 - **AND** the report declares the cost figures unverified
 
+### Requirement: An ablation table isolates each change it reports
+When one evaluation reports more than one change to the retrieval pipeline, the table MUST contain a row for each change applied **on its own**, in addition to the row that applies them together. A table that reports only the combined result MUST NOT be published, because an improvement it shows cannot be attributed to a cause.
+
+The baseline row MUST remain reproducible: whatever configuration the previously published baseline was measured under MUST still be selectable, so the new table keeps the row every other row is read against.
+
+#### Scenario: Each change has its own row
+- **GIVEN** an evaluation that reports both a fusion change and a ranking change
+- **WHEN** the ablation table is published
+- **THEN** it contains a row with the fusion change alone
+- **AND** a row with both changes applied
+- **AND** the improvement of each is attributable
+
+#### Scenario: The baseline row is still reproducible
+- **WHEN** the baseline configuration is evaluated after the change
+- **THEN** it runs under the configuration it was originally measured with
+- **AND** reproduces the published figures against the same golden set version
+
 ### Requirement: A configured default changes only when the verdict is material
-A default retrieval setting MUST NOT be changed on the basis of this evaluation unless the improvement exceeds the agreed margin, points the same way in the three readings of the tuning split, and degrades no measured category beyond the agreed margin. The rule MUST be recorded before the measurement is executed.
+A default retrieval setting MUST NOT be changed on the basis of this evaluation unless the improvement exceeds the agreed margin **in the reading that decides**, and degrades no measured category beyond the agreed margin. The rule MUST be recorded before the measurement is executed, together with which reading decides and why.
+
+The reading that decides MUST be the subset of queries that no calibration has seen. A saturated or contaminated reading MUST NOT block a change; it MUST be reported alongside, so that a reader can weigh it.
 
 The outcome MUST be documented whether or not any default moves.
 
 #### Scenario: A small improvement does not move a default
-- **WHEN** a configuration improves the ranking metric by less than the agreed margin
+- **WHEN** a configuration improves the deciding metric by less than the agreed margin
 - **THEN** the default is unchanged
 - **AND** the report records the measured difference and the decision not to act on it
 
 #### Scenario: A change of default is justified against the written rule
 - **WHEN** a default is changed
-- **THEN** the report shows the three readings and the per-category effect
-- **AND** cites the rule that was written before the measurement
+- **THEN** the report shows every reading and the per-category effect
+- **AND** cites the rule that was written before the measurement, including which reading decides
+
+#### Scenario: A degraded category blocks a change
+- **WHEN** a configuration improves the deciding metric beyond the margin
+- **AND** degrades a measured category beyond the margin
+- **THEN** the default is unchanged
+- **AND** the report names the category that paid
+
+#### Scenario: A contaminated reading does not block a change
+- **GIVEN** a configuration that improves the deciding reading beyond the margin
+- **AND** does not improve a reading reported as contaminated or saturated
+- **WHEN** the rule is applied
+- **THEN** the change is not blocked by that reading
+- **AND** the report publishes it alongside the decision
+
+### Requirement: An acceptance criterion the evidence cannot reach is restated as a relative one and its gap declared
+When a measured baseline shows that an absolute acceptance threshold is beyond the reach of the changes under evaluation, the evaluation MUST NOT be reported as a failure of those changes and MUST NOT relabel data until the figure is met. The criterion MUST be restated as a **relative** one — each configuration beats the one it is built on, in the reading that decides and beyond the agreed margin — and the distance to the absolute threshold MUST be declared as a limitation.
+
+The restatement MUST record the measured figures that justify it.
+
+**A configuration that fails the relative criterion MAY still be adopted, and when it is, that gap MUST be declared with the same prominence as the absolute one.** Adoption in that case MUST rest on a rule of its own that the configuration does satisfy, and the report MUST state which rule admitted it, why the deciding metric cannot resolve the difference, and what evidence outside that metric supports the decision. A gap that is adopted MUST NOT be reported as a pass, and a criterion MUST NOT be weakened after the measurement so that a configuration meets it.
+
+#### Scenario: The relative criterion is applied and the gap declared
+- **GIVEN** a configuration that beats the one it is built on beyond the margin in the deciding reading
+- **AND** does not reach the absolute threshold the design states
+- **WHEN** the evaluation is reported
+- **THEN** the configuration is accepted under the relative criterion
+- **AND** the distance to the absolute threshold is declared as a limitation with its measured figures
+
+#### Scenario: A configuration adopted without meeting the relative criterion declares that gap
+- **GIVEN** a configuration that does not beat the one it is built on beyond the margin in any reading
+- **AND** that satisfies the adoption rule its own capability defines
+- **WHEN** it is adopted
+- **THEN** the report declares that the relative criterion was not met, with its measured figures
+- **AND** names the rule that admitted it and the evidence outside the deciding metric
+- **AND** the outcome is not reported as having met the criterion
+
+#### Scenario: A criterion is not weakened to fit a result
+- **WHEN** a configuration fails an acceptance criterion
+- **THEN** the criterion recorded before the measurement is unchanged
+- **AND** the failure is declared rather than absorbed
+
+#### Scenario: Judgements are not relabelled to meet a threshold
+- **WHEN** an absolute threshold is not met
+- **THEN** the recorded judgements are unchanged
+- **AND** the annotation criterion is unchanged
 
 ### Requirement: Evaluation tests run offline
 The test suite of the evaluation harness MUST run without calling embedding providers, language model providers or a production database. Metric computation, golden set validation, pooling and report generation MUST be exercised against fixtures.

@@ -59,7 +59,6 @@ La regla de frontera que se materializa es la del diseño v3 §6.2: *Python calc
 **Referencias:**
 [proyecto-final-plan-changes-openspec.md](../../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (ficha C03),
 [proyecto-final-diseno-rag-joiabagur.md](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) (§6.2 frontera, §6.4 seguridad y degradación, §7.6 sobre-recuperación, §8.5 privacidad),
-[proyecto-final-diseno-rag-joiabagur-3devs.md](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur-3devs.md) (§6.6 observabilidad, §6.8 latencias objetivo),
 [epicas.md](../../epicas.md) (EP11),
 [HU-AIENG-002.md](HU-AIENG-002.md),
 specs vivas `openspec/specs/ai-service-api-contracts/spec.md` y `openspec/specs/ai-service-auth/spec.md`,

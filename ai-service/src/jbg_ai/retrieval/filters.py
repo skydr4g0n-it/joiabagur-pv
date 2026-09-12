@@ -14,8 +14,10 @@ catalogue) that carry no extracted materials at all — 36 rings out of every si
 The lookup is `ExpandedQuery.matched`, which C20 already built: no second mapping from typed
 term to vocabulary field is constructed over the same data.
 
-This module is the seam C25 replaces with calibrated weights against the golden set. Doing so
-undoes nothing, because a stable block sort is a score with two values.
+C25 took that seam: the fourth integer of the key became a continuous business score, and
+doing so undid nothing, because a stable block sort IS a score with two values. What it buys
+is a bounded blast radius — every weight lives in one term at the end of the key — and what it
+keeps is the lexicographic precedence of everything the operator actually typed.
 """
 
 from __future__ import annotations
@@ -30,10 +32,46 @@ from jbg_ai.retrieval.synonyms import ExpandedQuery
 MATERIALS_FIELD = "materials"
 SIZE_FIELD = "size_label"
 
-#: The bucket that demotes. Binary against everything else on purpose: ordering `1-2` before
-#: `3+` would be a magic number with no evidence behind it, and both tiers are persisted and
-#: unread until the ranking change that can calibrate them against a golden set.
+#: The bucket that demotes. Binary against everything else, and that is now a MEASURED
+#: conclusion rather than a deferral: under the operational gain function both non-zero
+#: buckets fall in the same branch and neither loses grade, so no objective function can order
+#: them; and measured over the live projection, `1-2` is 191 assigned pairs against `3+`'s
+#: 5.431 — 3,4 % of the non-zero ones — so even a function that could would be fitting noise.
+#: The two business readings also point in opposite directions at a counter.
 OUT_OF_STOCK_BUCKET = "0"
+
+
+@dataclass(frozen=True)
+class BusinessWeights:
+    """What the business score is made of. ONE weight, and it comes from configuration. C25.
+
+    It was two. The rotation term was withdrawn, **refuted by measurement rather than by
+    argument**, and the figures are in the C25 implementation report:
+
+    * As the strict tiebreak its own requirement described — acting only between candidates
+      the fusion ranks EQUALLY — it decided **0 pairs in the top five across all 48 queries**.
+      Exact score ties are common (662 pairs, 35 % of candidates), but none of the ones inside
+      the reported window pitted a seller against a non-seller. Implemented literally, it was
+      a no-op whose weight could not matter.
+    * As a component of the ordering key it was not a tiebreak at all: a binary flag at the
+      end of a lexicographic key PARTITIONS the whole block, so it inverted 11.067 pairs of
+      which only **3,4 % were adjacent** in the fused order and **71,2 % were more than ten
+      positions apart**. Where it acted it cost relevance — 6 of the 22 candidates it lifted
+      into the top five displaced a better-graded document.
+
+    A mechanism that can only be a no-op or a mistake is withdrawn, not tuned. The sentence
+    that justified it stays true at a counter; what the measurement establishes is that this
+    retriever does not produce the situation the sentence describes.
+
+    Kept as a value object rather than a loose float because the "zero" case — the rollback —
+    should be one readable predicate, and because a second signal may yet earn its place.
+    """
+
+    availability: float = 0.0
+
+    @property
+    def is_zero(self) -> bool:
+        return self.availability == 0.0
 
 #: Ceiling phrases an operator actually types, with the figure captured. Deliberately narrow:
 #: a rule that fires on "80" alone would invent a constraint out of a reference number.
@@ -74,7 +112,8 @@ class Constrained(Protocol):
     price: float | None
     size_label: str | None
     materials: list[str]
-    #: The projection bucket for the point of sale, or `None` when the query ran unscoped.
+    #: The projection bucket for the point of sale, or `None` when no reading scope was
+    #: applied or this point of sale does not carry the product.
     qty_bucket: str | None
 
 
@@ -142,30 +181,63 @@ def _out_of_stock(item: Constrained) -> bool:
     return item.qty_bucket == OUT_OF_STOCK_BUCKET
 
 
+def business_score(item: Constrained, weights: BusinessWeights) -> float:
+    """The continuous score that orders the tail block. Higher is better. C25 D9.
+
+    One term, and it only ever SUBTRACTS: availability costs its weight when the projection
+    reports `qty_bucket` of zero, and nothing else moves a candidate at all.
+
+    **An absent row costs nothing** — no reading scope was applied, or this point of sale does
+    not carry the product — because absence is not evidence of zero stock. That the score can
+    only subtract is the requirement rather than a preference: a term that PAID for good news
+    would rank a candidate whose row was never read below one whose row was, which is exactly
+    "treating absence as zero". Measured on a reading scope covering 416 of 1.168 products, a
+    bonus-shaped term cost 0,244 of pure relevance, because it sorted the assortment above
+    everything outside it instead of sorting the exhausted below the available.
+
+    **The value of the weight does not change the order, only its sign does.** With a single
+    binary term the score takes two values, so any positive weight yields the same ranking;
+    the sweep measured exactly that. The weight stays a configured float because zero is the
+    rollback, but the calibration report says plainly that `1.0` is a declared unit and not a
+    fitted figure.
+    """
+    if _out_of_stock(item):
+        return -weights.availability
+    return 0.0
+
+
 def demotion_rank(
-    item: Constrained, filters: StructuralFilters
-) -> tuple[int, int, int, int]:
+    item: Constrained,
+    filters: StructuralFilters,
+    weights: BusinessWeights | None = None,
+) -> tuple[int, int, int, float]:
     """The block a candidate falls into. Lower is better; equal blocks keep the fused order.
 
-    Availability is the **last** component, and one sort key rather than a second pass. Last
-    because what the operator typed outranks a signal they did not ask about: a query for a
-    ring under 80 EUR should not be reordered by stock before it is reordered by price. The
-    opposite is defensible at a till counter and is not settled by argument here — it is
-    handed to the ranking change that has a golden set to settle it with.
+    Three integer blocks read out of the operator's own text, then **one continuous score in
+    the tail**. The shape is the decision: what the operator typed keeps strict lexicographic
+    precedence over a signal they did not ask about, so no amount of stock or rotation can
+    lift a candidate over a price ceiling the operator expressed.
 
-    One key rather than two sorts because priority should be readable in the tuple instead of
-    emerging from the order in which somebody applied two `sorted` calls.
+    Before C25 the fourth component was a fourth integer. Making it continuous loses nothing —
+    a stable block sort is a score with two values — and it bounds the blast radius of the
+    magic numbers: the weights live in one term at the end of the key, not spread across six
+    coupled components where nobody can say why a document came third.
+
+    The tail is negated because the key sorts ascending and a higher business score is better.
     """
+    weights = weights or BusinessWeights()
     return (
         int(_over_ceiling(item, filters.price_ceiling)),
         int(_size_mismatch(item, filters.size)),
         int(_material_mismatch(item, filters.materials)),
-        int(_out_of_stock(item)),
+        -business_score(item, weights),
     )
 
 
 def demote(
-    candidates: Sequence[ConstrainedT], filters: StructuralFilters
+    candidates: Sequence[ConstrainedT],
+    filters: StructuralFilters,
+    weights: BusinessWeights | None = None,
 ) -> tuple[tuple[ConstrainedT, ...], int]:
     """Stable block sort. Returns the reordered candidates and how many were demoted.
 
@@ -175,10 +247,23 @@ def demote(
     operator, ranked below its in-stock peers, exactly as it does today with `HasStock: false`
     on the .NET side.
 
-    The early return is on "nothing to demote by", which since availability joined the key
-    means: no typed constraint fired **and** no candidate is out of stock.
+    The early return is on "nothing to demote by": no typed constraint fired **and** every
+    business score is zero — either because the weights are zero, which is the rollback, or
+    because no candidate carries a signal that moves one. It is kept because it is the
+    majority case, and it is what makes the tail block the whole list where it matters.
+
+    Zero weights reproduce exactly the ordering the fusion and the typed blocks produce alone.
     """
-    if filters.is_empty and not any(_out_of_stock(item) for item in candidates):
+    weights = weights or BusinessWeights()
+    scores = [business_score(item, weights) for item in candidates]
+    if filters.is_empty and not any(scores):
         return tuple(candidates), 0
-    demoted = sum(1 for item in candidates if any(demotion_rank(item, filters)))
-    return tuple(sorted(candidates, key=lambda item: demotion_rank(item, filters))), demoted
+    demoted = sum(
+        1
+        for item, score in zip(candidates, scores, strict=True)
+        if any(demotion_rank(item, filters)[:3]) or score < 0
+    )
+    return (
+        tuple(sorted(candidates, key=lambda item: demotion_rank(item, filters, weights))),
+        demoted,
+    )

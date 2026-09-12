@@ -60,7 +60,7 @@ El valor no es sólo de fontanería. C15 desbloquea **C16** (panel del operador)
 
 **Referencias:**
 
-- Change: `openspec/changes/add-dotnet-ai-search-endpoint/` · ticket [T-AIENG-015](../../../openspec/changes/add-dotnet-ai-search-endpoint/ticket.md)
+- Change: `openspec/changes/add-dotnet-ai-search-endpoint/` · ticket [T-AIENG-015](../../../openspec/changes/archive/2026-08-28-add-dotnet-ai-search-endpoint/ticket.md)
 - Plan: [proyecto-final-plan-changes-openspec.md](../../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) — ficha C15 y entrada §0 de 2026-08-28
 - Diseño: [proyecto-final-diseno-rag-joiabagur.md](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) — §6.2 (frontera), §6.4 (degradación), §7.6 (prefiltro blando y sobre-recuperación)
 - Specs vivas: `ai-gateway-client` · `ai-search-telemetry` · `vector-retrieval` · `product-management` · `inventory-management` · `access-control`

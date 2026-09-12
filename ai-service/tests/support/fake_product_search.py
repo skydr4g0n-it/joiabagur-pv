@@ -16,6 +16,20 @@ from jbg_ai.retrieval.ports import LexicalHit, SearchFilters, SearchHit
 #: A test about the scope passes `assignments` explicitly.
 DEFAULT_BUCKET = "3+"
 
+#: Stand-in for `numnode(plainto_tsquery('spanish', term)) > 0`, which is what the statement
+#: actually asks. These are the Spanish stop words the golden set's queries actually contain,
+#: and they are the whole reason the coverage denominator exists: `plainto_tsquery('spanish',
+#: 'de')` is an EMPTY tsquery, so that group can never match any document, and counting it
+#: would lower the coverage of a query that is in fact fully anchored.
+#:
+#: A stand-in and not a reimplementation: the real predicate is PostgreSQL's, and the C25
+#: implementation report records it verified against the live index query by query. What this
+#: buys is that a test about coverage can run with no database at all.
+EMPTY_TSQUERY_FORMS = frozenset(
+    {"de", "del", "la", "el", "los", "las", "un", "una", "unos", "unas",
+     "y", "o", "que", "en", "a", "al", "con", "para", "se", "lo", "su", "sus"}
+)
+
 
 @dataclass
 class FakeAssignment:
@@ -25,6 +39,10 @@ class FakeAssignment:
     product_id: UUID
     qty_bucket: str = DEFAULT_BUCKET
     is_assigned_hint: bool = True
+    #: The drain's 30-day figure for this pair, counted against the row's own reference
+    #: instant. Zero is a real value — "carried here, sold none" — and is a different thing
+    #: from the absence a product this point of sale does not carry reports.
+    sales_30d: int = 0
 
 
 @dataclass
@@ -78,19 +96,59 @@ class FakeProductSearch:
         self.scope_calls: list[UUID] = []
         self.synced_at_calls = 0
 
-    def _scope(self, pos_id: UUID) -> dict[UUID, str]:
-        """Product identifier to bucket, for what this point of sale actually carries."""
+    def _scope(self, pos_id: UUID) -> dict[UUID, FakeAssignment]:
+        """What this point of sale actually carries, by product identifier."""
         if self.assignments is None:
-            return {row.product_id: DEFAULT_BUCKET for row in self.rows}
+            return {
+                row.product_id: FakeAssignment(pos_id=pos_id, product_id=row.product_id)
+                for row in self.rows
+            }
         return {
-            item.product_id: item.qty_bucket
+            item.product_id: item
             for item in self.assignments
             if item.pos_id == pos_id and item.is_assigned_hint
         }
 
+    def _scopes(
+        self, pos_id: UUID | None, signal_pos_id: UUID | None
+    ) -> tuple[dict[UUID, FakeAssignment] | None, dict[UUID, FakeAssignment] | None]:
+        """The restricting scope and the reading one, mirroring the two joins of the SQL.
+
+        `None` for the restricting one means no candidate is removed; `None` for the reading
+        one means no signal is read at all, which is what leaves both signals absent. A
+        restricting scope reads too: in SQL the rows are joined already.
+        """
+        if pos_id is not None:
+            scope = self._scope(pos_id)
+            return scope, scope
+        if signal_pos_id is not None:
+            return None, self._scope(signal_pos_id)
+        return None, None
+
+    @staticmethod
+    def _bucket(reading: dict[UUID, "FakeAssignment"] | None, product_id: UUID) -> str | None:
+        if reading is None:
+            return None
+        row = reading.get(product_id)
+        return None if row is None else row.qty_bucket
+
+    @staticmethod
+    def _sales(reading: dict[UUID, "FakeAssignment"] | None, product_id: UUID) -> int | None:
+        """Absent when the row is not read or not carried. Absence is never a zero."""
+        if reading is None:
+            return None
+        row = reading.get(product_id)
+        return None if row is None else row.sales_30d
+
     async def count_scope(self, pos_id: UUID) -> int:
         self.scope_calls.append(pos_id)
         return len(self._scope(pos_id))
+
+    async def scope_buckets(self, pos_id: UUID) -> dict[str, str]:
+        return {
+            str(product_id): item.qty_bucket
+            for product_id, item in self._scope(pos_id).items()
+        }
 
     async def projection_synced_at(self) -> datetime | None:
         self.synced_at_calls += 1
@@ -125,6 +183,7 @@ class FakeProductSearch:
         model_version_key: str,
         model_id: str,
         pos_id: UUID | None = None,
+        signal_pos_id: UUID | None = None,
     ) -> list[SearchHit]:
         self.search_calls.append(
             {
@@ -135,9 +194,10 @@ class FakeProductSearch:
                 "model_version_key": model_version_key,
                 "model_id": model_id,
                 "pos_id": pos_id,
+                "signal_pos_id": signal_pos_id,
             }
         )
-        scope = self._scope(pos_id) if pos_id is not None else None
+        restricting, reading = self._scopes(pos_id, signal_pos_id)
         hits: list[SearchHit] = []
         for row in self.rows:
             if not row.is_active or not row.has_embedding or not row.compatible:
@@ -146,7 +206,7 @@ class FakeProductSearch:
                 continue
             if not self._passes_body_filters(row, filters):
                 continue
-            if scope is not None and row.product_id not in scope:
+            if restricting is not None and row.product_id not in restricting:
                 continue
             hits.append(
                 SearchHit(
@@ -158,7 +218,8 @@ class FakeProductSearch:
                     variant_label=row.variant_label,
                     price=row.price,
                     size_label=row.size_label,
-                    qty_bucket=None if scope is None else scope[row.product_id],
+                    qty_bucket=self._bucket(reading, row.product_id),
+                    sales_30d=self._sales(reading, row.product_id),
                 )
             )
         # Mirrors `_SEARCH_ORDER_LIMIT` key for key, including the `product_id` tiebreak:
@@ -175,13 +236,20 @@ class FakeProductSearch:
         depth: int,
         filters: SearchFilters,
         pos_id: UUID | None = None,
+        signal_pos_id: UUID | None = None,
     ) -> list[LexicalHit]:
         self.lexical_calls.append(
-            {"request": request, "depth": depth, "filters": filters, "pos_id": pos_id}
+            {
+                "request": request,
+                "depth": depth,
+                "filters": filters,
+                "pos_id": pos_id,
+                "signal_pos_id": signal_pos_id,
+            }
         )
         groups = request.groups or ((request.text,),)
         counting = request.counting or tuple(True for _ in groups)
-        scope = self._scope(pos_id) if pos_id is not None else None
+        restricting, reading = self._scopes(pos_id, signal_pos_id)
 
         hits: list[LexicalHit] = []
         for row in self.rows:
@@ -189,7 +257,7 @@ class FakeProductSearch:
                 continue
             if not self._passes_body_filters(row, filters):
                 continue
-            if scope is not None and row.product_id not in scope:
+            if restricting is not None and row.product_id not in restricting:
                 continue
             matched = [self._group_matches(row, group) for group in groups]
             if not any(matched):
@@ -199,18 +267,25 @@ class FakeProductSearch:
                 for hit, counts in zip(matched, counting, strict=False)
                 if hit and counts
             )
+            coverage_denominator = sum(
+                1
+                for group, counts in zip(groups, counting, strict=False)
+                if counts and self._group_is_expressible(group)
+            )
             hits.append(
                 LexicalHit(
                     product_id=row.product_id,
                     sku=row.sku,
                     ts_rank=sum(matched) / len(matched),
                     coordination=coordination,
+                    coverage_denominator=coverage_denominator,
                     materials=list(row.materials),
                     family_id=row.family_id,
                     variant_label=row.variant_label,
                     price=row.price,
                     size_label=row.size_label,
-                    qty_bucket=None if scope is None else scope[row.product_id],
+                    qty_bucket=self._bucket(reading, row.product_id),
+                    sales_30d=self._sales(reading, row.product_id),
                 )
             )
         # Same reason as the vector branch, and the same final key as the statement. It is
@@ -218,6 +293,13 @@ class FakeProductSearch:
         # by something the SQL never mentions is a fake that cannot witness the property.
         hits.sort(key=lambda item: (-item.coordination, -item.ts_rank, item.product_id))
         return hits[:depth]
+
+    @staticmethod
+    def _group_is_expressible(group: tuple[str, ...]) -> bool:
+        """Could this group's tsquery match ANY document? Mirrors `numnode(...) > 0`."""
+        return any(
+            form.strip() and fold(form) not in EMPTY_TSQUERY_FORMS for form in group
+        )
 
     @staticmethod
     def _group_matches(row: FakeIndexedRow, group: tuple[str, ...]) -> bool:

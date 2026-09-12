@@ -325,7 +325,16 @@ Si el producto tiene `Quantity = 0`, puede mostrarse solo como no vendible y con
 
 ## 5.5. Ranking híbrido
 
-> **Estado (C21).** La fusión implementada es **por rango (RRF ponderado)** y no por suma de scores: los `score_*` de abajo viven en escalas incomparables cuya distribución cambia por consulta, y normalizarlas es justo lo que RRF evita — la spec viva `hybrid-fusion` lo exige explícitamente. C21 fusiona tres listas ordenadas (tecleada, expandida y vectorial) con un peso por lista. Los términos de negocio de la fórmula —rotación, prioridad comercial, disponibilidad— siguen **pendientes de C25**, que decidirá si entran como una lista más a fusionar o como reordenación posterior.
+> **Estado (C21).** La fusión implementada es **por rango (RRF ponderado)** y no por suma de scores: los `score_*` de abajo viven en escalas incomparables cuya distribución cambia por consulta, y normalizarlas es justo lo que RRF evita — la spec viva `hybrid-fusion` lo exige explícitamente. C21 fusiona tres listas ordenadas (tecleada, expandida y vectorial) con un peso por lista. Los términos de negocio de la fórmula —rotación, prioridad comercial, disponibilidad— quedaban **pendientes de C25**, que decidiría si entran como una lista más a fusionar o como reordenación posterior. **Ya está decidido: ver la nota de estado de abajo.**
+
+> **Estado (C25), 2026-09-12.** Decidido y **medido**. La disponibilidad entra como **reordenación posterior** —un score continuo en el **último bloque** de la clave de degradación, nunca como una lista más a fusionar— de modo que lo que el operador tecleó la supera siempre; su peso decide el **signo y no el valor**, porque con una señal binaria el orden es invariante a la magnitud. Y la fusión deja de ser de tres listas: se compone en **dos etapas** con pesos por rama, porque la de C21 no fusionaba sino que **concatenaba**.
+>
+> **Dos términos del bloque de abajo quedan refutados por medición y NO se implementan:**
+>
+> - `score_rotacion_pos` — sale del orden. Como desempate estricto decidía **0 pares** del top-5 en las 48 consultas, y como clave de ordenación no desempataba sino que **particionaba**: 11.067 pares invertidos, el 71,2 % separados por más de diez puestos, con coste de relevancia donde actuaba. `sales_30d` se sigue leyendo y persistiendo **para diagnóstico**, y no ordena nada.
+> - `penalizacion_variante_ambigua` — se retira. Sólo **2 de 156** familias pueden llenar cinco huecos, el panel ya pinta `Talla {variantLabel}`, `variante-talla` ya es la mejor categoría y diversificar **baja** el nDCG@5 cuando las hermanas son grado 2: es **presentación**, no ranking, y pertenece a C30/C36.
+>
+> La fórmula se conserva **tal como se escribió** porque documenta la intención de partida; lo que cambia es qué partes de ella sobrevivieron a medirse. Detalle en [c25-implementation-measurements.md](informes/c25-implementation-measurements.md) y tabla en [c25-baselines-2026-09-11.md](../../ai-service/evals/results/c25-baselines-2026-09-11.md).
 
 ```text
 score_total =

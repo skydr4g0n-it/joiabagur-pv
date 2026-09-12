@@ -20,11 +20,77 @@ CANONICAL_OPENAPI_SERVICE_VERSION = "0.1.0"
 #: `retrieval/fusion.py`.
 FUSION_DEFAULTS: dict[str, Any] = {
     "jpv_rrf_k": 60,
+    "jpv_branch_depth": 60,
+    # --- C25: the fusion is composed in two stages, and the per-BRANCH weights are the pair
+    # the sweep explores. Only their RATIO changes the order (scaling both preserves it, which
+    # was measured), so the grid is one-dimensional and is expressed as rho = w_vec / w_lex.
+    "jpv_fusion_mode": "branch",
+    "jpv_branch_weight_lexical": 0.5,
+    "jpv_branch_weight_vector": 0.5,
+    # --- C21: the three flat weights. In `branch` mode the first two are the FIXED internal
+    # split of the lexical branch (stage 1) and the third is unused; in `flat` mode the three
+    # are the weights of one single-stage fusion, which is what the published baseline was
+    # measured under. They keep C21's values so that baseline stays reproducible.
     "jpv_rrf_weight_typed": 0.5,
     "jpv_rrf_weight_expanded": 0.5,
     "jpv_rrf_weight_vector": 0.33,
-    "jpv_branch_depth": 60,
 }
+
+#: The two fusion modes. `branch` composes in two stages and is the default; `flat` is C21's
+#: single-stage fusion over every list, kept selectable because the evaluation's published
+#: baseline row was measured under it and a configuration that can no longer be reproduced
+#: cannot serve as the row every other row is read against. Its retirement is `clean-plain-fusion`.
+FUSION_MODE_BRANCH = "branch"
+FUSION_MODE_FLAT = "flat"
+FUSION_MODES = (FUSION_MODE_BRANCH, FUSION_MODE_FLAT)
+
+#: C25 business-signal weights. Two weights, and they are NOT the same kind of number.
+#:
+#: `availability` is **calibrated**: it is swept against the golden set under the operational
+#: metric of D3, with pure relevance as the guardrail. That sweep is possible because the
+#: rubric's own scale supplies the hook — grade 1 is already defined as "a plausible
+#: substitute the operator would offer second", and a piece that cannot be put on the cloth is
+#: exactly that, so an exhausted grade 2 can be read as a grade 1 without inventing a constant.
+#:
+#: ONE weight, and it was two. The rotation term was **withdrawn, refuted by measurement**:
+#: as the strict tiebreak its requirement described it decided 0 pairs in the top five across
+#: all 48 queries, and as a component of the ordering key it was no tiebreak at all — it
+#: inverted 11.067 pairs, 71,2 % of them more than ten positions apart, and cost relevance
+#: where it acted. The figures are in the C25 implementation report.
+#:
+#: `availability` is read against the `computed_as_of` recorded on each projection row and
+#: never against the wall clock: with a wall clock the figures go to zero, because the world
+#: of C10 ends on 2026-08-23, and the ranking would be irreproducible by design.
+BUSINESS_DEFAULTS: dict[str, Any] = {
+    "jpv_business_weight_availability": 1.0,
+}
+
+#: C25 abstention. The FORM was selected by a measurement under a criterion written before it
+#: — the two populations of best-hit distance overlap completely, so a scalar bound cannot
+#: separate them — and the relative rule reads the SHAPE of the distance profile instead: an
+#: out-of-domain query is flat, because nothing in the catalogue stands out for it.
+#:
+#: **Fixed against the category once it grew to 20**, never against the five it had: two
+#: parameters fitted to five points are fitted to five points, which is what this change
+#: refused to do everywhere else. Measured over 20 out-of-domain and 43 answerable queries,
+#: this point abstains on **2 of the 20 and on none of the 43** — the only operating points
+#: that silence no answerable query are this one and two that catch less.
+#:
+#: The rate it buys is **10 %**, far from the 0,80 the ticket asked for, and the gap is
+#: declared rather than closed: reaching 0,80 costs silencing **21 of the 43** answerable
+#: queries, half the set. The asymmetry decides the point — silencing a query the shop CAN
+#: answer is a visible failure at the counter, while failing to abstain on an impossible one
+#: merely shows five pieces that do not fit and the operator can see that.
+#:
+#: It is on because the alternative signal does not do this job: `low_confidence` fires on 1
+#: of the 20 out-of-domain queries and on 10 of the 43 answerable ones, which is
+#: anti-correlated with what abstention needs.
+ABSTENTION_DEFAULTS: dict[str, Any] = {
+    "jpv_abstention_enabled": True,
+    "jpv_abstention_band_alpha": 0.03,
+    "jpv_abstention_band_min_candidates": 15,
+}
+
 
 #: C23 knowledge defaults, in one place for the same reason as FUSION_DEFAULTS: the field
 #: default, the blank-string fallback and the canonical OpenAPI profile are three copies of
@@ -263,6 +329,50 @@ class Settings(BaseSettings):
         ),
     )
 
+    jpv_fusion_mode: str = Field(
+        default=FUSION_DEFAULTS["jpv_fusion_mode"],
+        description=(
+            "C25 how the ranked lists are composed (JPV_FUSION_MODE): 'branch' fuses the two "
+            "lexical lists into one and then fuses that against the vector list under the "
+            "per-branch weights; 'flat' is C21's single fusion over all three. Optional at "
+            "boot; a blank export means unset and falls back to the default. 'branch' is the "
+            "default because the flat mode does not fuse, it CONCATENATES: measured, with the "
+            "C21 weights the sixty lexical documents outscore the vector branch's best hit in "
+            "every query, so a document the vector branch ranks first lands at position 33. "
+            "'flat' stays selectable because the published baseline was measured under it. "
+            "Supplies only the DEFAULT: the effective value travels as a parameter of the "
+            "retrieval orchestration call. Not required to boot /health."
+        ),
+    )
+
+    jpv_branch_weight_lexical: float = Field(
+        default=FUSION_DEFAULTS["jpv_branch_weight_lexical"],
+        ge=0,
+        description=(
+            "C25 weight of the whole LEXICAL BRANCH in the inter-branch fusion "
+            "(JPV_BRANCH_WEIGHT_LEXICAL), used only in 'branch' mode. Optional at boot; blank "
+            "means unset. It is the branch's TOTAL vote, whatever number of lists it is "
+            "composed of and however many of them matched — which is the property the flat "
+            "mode lacks, where the crossover threshold is 0.469 or 0.938 depending on whether "
+            "the typed list happened to match. Supplies only the DEFAULT: the effective value "
+            "travels as a parameter of the orchestration call. Not required to boot /health."
+        ),
+    )
+
+    jpv_branch_weight_vector: float = Field(
+        default=FUSION_DEFAULTS["jpv_branch_weight_vector"],
+        ge=0,
+        description=(
+            "C25 weight of the VECTOR BRANCH in the inter-branch fusion "
+            "(JPV_BRANCH_WEIGHT_VECTOR), used only in 'branch' mode. Optional at boot; blank "
+            "means unset. Equal to the lexical branch weight by default, and that is a value "
+            "of PRINCIPLE rather than a fitted one: each branch holds one vote, the best hit "
+            "of each takes one of the first two places, and what both branches point at goes "
+            "first. Only the RATIO to JPV_BRANCH_WEIGHT_LEXICAL changes the order, so the "
+            "sweep over the two is one-dimensional. Not required to boot /health."
+        ),
+    )
+
     jpv_branch_depth: int = Field(
         default=FUSION_DEFAULTS["jpv_branch_depth"],
         gt=0,
@@ -275,6 +385,55 @@ class Settings(BaseSettings):
             "returns, which follows `top_k`, even where the two happen to share a default — "
             "reusing the existing OVER_RETRIEVAL_CAP is one fewer arbitrary constant, not the "
             "same parameter. Not "
+            "required to boot /health."
+        ),
+    )
+
+    jpv_business_weight_availability: float = Field(
+        default=BUSINESS_DEFAULTS["jpv_business_weight_availability"],
+        ge=0,
+        description=(
+            "C25 weight of the availability signal, and the ONLY business weight "
+            "(JPV_BUSINESS_WEIGHT_AVAILABILITY). Optional at boot; a blank export means unset "
+            "and falls back to the default. Its SIGN is what the calibration decided, not its "
+            "value: with a single binary term the score takes two values, so every positive "
+            "weight produces the same ranking — the sweep measured exactly that, and 1.0 is a "
+            "declared unit rather than a fitted figure. Zero restores exactly the ordering the "
+            "fusion and the typed-constraint blocks produce on their own, which makes it the "
+            "rollback for the business signals. Supplies only the DEFAULT: the effective value "
+            "travels as a parameter of the orchestration call. Not required to boot /health."
+        ),
+    )
+
+    jpv_abstention_enabled: bool = Field(
+        default=ABSTENTION_DEFAULTS["jpv_abstention_enabled"],
+        description=(
+            "C25 relative abstention rule (JPV_ABSTENTION_ENABLED). Optional at boot; blank "
+            "means unset. Default TRUE, fixed against 20 out-of-domain and 43 answerable "
+            "queries: at the configured band it abstains on 2 of the 20 and on NONE of the "
+            "43. Setting it false is the rollback and restores the behaviour of answering "
+            "every query. Not required to boot /health."
+        ),
+    )
+
+    jpv_abstention_band_alpha: float = Field(
+        default=ABSTENTION_DEFAULTS["jpv_abstention_band_alpha"],
+        ge=0,
+        description=(
+            "C25 half-width of the band around the best retrieval distance, as a fraction of "
+            "it (JPV_ABSTENTION_BAND_ALPHA). With JPV_ABSTENTION_BAND_MIN_CANDIDATES it says "
+            "when a distance profile is FLAT — nothing stands out — which is the shape an "
+            "out-of-domain query has. A starting point measured on five queries, not a fixed "
+            "figure. Not required to boot /health."
+        ),
+    )
+
+    jpv_abstention_band_min_candidates: int = Field(
+        default=ABSTENTION_DEFAULTS["jpv_abstention_band_min_candidates"],
+        gt=0,
+        description=(
+            "C25 how many candidates must fall inside the band before the profile counts as "
+            "flat (JPV_ABSTENTION_BAND_MIN_CANDIDATES). See JPV_ABSTENTION_BAND_ALPHA. Not "
             "required to boot /health."
         ),
     )
@@ -522,6 +681,9 @@ class Settings(BaseSettings):
         "jpv_rrf_weight_expanded",
         "jpv_rrf_weight_vector",
         "jpv_branch_depth",
+        "jpv_fusion_mode",
+        "jpv_branch_weight_lexical",
+        "jpv_branch_weight_vector",
         mode="before",
     )
     @classmethod
@@ -529,6 +691,40 @@ class Settings(BaseSettings):
         """A blank export means "unset". A blank weight read as 0 would silence a branch."""
         if isinstance(value, str) and not value.strip():
             return FUSION_DEFAULTS[str(info.field_name)]
+        return value
+
+    @field_validator(
+        "jpv_abstention_enabled",
+        "jpv_abstention_band_alpha",
+        "jpv_abstention_band_min_candidates",
+        mode="before",
+    )
+    @classmethod
+    def blank_abstention_setting_is_default(cls, value: object, info: ValidationInfo) -> object:
+        """A blank export means "unset". Read as false it would silently disable the rule."""
+        if isinstance(value, str) and not value.strip():
+            return ABSTENTION_DEFAULTS[str(info.field_name)]
+        return value
+
+    @field_validator("jpv_business_weight_availability", mode="before")
+    @classmethod
+    def blank_business_setting_is_default(cls, value: object, info: ValidationInfo) -> object:
+        """A blank export means "unset". Read as 0 it would silently drop a signal."""
+        if isinstance(value, str) and not value.strip():
+            return BUSINESS_DEFAULTS[str(info.field_name)]
+        return value
+
+    @field_validator("jpv_fusion_mode")
+    @classmethod
+    def known_fusion_mode(cls, value: str) -> str:
+        """An unknown mode fails at boot rather than silently selecting one of the two.
+
+        The two modes produce different orderings, so a typo that fell back to a default
+        would publish an evaluation row under a fusion nobody chose — the exact confusion
+        the mode is recorded in the provenance to prevent.
+        """
+        if value not in FUSION_MODES:
+            raise ValueError(f"unknown fusion mode {value!r}, expected one of {FUSION_MODES}")
         return value
 
 

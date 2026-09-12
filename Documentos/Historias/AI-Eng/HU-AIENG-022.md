@@ -110,7 +110,7 @@ Desde C14 el planificador elige escaneo secuencial exacto, porque a 1.168 filas 
 - Specs vivas afectadas: `openspec/specs/vector-retrieval/`, `openspec/specs/product-document-indexer/`, `openspec/specs/index-feed/`, `openspec/specs/hybrid-fusion/`.
 - Historias previas: [HU-AIENG-012](HU-AIENG-012.md) (feed de POS), [HU-AIENG-013](HU-AIENG-013.md) (indexador de catálogo), [HU-AIENG-014](HU-AIENG-014.md) (retriever vectorial), [HU-AIENG-015](HU-AIENG-015.md) (hidratación autoritativa), [HU-AIENG-021](HU-AIENG-021.md) (fusión híbrida).
 - Apuntes: [S10 · Filtrado contextual y temporal](../../Sesiones%20Master%20AIEng/S10_Tecnicas_Recuperacion/Filtrado%20contextual%20y%20temporal.md), [S8 · Anatomía de un índice vectorial](../../Sesiones%20Master%20AIEng/S8_BBDD_Vectoriales/Anatomia%20de%20un%20Indice%20Vectorial%20HNSW,%20IVFFlat%20y%20el%20horizonte%20DiskANN.md).
-- Change: [`add-pos-projection-soft-prefilter`](../../../openspec/changes/add-pos-projection-soft-prefilter/) · ticket [T-AIENG-022](../../../openspec/changes/add-pos-projection-soft-prefilter/ticket.md).
+- Change: [`add-pos-projection-soft-prefilter`](../../../openspec/changes/archive/2026-09-05-add-pos-projection-soft-prefilter/) · ticket [T-AIENG-022](../../../openspec/changes/archive/2026-09-05-add-pos-projection-soft-prefilter/ticket.md).
 
 ---
 

@@ -55,7 +55,7 @@ def test_provenance_reports_every_list_and_position() -> None:
 
 
 def test_fusion_performs_no_input_or_output(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Pure by contract: C23, C25 and C26 import it without an endpoint around it."""
+    """Pure by contract: C23 imports it, C25 composes it with itself, C26 is next."""
 
     def _fail(*_args: object, **_kwargs: object) -> None:
         raise AssertionError("the fusion must not open a socket")
@@ -205,3 +205,119 @@ def test_normalised_scores_start_at_one_and_never_increase() -> None:
     assert all(0.0 <= score <= 1.0 for score in scores)
     assert list(scores) == sorted(scores, reverse=True)
     assert normalised_scores(()) == ()
+
+
+# --------------------------------------------------------------------------------------
+# C25 — the fusion is composed in two stages, and the formula is untouched.
+# --------------------------------------------------------------------------------------
+
+
+def test_fuse_composes_with_itself_without_changing_the_formula() -> None:
+    """Stage 1's ORDER feeds back in as a ranked list. That is the whole mechanism.
+
+    `fuse` takes identifiers in order and returns identifiers in order, so composing it with
+    itself needs no new entry point and no change to `score(d) = sum w_i / (k + rank_i(d))`.
+    What the composition loses is declared: only the order survives stage 1, so the magnitude
+    of the intra-lexical consensus is flattened.
+    """
+    typed = _list("typed", 0.5, "a", "b", "c")
+    expanded = _list("expanded", 0.5, "b", "a", "d")
+
+    stage_one = fuse([typed, expanded], k=K, depth=DEPTH)
+    relayed = RankedList("lexical", 1.0, [item.key for item in stage_one])
+    stage_two = fuse([relayed], k=K, depth=DEPTH)
+
+    # A single list fused alone is order-preserving, so stage 2 hands back stage 1's order.
+    assert [item.key for item in stage_two] == [item.key for item in stage_one]
+    # And the relayed list carries ONE name, so provenance collapses to the branch.
+    assert all(item.ranks == {"lexical": position} for position, item in enumerate(stage_two, 1))
+
+
+def test_a_branch_relayed_as_one_list_votes_once_however_many_lists_composed_it() -> None:
+    """Two lists agreeing and one list alone relay the same total vote. C25 D5(a)."""
+    agreeing = fuse(
+        [_list("typed", 0.5, "x", "y"), _list("expanded", 0.5, "x", "y")], k=K, depth=DEPTH
+    )
+    alone = fuse([_list("expanded", 0.5, "x", "y")], k=K, depth=DEPTH)
+
+    for stage_one in (agreeing, alone):
+        relayed = fuse(
+            [
+                RankedList("lexical", 0.5, [item.key for item in stage_one]),
+                RankedList("vector", 0.5, ["v"]),
+            ],
+            k=K,
+            depth=DEPTH,
+        )
+        by_key = {item.key: item.score for item in relayed}
+        # The branch's leader scores exactly w_lex / (k + 1) in both regimes: the crossover
+        # is no longer 0,469 or 0,938 depending on whether the typed list happened to match.
+        assert by_key["x"] == pytest.approx(0.5 / (K + 1))
+        assert by_key["v"] == pytest.approx(0.5 / (K + 1))
+
+
+def test_flat_fusion_mode_reproduces_the_published_baseline() -> None:
+    """The flat mode is bit-identical to C21's single fusion over the three lists.
+
+    This is the offline half of the guarantee: the flat path composes nothing, so the order
+    it produces is the one the published baseline was measured under. The other half is the
+    live half — `v2-hibrido.yaml` pins `fusion: flat` and reproduces 0,603 / 0,942 / 0,535
+    against golden set `1:93a94fa8fbc3`, recorded in the C25 implementation report.
+
+    If this fails, the table has lost the row every other row is read against.
+    """
+    from uuid import UUID
+
+    from jbg_ai.retrieval.orchestrator import _fuse_branches
+
+    typed = [UUID(f"00000000-0000-0000-0000-{i:012d}") for i in range(1, 31)]
+    expanded = [UUID(f"00000000-0000-0000-0000-{i:012d}") for i in range(5, 45)]
+    vector = [UUID(f"22222222-0000-0000-0000-{i:012d}") for i in range(1, 61)]
+
+    c21_weights = (
+        FUSION_DEFAULTS["jpv_rrf_weight_typed"],
+        FUSION_DEFAULTS["jpv_rrf_weight_expanded"],
+        FUSION_DEFAULTS["jpv_rrf_weight_vector"],
+    )
+    expected = fuse(
+        [
+            RankedList("typed", c21_weights[0], typed),
+            RankedList("expanded", c21_weights[1], expanded),
+            RankedList("vector", c21_weights[2], vector),
+        ],
+        k=FUSION_DEFAULTS["jpv_rrf_k"],
+        depth=FUSION_DEFAULTS["jpv_branch_depth"],
+    )
+
+    hits = {key: _FakeHit(key) for key in (*typed, *expanded, *vector)}
+    ordered, _ = _fuse_branches(
+        [hits[key] for key in typed],
+        [hits[key] for key in expanded],
+        [hits[key] for key in vector],
+        k=FUSION_DEFAULTS["jpv_rrf_k"],
+        depth=FUSION_DEFAULTS["jpv_branch_depth"],
+        mode="flat",
+        flat_weights=c21_weights,
+        branch_weights=(0.5, 0.5),
+        internal_weights=(0.5, 0.5),
+    )
+
+    assert [item.product_id for item in ordered] == [item.key for item in expected]
+
+
+class _FakeHit:
+    """The minimum a hit needs to be rebuilt into a candidate by the orchestrator."""
+
+    def __init__(self, product_id) -> None:
+        self.product_id = product_id
+        self.sku = str(product_id)[:8]
+        self.materials: list[str] = []
+        self.family_id = None
+        self.variant_label = None
+        self.price = None
+        self.size_label = None
+        self.qty_bucket = None
+        self.sales_30d = None
+        self.ts_rank = 0.5
+        self.coordination = 1
+        self.distance = 0.3

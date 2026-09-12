@@ -92,11 +92,21 @@ def test_terms_are_joined_so_that_matching_any_of_them_is_enough() -> None:
     assert websearch_terms("") == ""
 
 
-def test_the_five_configurations_load_and_the_table_is_in_order() -> None:
+def test_every_configuration_loads_and_the_table_is_in_order() -> None:
+    """Seven rows after C25, and the order is the reading order of the table.
+
+    `v2b-fusion` and `v3-senales` are the two the change adds, and they sit AFTER the
+    baseline they are read against. Without `v2b` an improvement in `v3` could belong to the
+    fusion or to the signals and nobody could attribute it.
+    """
     configs = load_all()
 
     assert [item.id for item in configs] == list(ABLATION_ORDER)
     assert {item.id for item in configs if item.pooled} == set(POOLED)
+    assert "v2b-fusion" in ABLATION_ORDER and "v3-senales" in ABLATION_ORDER
+    assert ABLATION_ORDER.index("v2b-fusion") < ABLATION_ORDER.index("v3-senales")
+    # `v0-cag` answers in prose over a context window, so it has no ranked list to pool.
+    assert "v0-cag" not in POOLED
 
 
 def test_the_zero_cost_baselines_record_zero_and_not_an_absent_value() -> None:
@@ -145,3 +155,26 @@ def test_the_prices_carry_their_date_and_source() -> None:
     assert prices.source.startswith("https://")
     assert prices.as_of != "unknown"
     assert prices.verified is True
+
+
+def test_only_a_hybrid_row_records_a_fusion_mode() -> None:
+    """The provenance names how a row composed its lists, so a row that composed nothing must
+    say so. Defaulting the four non-fusing rows to the live mode would print a composition
+    rule on the degraded baselines and on the single-branch vector row, and the column would
+    stop meaning what it says. `v2-hibrido` pins `flat` because it reproduces the published
+    baseline; it is the reason the mode is provenance at all."""
+    from jbg_ai.evals.execute import harness_settings
+    from jbg_ai.evals.provenance import NO_FUSION
+    from jbg_ai.evals.runner import _fusion_mode_of
+
+    settings = harness_settings(requires_database=False)
+    modes = {
+        name: _fusion_mode_of(load_config(name), settings)
+        for name in ("v0-nombre", "v0-fts", "v1-vectorial", "v2-hibrido", "v2b-fusion")
+    }
+
+    assert modes["v0-nombre"] == NO_FUSION
+    assert modes["v0-fts"] == NO_FUSION
+    assert modes["v1-vectorial"] == NO_FUSION
+    assert modes["v2-hibrido"] == "flat"
+    assert modes["v2b-fusion"] == "branch"

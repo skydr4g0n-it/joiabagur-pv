@@ -88,6 +88,10 @@ async def persist(report: Report, golden: GoldenSet, *, settings: Settings) -> l
                                 for reading, agg in item.readings.items()
                                 for name, value in agg.values.items()
                             },
+                            # A string among numbers, and deliberately: `ai.eval_run` has
+                            # C24's fixed columns and this change adds no migration, so the
+                            # jsonb is where the sixth element of the provenance lands.
+                            "provenance.fusion_mode": item.provenance.fusion_mode,
                             "abstention_rate": item.abstention_rate,
                             "cost_per_query_usd": item.cost_per_query_usd,
                             **item.latency.as_dict(),

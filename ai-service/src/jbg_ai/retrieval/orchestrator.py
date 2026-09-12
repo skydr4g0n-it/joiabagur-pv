@@ -6,7 +6,8 @@ a generated `to_tsvector('spanish', doc_text)` column with its GIN index — had
 on every live row since C05 and nothing queried it. C20 computed the query expansion, logged it
 as `stage=expand` and nobody read the result. Both are consumed here.
 
-The order of the pipeline is a decision and not an accident (design D10): the lexical branch
+The order of the pipeline is a decision and not an accident (**C21** design D10 — not C25's,
+whose D10 withdrew rotation from the ordering): the lexical branch
 races the **embedding provider**, not the vector search. Running the two SQL statements in
 parallel would optimise what costs nothing — on 1.168 rows with a GIN index the lexical query
 is noise — while holding two of the five pool connections per request against a pool with
@@ -19,7 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from uuid import UUID
 
@@ -32,13 +33,27 @@ from jbg_ai.api.schemas.retrieval import (
     RetrievalResponse,
     RetrievalResult,
 )
-from jbg_ai.config.settings import Settings
+from jbg_ai.config.settings import (
+    FUSION_MODE_BRANCH,
+    FUSION_MODE_FLAT,
+    FUSION_MODES,
+    Settings,
+)
 from jbg_ai.indexing.constants import DEFAULT_EMBEDDING_MODEL
 from jbg_ai.indexing.embeddings import EmbeddingClient, EmbedResult, LiteLlmEmbeddingClient
 from jbg_ai.indexing.errors import EmbeddingError
+from jbg_ai.retrieval.abstention import AbstentionRule
+from jbg_ai.retrieval.abstention import log_decision as log_abstention
+from jbg_ai.retrieval.abstention import should_abstain
 from jbg_ai.retrieval.errors import InvalidFamilyIdError, RetrievalDependencyError
-from jbg_ai.retrieval.filters import StructuralFilters, demote, extract_filters
-from jbg_ai.retrieval.fusion import RankedList, fuse, normalised_scores
+from jbg_ai.retrieval.filters import (
+    OUT_OF_STOCK_BUCKET,
+    BusinessWeights,
+    StructuralFilters,
+    demote,
+    extract_filters,
+)
+from jbg_ai.retrieval.fusion import FusedCandidate, RankedList, fuse, normalised_scores
 from jbg_ai.retrieval.lexical import EXPANDED_LIST, TYPED_LIST, expanded_request, typed_request
 from jbg_ai.retrieval.ports import LexicalHit, ProductSearchPort, SearchFilters, SearchHit
 from jbg_ai.retrieval.projection import (
@@ -54,6 +69,27 @@ from jbg_ai.stubs.responses import over_retrieval_count
 logger = logging.getLogger(__name__)
 
 VECTOR_LIST = "vector"
+#: Name the lexical branch presents to the inter-branch stage. It is a BRANCH and not a list:
+#: whatever the two lexical lists did among themselves, stage 2 sees one ranked opinion holding
+#: one weight. That is what makes `len(ranks) > 1` in stage 2 mean cross-branch consensus.
+LEXICAL_BRANCH_LIST = "lexical"
+
+#: Two values, and neither is a strength parameter: the scaling IS the proportion, so the
+#: live system carries no number governing how hard it pulls.
+#:
+#: `continuous` is the adopted rule. `none` switches it off and is the CONTROL — the arm that
+#: measured whether the idea is worth having at all, and the rollback if it ever misbehaves.
+#:
+#: A third form was implemented and **withdrawn after measuring**: "did the best candidate
+#: cover every expressible group? if not, keep a declared fraction alpha". It produced results
+#: identical to the continuous rule at every point of the sweep, for two independent reasons —
+#: the natural alpha of 0,5 coincides with the most frequent partial coverage on this set, and
+#: where the two do differ both push the effective branch ratio past the point where the fused
+#: order saturates. Indistinguishable in effect and carrying one parameter more, it lost on
+#: cost rather than on result. The figures are in the C25 implementation report.
+COVERAGE_CONTINUOUS = "continuous"
+COVERAGE_NONE = "none"
+COVERAGE_RULES = (COVERAGE_CONTINUOUS, COVERAGE_NONE)
 LEXICAL_REASON = "lexical"
 VECTOR_REASON = "vector"
 
@@ -119,6 +155,9 @@ class _Candidate:
     #: Read by the availability block of `demotion_rank` and never emitted. `None` means the
     #: query ran unscoped, which is not the same as a bucket of zero.
     qty_bucket: str | None = None
+    #: Read by the business score of `demotion_rank` and never emitted. `None` is absence —
+    #: no reading scope, or a product this point of sale does not carry — and never a zero.
+    sales_30d: int | None = None
     vector_score: float | None = None
     lexical_score: float | None = None
     reasons: list[str] = field(default_factory=list)
@@ -144,8 +183,16 @@ async def retrieve_products(
     weight_typed: float | None = None,
     weight_expanded: float | None = None,
     weight_vector: float | None = None,
+    fusion: str | None = None,
+    branch_weight_lexical: float | None = None,
+    branch_weight_vector: float | None = None,
+    coverage_rule: str = COVERAGE_CONTINUOUS,
+    abstain: bool | None = None,
     branch_depth: int | None = None,
     pos_prefilter: bool | None = None,
+    signal_pos_id: UUID | None = None,
+    business_weight_availability: float | None = None,
+    on_fused_candidates: Callable[[Sequence[object]], None] | None = None,
     projection_max_age_seconds: int | None = None,
     freshness: ProjectionFreshness | None = None,
 ) -> RetrievalResponse:
@@ -168,7 +215,27 @@ async def retrieve_products(
     w_typed = settings.jpv_rrf_weight_typed if weight_typed is None else weight_typed
     w_expanded = settings.jpv_rrf_weight_expanded if weight_expanded is None else weight_expanded
     w_vector = settings.jpv_rrf_weight_vector if weight_vector is None else weight_vector
+    fusion_mode = settings.jpv_fusion_mode if fusion is None else fusion
+    if fusion_mode not in FUSION_MODES:
+        raise ValueError(f"unknown fusion mode {fusion_mode!r}, expected one of {FUSION_MODES}")
+    w_lex_branch = (
+        settings.jpv_branch_weight_lexical
+        if branch_weight_lexical is None
+        else branch_weight_lexical
+    )
+    w_vec_branch = (
+        settings.jpv_branch_weight_vector
+        if branch_weight_vector is None
+        else branch_weight_vector
+    )
     depth = settings.jpv_branch_depth if branch_depth is None else branch_depth
+    weights = BusinessWeights(
+        availability=(
+            settings.jpv_business_weight_availability
+            if business_weight_availability is None
+            else business_weight_availability
+        ),
+    )
     prefilter = (
         settings.jpv_pos_prefilter_enabled if pos_prefilter is None else pos_prefilter
     )
@@ -256,6 +323,7 @@ async def retrieve_products(
         run_vector=run_vector,
         run_lexical=run_lexical,
         pos_id=scope.pos_id,
+        signal_pos_id=signal_pos_id,
     )
 
     vector_hits: list[SearchHit] = []
@@ -273,6 +341,7 @@ async def retrieve_products(
             depth=depth,
             mode=payload.mode,
             pos_id=scope.pos_id,
+            signal_pos_id=signal_pos_id,
         )
     elif embedded is not None and embedded.error is not None:
         if payload.mode is RetrievalMode.VECTOR or not (typed_hits or expanded_hits):
@@ -288,16 +357,47 @@ async def retrieve_products(
         )
 
     structural = extract_filters(expanded)
+
+    # The fourth stripped cable of this subsystem, after `tsv`, the expansion and
+    # `qty_bucket`: `coordination` has been computed, carried on every `LexicalHit` and read
+    # by nobody. C21 expected an adaptive weighting to EMERGE from `ts_rank` and it does not —
+    # `ts_rank` keeps ordering sixty documents that keep winning all of them.
+    coverage = _lexical_coverage(expanded_hits)
+    w_lex_effective = _scaled_lexical_weight(w_lex_branch, coverage, rule=coverage_rule)
+    if fusion_mode == FUSION_MODE_BRANCH:
+        logger.info(
+            "stage=coverage trace_id=%s rule=%s coverage=%s w_lex=%s w_lex_effective=%s",
+            principal.trace_id,
+            coverage_rule,
+            "none" if coverage is None else f"{coverage:.3f}",
+            w_lex_branch,
+            f"{w_lex_effective:.4f}",
+            extra={"trace_id": principal.trace_id},
+        )
+
     candidates, cross_branch = _fuse_branches(
         typed_hits,
         expanded_hits,
         vector_hits,
         k=k,
         depth=depth,
-        weights=(w_typed, w_expanded, w_vector),
+        mode=fusion_mode,
+        flat_weights=(w_typed, w_expanded, w_vector),
+        branch_weights=(w_lex_effective, w_vec_branch),
+        internal_weights=(w_typed, w_expanded),
     )
 
-    ordered, demoted = demote(candidates, structural)
+    # An observability seam for the EVALUATION, and nothing else calls it. The capture phase
+    # of the sweep needs the fused window with the fields the ordering reads — price, size,
+    # materials, bucket, sales window — and the response carries none of them by design. The
+    # alternative was a harness that rebuilt the pipeline, which would measure the copy.
+    # It receives the window BEFORE `demote`, so what is persisted is the fusion's own output
+    # and the re-score applies the whole ordering key from scratch.
+    if on_fused_candidates is not None:
+        on_fused_candidates(candidates)
+
+    before = [item.product_id for item in candidates]
+    ordered, demoted = demote(candidates, structural, weights)
     logger.info(
         "stage=filters trace_id=%s extracted=%s demoted=%s candidates=%s",
         principal.trace_id,
@@ -306,16 +406,73 @@ async def retrieve_products(
         len(ordered),
         extra={"trace_id": principal.trace_id},
     )
+    # `stage=signals` reports the business signals alone, because `stage=filters` cannot: it
+    # counts everything the key demoted, and after C25 that conflates a price ceiling the
+    # operator typed with a stock figure they never asked about. No exact quantity and no
+    # vector appears here — the bucket is a bucket, and the sales window is reported only as
+    # how many candidates carried one.
+    logger.info(
+        "stage=signals trace_id=%s w_availability=%s reading_scope=%s "
+        "reordered=%s absent_signal=%s out_of_stock=%s with_sales_signal=%s",
+        principal.trace_id,
+        weights.availability,
+        signal_pos_id is not None or scope.applied,
+        sum(
+            1
+            for position, item in enumerate(ordered)
+            if position >= len(before) or before[position] != item.product_id
+        ),
+        sum(1 for item in ordered if item.qty_bucket is None),
+        sum(1 for item in ordered if item.qty_bucket == OUT_OF_STOCK_BUCKET),
+        # A DIAGNOSTIC count and nothing else: `sales_30d` is persisted and read so the
+        # report can publish its distribution, and no ordering rule consumes it. The
+        # `Constrained` protocol `demote` reads does not even carry the field.
+        sum(1 for item in ordered if item.sales_30d),
+        extra={"trace_id": principal.trace_id},
+    )
 
     window = over_retrieval_count(payload.top_k)
     shown = ordered[:window]
     fused = run_lexical and vector_ran
     low_confidence = _low_confidence(shown, fused=fused)
 
+    # The decision about whether the catalogue can answer this query at all. It runs HERE —
+    # after the fusion, over the distances the vector branch already produced — and not in the
+    # retrieval statement, because the measurement that chose its form also chose its phase:
+    # a relative rule does not alter the candidate set, which is what keeps the persisted
+    # windows of the calibration valid.
+    #
+    # It is reached only when the vector branch actually ran. A provider failure degrades to
+    # the lexical branch further up, or raises; serving that as an abstention would be the
+    # same lie as a 200 with an empty list, and D8 of the fusion design prevents it.
+    abstention = AbstentionRule(
+        enabled=(
+            settings.jpv_abstention_enabled if abstain is None else abstain
+        ),
+        band_alpha=settings.jpv_abstention_band_alpha,
+        min_candidates=settings.jpv_abstention_band_min_candidates,
+    )
+    distances = [hit.distance for hit in vector_hits]
+    abstained = vector_ran and should_abstain(distances, abstention)
+    if vector_ran:
+        log_abstention(
+            trace_id=principal.trace_id,
+            rule=abstention,
+            distances=distances,
+            abstained=abstained,
+        )
+    if abstained:
+        # A decision about the query, applied to the WHOLE response: no candidate is removed
+        # one by one, because an abstention built by filtering is indistinguishable from a
+        # retrieval that merely found little.
+        shown = []
+        low_confidence = True
+
     logger.info(
-        "stage=fuse trace_id=%s typed=%s expanded=%s vector=%s fused=%s branches=%s "
-        "cross_branch=%s returned=%s low_confidence=%s k=%s depth=%s",
+        "stage=fuse trace_id=%s mode=%s typed=%s expanded=%s vector=%s fused=%s branches=%s "
+        "cross_branch=%s returned=%s low_confidence=%s k=%s depth=%s weights=%s",
         principal.trace_id,
+        fusion_mode,
         len(typed_hits),
         len(expanded_hits),
         len(vector_hits),
@@ -326,6 +483,11 @@ async def retrieve_products(
         low_confidence,
         k,
         depth,
+        (
+            f"w_lex={w_lex_branch} w_vec={w_vec_branch}"
+            if fusion_mode == FUSION_MODE_BRANCH
+            else f"typed={w_typed} expanded={w_expanded} vector={w_vector}"
+        ),
         extra={"trace_id": principal.trace_id},
     )
 
@@ -352,6 +514,7 @@ async def _race_provider_against_text(
     run_vector: bool,
     run_lexical: bool,
     pos_id: UUID | None,
+    signal_pos_id: UUID | None,
 ) -> tuple[_EmbedOutcome | None, list[LexicalHit], list[LexicalHit]]:
     """`gather(embed, lexical A then B)` — one pool connection held at any moment (D10)."""
 
@@ -385,10 +548,18 @@ async def _race_provider_against_text(
         # Sequential on purpose: two concurrent statements would hold two of the five pool
         # connections, and the pair costs single-digit milliseconds behind the provider.
         typed = await search.search_lexical(
-            typed_request(payload.query), depth=depth, filters=filters, pos_id=pos_id
+            typed_request(payload.query),
+            depth=depth,
+            filters=filters,
+            pos_id=pos_id,
+            signal_pos_id=signal_pos_id,
         )
         widened = await search.search_lexical(
-            expanded_request(expanded), depth=depth, filters=filters, pos_id=pos_id
+            expanded_request(expanded),
+            depth=depth,
+            filters=filters,
+            pos_id=pos_id,
+            signal_pos_id=signal_pos_id,
         )
         logger.info(
             "stage=lexical trace_id=%s latency_ms=%.1f typed=%s expanded=%s scoped=%s",
@@ -417,6 +588,7 @@ async def _vector_branch(
     depth: int,
     mode: RetrievalMode,
     pos_id: UUID | None,
+    signal_pos_id: UUID | None,
 ) -> list[SearchHit]:
     started = time.perf_counter()
     hits = await search.search(
@@ -427,6 +599,7 @@ async def _vector_branch(
         model_version_key=embed.model_version_key,
         model_id=embed.model_id,
         pos_id=pos_id,
+        signal_pos_id=signal_pos_id,
     )
     hits = sorted(hits, key=lambda item: item.distance)[:depth]
     # `vector_empty` and not `low_confidence`: this stage knows only whether **its own**
@@ -460,10 +633,19 @@ def _fuse_branches(
     *,
     k: int,
     depth: int,
-    weights: tuple[float, float, float],
+    mode: str,
+    flat_weights: tuple[float, float, float],
+    branch_weights: tuple[float, float],
+    internal_weights: tuple[float, float],
 ) -> tuple[list[_Candidate], int]:
-    """Fuse the three lists and rebuild the candidates with their real provenance."""
-    w_typed, w_expanded, w_vector = weights
+    """Fuse the lists and rebuild the candidates with their real provenance.
+
+    Two modes, and the difference is not a weight but an ARITY. `flat` fuses all three lists
+    at once, which is what C21 shipped and what the published baseline was measured under.
+    `branch` fuses the two lexical lists into one ranked list and then fuses THAT against the
+    vector list, so a branch's total vote is exactly its declared weight however many of its
+    own lists happened to match.
+    """
     candidates: dict[UUID, _Candidate] = {}
 
     for hit in (*typed_hits, *expanded_hits):
@@ -476,15 +658,34 @@ def _fuse_branches(
         item.vector_score = clamp_score(hit.distance)
         candidates[hit.product_id] = item
 
-    fused = fuse(
-        [
-            RankedList(TYPED_LIST, w_typed, [hit.product_id for hit in typed_hits]),
-            RankedList(EXPANDED_LIST, w_expanded, [hit.product_id for hit in expanded_hits]),
-            RankedList(VECTOR_LIST, w_vector, [hit.product_id for hit in vector_hits]),
-        ],
-        k=k,
-        depth=depth,
-    )
+    typed_ids = [hit.product_id for hit in typed_hits]
+    expanded_ids = [hit.product_id for hit in expanded_hits]
+    vector_ids = [hit.product_id for hit in vector_hits]
+
+    if mode == FUSION_MODE_FLAT:
+        w_typed, w_expanded, w_vector = flat_weights
+        fused = fuse(
+            [
+                RankedList(TYPED_LIST, w_typed, typed_ids),
+                RankedList(EXPANDED_LIST, w_expanded, expanded_ids),
+                RankedList(VECTOR_LIST, w_vector, vector_ids),
+            ],
+            k=k,
+            depth=depth,
+        )
+        lexical_names = (TYPED_LIST, EXPANDED_LIST)
+    else:
+        fused = _fuse_two_stage(
+            typed_ids,
+            expanded_ids,
+            vector_ids,
+            k=k,
+            depth=depth,
+            branch_weights=branch_weights,
+            internal_weights=internal_weights,
+        )
+        lexical_names = (LEXICAL_BRANCH_LIST,)
+
     scores = normalised_scores(fused)
 
     ordered: list[_Candidate] = []
@@ -495,11 +696,13 @@ def _fuse_branches(
         reasons: list[str] = []
         if VECTOR_LIST in entry.ranks:
             reasons.append(VECTOR_REASON)
-        if TYPED_LIST in entry.ranks or EXPANDED_LIST in entry.ranks:
+        if any(name in entry.ranks for name in lexical_names):
             reasons.append(LEXICAL_REASON)
         item.reasons = reasons
         # A candidate seen by both lexical lists is not cross-branch: with the expansion
-        # disabled the two lists are identical, and every lexical hit would qualify.
+        # disabled the two lists are identical, and every lexical hit would qualify. In
+        # `branch` mode the point is moot — stage 2 has one entry per branch — which is the
+        # collapse D5(c) predicted and the reason `low_confidence` needs no exception there.
         if len(reasons) > 1:
             cross_branch += 1
         # A diagnostic is absent rather than invented for a branch that did not see it.
@@ -510,6 +713,101 @@ def _fuse_branches(
         ordered.append(item)
 
     return ordered, cross_branch
+
+
+def _lexical_coverage(expanded_hits: Sequence[LexicalHit]) -> float | None:
+    """How much of what the query CAN express its best lexical candidate actually matched.
+
+    The numerator is free: the expanded list arrives `ORDER BY coordination DESC`, so the
+    first hit's tally IS the maximum. The denominator counts only the groups whose tsquery
+    survives the language configuration, which is the point the whole rule turns on — a stop
+    word the operator typed becomes a counting group that can never match anything, and
+    counting it would lower the weight of a query that is in fact fully anchored.
+
+    `None` means "do not scale", and it is returned for the two cases where the ratio carries
+    no information rather than carrying zero:
+
+    * the lexical branch produced nothing, so its weight decides nothing;
+    * the query expressed no group the index can be asked about at all, so there is no
+      denominator. Scaling to zero there would silence the branch on the strength of a
+      question that was never asked.
+    """
+    if not expanded_hits:
+        return None
+    best = expanded_hits[0]
+    if best.coverage_denominator <= 0:
+        return None
+    # Clamped because a document can match a group more than one way through the OR of its
+    # surface forms; coverage is a proportion and must not exceed one.
+    return min(best.coordination / best.coverage_denominator, 1.0)
+
+
+def _scaled_lexical_weight(weight: float, coverage: float | None, *, rule: str) -> float:
+    """`w_lex x coverage`, and nothing else. C25 D7.
+
+    A branch whose best candidate matched everything the query can express keeps its full
+    declared weight; one that matched a fraction keeps that fraction. **No parameter of its
+    own**, which is the property the rule was adopted for and the one that survived the
+    comparison against a form that had one.
+
+    Measured against the control arm — the same fusion with the rule off — it buys **+0,128**
+    on `descripcion-sin-anclaje` and **exactly zero** on all seven other categories, which is
+    D7's falsifiable prediction confirmed against the live index. It also flattens the branch
+    ratio from a cliff into a plateau: the sweep's range over `rho` falls from 0,070 without
+    the rule to 0,007 with it, so the default stops sitting on a discontinuity.
+
+    `none` is the control and the rollback. It is an on/off switch, not a strength.
+    """
+    if coverage is None or rule == COVERAGE_NONE:
+        return weight
+    if rule != COVERAGE_CONTINUOUS:
+        raise ValueError(f"unknown coverage rule {rule!r}, expected one of {COVERAGE_RULES}")
+    return weight * coverage
+
+
+def _fuse_two_stage(
+    typed_ids: Sequence[UUID],
+    expanded_ids: Sequence[UUID],
+    vector_ids: Sequence[UUID],
+    *,
+    k: int,
+    depth: int,
+    branch_weights: tuple[float, float],
+    internal_weights: tuple[float, float],
+) -> tuple[FusedCandidate, ...]:
+    """Stage 1 inside the lexical branch, stage 2 between the branches. C25.
+
+    The formula is untouched: this composes `fuse` with itself, feeding stage 1's ORDER back
+    in as a ranked list. Only the order survives stage 1 — the magnitude of the intra-lexical
+    consensus is flattened — which is the declared cost of the change, and the defence is that
+    flattening magnitude into rank is what RRF does at every level of every one of its stages.
+
+    **Stage 1's output is truncated at `depth` too.** Without that the lexical branch could
+    present up to `2 * depth` distinct candidates to stage 2 against the vector branch's
+    `depth`, which is a second and independent way of over-weighting it: twice the slots on
+    top of the larger vote.
+    """
+    w_typed, w_expanded = internal_weights
+    w_lex, w_vec = branch_weights
+
+    lexical = fuse(
+        [
+            RankedList(TYPED_LIST, w_typed, typed_ids),
+            RankedList(EXPANDED_LIST, w_expanded, expanded_ids),
+        ],
+        k=k,
+        depth=depth,
+    )
+    lexical_ids = [item.key for item in lexical][:depth]
+
+    return fuse(
+        [
+            RankedList(LEXICAL_BRANCH_LIST, w_lex, lexical_ids),
+            RankedList(VECTOR_LIST, w_vec, vector_ids),
+        ],
+        k=k,
+        depth=depth,
+    )
 
 
 def _from_hit(hit: LexicalHit | SearchHit) -> _Candidate:
@@ -523,6 +821,7 @@ def _from_hit(hit: LexicalHit | SearchHit) -> _Candidate:
         price=hit.price,
         size_label=hit.size_label,
         qty_bucket=hit.qty_bucket,
+        sales_30d=hit.sales_30d,
     )
 
 

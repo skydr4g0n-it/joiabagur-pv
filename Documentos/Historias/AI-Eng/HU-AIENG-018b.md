@@ -294,13 +294,13 @@ Cerrados confirmando la opción por defecto de las seis preguntas abiertas del t
 - **Limitación conocida:** los 21 huérfanos cuyo `piece_type` no tiene ninguna familia existente no pueden puntuar contra nada y quedan fuera de la alerta por construcción. No es un defecto: no hay familia a la que pertenecer.
 - **Tres estados que la pantalla no puede confundir**, y que es lo que D20 exige tras revisarse: *(1)* la lista se calculó y salió vacía; *(2)* el servicio no contestó, así que no se sabe; *(3)* la lista se calculó y tiene contenido. El segundo pintado como el primero es el fallo de C17 repetido, y sobre una pantalla de calidad de catálogo se lee como «el catálogo está limpio». La revisión de familias no depende de vectores y sigue disponible en el estado *(2)*.
 - **Divergencia heredada, sin resolver aquí:** la spec viva `product-family` justifica la distinción con las colecciones diciendo que un producto puede pertenecer *«to one of many unrelated collections»*, pero [`Product.cs:31`](../../../backend/src/JoiabagurPV.Domain/Entities/Product.cs#L31) declara `Guid? CollectionId`, una FK única y anulable: ambas cardinalidades son 0..1. Los discriminadores reales, medidos: una colección abarca 1–154 productos (mediana 15) y 13–16 tipos de pieza; una familia, 2–4 de un solo tipo.
-- **Change asociado:** [`add-family-review-ui-and-orphan-alert`](../../../openspec/changes/add-family-review-ui-and-orphan-alert/), rama `c18b-add-family-review-ui-and-orphan-alert`, creada desde `ai-eng` en `6ffd390`.
+- **Change asociado:** [`add-family-review-ui-and-orphan-alert`](../../../openspec/changes/archive/2026-09-01-add-family-review-ui-and-orphan-alert/), rama `c18b-add-family-review-ui-and-orphan-alert`, creada desde `ai-eng` en `6ffd390`.
 
 ---
 
 ## Referencias
 
-- Ticket técnico: [T-AIENG-018b](../../../openspec/changes/add-family-review-ui-and-orphan-alert/ticket.md)
+- Ticket técnico: [T-AIENG-018b](../../../openspec/changes/archive/2026-09-01-add-family-review-ui-and-orphan-alert/ticket.md)
 - Épica: [EP13 — Familias de Producto y Desambiguación de Variantes](../../epicas.md)
 - Diseño: [`proyecto-final-diseno-rag-joiabagur.md`](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) §7.5 (flujo mixto y alerta de huérfanos), §7.8 (revisión híbrida y vía revisada), §11.5 (métricas del enriquecimiento), §16 (checklist de entrega)
 - Plan: [`proyecto-final-plan-changes-openspec.md`](../../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md), ficha C18b, §0 (partición de C18 y anulación de la rama de C19), §12 (turno de migración)

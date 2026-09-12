@@ -90,6 +90,11 @@ class LexicalFragments:
     match: str
     coordination: str
     params: dict[str, object]
+    #: How many counting groups could match ANY document at all — the denominator of the
+    #: coverage that scales the lexical branch's weight in C25. Constant per query and
+    #: row-independent, but composed here and selected in the same statement as the
+    #: coordination tally, so measuring coverage costs no second trip to the pool.
+    coverage_denominator: str = "0"
 
 
 def compose_group_fragments(
@@ -163,6 +168,9 @@ def build_fragments(request: LexicalRequest, *, placeholder: Placeholder) -> Lex
             match=match,
             coordination=f"(tsv @@ {match})::int",
             params={name: request.text},
+            # The typed list is one group: the operator's whole phrase. It can match at most
+            # one, and it is not what coverage is read from — see `numnode` below.
+            coverage_denominator=f"(numnode({match}) > 0)::int",
         )
 
     fragments, terms = compose_group_fragments(request.groups, placeholder=placeholder)
@@ -178,8 +186,26 @@ def build_fragments(request: LexicalRequest, *, placeholder: Placeholder) -> Lex
     # change the order: the `EXISTS`-per-group zero-drop the exploration first proposed is
     # unnecessary. A query with no counting group at all leaves the ordering to `ts_rank`,
     # and through it to the vector branch — which is D4's emergent adaptive weighting.
+    # `numnode(<fragment>) > 0` asks PostgreSQL itself whether that group's tsquery has any
+    # lexeme left after the language configuration is applied. A stop word the operator typed
+    # — `de`, `una`, `y`, `que` — becomes a counting group whose `plainto_tsquery` is EMPTY,
+    # so it can never match any document. Counting it in the denominator would lower the
+    # weight of a query that is in fact fully anchored, and it would do so on exactly the
+    # queries where the lexical branch is strongest: measured, `sortija de plata` scores nDCG
+    # 1,000 and the naive denominator would cut a third of its lexical weight.
+    #
+    # The vacuity of the TYPED list is deliberately not used as the discriminator instead:
+    # `bano de oro` matches no document under the AND of `websearch` — the corpus says
+    # «baño» — yet it also scores 1,000, so that rule would crush it.
+    expressible = [
+        f"(numnode({fragment}) > 0)::int"
+        for fragment, counts in zip(fragments, counting, strict=False)
+        if counts
+    ]
+
     return LexicalFragments(
         match="(" + " || ".join(fragments) + ")",
         coordination=" + ".join(tallied) if tallied else "0",
         params=params,
+        coverage_denominator=" + ".join(expressible) if expressible else "0",
     )

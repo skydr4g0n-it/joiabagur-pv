@@ -23,9 +23,10 @@ from sqlalchemy import text
 
 from jbg_ai.config.settings import Settings
 from jbg_ai.db.engine import session_scope
-from jbg_ai.evals.configs import EvalConfig
+from jbg_ai.api.schemas.retrieval import RetrievalMode
+from jbg_ai.evals.configs import KIND_PIPELINE, EvalConfig
 from jbg_ai.evals.execute import QueryRun, execute
-from jbg_ai.evals.golden import GoldenQuery, GoldenSet
+from jbg_ai.evals.golden import OUT_OF_DOMAIN, GoldenQuery, GoldenSet
 from jbg_ai.evals.latency import LatencySummary, Sample, summarise
 from jbg_ai.evals.metrics import (
     Aggregate,
@@ -37,7 +38,12 @@ from jbg_ai.evals.metrics import (
     stale_judgements,
 )
 from jbg_ai.evals.pricing import PriceList
-from jbg_ai.evals.provenance import Provenance, current_git_sha, index_set_hash
+from jbg_ai.evals.provenance import (
+    NO_FUSION,
+    Provenance,
+    current_git_sha,
+    index_set_hash,
+)
 from jbg_ai.indexing.embeddings import EmbeddingClient
 from jbg_ai.retrieval.ports import ProductSearchPort
 
@@ -84,6 +90,9 @@ class ConfigReport:
     documents_omitted: int
     cases: tuple[CaseMetrics, ...]
     ranked: dict[str, tuple[str, ...]]
+    #: How many of the tuning subset's queries are already at the ceiling of the deciding
+    #: metric. Reported beside that subset so a reader can tell whether it had room to move.
+    tuning_at_ceiling: int = 0
     notes: tuple[str, ...] = ()
 
 
@@ -101,6 +110,9 @@ class Report:
     distance_distribution: dict[str, dict[str, float]]
     stale_judgements: int
     price_list: PriceList
+    #: Best hit per query, split into answerable and out-of-domain. The quantity that decides
+    #: abstention, which the per-document histogram above does not answer.
+    best_hit_distances: dict[str, list[float]] = field(default_factory=dict)
     cag: dict | None = None
     notes: tuple[str, ...] = field(default_factory=tuple)
 
@@ -109,6 +121,19 @@ class Report:
             if item.config_id == config_id:
                 return item
         raise KeyError(config_id)
+
+
+def _fusion_mode_of(config: EvalConfig, settings: Settings) -> str:
+    """How this row composed its lists, or that it composed nothing.
+
+    Only a hybrid pipeline fuses: the two degraded baselines and the context-only row never
+    reach the fusion, and the vector row runs one branch, which leaves nothing to fuse with.
+    """
+    if config.kind != KIND_PIPELINE:
+        return NO_FUSION
+    if RetrievalMode(config.mode or "hybrid") is not RetrievalMode.HYBRID:
+        return NO_FUSION
+    return config.fusion or settings.jpv_fusion_mode
 
 
 async def corpus_snapshot(settings: Settings) -> tuple[list[UUID], dict[str, str]]:
@@ -151,6 +176,51 @@ async def judged_distances(
     return pairs
 
 
+_BEST_HIT = """
+SELECT min(embedding <=> CAST(:q AS vector)) AS best
+FROM ai.product_document
+WHERE embedding IS NOT NULL AND is_active IS TRUE
+"""
+
+
+async def best_hit_distances(
+    golden: GoldenSet, *, settings: Settings, embed: EmbeddingClient
+) -> dict[str, list[float]]:
+    """The BEST retrieval distance per query, split into answerable and out-of-domain.
+
+    This is the quantity that decides abstention, and it is not the one the per-document
+    histogram answers: a total overlap between the distances of relevant and irrelevant
+    DOCUMENTS does not imply that the best hit of an answerable QUERY cannot be separated from
+    the best hit of an impossible one. They are different questions, and the rule must be
+    justified from this one.
+
+    Taken over the whole live corpus and without the distance bound, because what is wanted is
+    the best hit a query really has — including the queries that today would return nothing.
+    """
+    out: dict[str, list[float]] = {"answerable": [], "out_of_domain": []}
+    for query in golden.judged_queries:
+        vector = (await embed.embed([query.text])).vectors[0]
+        literal = "[" + ",".join(str(value) for value in vector) + "]"
+        async with session_scope(settings) as session:
+            best = (await session.execute(text(_BEST_HIT), {"q": literal})).scalar()
+        if best is None:
+            continue
+        key = "out_of_domain" if query.category == OUT_OF_DOMAIN else "answerable"
+        out[key].append(float(best))
+    return {name: sorted(values) for name, values in out.items()}
+
+
+def count_at_ceiling(cases: Sequence[CaseMetrics], metric: str = "ndcg_at_5") -> int:
+    """How many queries already sit at the top of the deciding metric.
+
+    A saturated reading cannot register an improvement — only a tie or a fall — so a reader
+    who is weighing a disagreement between two subsets has to be able to see how much room
+    each of them had. Without this count, "the tuning subset did not improve" and "the tuning
+    subset could not improve" print identically.
+    """
+    return sum(1 for case in cases if getattr(case, metric) >= 1.0)
+
+
 def split_readings(
     golden: GoldenSet, cases: Sequence[CaseMetrics]
 ) -> dict[str, Aggregate]:
@@ -159,12 +229,28 @@ def split_readings(
     A configuration that wins only on the queries used to calibrate it has not been confirmed;
     it has been fitted. Publishing the three makes the contamination visible and quantified
     instead of leaving it to be assumed away.
+
+    **The three are averaged over the ANSWERABLE queries only.** An out-of-domain query has no
+    relevant document, so its nDCG is zero for every configuration by construction: averaging
+    it in adds the same zero to every numerator and a one to every denominator, which carries
+    no information about ranking and compresses every difference by the share of the category.
+    Measured when C25 took that category from 5 to 20, the gain of the branch fusion over the
+    published baseline read **+0,053** with them and **+0,084** without — the margin is 0,05,
+    so a real improvement came within three thousandths of being vetoed by the composition of
+    the set rather than by its own merit. Growing the category further would veto it outright.
+
+    What those queries measure is the abstention rate, which is reported from them and only
+    from them, and their per-category row still appears in the breakdown.
     """
     tuning = {query.id for query in golden.queries if query.in_tuning_set}
+    answerable = {
+        query.id for query in golden.queries if query.category != OUT_OF_DOMAIN
+    }
+    scored = [case for case in cases if case.query_id in answerable]
     return {
-        "global": aggregate(list(cases)),
-        "tuning": aggregate([case for case in cases if case.query_id in tuning]),
-        "new": aggregate([case for case in cases if case.query_id not in tuning]),
+        "global": aggregate(scored),
+        "tuning": aggregate([case for case in scored if case.query_id in tuning]),
+        "new": aggregate([case for case in scored if case.query_id not in tuning]),
     }
 
 
@@ -187,6 +273,15 @@ async def run_config(
 ) -> ConfigReport:
     """Evaluate one configuration over the whole judged set."""
     queries = list(golden.judged_queries)
+    # The operational reading needs the bucket of every JUDGED document, not only of the ones
+    # this configuration retrieved, because the ideal ordering is built from the same gain
+    # function. One statement per run, and `None` for a configuration that reads no signal —
+    # which is what makes the third reading absent rather than equal to the graded one.
+    buckets = (
+        await search.scope_buckets(UUID(config.signal_pos_id))
+        if config.signal_pos_id
+        else None
+    )
     ranked: dict[str, tuple[str, ...]] = {}
     abstained: dict[str, bool] = {}
     cold: list[Sample] = []
@@ -217,6 +312,7 @@ async def run_config(
             query.id,
             [UUID(value) for value in ranked[query.id]],
             abstained=abstained[query.id],
+            buckets=buckets,
         )
         for query in queries
     ]
@@ -271,6 +367,13 @@ async def run_config(
         documents_omitted=0,
         cases=tuple(cases),
         ranked=ranked,
+        tuning_at_ceiling=count_at_ceiling(
+            [
+                case
+                for case in cases
+                if case.query_id in {q.id for q in queries if q.in_tuning_set}
+            ]
+        ),
     )
 
 
@@ -300,6 +403,7 @@ async def run(
                 embed.model_version_key if config.uses_provider and embed else None
             ),
             git_sha=sha,
+            fusion_mode=_fusion_mode_of(config, settings),
         )
         reports.append(
             await run_config(
@@ -329,6 +433,9 @@ async def run(
         corpus_size=len(ids),
         configs=tuple(reports),
         distance_distribution=grade_distribution(distances),
+        best_hit_distances=await best_hit_distances(
+            golden, settings=settings, embed=embed
+        ),
         stale_judgements=stale_judgements(golden, hashes),
         price_list=prices,
         notes=(f"wall clock {round(time.perf_counter() - started, 1)} s",),

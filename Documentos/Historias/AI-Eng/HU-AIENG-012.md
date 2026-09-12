@@ -72,15 +72,15 @@ Indexable en catálogo: `Product.IsActive` **y** `ProductAiProfile.ReviewStatus 
 
 **Referencias:**
 
-[proyecto-final-plan-changes-openspec.md](../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (ficha C12, §0 C07 obligaciones heredadas, §6 nunca se recorta),
-[proyecto-final-diseno-rag-joiabagur.md](../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) (§6.2, **§6.3** contrato de sincronización, §7.2 esquema, D10, D11),
-[La capa de datos como servicio](../Sesiones%20Master%20AIEng/S9_Fundamentos_RAG/La%20capa%20de%20datos%20como%20servicio%20-%20Aislar%20y%20Securizar%20el%20Retriever.md) (guía: API Key en este camino; JWT donde hay identidad),
-[Reindexación y versionado de embeddings](../Sesiones%20Master%20AIEng/S11_RAG_avanzado/Reindexacion%20y%20Versionado%20Embeddings.md) (captura de cambios vs skip de embedding),
+[proyecto-final-plan-changes-openspec.md](../../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (ficha C12, §0 C07 obligaciones heredadas, §6 nunca se recorta),
+[proyecto-final-diseno-rag-joiabagur.md](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) (§6.2, **§6.3** contrato de sincronización, §7.2 esquema, D10, D11),
+[La capa de datos como servicio](../../Sesiones%20Master%20AIEng/S9_Fundamentos_RAG/La%20capa%20de%20datos%20como%20servicio%20-%20Aislar%20y%20Securizar%20el%20Retriever.md) (guía: API Key en este camino; JWT donde hay identidad),
+[Reindexación y versionado de embeddings](../../Sesiones%20Master%20AIEng/S11_RAG_avanzado/Reindexacion%20y%20Versionado%20Embeddings.md) (captura de cambios vs skip de embedding),
 [epicas.md](../../epicas.md) (EP14),
 [modelo-de-datos.md](../../modelo-de-datos.md) (`Product`, `ProductAiProfile`, `ProductFamily`, `Inventory`, `Sale`),
 [HU-AIENG-007.md](HU-AIENG-007.md), [HU-AIENG-008.md](HU-AIENG-008.md), [HU-AIENG-011.md](HU-AIENG-011.md),
 specs vivas `product-family`, `product-ai-profile`, `catalog-source-text`, `ai-vector-schema`,
-change OpenSpec [`openspec/changes/add-dotnet-index-feed-endpoints/`](../../../openspec/changes/add-dotnet-index-feed-endpoints/) y su [ticket técnico](../../../openspec/changes/add-dotnet-index-feed-endpoints/ticket.md).
+change OpenSpec [`openspec/changes/add-dotnet-index-feed-endpoints/`](../../../openspec/changes/archive/2026-08-26-add-dotnet-index-feed-endpoints/) y su [ticket técnico](../../../openspec/changes/archive/2026-08-26-add-dotnet-index-feed-endpoints/ticket.md).
 
 ---
 

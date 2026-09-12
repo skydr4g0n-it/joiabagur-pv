@@ -415,10 +415,35 @@ uv run evals validate                                  # the set alone: no datab
 uv run evals freeze-vectors                            # once, against the real provider
 uv run evals run --all --repeat 3 [--persist]          # the ablation table
 uv run evals run --config v2-hibrido                   # one row
-uv run evals sweep                                     # the directional sweep and its verdict
+uv run evals sweep                                     # phase A: the branch-weight ratio
+uv run evals capture                                   # phase B: persist one window per query
+uv run evals rescore                                   # phase C: the weight grid, offline
 uv run evals cag [--dry-run]                           # the context-only measurement, dated
 uv run evals provider-latency                          # the provider round trip, cold and warm
 ```
+
+**The calibration runs in two phases, and their order is a constraint rather than a
+preference.** The fusion decides WHICH candidates a query produces; the business signals only
+reorder them — `demote` is a stable sort that removes nothing. So:
+
+```
+  phase A  ·  sweep     fix the fusion          provider + database · the window MOVES
+                ↓ frozen
+  phase B  ·  capture   one retrieval per query, window persisted with its signals
+                ↓ window FIXED
+  phase C  ·  rescore   the business-weight grid    no provider · no database · seconds
+```
+
+Inverting them is a **silent** failure: phase C would run, print numbers, and they would
+describe a fusion that is no longer the one being calibrated. So each capture records the
+fusion fingerprint it was taken under and `rescore` **refuses** a window that does not match,
+naming what differs. `rescore` also needs no `DATABASE_URL` at all, which is the guarantee
+rather than a convenience — the signals and the assortment's buckets travel inside the capture
+file.
+
+`sweep` explores `rho = w_vec / w_lex` over a **one-dimensional** grid, because only the ratio
+changes the order: scaling both weights preserves it, measured by running `fuse`. `k` and the
+branch depth move together, by C21's rule that a deeper branch keeps more of its tail voting.
 
 `--persist` is the only thing that writes `ai.eval_run` / `ai.eval_case` / `ai.eval_result`; the
 report and the per-query detail land in [`evals/results/`](evals/results/) either way. The
@@ -485,6 +510,70 @@ warm — the process-wide client does not reduce the round trip on a repeated qu
    labelled unscoped, a decision taken in C22 so that retrieval quality and assortment coverage
    are not compressed into one number, and the scoped row was cut by declared decision.
 
+## Ranking, business signals and abstention (C25)
+
+C25 used that judge and found four things no argument had. The report is
+[`evals/results/c25-baselines-2026-09-11.md`](evals/results/c25-baselines-2026-09-11.md) and the
+measurements are in
+[`c25-implementation-measurements.md`](../Documentos/Proyecto%20Final%20AIEng/informes/c25-implementation-measurements.md).
+
+**The fusion did not fuse: it concatenated.** With C21's weights the sixty lexical documents
+outscored the vector branch's best hit in **every** query, so a grade-2 document the vector
+branch ranked **first** landed at **position 33**. It was an arithmetic defect, not a badly
+calibrated weight. The fusion is now composed in **two stages** — the two lexical lists into one
+ranked list, that list against the vector one under per-**branch** weights — so a branch's total
+vote is exactly its declared weight however many of its own lists matched, and the lexical branch
+stops contributing 120 candidates against the vector branch's 60. `JPV_FUSION_MODE=flat` restores
+C21's single-stage fusion exactly, and the published baseline row pins it.
+
+**The lexical branch now weighs less when its best candidate matched less of the query.** The
+coordination tally had been computed, carried on every hit and read by nobody — the fourth
+stripped cable of this subsystem. `w_lex x coverage`, with **no parameter of its own**. The
+denominator counts only the groups whose `tsquery` is non-empty, which is the whole rule: a stop
+word the operator typed becomes a counting group that can never match, and counting it would cut
+the weight of a query that is in fact fully anchored. Measured against the same fusion with the
+rule off, it buys **+0,128** on `descripcion-sin-anclaje` and **exactly zero** on the other seven
+categories — and it turns the branch ratio from a cliff into a plateau, taking the sweep's range
+over `rho` from **0,070 to 0,007**.
+
+**Availability reorders, and it is read without restricting.** The scope that RESTRICTS
+(`pos_id`, C22's prefilter) and the scope that only READS (`signal_pos_id`) are two independent
+parameters over one CTE, so the reordering can be measured without paying the prefilter's recall
+cost. A candidate the point of sale does not carry reports its signals **absent**, and absence is
+never read as zero. The score only ever subtracts, which is what keeps an unread row neutral.
+`JPV_BUSINESS_WEIGHT_AVAILABILITY=0` is the rollback.
+
+**The retriever can decline to answer.** The form of the rule was chosen by a measurement under a
+criterion written before the distribution was inspected: the best-hit distances of answerable and
+out-of-domain queries **overlap completely**, so no scalar separates them. What discriminates is
+the **shape** of the distance profile — an impossible query is flat, because nothing stands out.
+`JPV_ABSTENTION_ENABLED=false` is the rollback and restores answering everything.
+
+**The calibration runs offline after one capture.** See the two phases above under
+`uv run evals capture` / `rescore`.
+
+**Four limitations this change declares rather than mitigates:**
+
+1. **`Recall@5` reaches 0,758 against the 0,85 the design asks for.** The gap is +0,09 and no
+   lever in this change can close it: recall at five depends on **what** enters the window, and
+   the business signals only reorder what already did. The criterion was restated as a relative
+   one — each row beats the one it is built on — and this distance is declared.
+2. **The signals row does not clear the relative criterion either.** `v3` improves the
+   operational metric by **+0,030**, below the 0,05 this golden set can resolve. It is adopted
+   because its own adoption rule is satisfied and because the set is **structurally blind** to
+   availability — `criterion.md` never mentions stock — so what is missing is resolution, not
+   evidence. Reported as a gap, not as a pass.
+3. **Abstention reaches 0,150 against the 0,80 the ticket asks for.** Reaching 0,80 costs
+   silencing **21 of the 43** answerable queries. The rule is fixed at the most it can catch
+   while silencing **none** of them, and the rest is declared. The 0,150 is what the system
+   declines, not what the rule alone catches: an abstention and a `low_confidence` land on the
+   same response flag, so the figure unions the two — the rule takes it from 0,050 to 0,150,
+   and its own two-sided figures are in the C25 implementation report.
+4. **The out-of-domain category is unbalanced in a way that is measured but not corrected.**
+   Naming a material pulls a query **0,12 closer** to the catalogue and makes it look more
+   answerable; 12 of the 20 queries name one, because the five inherited from C24 all do and
+   rewriting them would falsify the comparison with the published baseline.
+
 ## Tests
 
 ```bash
@@ -513,12 +602,12 @@ These four tests exist to catch failures that produce **no error at all**: an HN
 
 ## Explicit non-goals
 
-- No real retrieval or agent loops — stubs are replaced route by route in later changes. Enrichment is real when `STUB_MODE=false` (C09). Catalog index sync is real when `STUB_MODE=false` (C13). Product retrieval is real when `STUB_MODE=false` (C14) and **hybrid since C21**: three ranked lists fused by weighted RRF, distance threshold 0.65 (a floor, not a discriminator), no `query_log`, `indexing/embeddings.py` and `openapi.json` unchanged. Substitutes stay stub/501 (C26)
+- No real retrieval or agent loops — stubs are replaced route by route in later changes. Enrichment is real when `STUB_MODE=false` (C09). Catalog index sync is real when `STUB_MODE=false` (C13). Product retrieval is real when `STUB_MODE=false` (C14), **hybrid since C21** and **fused in two stages since C25**: the two lexical lists are fused with each other and the result with the vector list under per-branch weights, so a branch's vote is the one declared however many of its lists matched. The scalar distance threshold 0.65 remains a floor rather than a discriminator, and C25 answers that with a relative per-query rule instead of moving it. No `query_log`, `indexing/embeddings.py` and `openapi.json` unchanged. Substitutes stay stub/501 (C26)
 - No `POST /v1/retrieval/complementary` — later OpenAPI negotiation. `POST /v1/families/suggest` **exists since C18a**, which is the change that first called it; `POST /v1/families/audit` since C18b, for the same reason
 - `ai.product_document` is written by C13 from the catalog feed; `ai.pos_projection` is **written by C22** from the POS availability feed; `ai.knowledge_document` and `ai.knowledge_chunk` are **written by C23**, by `python -m jbg_ai.indexing sync-knowledge`, from the corpus in `data/knowledge/`
 - No `ai.query_log` (unassigned; the pipeline logs `stage=expand|embed|search|lexical|filters|fuse` with `trace_id` instead). The `ai.eval_*` tables **exist since C24** and are written only with `--persist`
-- No reranking. C24 measured the number that would make it decidable — **one query of forty-eight** has a maximum-grade document inside the window a reranker would reorder but outside the five that are shown — and a cross-encoder at ~250 ms would spend 10-15 % of C16's budget for a ceiling of 2 % of the queries. Adding one is a `configs/v2-rerank.yaml` plus a run, which is the protocol being executable rather than rhetorical
-- No recalibration of `JPV_RETRIEVAL_DISTANCE_THRESHOLD`: it is C25's scope. C24 published the input it needs and the answer is negative — over 3.926 judgements the relevant documents reach a distance of 0,8008 and the irrelevant ones start at 0,3268, so **the two populations overlap and no single value separates them**. A per-query quantile is required, which is a redesign rather than a sweep
+- No reranking. C24 measured the number that would make it decidable and C25 re-measured it under the two-stage fusion — **two queries of forty-three** have a maximum-grade document inside the window a reranker would reorder but outside the five that are shown — and a cross-encoder at ~250 ms would spend 10-15 % of C16's budget for a ceiling of 2 % of the queries. Adding one is a `configs/v2-rerank.yaml` plus a run, which is the protocol being executable rather than rhetorical
+- No recalibration of `JPV_RETRIEVAL_DISTANCE_THRESHOLD`, and **C25 settled that it was never the right lever**. Over 3.926 judgements the relevant documents reach a distance of 0,8008 and the irrelevant ones start at 0,3268, so the two populations overlap; per QUERY — the quantity that actually decides — the answerable best hits reach 0,7118 while the out-of-domain ones start at 0,4469, which is **containment and not partial overlap**: the impossible range sits *inside* the answerable one. No scalar can separate them, so C25 ships a **relative per-query rule** (`retrieval/abstention.py`) that reads the SHAPE of the distance profile, runs after the fusion and does not alter the candidate set. The scalar stays where it is **by decision rather than by deferral**
 - No SQL access to schema `public`, ever
 - No production deploy, SSM or `CREATE EXTENSION` on RDS. C17 delivered the **enriched health** — `GET /health` reports database reachability, indexed document count, whether the embedding provider credential is configured, and a contrast between the configured embedding model and the one recorded on the index rows, all without ever calling the provider — and deployed it to an **isolated demo account**, not to the shop's production account. The return annotation stays an open mapping, so `openapi.json` is unchanged
 - No production tuning: `halfvec`, `hnsw.iterative_scan`, `CREATE INDEX CONCURRENTLY` and the `VACUUM`/`REINDEX` cycle are deliberate omissions at ~1,500 vectors, not oversights

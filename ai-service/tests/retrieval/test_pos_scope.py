@@ -24,7 +24,18 @@ from jbg_ai.retrieval.projection import (
     resolve_scope,
 )
 from support.fake_embedding_client import FakeEmbeddingClient
+from pydantic import ValidationError
+
+from jbg_ai.retrieval.filters import (
+    BusinessWeights,
+    StructuralFilters,
+    business_score,
+    demote,
+    demotion_rank,
+)
+from jbg_ai.retrieval.ports import SearchFilters
 from support.fake_product_search import (
+    DEFAULT_BUCKET,
     FakeAssignment,
     FakeIndexedRow,
     FakeProductSearch,
@@ -521,31 +532,57 @@ def test_no_vector_reaches_the_logs(caplog: pytest.LogCaptureFixture) -> None:
 # ------------------------------------------------------------------- sales, unread
 
 
-def test_the_retrieval_path_cannot_read_the_sales_figures() -> None:
-    """Written by the drain, read by nothing here. Structural, not a promise.
+def test_the_sales_figures_are_persisted_and_read_but_never_order_anything() -> None:
+    """Three figures the drain writes. One is read for diagnostics. NONE orders anything.
 
-    `sales_30d`, `sales_90d` and `last_sale_at` are persisted so the business-signals
-    ranking that follows has an input, and this capability must not quietly start using
-    them — a weight that appeared here would be uncalibrated by definition, because the
-    golden set that could calibrate it does not exist yet. The cheapest guarantee is that
-    the values never reach the pipeline at all: no hit type carries them, so no ordering
-    rule can read one by accident.
+    This replaces C22's guard, whose promise was that no sales figure reached the pipeline at
+    all. `sales_30d` now does reach it — it travels on every hit and is persisted in the
+    sweep's captured windows, so the report can publish its distribution and C26 has an input
+    — so the guarantee moves to where it can still be structural: **the protocol the ordering
+    reads does not carry the field.** `demote` cannot consume it even by accident, because it
+    cannot see it.
+
+    Why it orders nothing is measured, not cautious. As the strict tiebreak its requirement
+    described, it decided **0 pairs of the top five across all 48 queries**: exact score ties
+    are common — 662 pairs, 35 % of candidates — but none inside the reported window pitted a
+    seller against a non-seller. As a component of the ordering key it was no tiebreak at all,
+    inverting 11.067 pairs of which 71,2 % sat more than ten positions apart, and 6 of the 22
+    candidates it lifted into the top five displaced a better-graded document.
+
+    `sales_90d` and `last_sale_at` never reach the pipeline at all. `last_sale_at` is the
+    tempting one — 4.021 non-null rows against `sales_30d`'s 1.424 — as an exponential decay
+    whose "today" would be a wall clock; the world of C10 ends on 2026-08-23, so wall-clock
+    decay takes the signal to zero and makes the ranking irreproducible by design.
     """
     import inspect
 
     from jbg_ai.retrieval import filters, fusion, orchestrator
+    from jbg_ai.retrieval.filters import Constrained
     from jbg_ai.retrieval.ports import LexicalHit, SearchHit
 
+    # It travels: the hits carry it, so a diagnostic and a capture can read it.
     for hit_type in (SearchHit, LexicalHit):
         fields = set(hit_type.__dataclass_fields__)
-        assert not any(name.startswith("sales_") for name in fields), hit_type
-        assert "last_sale_at" not in fields
+        assert "sales_30d" in fields, f"{hit_type} must carry the signal for diagnostics"
+        assert "sales_90d" not in fields, hit_type
+        assert "last_sale_at" not in fields, hit_type
+
+    # It orders nothing: the protocol the ordering reads does not have the field.
+    ordering_fields = set(Constrained.__annotations__)
+    assert "sales_30d" not in ordering_fields, "the ordering must not be able to see it"
+    assert not any(name.startswith("sales_") for name in ordering_fields)
+    assert "last_sale_at" not in ordering_fields
+
+    # And the ordering module never names it.
+    assert "sales_30d" not in inspect.getsource(filters), "filters.py must not mention it"
 
     for module in (orchestrator, filters, fusion):
         source = inspect.getsource(module)
-        assert "sales_30d" not in source, module.__name__
         assert "sales_90d" not in source, module.__name__
         assert "last_sale_at" not in source, module.__name__
+        # And no ordering rule may reach for a wall clock.
+        assert "date.today" not in source, module.__name__
+        assert "datetime.now" not in source, module.__name__
 
 
 def test_sales_figures_do_not_change_the_order() -> None:
@@ -584,3 +621,472 @@ def test_resolve_scope_skips_every_query_when_disabled() -> None:
     assert scope.reported_age is None
     assert search.scope_calls == []
     assert search.synced_at_calls == 0
+
+
+# --------------------------------------------------------------------------------------
+# C25 - the reading scope is separate from the restricting one.
+# --------------------------------------------------------------------------------------
+
+def test_signal_join_never_restricts_the_candidate_set() -> None:
+    """A LEFT JOIN that reads, against an INNER JOIN that restricts. C25 D4.
+
+    This is the whole point of splitting the parameter: it lets the reordering by
+    availability be measured WITHOUT paying the recall cost of the prefilter, which is the
+    confusion C22 declined to introduce and declared unmeasured. If the reading scope removed
+    even one candidate, the `v3` row would be measuring two changes at once.
+    """
+    rows = [row(A, "carried", 0.10), row(B, "not-carried", 0.11), row(C, "also-not", 0.12)]
+    # The point of sale carries exactly one of the three.
+    assignments = [FakeAssignment(pos_id=MINE, product_id=A, qty_bucket="3+", sales_30d=7)]
+
+    without_anything = serve(FakeProductSearch(list(rows)), pos_prefilter=False)
+    with_signal = serve(
+        FakeProductSearch(list(rows), assignments=list(assignments)),
+        pos_prefilter=False,
+        signal_pos_id=MINE,
+    )
+
+    assert [item.sku for item in with_signal.results] == [
+        item.sku for item in without_anything.results
+    ], "reading the signal must preserve every candidate, and their order"
+
+    # And the signals really were read for the candidate the point of sale carries.
+    search = FakeProductSearch(list(rows), assignments=list(assignments))
+    serve(search, pos_prefilter=False, signal_pos_id=MINE)
+    hits = run(
+        search.search(
+            [0.0],
+            threshold=0.65,
+            depth=60,
+            filters=SearchFilters(),
+            model_version_key="m:1",
+            model_id="m",
+            signal_pos_id=MINE,
+        )
+    )
+    by_sku = {hit.sku: hit for hit in hits}
+    assert len(by_sku) == 3, "the reading scope dropped a candidate"
+    assert by_sku["carried"].qty_bucket == "3+"
+    assert by_sku["carried"].sales_30d == 7
+
+
+def test_absent_projection_row_reports_absent_signals_not_zero() -> None:
+    """Absence is not evidence of zero stock, and it is not evidence of zero sales either.
+
+    `None` and `0` are different world states: "this point of sale does not carry it" against
+    "it is carried here and sold none". Collapsing them would make the availability demotion
+    fire on every product outside the assortment, turning assortment coverage into a
+    relevance penalty - exactly the conflation C22 kept apart.
+    """
+    rows = [row(A, "carried-sold-none", 0.10), row(B, "not-carried", 0.11)]
+    assignments = [
+        FakeAssignment(pos_id=MINE, product_id=A, qty_bucket="0", sales_30d=0),
+    ]
+    search = FakeProductSearch(rows, assignments=assignments)
+
+    hits = run(
+        search.search(
+            [0.0],
+            threshold=0.65,
+            depth=60,
+            filters=SearchFilters(),
+            model_version_key="m:1",
+            model_id="m",
+            signal_pos_id=MINE,
+        )
+    )
+    by_sku = {hit.sku: hit for hit in hits}
+
+    carried = by_sku["carried-sold-none"]
+    assert carried.qty_bucket == "0", "a real zero bucket"
+    assert carried.sales_30d == 0, "a real zero sales window"
+
+    absent = by_sku["not-carried"]
+    assert absent.qty_bucket is None, "absence must not be reported as a bucket"
+    assert absent.sales_30d is None, "absence must not be reported as zero sales"
+
+
+def test_no_reading_scope_leaves_every_signal_absent() -> None:
+    """With neither scope supplied, nothing is read and nothing is invented."""
+    search = FakeProductSearch([row(A, "anything", 0.10)])
+    hits = run(
+        search.search(
+            [0.0],
+            threshold=0.65,
+            depth=60,
+            filters=SearchFilters(),
+            model_version_key="m:1",
+            model_id="m",
+        )
+    )
+    assert hits[0].qty_bucket is None
+    assert hits[0].sales_30d is None
+
+
+def test_scope_join_still_restricts_when_supplied() -> None:
+    """C22's guarantee, intact. The new parameter must not have weakened the old one."""
+    rows = [row(A, "carried", 0.10), row(B, "not-carried", 0.11)]
+    assignments = [FakeAssignment(pos_id=MINE, product_id=A)]
+    search = FakeProductSearch(rows, assignments=assignments)
+
+    response = serve(search, pos_prefilter=True)
+
+    assert [item.sku for item in response.results] == ["carried"], (
+        "the restricting scope must still remove what the point of sale does not carry"
+    )
+    # And a restricting scope reads as well: in SQL the rows are joined already.
+    hits = run(
+        search.search(
+            [0.0],
+            threshold=0.65,
+            depth=60,
+            filters=SearchFilters(),
+            model_version_key="m:1",
+            model_id="m",
+            pos_id=MINE,
+        )
+    )
+    assert [hit.sku for hit in hits] == ["carried"]
+    assert hits[0].qty_bucket == DEFAULT_BUCKET
+
+
+def test_the_two_scopes_are_independent_parameters_not_one_flag() -> None:
+    """Four combinations, and each one is a different question. C25 D4.
+
+    The flag they replace did two things at once, so `scoped=False` meant BOTH "do not
+    restrict" and "do not read" - which is why the availability demotion C22 shipped never
+    fired once in the 192 rows of the published evaluation run.
+    """
+    from jbg_ai.retrieval.search import compile_search_sql
+
+    neither = compile_search_sql(SearchFilters())
+    reads_only = compile_search_sql(SearchFilters(), reads=True)
+    restricts_only = compile_search_sql(SearchFilters(), restricts=True)
+
+    assert "scope" not in neither and "NULL AS qty_bucket" in neither
+    assert "NULL AS sales_30d" in neither
+
+    assert "LEFT JOIN scope s" in reads_only, "reading must not restrict"
+    assert "s.qty_bucket" in reads_only and "s.sales_30d" in reads_only
+
+    assert "LEFT JOIN scope s" not in restricts_only, "restricting must restrict"
+    assert "JOIN scope s" in restricts_only
+    assert "s.qty_bucket" in restricts_only and "s.sales_30d" in restricts_only
+
+
+class _Candidate:
+    """The smallest thing the business score can read."""
+
+    def __init__(self, *, price=None, size_label=None, materials=None,
+                 qty_bucket=None, sales_30d=None):
+        self.price = price
+        self.size_label = size_label
+        self.materials = materials or []
+        self.qty_bucket = qty_bucket
+        self.sales_30d = sales_30d
+
+
+
+# --------------------------------------------------------------------------------------
+# C25 - the business score orders only the tail block.
+# --------------------------------------------------------------------------------------
+
+LIVE_WEIGHTS = BusinessWeights(availability=1.0)
+
+
+def test_typed_constraint_outranks_the_business_score() -> None:
+    """What the operator expressed keeps strict precedence over a signal they did not ask for.
+
+    This is the property the lexicographic shape exists to guarantee, and the reason the
+    business weights live in ONE term at the end of the key rather than summed with the rest:
+    a weighted sum of everything would let enough evidence of stock topple an explicit price
+    ceiling, and then nobody could say why a document came third.
+    """
+    filters = StructuralFilters(price_ceiling=80.0)
+    # The worst business score the scale allows, inside the ceiling.
+    within = _Candidate(price=40.0, qty_bucket="0", sales_30d=0)
+    # The best business score the scale allows, outside it.
+    over = _Candidate(price=900.0, qty_bucket="3+", sales_30d=999)
+
+    ordered, _ = demote([over, within], filters, LIVE_WEIGHTS)
+
+    assert ordered == (within, over), "the ceiling must decide before the business score"
+    assert demotion_rank(within, filters, LIVE_WEIGHTS) < demotion_rank(
+        over, filters, LIVE_WEIGHTS
+    )
+
+
+def test_out_of_stock_product_ranks_below_equivalent_in_stock() -> None:
+    """Unscoped, with the signal arriving through the reading scope. C25 D4 + D9.
+
+    Unscoped on purpose: this is the configuration the evaluation runs in, and the whole
+    reason the signal was split from the scope. Under C22's single flag this ordering could
+    not be produced at all without also restricting the candidate set.
+    """
+    # A wins the fusion tiebreak (lower UUID), so A must be the EXHAUSTED one: otherwise
+    # the fusion already orders in-stock first and the assertion passes without the signal
+    # doing anything at all.
+    rows = [row(A, "out-of-stock", 0.11), row(B, "in-stock", 0.10)]
+    assignments = [
+        FakeAssignment(pos_id=MINE, product_id=A, qty_bucket="0"),
+        FakeAssignment(pos_id=MINE, product_id=B, qty_bucket="3+"),
+    ]
+
+    # `pos_prefilter=False`: the candidate set is the whole catalogue, as in the evaluation.
+    response = serve(
+        FakeProductSearch(rows, assignments=assignments),
+        pos_prefilter=False,
+        signal_pos_id=MINE,
+    )
+
+    # The fusion on its own puts `out-of-stock` first, so this ordering is the signal's work
+    # and not a coincidence of the tiebreak.
+    assert skus(serve(FakeProductSearch(list(rows)), pos_prefilter=False)) == [
+        "out-of-stock",
+        "in-stock",
+    ], "the premise: without the signal the exhausted candidate leads"
+    assert skus(response) == ["in-stock", "out-of-stock"], (
+        "the zero-stock candidate must be demoted below its in-stock peer"
+    )
+    assert len(response.results) == 2, "demoted, never removed"
+
+
+def test_rotation_does_not_order_anything() -> None:
+    """The withdrawn term, kept as a test so the refutation cannot be undone by accident.
+
+    Two candidates the availability signal ranks equally, one of which sold and one of which
+    did not, keep the order the fusion gave them. The sentence that justified a tiebreak is
+    still true at a counter; what the measurement established is that this retriever does not
+    produce the situation the sentence describes - in the top five, across all 48 queries,
+    there was not one tied pair for rotation to decide.
+    """
+    filters = StructuralFilters()
+    sold = _Candidate(qty_bucket="3+", sales_30d=6)
+    unsold = _Candidate(qty_bucket="3+", sales_30d=0)
+
+    assert business_score(sold, LIVE_WEIGHTS) == business_score(unsold, LIVE_WEIGHTS)
+    ordered, _ = demote([unsold, sold], filters, LIVE_WEIGHTS)
+    assert ordered == (unsold, sold), "the fused order survives; the sales window decides nothing"
+
+
+def test_availability_is_the_only_business_weight() -> None:
+    """One weight, and its SIGN is what the calibration decided rather than its value.
+
+    With a single binary term the score takes two values, so every positive weight produces
+    the same ranking. The weight stays configurable because zero is the rollback, but the
+    report says plainly that 1.0 is a declared unit and not a fitted figure.
+    """
+    from jbg_ai.config.settings import BUSINESS_DEFAULTS, Settings
+
+    assert list(BUSINESS_DEFAULTS) == ["jpv_business_weight_availability"]
+    assert not hasattr(BusinessWeights(), "rotation")
+    settings = Settings(app_env="local", service_version="c25", jwt_secret="x" * 32)
+    assert not any("rotation" in name for name in type(settings).model_fields)
+
+    exhausted = _Candidate(qty_bucket="0", sales_30d=6)
+    stocked = _Candidate(qty_bucket="3+", sales_30d=0)
+    orders = {
+        tuple(
+            item.qty_bucket
+            for item in demote(
+                [exhausted, stocked], StructuralFilters(), BusinessWeights(availability=w)
+            )[0]
+        )
+        for w in (0.25, 0.5, 1.0, 2.0, 100.0)
+    }
+    assert orders == {("3+", "0")}, "every positive weight gives the same ranking"
+
+
+def test_weights_load_from_config_not_hardcoded() -> None:
+    """No weight value is written into the ordering module, and both travel per call."""
+    import inspect
+
+    from jbg_ai.config.settings import BUSINESS_DEFAULTS
+    from jbg_ai.retrieval import filters as filters_module
+
+    source = inspect.getsource(filters_module)
+    for value in BUSINESS_DEFAULTS.values():
+        assert f"= {value}" not in source, f"{value} is written into the ordering module"
+
+    settings = build_settings()
+    assert settings.jpv_business_weight_availability == BUSINESS_DEFAULTS[
+        "jpv_business_weight_availability"
+    ]
+
+    # Two configurations in one process, and neither mutates the settings object.
+    # A wins the fusion tiebreak (lower UUID), so A must be the EXHAUSTED one: otherwise
+    # the fusion already orders in-stock first and the assertion passes without the signal
+    # doing anything at all.
+    rows = [row(A, "out-of-stock", 0.11), row(B, "in-stock", 0.10)]
+    assignments = [
+        FakeAssignment(pos_id=MINE, product_id=A, qty_bucket="0"),
+        FakeAssignment(pos_id=MINE, product_id=B, qty_bucket="3+"),
+    ]
+    weighted = serve(
+        FakeProductSearch(rows, assignments=assignments),
+        settings=settings,
+        pos_prefilter=False,
+        signal_pos_id=MINE,
+    )
+    unweighted = serve(
+        FakeProductSearch(rows, assignments=assignments),
+        settings=settings,
+        pos_prefilter=False,
+        signal_pos_id=MINE,
+        business_weight_availability=0.0,
+    )
+    assert skus(weighted) == ["in-stock", "out-of-stock"]
+    assert skus(unweighted) == ["out-of-stock", "in-stock"]
+    assert settings.jpv_business_weight_availability == 1.0, "settings were mutated"
+
+
+def test_zero_weights_restore_the_previous_ordering() -> None:
+    """The rollback: zero weights reproduce fusion plus the typed blocks, exactly."""
+    # A wins the fusion tiebreak (lower UUID), so A must be the EXHAUSTED one: otherwise
+    # the fusion already orders in-stock first and the assertion passes without the signal
+    # doing anything at all.
+    rows = [row(A, "out-of-stock", 0.11), row(B, "in-stock", 0.10)]
+    assignments = [
+        FakeAssignment(pos_id=MINE, product_id=A, qty_bucket="0"),
+        FakeAssignment(pos_id=MINE, product_id=B, qty_bucket="3+"),
+    ]
+
+    zeroed = serve(
+        FakeProductSearch(rows, assignments=assignments),
+        pos_prefilter=False,
+        signal_pos_id=MINE,
+        business_weight_availability=0.0,
+    )
+    no_signal_at_all = serve(FakeProductSearch(list(rows)), pos_prefilter=False)
+
+    assert skus(zeroed) == skus(no_signal_at_all)
+    # And at the unit level the key collapses to the typed blocks alone.
+    zero = BusinessWeights()
+    assert demotion_rank(_Candidate(qty_bucket="0", sales_30d=0), StructuralFilters(), zero) == (
+        demotion_rank(_Candidate(qty_bucket="3+", sales_30d=9), StructuralFilters(), zero)
+    )
+
+
+def test_no_stock_quantity_reaches_the_response() -> None:
+    """The bucket is a bucket. .NET owns the number, and a number here would start one."""
+    rows = [row(A, "carried", 0.10)]
+    assignments = [FakeAssignment(pos_id=MINE, product_id=A, qty_bucket="1-2", sales_30d=7)]
+
+    response = serve(
+        FakeProductSearch(rows, assignments=assignments),
+        pos_prefilter=False,
+        signal_pos_id=MINE,
+    )
+
+    payload = response.model_dump_json()
+    for forbidden in ("qty_bucket", "sales_30d", "1-2", "stock", "quantity"):
+        assert forbidden not in payload, f"{forbidden} reached the response"
+    for item in response.results:
+        fields = set(type(item).model_fields)
+        assert not any("stock" in name or "qty" in name or "sales" in name for name in fields)
+
+
+def test_sales_window_is_read_against_the_row_reference_instant() -> None:
+    """Never against the wall clock, so the same configuration orders the same on any day.
+
+    `sales_30d` is the drain's own figure, already counted against the `computed_as_of`
+    recorded on that row. The ranking reads the stored number and computes no window of its
+    own, which is what makes this structural: there is no clock in the ordering path to be
+    wrong. The world of C10 ends on 2026-08-23, so a wall-clock window would take every
+    figure to zero and make the ranking irreproducible by design.
+    """
+    import inspect
+
+    from jbg_ai.retrieval import filters as filters_module
+    from jbg_ai.retrieval import orchestrator as orchestrator_module
+
+    for module in (filters_module, orchestrator_module):
+        source = inspect.getsource(module)
+        for clock in ("date.today", "datetime.now", "utcnow", "time.time()"):
+            assert clock not in source, f"{module.__name__} reaches for a wall clock: {clock}"
+
+    # And the value the ordering reads is the stored one, unmodified.
+    rows = [row(A, "sold", 0.10), row(B, "unsold", 0.11)]
+    assignments = [
+        FakeAssignment(pos_id=MINE, product_id=A, qty_bucket="3+", sales_30d=4),
+        FakeAssignment(pos_id=MINE, product_id=B, qty_bucket="3+", sales_30d=0),
+    ]
+    search = FakeProductSearch(rows, assignments=assignments)
+    hits = run(
+        search.search(
+            [0.0],
+            threshold=0.65,
+            depth=60,
+            filters=SearchFilters(),
+            model_version_key="m:1",
+            model_id="m",
+            signal_pos_id=MINE,
+        )
+    )
+    assert {hit.sku: hit.sales_30d for hit in hits} == {"sold": 4, "unsold": 0}
+
+
+def test_the_signals_stage_logs_its_weights_without_quantities_or_vectors(caplog) -> None:
+    """`stage=filters` cannot report this: it conflates a typed ceiling with a stock figure."""
+    rows = [row(A, "in-stock", 0.11), row(B, "out-of-stock", 0.10)]
+    assignments = [
+        FakeAssignment(pos_id=MINE, product_id=A, qty_bucket="3+", sales_30d=5),
+        FakeAssignment(pos_id=MINE, product_id=B, qty_bucket="0", sales_30d=0),
+    ]
+
+    with caplog.at_level(logging.INFO, logger="jbg_ai.retrieval.orchestrator"):
+        serve(
+            FakeProductSearch(rows, assignments=assignments),
+            pos_prefilter=False,
+            signal_pos_id=MINE,
+        )
+
+    entry = next(m for m in caplog.messages if "stage=signals" in m)
+    assert "w_availability=1.0" in entry
+    assert "w_rotation" not in entry, "the withdrawn weight must not be logged"
+    assert "reading_scope=True" in entry
+    assert "out_of_stock=1" in entry
+    # A diagnostic count, not an ordering input: the report publishes the distribution.
+    assert "with_sales_signal=1" in entry
+    assert TOKEN_TRACE_ID in entry
+    # No exact quantity and no vector.
+    assert "sales_30d=5" not in entry
+    assert "0.11" not in entry and "[" not in entry
+
+
+def test_an_absent_signal_never_ranks_below_a_read_one() -> None:
+    """The rule the first implementation broke, and the measurement caught. C25.
+
+    A bonus for having sold ranks a candidate whose projection row was never read BELOW one
+    that sold, which is exactly "treating absence as zero sales". Measured on a reading scope
+    covering 416 of 1.168 products, that form cost 0,244 of pure relevance: it sorted the
+    assortment above everything outside it instead of sorting the exhausted below the
+    available. Both terms subtract, so absence is neutral by construction.
+    """
+    absent = _Candidate(qty_bucket=None, sales_30d=None)
+    carried_and_sold = _Candidate(qty_bucket="3+", sales_30d=9)
+    carried_unsold = _Candidate(qty_bucket="3+", sales_30d=0)
+    exhausted = _Candidate(qty_bucket="0", sales_30d=9)
+
+    # Absence is never worse than the best news a read row can carry.
+    assert business_score(absent, LIVE_WEIGHTS) >= business_score(
+        carried_and_sold, LIVE_WEIGHTS
+    )
+    # And no score is ever positive: only bad news moves a candidate.
+    for item in (absent, carried_and_sold, carried_unsold, exhausted):
+        assert business_score(item, LIVE_WEIGHTS) <= 0.0
+    # With rotation withdrawn the surviving asymmetry is gone too: a row that was read and
+    # did not sell scores exactly what an unread one scores.
+    assert business_score(carried_unsold, LIVE_WEIGHTS) == business_score(
+        absent, LIVE_WEIGHTS
+    )
+
+    ordered, _ = demote(
+        [exhausted, carried_unsold, absent, carried_and_sold],
+        StructuralFilters(),
+        LIVE_WEIGHTS,
+    )
+    # Only the exhausted candidate moves. Absent, carried-and-sold and carried-unsold all
+    # score zero and keep the order the fusion gave them.
+    assert ordered[-1] is exhausted
+    assert [item for item in ordered[:3]] == [carried_unsold, absent, carried_and_sold]

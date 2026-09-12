@@ -1,0 +1,39 @@
+# The two-stage fusion with the adaptive coverage rule, and NO business signals.
+#
+# This row exists so that a `v3` that improved would be attributable. Without it, an
+# improvement could belong to the fusion or to the signals and nobody could say which.
+#
+# It runs UNSCOPED and with no reading scope, exactly like `v2-hibrido`, so the only
+# difference between the two rows is how the ranked lists are composed. Its operational
+# reading is therefore absent, and that is correct: this configuration reorders by no
+# business signal, so it never competed on that metric.
+id: v2b-fusion
+kind: pipeline
+label: "Fusión por rama con cobertura adaptativa"
+rationale: >-
+  La fusión en dos etapas con pesos por rama, más la ponderación adaptativa por cobertura.
+  Aísla la corrección de la fusión: misma ventana de evaluación que v2-hibrido, sin señales
+  de negocio. La fusión plana de v2 no fusiona sino que concatena — con los pesos de C21 los
+  sesenta documentos léxicos ganan siempre al mejor acierto vectorial — y ésta es la fila que
+  mide cuánto vale corregirlo.
+#
+# CONGELADA el 2026-09-11 al cerrar la fase A (tarea 9.4). El barrido de 32 puntos no movio
+# una sola linea de este fichero: el mejor punto mejora +0,008 en la lectura que decide, muy
+# por debajo del margen de 0,05, asi que la regla de D14 dice no moverse. `rho = 1,0` sigue
+# siendo el valor de principio con el que arranco — cada rama tiene un voto — y ahora ademas
+# esta medido como robusto: con la regla adaptativa el recorrido del barrido sobre `rho` cae
+# de 0,070 a 0,007, de acantilado a meseta.
+#
+# Contra la linea base publicada, que es lo que hay que batir, esta fila gana +0,073 en
+# `nuevas` (0,608 contra 0,535) — por encima del margen, con `ajuste` a -0,006 sin vetar.
+uses_provider: true
+mode: hybrid
+expand_synonyms: true
+fusion: branch
+rrf_k: 60
+branch_weight_lexical: 0.5
+branch_weight_vector: 0.5
+coverage_rule: continuous
+branch_depth: 60
+pos_prefilter: false
+max_results: 60

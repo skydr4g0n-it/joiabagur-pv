@@ -35,7 +35,7 @@ from jbg_ai.evals.errors import EvaluationUnavailable
 from jbg_ai.evals.latency import PROVIDER_STAGE, Sample, StageCollector
 from jbg_ai.indexing.constants import DEFAULT_EMBEDDING_MODEL
 from jbg_ai.indexing.embeddings import EmbeddingClient
-from jbg_ai.retrieval.orchestrator import retrieve_products
+from jbg_ai.retrieval.orchestrator import COVERAGE_CONTINUOUS, retrieve_products
 from jbg_ai.retrieval.ports import ProductSearchPort
 from jbg_ai.retrieval.search import SqlAlchemyProductSearch
 
@@ -68,8 +68,14 @@ class QueryRun:
     low_confidence: bool
 
 
-def harness_settings(**overrides: object) -> Settings:
-    """The measurement profile: serving fields pinned, retrieval knobs at their live defaults."""
+def harness_settings(*, requires_database: bool = True, **overrides: object) -> Settings:
+    """The measurement profile: serving fields pinned, retrieval knobs at their live defaults.
+
+    `requires_database=False` is for the RE-SCORE phase of C25's sweep and for nothing else.
+    That phase reads persisted windows and must not open a pool — the guarantee is its whole
+    point — so demanding a URL it will never use would make the offline phase impossible to
+    run offline, which is the opposite of the property being claimed.
+    """
     values: dict[str, object] = {
         "app_env": HARNESS_APP_ENV,
         "service_version": HARNESS_SERVICE_VERSION,
@@ -90,7 +96,7 @@ def harness_settings(**overrides: object) -> Settings:
         **FUSION_DEFAULTS,
     }
     values.update(overrides)
-    if not values["database_url"]:
+    if requires_database and not values["database_url"]:
         raise EvaluationUnavailable(
             "DATABASE_URL is not set. The pool cannot be built from a file: the harness has to "
             "run the configurations against the real index to know what each one returns"
@@ -191,8 +197,15 @@ async def execute(
                 weight_typed=config.weight_typed,
                 weight_expanded=config.weight_expanded,
                 weight_vector=config.weight_vector,
+                fusion=config.fusion,
+                branch_weight_lexical=config.branch_weight_lexical,
+                branch_weight_vector=config.branch_weight_vector,
+                coverage_rule=config.coverage_rule or COVERAGE_CONTINUOUS,
                 branch_depth=config.branch_depth,
                 pos_prefilter=config.pos_prefilter,
+                signal_pos_id=UUID(config.signal_pos_id) if config.signal_pos_id else None,
+                business_weight_availability=config.business_weight_availability,
+                abstain=config.abstain,
             )
             hits = tuple(
                 RankedHit(UUID(item.product_id), item.sku, item.score)

@@ -1,6 +1,6 @@
 {
   "model": "openai/gpt-4o-mini",
-  "measured_at": "2026-09-06",
+  "measured_at": "2026-09-11",
   "documents_total": 1168,
   "documents_omitted": 0,
   "tokens": 17583,
@@ -47,8 +47,8 @@
     "q11": [],
     "q12": [
       "SKU102",
-      "SKU236",
       "SKU78",
+      "SKU236",
       "SKU61",
       "SKU30"
     ]

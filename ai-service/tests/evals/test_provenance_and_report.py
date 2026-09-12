@@ -15,15 +15,25 @@ from jbg_ai.evals.errors import EvaluationUnavailable
 from jbg_ai.evals.latency import LatencySummary, Sample, StageCollector, summarise
 from jbg_ai.evals.metrics import AVERAGED, Aggregate, CaseMetrics
 from jbg_ai.evals.pricing import load_prices
-from jbg_ai.evals.provenance import UNKNOWN_SHA, Provenance, index_set_hash
-from jbg_ai.evals.report import write
+from jbg_ai.data.paths import AI_SERVICE_ROOT
+from jbg_ai.evals import provenance as provenance_module
+from jbg_ai.evals.provenance import (
+    DIRTY_SUFFIX,
+    UNKNOWN_SHA,
+    Provenance,
+    index_set_hash,
+)
+from jbg_ai.evals.report import _short_sha, write
 from jbg_ai.evals.runner import ConfigReport, Report
 from jbg_ai.evals.sweep import (
     CATEGORY_TOLERANCE,
+    DECIDING_READING,
+    DIAGNOSTIC_READING,
     MATERIAL_DELTA,
-    WEIGHT_VECTOR_GRID,
+    RHO_GRID,
     SweepPoint,
     decide,
+    weights_for,
 )
 from jbg_ai.evals.vectors import FrozenEmbeddingClient, FrozenVector, load_vectors, write_vectors
 
@@ -38,6 +48,7 @@ def _provenance(**overrides: object) -> Provenance:
         "index_set_hash": "0" * 64,
         "embedding_model_version_key": "openai/text-embedding-3-small:1536",
         "git_sha": "a03b4ad",
+        "fusion_mode": "branch",
     }
     values.update(overrides)
     return Provenance(**values)  # type: ignore[arg-type]
@@ -77,6 +88,65 @@ def test_an_unavailable_revision_is_recorded_as_unknown_and_never_guessed() -> N
     unknown = _provenance(git_sha=UNKNOWN_SHA)
 
     assert not unknown.comparable_with(_provenance())
+
+
+def test_the_fusion_mode_is_recorded_in_the_provenance() -> None:
+    """The spec asks for it by name: the flat fusion stays selectable, so the mode is no longer
+    implied by the revision and two runs of one configuration can compose their lists two ways.
+    """
+    assert _provenance().as_dict()["fusion_mode"] == "branch"
+
+
+def test_two_runs_that_fused_differently_are_not_comparable() -> None:
+    """Same golden set, same index, same revision, same configuration — and different numbers,
+    because the flat mode concatenates where the branch mode fuses. Naming it is the point."""
+    flat = _provenance(fusion_mode="flat")
+
+    assert not _provenance().comparable_with(flat)
+    assert _provenance().differences(flat) == ("fusion_mode",)
+
+
+def test_a_dirty_tree_is_marked_and_never_passes_as_its_commit(monkeypatch) -> None:
+    """The defect this marker exists for: a run measured with uncommitted code recording the
+    bare sha of the commit it started from, so a re-run there is declared comparable and
+    disagrees. C25's own published table was produced that way."""
+    monkeypatch.setattr(
+        provenance_module,
+        "_git",
+        lambda *args: "a03b4ad" if args[0] == "rev-parse" else " M src/x.py",
+    )
+
+    sha = provenance_module.current_git_sha()
+
+    assert sha.endswith(DIRTY_SUFFIX)
+    assert not _provenance(git_sha=sha).comparable_with(_provenance(git_sha="a03b4ad"))
+
+
+def test_a_clean_tree_records_the_bare_revision(monkeypatch) -> None:
+    monkeypatch.setattr(
+        provenance_module,
+        "_git",
+        lambda *args: "a03b4ad" if args[0] == "rev-parse" else "",
+    )
+
+    assert provenance_module.current_git_sha() == "a03b4ad"
+
+
+def test_an_unverifiable_tree_is_treated_as_dirty(monkeypatch) -> None:
+    """Over-marking costs a spurious «not comparable»; under-marking costs a wrong number."""
+    monkeypatch.setattr(
+        provenance_module,
+        "_git",
+        lambda *args: "a03b4ad" if args[0] == "rev-parse" else None,
+    )
+
+    assert provenance_module.current_git_sha().endswith(DIRTY_SUFFIX)
+
+
+def test_the_short_sha_keeps_the_dirty_marker() -> None:
+    """Truncating to twelve characters must not be how the marker disappears."""
+    assert _short_sha(f"{'a' * 40}{DIRTY_SUFFIX}") == f"{'a' * 12}{DIRTY_SUFFIX}"
+    assert _short_sha("a" * 40) == "a" * 12
 
 
 def test_the_index_fingerprint_notices_a_swapped_document() -> None:
@@ -208,17 +278,19 @@ def _config_report(config_id: str, ndcg: dict[str, float], categories: dict[str,
     )
 
 
-def _point(weight: float, ndcg: dict[str, float], categories: dict[str, float]) -> SweepPoint:
+def _point(rho: float, ndcg: dict[str, float], categories: dict[str, float]) -> SweepPoint:
     return SweepPoint(
-        weight_vector=weight,
+        rho=rho,
+        rrf_k=60,
         branch_depth=60,
-        report=_config_report(f"w{weight}", ndcg, categories),
+        report=_config_report(f"rho{rho}", ndcg, categories),
     )
 
 
-def test_a_small_improvement_does_not_move_a_default() -> None:
-    baseline = _point(0.33, {"global": 0.60, "tuning": 0.60, "new": 0.60}, {"piedra": 0.5})
-    better = _point(1.0, {"global": 0.64, "tuning": 0.64, "new": 0.64}, {"piedra": 0.5})
+def test_a_weight_that_costs_more_than_the_margin_is_rejected() -> None:
+    """Below the margin the set cannot resolve the difference, so nothing moves."""
+    baseline = _point(1.0, {"global": 0.60, "tuning": 0.60, "new": 0.60}, {"piedra": 0.5})
+    better = _point(1.05, {"global": 0.64, "tuning": 0.64, "new": 0.64}, {"piedra": 0.5})
 
     verdict = decide(baseline, [better])
 
@@ -226,19 +298,41 @@ def test_a_small_improvement_does_not_move_a_default() -> None:
     assert str(MATERIAL_DELTA) in verdict.reason
 
 
-def test_a_result_that_only_holds_on_the_tuning_subset_is_not_a_confirmation() -> None:
-    baseline = _point(0.33, {"global": 0.60, "tuning": 0.60, "new": 0.60}, {"piedra": 0.5})
-    fitted = _point(1.0, {"global": 0.70, "tuning": 0.95, "new": 0.55}, {"piedra": 0.5})
+def test_a_contaminated_reading_does_not_block_a_change() -> None:
+    """The reformulation of D14, and the reason this change was possible at all.
+
+    Under C24's rule a configuration had to improve on all three readings, which vetoed
+    raising the vector weight using the eight queries chosen to calibrate the lexical branch -
+    6 of them already at the ceiling of the deciding metric. A saturated, contaminated
+    partition is evidence of the incumbent's overfitting, not a control group.
+    """
+    baseline = _point(1.0, {"global": 0.60, "tuning": 0.94, "new": 0.55}, {"piedra": 0.5})
+    better = _point(1.05, {"global": 0.66, "tuning": 0.93, "new": 0.64}, {"piedra": 0.5})
+
+    verdict = decide(baseline, [better])
+
+    assert verdict.moved is True, "a saturated reading must not veto"
+    assert verdict.deltas[DIAGNOSTIC_READING] < 0, "the premise: tuning does not follow"
+    assert verdict.deltas[DECIDING_READING] > MATERIAL_DELTA
+    # And the disagreement is published rather than hidden.
+    assert DIAGNOSTIC_READING in verdict.reason
+    assert any(DIAGNOSTIC_READING in line for line in verdict.as_lines())
+
+
+def test_a_result_that_holds_on_neither_reading_is_not_a_confirmation() -> None:
+    """`tuning` cannot veto, but it cannot rescue either: the deciding reading is `new`."""
+    baseline = _point(1.0, {"global": 0.60, "tuning": 0.60, "new": 0.60}, {"piedra": 0.5})
+    fitted = _point(1.05, {"global": 0.70, "tuning": 0.95, "new": 0.55}, {"piedra": 0.5})
 
     verdict = decide(baseline, [fitted])
 
     assert verdict.moved is False
-    assert "'new'" in verdict.reason or "new" in verdict.reason
+    assert DECIDING_READING in verdict.reason
 
 
 def test_a_category_paying_for_the_average_blocks_the_change() -> None:
-    baseline = _point(0.33, {"global": 0.60, "tuning": 0.60, "new": 0.60}, {"piedra": 0.80})
-    lopsided = _point(1.0, {"global": 0.70, "tuning": 0.70, "new": 0.70}, {"piedra": 0.60})
+    baseline = _point(1.0, {"global": 0.60, "tuning": 0.60, "new": 0.60}, {"piedra": 0.80})
+    lopsided = _point(1.05, {"global": 0.70, "tuning": 0.70, "new": 0.70}, {"piedra": 0.60})
 
     verdict = decide(baseline, [lopsided])
 
@@ -247,19 +341,39 @@ def test_a_category_paying_for_the_average_blocks_the_change() -> None:
     assert str(CATEGORY_TOLERANCE) in verdict.reason
 
 
-def test_a_material_improvement_in_every_reading_moves_the_default() -> None:
-    baseline = _point(0.33, {"global": 0.60, "tuning": 0.60, "new": 0.60}, {"piedra": 0.50})
-    better = _point(1.0, {"global": 0.70, "tuning": 0.68, "new": 0.71}, {"piedra": 0.49})
+def test_a_material_improvement_in_the_deciding_reading_moves_the_default() -> None:
+    baseline = _point(1.0, {"global": 0.60, "tuning": 0.60, "new": 0.60}, {"piedra": 0.50})
+    better = _point(1.05, {"global": 0.70, "tuning": 0.68, "new": 0.71}, {"piedra": 0.49})
 
     verdict = decide(baseline, [better])
 
     assert verdict.moved is True
-    assert verdict.best.weight_vector == 1.0
+    assert verdict.best.rho == 1.05
 
 
-def test_the_sweep_is_directional_and_never_looks_below_the_value_in_force() -> None:
-    """The rubric that fixed the live weight is the lexical branch's own objective function."""
-    assert min(WEIGHT_VECTOR_GRID) == FUSION_DEFAULTS["jpv_rrf_weight_vector"]
+def test_the_grid_covers_the_band_the_exploration_measured() -> None:
+    """Four points inside [0,9 ; 1,1], where the previous grid had exactly one.
+
+    The band is narrow because the fusion has a crossover: the position at which the vector
+    branch's best hit lands against a lexical list of sixty moves from 61 to 1 across it.
+    """
+    inside = [value for value in RHO_GRID if 0.9 <= value <= 1.1]
+    assert len(inside) >= 4, f"the useful band is under-sampled: {inside}"
+    assert min(RHO_GRID) < 0.9 < max(RHO_GRID), "the grid must bracket the band"
+    # Only the ratio decides, and the pair is renormalised so two points differ in one number.
+    for rho in RHO_GRID:
+        w_lex, w_vec = weights_for(rho)
+        assert w_lex + w_vec == pytest.approx(1.0)
+        assert w_vec / w_lex == pytest.approx(rho)
+
+
+def test_the_live_default_is_a_point_of_the_grid() -> None:
+    """Otherwise the sweep compares its candidates against something it never measured."""
+    live = (
+        FUSION_DEFAULTS["jpv_branch_weight_vector"]
+        / FUSION_DEFAULTS["jpv_branch_weight_lexical"]
+    )
+    assert live in RHO_GRID
 
 
 def test_the_sweep_grid_and_the_production_default_are_separate_constants() -> None:
@@ -275,7 +389,8 @@ def test_the_sweep_grid_and_the_production_default_are_separate_constants() -> N
 
     source = inspect.getsource(module)
     assert "FUSION_DEFAULTS" in source
-    assert "jpv_rrf_weight_vector = " not in source
+    assert "jpv_branch_weight_vector = " not in source
+    assert "jpv_branch_weight_lexical = " not in source
 
 
 # --------------------------------------------------------------------------- artifact-first
@@ -373,13 +488,36 @@ def test_the_report_names_the_size_at_which_the_catalogue_stops_fitting(tmp_path
     assert "deja de caber en 6643 productos" in body
 
 
-def test_the_report_marks_the_abstention_figures_provisional(tmp_path: Path) -> None:
+def test_the_report_describes_the_abstention_rule_that_is_actually_in_force(
+    tmp_path: Path,
+) -> None:
+    """This block used to carry C24's sentence — *«este change no toca el umbral; su
+    re-fijación es alcance del siguiente»* — and C25 IS that next change: it withdrew the
+    requirement that froze the threshold and fixed a rule instead. Left alone, the generator
+    would keep printing the withdrawn claim on every future report."""
     body = write(_report(tmp_path), title="t", name="r.md", out_dir=tmp_path).read_text(
         encoding="utf-8"
     )
 
-    assert "**Provisional.**" in body
-    assert "no** toca el umbral" in body
+    assert "no** toca el umbral" not in body
+    assert "alcance del siguiente" not in body
+    # The rule, its phase, and its effect on the candidate set — what the spec asks a
+    # threshold change to state.
+    assert "relativa por consulta" in body
+    assert "no altera el conjunto de candidatos" in body
+
+
+def test_the_report_says_the_abstention_column_unions_two_signals(tmp_path: Path) -> None:
+    """The column counts the abstention rule OR `low_confidence`, because both land on the
+    same response flag and the schema that carries it is frozen by contract. Labelling it as
+    the rate of the rule alone would attribute to the rule what branch disagreement did."""
+    body = write(_report(tmp_path), title="t", name="r.md", out_dir=tmp_path).read_text(
+        encoding="utf-8"
+    )
+
+    assert "sin respuesta confiada sobre fuera de dominio" in body
+    assert "`low_confidence`" in body
+    assert "unión" in body
 
 
 def test_a_latency_summary_carries_both_figures() -> None:
@@ -512,3 +650,20 @@ def test_a_file_claiming_to_be_verified_without_a_date_is_not_believed(tmp_path:
     )
 
     assert load_prices(tmp_path).verified is False
+
+
+def test_the_published_c25_table_carries_no_withdrawn_claim() -> None:
+    """The artifact, not the generator. It is the file the epics, the README and the plan all
+    link to, it is regenerated by hand about never, and the sentence it used to carry said the
+    opposite of what the change it reports actually did."""
+    published = (
+        AI_SERVICE_ROOT / "evals" / "results" / "c25-baselines-2026-09-11.md"
+    ).read_text(encoding="utf-8")
+
+    assert "no** toca el umbral" not in published
+    assert "alcance del siguiente" not in published
+    assert "relativa por consulta" in published
+    # The provenance says which revision produced the numbers, and this run was taken on a
+    # modified tree: the metric code landed one commit later.
+    assert "`29a7bc5249aa+dirty`" in published
+    assert "| configuración | fusión |" in published

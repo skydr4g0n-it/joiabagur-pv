@@ -14,6 +14,62 @@
 
 Este documento se escribió antes de implementar. Cuando una sesión de diseño de un change concreto altera lo que su ficha decía, el cambio se registra aquí con fecha y motivo, y la ficha afectada se corrige en el sitio.
 
+### 2026-09-12 — C25 archivado, y el andamio que deja abierto entra en el plan como `C25bis`
+
+**C25 pasa a hecho** y con él la cadena crítica arranca en **C26**. Recuento: **27 archivadas, 11 pendientes**. Al archivarse **nacen dos capacidades vivas** — `business-signals-ranking`, la disponibilidad como reordenación blanda calibrada contra el golden set, y `retrieval-abstention`, la regla que decide **si** contestar — y se modifican `hybrid-fusion`, `pos-projection` y `retrieval-evaluation`. Esta última **pierde** un requisito: cae el de C24 que congelaba el umbral de distancia, sustituido por el que permite re-fijar la regla bajo un criterio escrito antes de medir.
+
+**`C25bis` (`clean-plain-fusion`) entra en el §2, el §3 y el §4.** Se creó el 11 de septiembre, junto con los artefactos de C25, y hasta hoy no figuraba en este documento: estaba en `openspec/changes/` y en `epicas.md`, pero no en el plan, que es donde se decide el orden. Va **fuera de la numeración C** por el mismo motivo que `FIX1` — no sale de la descomposición original sino de una consecuencia de otro change — y su prerrequisito duro, *«C25 archivado»*, **queda cumplido hoy**. No entra en la ruta crítica: es una hoja y cede el turno a C26.
+
+**Y la ficha de C25 se pone al día con lo que de verdad entregó.** Seguía titulada `add-business-signals-ranking` —el nombre anterior al renombrado del 1 de septiembre— y describía un alcance que la medición desmintió en tres puntos: la penalización de variante ambigua, la calibración de `1-2` frente a `3+` y la rotación como criterio de orden. También decía *«re-fijación del umbral con la distribución empírica»*, y lo que ocurrió fue lo contrario: el escalar resultó incapaz de separar las dos poblaciones —el rango de las imposibles cae **dentro** del de las contestables— así que el umbral se queda donde estaba, ahora por decisión y no por aplazamiento, y la regla adoptada es relativa por consulta.
+
+---
+
+### 2026-09-11 — C25, al aplicar: la fusión no fusionaba, y dos puntos de la ficha se caen por medición
+
+**Medido contra el Postgres local, sobre los 1.168 documentos vivos y el golden set de C24.** El
+change se renombra de `add-business-signals-ranking` a **`recalibrate-ranking-and-abstention`**,
+porque el nombre viejo cubría un tercio de lo que había que hacer. El número **se conserva**:
+renumerar rompería las referencias de C26 (`prereq C22, C25`) y C27 (`C10, C25`) a cambio de nada.
+
+**El hallazgo que reordenó el change.** La fusión de C21 no fusionaba: **concatenaba**. Con
+`wC = 0,33` los sesenta documentos léxicos ganaban al mejor acierto vectorial en **toda** consulta,
+de modo que un documento de grado 2 que la rama vectorial ponía **primero** caía a la **posición
+33** — reproducido en tres consultas distintas y también en el modelo. Es un defecto **aritmético**
+y no un peso mal calibrado, así que la ficha pasa de «calibrar pesos» a **rehacer la composición**:
+dos etapas, pesos por rama, y la rama léxica deja de meter 120 candidatos contra 60.
+
+**Tres puntos de la ficha se retiran, los tres refutados por medición y no por argumento:**
+
+1. **Penalizar la variante ambigua dentro de familia.** 29,2 % de las consultas tienen 3+ hermanas
+   en el top-10 pero **ninguna pasa de cuatro**, así que la familia nunca ocupa más de 4 de los 10
+   huecos que el operador ve. Es un problema de **presentación** y pertenece a C30/C36; penalizar
+   costaría relevancia y escondería al operador que las tallas existen.
+2. **Calibrar `1-2` frente a `3+`.** Con la función de ganancia operativa los dos caen en la misma
+   rama y ninguno pierde grado, así que **no existe función objetivo** que pueda ordenarlos. Y
+   `1-2` son 191 pares contra 5.431: aunque existiera, calibraría sobre ruido.
+3. **Ordenar por rotación.** Retirada **durante el apply**. Como el desempate estricto que su
+   propio requisito describía decidía **cero** pares del top-5 en las 48 consultas; como clave de
+   ordenación no desempataba sino que **particionaba** —11.067 pares invertidos, el 71,2 % a más de
+   diez puestos— y costaba relevancia donde actuaba. `sales_30d` se sigue leyendo para diagnóstico
+   y no ordena nada.
+
+**Lo que el change entrega, con su cifra.** La fusión por rama gana **+0,083** sobre la línea base
+en la lectura que decide. La ponderación adaptativa por cobertura aporta **+0,128** en
+`descripcion-sin-anclaje` y **cero exacto** en las otras siete categorías, y convierte la elección
+del cociente de rama de **acantilado en meseta** (recorrido del barrido 0,070 → 0,007). La señal de
+disponibilidad retira el **91 %** de las piezas agotadas del top-5. La abstención pasa de 0,050 a
+**0,150** sin silenciar ni una consulta contestable.
+
+**Y tres listones no se alcanzan, declarados y no cerrados:** el `Recall@5 ≥ 0,85` del §11.2 se
+queda en **0,758**; la abstención de 0,80 de la ficha, en **0,150**; y `v3` no bate a `v2b` por el
+margen de 0,05 —**+0,030** operativo— aunque cumple su propia regla de adopción. Los tres son
+listones fijados **antes de que existiera el instrumento** que los mediría. Ninguno se ha cerrado
+moviendo el listón después de medir, y ninguna etiqueta se ha reescrito.
+
+**Zona.** Decimotercera vez que la ficha se queda corta: además de `retrieval/` toca `evals/`,
+`config/settings.py` y `evals/golden/`. Sin diff en `backend/`, `frontend/`, `terraform/`,
+`.github/` ni `openapi.json`, y sin migración de Alembic.
+
 ### 2026-09-01 — C20, al explorar: el diccionario no es sólo de sinónimos, y una consulta ensanchada tira el término exacto
 
 **Medido contra el Postgres local, sobre los 1.168 documentos vivos de `ai.product_document` y con 12 embeddings reales del proveedor.** La ficha describía un fichero YAML de sinónimos comerciales. Es eso y dos cosas más que nadie había nombrado.
@@ -155,7 +211,7 @@ C22 depende de C10, C12 y C14. C25 depende de C21, C22 y C24. **Ninguno de los d
 | **C35** `add-inventory-agent-proposals` | Python | **el segundo agente** |
 | **C37** `add-frontend-inventory-review-and-print` | Frontend | ninguno — pantalla y vista imprimible |
 
-**Y el propio plan ya lo había decidido, en su otra versión.** [`proyecto-final-plan-changes-openspec-3devs.md`](proyecto-final-plan-changes-openspec-3devs.md) agrupa exactamente esta rama bajo *«§6. Bloque opcional — Agente de reposición ⚠️ · Solo si el núcleo está cerrado. Es el primer bloque que se cae»*, y su orden de corte empieza literalmente por ella. En esta versión la misma señal estaba repartida y por eso no se veía: **cuatro de los ocho cortes pre-acordados del §6 viven dentro de la rama** — Rotate de C29 (nº 2), Transfer de C29 (nº 4), vista imprimible de C37 (nº 5) y C35 entero (nº 8). Si esos cuatro se hubieran disparado, lo que quedaba en pie era una migración, un motor de reglas .NET y una pantalla de aprobación: todo el esfuerzo fuera de lo que el Proyecto Final evalúa.
+**Y el propio plan ya lo había decidido, en su otra versión.** La variante para tres desarrolladores —retirada del repositorio el 2026-09-12 por obsoleta— agrupaba exactamente esta rama bajo *«§6. Bloque opcional — Agente de reposición ⚠️ · Solo si el núcleo está cerrado. Es el primer bloque que se cae»*, y su orden de corte empieza literalmente por ella. En esta versión la misma señal estaba repartida y por eso no se veía: **cuatro de los ocho cortes pre-acordados del §6 viven dentro de la rama** — Rotate de C29 (nº 2), Transfer de C29 (nº 4), vista imprimible de C37 (nº 5) y C35 entero (nº 8). Si esos cuatro se hubieran disparado, lo que quedaba en pie era una migración, un motor de reglas .NET y una pantalla de aprobación: todo el esfuerzo fuera de lo que el Proyecto Final evalúa.
 
 **Lo que se pierde, exactamente y sin adornos:**
 
@@ -607,7 +663,8 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 | **C22** | `add-pos-projection-soft-prefilter` | Python + .NET | C10, C12, C14 | 🟢 | **archivado el 5 sep** · *tres puntos de la ficha refutados con medición; entra además el reloj inyectado (FIX2)* |
 | **C23** | `add-knowledge-corpus-and-indexer` | Python | C11 | 🟢 | **archivado el 6 sep** · *zona, alcance y conflicto de zona de la ficha refutados por la implementación* |
 | **C24** | `add-eval-harness-golden-set-and-baselines` | Python | C14, C21 | ✅ | **archivado el 2026-09-11** · dec. 12 respondida: la vectorial bate a la léxica · etiquetado simple |
-| **C25** | `add-business-signals-ranking` | Python | C21, C22, C24 | 🔴 | — |
+| **C25** | `recalibrate-ranking-and-abstention` | Python | C21, C22, C24 | ✅ | **archivado el 2026-09-12** · renombrado desde `add-business-signals-ranking`; **3 puntos de la ficha retirados por medición** y un defecto de C21 corregido: la fusión concatenaba |
+| **C25bis** | `clean-plain-fusion` | Python | C25 | 🟢 | **creado el 2026-09-11**, desbloqueado el 12 · *retira el andamio de C25: la fusión plana y las perillas sin lector* |
 | **C26** | `add-substitutes-retrieval` | Python | C22, C25 | 🟢 | specs v2 §6.3.2 |
 | **C27** | `add-complementary-recommendations` | Python + .NET 🗄️ | C10, C25 | 🟢 | **rev. dec. 8** · **corte nº 1 pre-autorizado** |
 | **C28** | `add-profile-review-ui-and-metrics` | Frontend + .NET | C08 | 🟢 | **rev. dec. 5** · *lo pide el checklist §16* |
@@ -627,7 +684,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 
 **⛔ Anulados el 2026-08-31 (5):** C19, C29, C33, C35 y C37 — la rama del agente de inventario. Motivo y consecuencias en el §0. Las fichas se conservan como registro y llevan el sello en el sitio.
 
-**Vivos: 37** (36 numerados más `FIX1`). Archivados **26** (C01–C18b, C20, C21, C22, C23, C24 y `FIX1`). Pendientes **11**: C25, C26, C27, C28, C30, C31, C32, C34, C36, C38 y C39 — de los cuales C27 lleva corte pre-autorizado. **C23 se archivó el 2026-09-06** y su corte pre-autorizado —bajar a 15 documentos— se refutó por su propia unidad de medida: el diseño fija el tamaño en fragmentos y quince documentos dan la mitad del mínimo, con lo que la abstención dejaba de poder demostrarse. **C21 se archivó el 2026-09-02**, y con él caen los prerrequisitos de C24 y C30, o sea las dos mitades del proyecto que estaban esperando a la fusión. **C22 y `FIX1` se archivaron el 2026-09-05**, con lo que la ventana que `FIX1` tenía que respetar —entrar antes de que C24 etiquete su línea base— queda cumplida.
+**Vivos: 38** (36 numerados más `FIX1` y `C25bis`). Archivados **27** (C01–C18b, C20, C21, C22, C23, C24, C25 y `FIX1`). Pendientes **11**: C25bis, C26, C27, C28, C30, C31, C32, C34, C36, C38 y C39 — de los cuales C27 lleva corte pre-autorizado. **C23 se archivó el 2026-09-06** y su corte pre-autorizado —bajar a 15 documentos— se refutó por su propia unidad de medida: el diseño fija el tamaño en fragmentos y quince documentos dan la mitad del mínimo, con lo que la abstención dejaba de poder demostrarse. **C21 se archivó el 2026-09-02**, y con él caen los prerrequisitos de C24 y C30, o sea las dos mitades del proyecto que estaban esperando a la fusión. **C22 y `FIX1` se archivaron el 2026-09-05**, con lo que la ventana que `FIX1` tenía que respetar —entrar antes de que C24 etiquete su línea base— queda cumplida. **C24 se archivó el 2026-09-11 y C25 el 2026-09-12**, con lo que la cadena crítica `C21 → C24 → C25 → C26 → C34 → C36` arranca ahora en **C26**. C25 se archiva habiendo **refutado tres puntos de su propia ficha con mediciones** — la penalización de variante ambigua, la calibración de `1-2` frente a `3+` y la rotación como criterio de orden — y habiendo corregido un defecto que no estaba en su alcance: la fusión de C21 **concatenaba en vez de fusionar**. Deja **tres brechas declaradas y no cerradas** (`Recall@5` 0,758 contra 0,85, abstención 0,150 contra 0,80, y `v3` sin batir a `v2b` por el margen) y **desbloquea C25bis** (`clean-plain-fusion`), que retira el andamio de la fusión plana.
 
 ---
 
@@ -1029,12 +1086,32 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ---
 
-#### C25 · `add-business-signals-ranking` 🔴
+#### C25 · `recalibrate-ranking-and-abstention` ✅ *(archivado el 2026-09-12)*
+
+> **Renombrado desde `add-business-signals-ranking`** *(11 sep)*: el nombre anterior describía un tercio de lo que acabó haciendo. El número se conserva porque renumerar rompería las referencias de C26 (`prereq C22, C25`) y C27 (`C10, C25`) a cambio de nada. La narrativa completa, con las cifras, está en la entrada del §0 del 2026-09-11.
 
 **Objetivo.** Disponibilidad, rotación y perfil de POS como reordenación suave, con pesos **calibrados contra el golden set**.
-**Prereq.** C21, C22, C24 · **Zona.** `ai-service/src/jbg_ai/retrieval/`
-**Alcance.** Señales `qty_bucket`, `sales_30d`; penalizaciones por stock cero y variante ambigua dentro de familia; barrido de pesos y fijación del ganador; re-fijación del umbral con la distribución empírica; producción de la **tabla de ablations v0→v3**.
-**Tests.** `test_out_of_stock_product_ranks_below_equivalent_in_stock`; `test_weights_load_from_config_not_hardcoded`; `test_ambiguous_variant_penalty_applies_only_within_family`; `test_calibration_sweep_is_reproducible`.
+**Prereq.** C21, C22, C24 · **Zona.** `ai-service/src/jbg_ai/retrieval/` y `ai-service/src/jbg_ai/evals/`. **Sin migración, sin `openapi.json` y sin diff fuera de `ai-service/`.**
+**Alcance entregado.** El objetivo de arriba sobrevivió a medias, porque la exploración encontró **un defecto que valía más que toda la ficha: la fusión de C21 no fusionaba, concatenaba**, y los 60 documentos léxicos ganaban al mejor acierto vectorial en toda consulta. Entra por delante la **fusión en dos etapas con pesos por rama** (+0,083 en la lectura que decide), la **ponderación adaptativa por cobertura sin parámetros**, la señal de POS **separada del alcance** (`LEFT JOIN` que lee frente a `INNER JOIN` que restringe), el **score continuo en el último bloque** de la clave, la métrica **`nDCG@5 operativo`**, el barrido en dos fases `capture`/`rescore`, la **abstención relativa por consulta** y la tabla de ablations de **seis filas**.
+**Tres puntos de la ficha, retirados por medición y no por argumento.** La **penalización de variante ambigua** (D16: sólo 2 de 156 familias pueden llenar cinco huecos, y diversificar **baja** el nDCG@5 — es presentación, y pertenece a C30/C36); la **calibración de `1-2` frente a `3+`** (D17: no tiene función objetivo posible, porque ninguno de los dos pierde grado); y la **rotación como criterio de orden** (D10, refutada durante el apply: como desempate estricto decidía **cero** pares del top-5, y como clave de ordenación particionaba, invirtiendo 11.067). `sales_30d` se sigue leyendo **para diagnóstico** y no ordena nada.
+**Y la re-fijación del umbral no fue una re-fijación.** El escalar no podía servir: el mejor acierto por consulta de las contestables llega a 0,7118 y el de las imposibles arranca en 0,4469, o sea **contención total y no solape parcial**. La regla adoptada es **relativa por consulta**, corre después de la fusión y **no altera el conjunto de candidatos**. El escalar se queda donde estaba, ahora por decisión y no por aplazamiento.
+**Tests.** `test_out_of_stock_product_ranks_below_equivalent_in_stock`; `test_weights_load_from_config_not_hardcoded`; `test_calibration_sweep_is_reproducible` *(ahora estructural)*. `test_ambiguous_variant_penalty_applies_only_within_family` **no se escribe**: su requisito se retiró. Entran en su lugar `test_branch_vote_is_independent_of_how_many_of_its_lists_matched`, `test_signal_join_never_restricts_the_candidate_set`, `test_rotation_does_not_order_anything` y `test_window_captured_under_a_different_fusion_is_refused`. Suite en **994**.
+**Tres listones no se alcanzan, y se declaran en vez de cerrarse.** `Recall@5` **0,758** contra 0,85; abstención **0,150** contra 0,80 —llegar a 0,80 costaría silenciar 21 de las 43 contestables—; y `v3-senales` no bate a `v2b-fusion` por el margen (**+0,030** operativo) aunque cumple su propia regla de adopción. Informes en [`c25-exploration-measurements.md`](informes/c25-exploration-measurements.md) y [`c25-implementation-measurements.md`](informes/c25-implementation-measurements.md); tabla en [`c25-baselines-2026-09-11.md`](../../ai-service/evals/results/c25-baselines-2026-09-11.md).
+**Deja abierto C25bis**, que retira el andamio que este change tuvo que conservar.
+
+---
+
+#### C25bis · `clean-plain-fusion` 🟢 *(creado el 2026-09-11, desbloqueado el 12)*
+
+> **Fuera de la numeración C por el mismo motivo que `FIX1`** *(fijado el 11 sep)*. No sale de la descomposición original del proyecto sino de una **consecuencia de C25**, y darle un número C sugeriría que estaba planificado. Lleva ficha porque **exige change propio**: retira requisitos de dos specs vivas —`hybrid-fusion` y `retrieval-evaluation`— y la única vía sancionada para mover una spec viva es una delta dentro de un change.
+
+**Objetivo.** Retirar el andamio que C25 tuvo que conservar. Aquél **mantiene la fusión plana como modo seleccionable** porque sin ella la fila `v2-hibrido` de la tabla de ablations deja de ser reproducible, y con ella se pierde la referencia contra la que se leen todas las demás filas. Publicada la tabla y congelada la configuración, ese modo pasa a ser lo contrario de lo que era: **un camino muerto, activable por error, cuya aritmética el proyecto midió como defectuosa** — los 60 documentos léxicos ganando al mejor candidato vectorial en toda consulta, y el grado 2 cayendo a la posición 33.
+**Prereq.** C25 **archivado** — prerrequisito duro, cumplido el 2026-09-12 · **Zona.** `ai-service/src/jbg_ai/retrieval/`, `ai-service/src/jbg_ai/evals/` y `ai-service/evals/configs/`. **Sin migración, sin contrato y sin diff fuera de `ai-service/`.**
+**Alcance.** Retirar `JPV_FUSION_MODE` y la rama plana del orquestador; retirar la variante de ponderación adaptativa que perdió el barrido y las perillas que queden sin lector, con un **inventario comprobado por búsqueda y no por memoria** — este subsistema ya sorprendió cuatro veces con cables calculados y sin consumidor (`tsv`, la expansión, `qty_bucket` y `coordination`), y aquí el riesgo es el simétrico: retirar algo que sí tenía lector.
+**Acepta un coste y lo declara.** La fila de la línea base deja de poder re-medirse y pasa a ser **histórica y citable** —su informe y su JSONL por consulta quedan versionados—, porque la alternativa era mantener vivo un camino medido como roto, y un camino muerto que se puede activar por error es cómo un defecto corregido regresa.
+**No re-mide nada y no tiene autoridad para mover una cifra.** Su criterio de verificación es que las filas supervivientes den cifras **idénticas** tras el borrado; cualquier diferencia es un fallo del change que se revierte, no un resultado que discutir.
+**Cuándo, y por qué ahí.** Sólo cuando la decisión de fusión esté congelada y publicada, y lo está desde el archivado de C25. No antes: mientras la tabla siga pudiendo re-correrse, la fila plana es la referencia y no el andamio. Es una **hoja** —no abre ninguna arista—, así que por la regla 2 del §1 cede el turno a C26, que sí desbloquea.
+**Estado.** Artefactos generados *(proposal, design, tasks y specs)*, **0/29 tareas**. Change [`clean-plain-fusion`](../../openspec/changes/clean-plain-fusion/).
 
 ---
 
@@ -1222,7 +1299,7 @@ flowchart LR
     C22 --> C25 & C26
     C23 --> C30
     C24 --> C25 & C38
-    C25 --> C26 & C27
+    C25 --> C26 & C27 & C25bis
     C26 --> C34
     C27 --> C34
     C30 --> C31 & C34 & C38
@@ -1250,10 +1327,11 @@ flowchart LR
 | **FIX1** | nada — es una hoja | **por eso va detrás de C21 y no delante**: la regla 2 del §1 da prioridad a lo que abre aristas. Y antes de C21 no habría rama léxica con la que medir su efecto |
 | C23 | C30 | |
 | C22 | C25, C26 | |
+| **C25bis** | nada — es una hoja, como `FIX1` | **por eso cede el turno a C26**: la regla 2 del §1 da prioridad a lo que abre aristas. Y antes de que C25 se archivara no se podía hacer, porque la fila plana seguía siendo la referencia de la tabla y no el andamio |
 | C28 | nada — pero lo pide el checklist §16 del diseño | hoja obligatoria |
 | C18b | nada — pero es la única evidencia posible del checklist §16 sobre familias | hoja, ya no gratis de recortar |
 
-**Cadena crítica que queda:** `C25 → C26 → C34 → C36` *(C20 archivado el 1 sep; **C24 el 11 sep**, y con él cae el eslabón que bloqueaba a C25 y a C38)*, con `C22` y `C23` ya entrados por los lados, y `C30 → C31 → C32 → C38 → C39` cerrando.
+**Cadena crítica que queda:** `C26 → C34 → C36` *(C20 archivado el 1 sep; C24 el 11 sep; **C25 el 12 sep**, y con él cae el último eslabón que bloqueaba a C26 y a C27)*, con `C22` y `C23` ya entrados por los lados, y `C30 → C31 → C32 → C38 → C39` cerrando.
 
 ---
 

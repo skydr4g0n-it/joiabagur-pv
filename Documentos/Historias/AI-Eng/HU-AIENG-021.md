@@ -130,7 +130,7 @@ El óptimo es una meseta de **40-60** que decae a partir de 100. El motivo es qu
 [modelo-de-datos.md](../../modelo-de-datos.md) (`ai.product_document`, `tsv` generada, GIN, HNSW),
 [HU-AIENG-014.md](HU-AIENG-014.md) (retriever vectorial), [HU-AIENG-015.md](HU-AIENG-015.md) (hidratación autoritativa), [HU-AIENG-016.md](HU-AIENG-016.md) (panel e insignia de origen), [HU-AIENG-020.md](HU-AIENG-020.md) (diccionario de expansión),
 specs vivas `vector-retrieval`, `query-expansion`, `ai-vector-schema`, `ai-service-runtime`, `assisted-search-panel`,
-change OpenSpec [`openspec/changes/add-hybrid-search-rrf/`](../../../openspec/changes/add-hybrid-search-rrf/) y su [ticket técnico](../../../openspec/changes/add-hybrid-search-rrf/ticket.md).
+change OpenSpec [`openspec/changes/add-hybrid-search-rrf/`](../../../openspec/changes/archive/2026-09-02-add-hybrid-search-rrf/) y su [ticket técnico](../../../openspec/changes/archive/2026-09-02-add-hybrid-search-rrf/ticket.md).
 
 ---
 

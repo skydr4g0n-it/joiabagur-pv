@@ -22,14 +22,14 @@ El valor no es de usuario final de tienda —no hay pantalla— sino de **desblo
 
 **Alcance de esta historia (sí):**
 
-- Lectura del xlsx anonimizado [`data/catalog/real/product-JoiaBagur.xlsx`](../../data/catalog/real/product-JoiaBagur.xlsx) — columnas `SKU`, `Name`, `Description`, `Price`, `Collection`, alineadas con [`ExcelImportService`](../../../backend/src/JoiabagurPV.Application/Services/ExcelImportService.cs).
+- Lectura del xlsx anonimizado [`data/catalog/real/product-JoiaBagur.xlsx`](../../../data/catalog/real/product-JoiaBagur.xlsx) — columnas `SKU`, `Name`, `Description`, `Price`, `Collection`, alineadas con [`ExcelImportService`](../../../backend/src/JoiabagurPV.Application/Services/ExcelImportService.cs).
 - Agrupación de variantes **solo interna** para el sorteo de calidad. El JSONL **no** emite `variant_group_key`, `variant_label` ni `family_seed`.
 - Reparto de calidad **por familia de variantes** con **semilla fija**: ~70 % `rich`, ~20 % `sparse`, ~10 % `original` — **toda la familia comparte nivel** (§8.4). `original` = texto del comerciante, no «campo vacío».
 - Redacción asistida de vendedor (`catalog-assist/v2`): describir lo que «se ve», sin aludir a la foto; limitación (0 fotos reales) **solo en el informe**.
 - Salida versionada:
   - `data/catalog/real/generated/catalog-real-enriched.jsonl` — **versionado en git** (derivado anonimizado)
   - sidecar `.meta.json` (`generator_version` `c06a-assist/v2`, `seed`, `generated_at`, ratios)
-  - informe [`Documentos/Proyecto Final AIEng/informes/c06a-catalog-enrichment-report.md`](../Proyecto%20Final%20AIEng/informes/c06a-catalog-enrichment-report.md)
+  - informe [`Documentos/Proyecto Final AIEng/informes/c06a-catalog-enrichment-report.md`](../../Proyecto%20Final%20AIEng/informes/c06a-catalog-enrichment-report.md)
 - Metadatos por producto en JSONL: `data_origin: real`, `text_provenance` (`merchant` | `ai_assisted`), `text_quality_tier`, más campos de catálogo inmutables. **Sin** campos de familia.
 - **`product_id` en JSONL:** opcional, por lookup de SKU.
 - **Ingesta en BD local** (Docker, puerto host **5433**, BD `joiabagur_pv`): `UPDATE "Products"` **por SKU**, conservando `Id`, `SKU`, `Price`, `CollectionId` y **`Name`**; actualizar **únicamente `Description`**.
@@ -66,8 +66,8 @@ El valor no es de usuario final de tienda —no hay pantalla— sino de **desblo
 
 **Referencias:**
 
-[proyecto-final-plan-changes-openspec.md](../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (ficha C06a, §0 revisiones 2026-08-17, reglas transversales de testing),
-[proyecto-final-diseno-rag-joiabagur.md](../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) (§8.1.1 corpus híbrido, §8.4 realismo dirigido, §8.5 puertas, §15 limitaciones),
+[proyecto-final-plan-changes-openspec.md](../../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (ficha C06a, §0 revisiones 2026-08-17, reglas transversales de testing),
+[proyecto-final-diseno-rag-joiabagur.md](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) (§8.1.1 corpus híbrido, §8.4 realismo dirigido, §8.5 puertas, §15 limitaciones),
 [epicas.md](../../epicas.md) (EP12),
 [modelo-de-datos.md](../../modelo-de-datos.md) (`Product`),
 [HU-AIENG-001.md](HU-AIENG-001.md), [HU-AIENG-005.md](HU-AIENG-005.md) (`data_origin` en `ai.product_document`),

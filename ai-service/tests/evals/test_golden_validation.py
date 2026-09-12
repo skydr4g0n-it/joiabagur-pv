@@ -192,7 +192,9 @@ def test_a_wholly_synthetic_category_is_refused(
 
 def test_a_set_below_the_floor_is_refused(golden_factory: Callable[..., Path]) -> None:
     """45 judged queries is the floor the exploration fixed before any of them was written."""
-    kept = {f"v{index:02d}" for index in range(2)}
+    # Enough to cross the floor from whatever the reference set holds. It grew when C25 took
+    # the out-of-domain category from five to twenty, so a fixed count of two stopped reaching.
+    kept = {f"o{index:02d}" for index in range(20)} | {f"v{index:02d}" for index in range(2)}
 
     with pytest.raises(GoldenSetError) as exc:
         load_golden_set(

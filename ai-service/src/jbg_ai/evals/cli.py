@@ -92,7 +92,8 @@ async def _run(args: argparse.Namespace) -> int:
 
     target = report_module.write(
         result,
-        title=args.title or "C24 — líneas base de recuperación con relevancia graduada",
+        title=args.title
+        or "C25 — líneas base de recuperación con relevancia graduada, señal y abstención",
         name=_report_name(args.name),
         out_dir=Path(args.out) if args.out else None,
     )
@@ -173,6 +174,7 @@ async def _sweep(args: argparse.Namespace) -> int:
         index_set_hash=index_set_hash(ids),
         embedding_model_version_key=embed.model_version_key,
         git_sha=current_git_sha(),
+        fusion_mode=config.fusion or settings.jpv_fusion_mode,
     )
     baseline, candidates = await sweep(
         config,
@@ -183,28 +185,42 @@ async def _sweep(args: argparse.Namespace) -> int:
         prices=load_prices(),
         provenance=provenance,
         repeat=1,
+        coverage_rules=tuple(
+            item.strip() for item in args.coverage_rules.split(",") if item.strip()
+        ),
     )
     verdict = decide(baseline, candidates)
 
     lines = [
-        "# C24 — barrido direccional del peso de la rama vectorial y de la profundidad",
+        "# C25 — barrido de la fusión por rama (fase A)",
         "",
-        "La regla que decide se escribió **antes** de medir; ver `evals/sweep.py`. El barrido "
-        "es direccional: la rúbrica que fijó los pesos vigentes es la función objetivo de la "
-        "rama léxica, así que infravalora la vectorial por construcción y el óptimo verdadero "
-        "no puede estar por debajo del valor en vigor.",
+        "La regla que decide se escribió **antes** de medir y está fechada en D14 del "
+        "`design.md`; el código la aplica en `evals/sweep.py`. La lectura que **decide** es "
+        "`nuevas` —las 40 consultas que ninguna calibración ha visto—; `ajuste` se publica "
+        "como **diagnóstico de contaminación** y no veta.",
         "",
-        "| wC | profundidad | nDCG@5 global | sólo ajuste | sólo nuevas |",
-        "|---:|---:|---:|---:|---:|",
+        "La rejilla es **de una dimensión**, sobre `rho = w_vec / w_lex`, porque sólo el "
+        "cociente cambia el orden: escalar los dos pesos lo preserva. `k` y la profundidad se "
+        "mueven juntos, por la regla de C21 de que una rama más profunda mantiene más cola "
+        "votando. La banda útil es estrecha —`rho ∈ [0,9 ; 1,1]`— y la rejilla de C24 tenía "
+        "**un solo punto** dentro, que es por qué su óptimo parecía un filo de cuchillo.",
+        "",
+        "La columna `cobertura` es la segunda fila candidata: la regla **continua** no tiene "
+        "parámetro y es la adoptada; la **binaria** lleva una `α` declarada y entra para que "
+        "esa elección sea falsable en vez de supuesta.",
+        "",
+        "| rho | k / profundidad | cobertura | nDCG@5 global | sólo ajuste | **nuevas (decide)** |",
+        "|---:|---:|---|---:|---:|---:|",
     ]
     for point in sorted(
-        [baseline, *candidates], key=lambda item: (item.weight_vector, item.branch_depth)
+        [baseline, *candidates],
+        key=lambda item: (item.coverage_rule, item.rho, item.branch_depth),
     ):
         mark = " **(vigente)**" if point is baseline else ""
         lines.append(
-            f"| {point.weight_vector}{mark} | {point.branch_depth} | "
-            f"{point.score('global'):.3f} | {point.score('tuning'):.3f} | "
-            f"{point.score('new'):.3f} |"
+            f"| {point.rho}{mark} | {point.rrf_k}/{point.branch_depth} | "
+            f"{point.coverage_rule} | {point.score('global'):.3f} | "
+            f"{point.score('tuning'):.3f} | **{point.score('new'):.3f}** |"
         )
     lines += ["", "## Veredicto de la regla", "", *verdict.as_lines(), ""]
 
@@ -287,10 +303,34 @@ def build_parser() -> argparse.ArgumentParser:
     cag.add_argument("--out", default=None, help="Directory for the JSON summary")
     cag.add_argument("--dry-run", action="store_true", help="Size and cost only, no model call")
 
-    sweep_cmd = sub.add_parser("sweep", help="Directional sweep of the fusion knobs (D13)")
-    sweep_cmd.add_argument("--config", default="v2-hibrido")
+    sweep_cmd = sub.add_parser("sweep", help="Sweep of the branch-weight ratio (C25 phase A)")
+    sweep_cmd.add_argument("--config", default="v2b-fusion")
     sweep_cmd.add_argument("--out", default=None)
     sweep_cmd.add_argument("--name", default=None)
+    sweep_cmd.add_argument(
+        "--coverage-rules",
+        default="continuous",
+        help=(
+            "Comma-separated coverage rules to sweep (continuous,none). Include `none` to "
+            "measure the CONTROL arm: whether the adaptive rule is worth having at all"
+        ),
+    )
+
+    capture_cmd = sub.add_parser(
+        "capture",
+        help="Phase B: retrieve each query once under the frozen fusion and persist its window",
+    )
+    capture_cmd.add_argument("--config", default="v3-senales")
+    capture_cmd.add_argument("--out", default=None, help="Where to write the capture file")
+
+    rescore_cmd = sub.add_parser(
+        "rescore",
+        help="Phase C: explore the business-weight grid over persisted windows. No provider, no DB",
+    )
+    rescore_cmd.add_argument("--config", default="v3-senales")
+    rescore_cmd.add_argument("--capture", default=None, help="The capture file to re-score")
+    rescore_cmd.add_argument("--out", default=None)
+    rescore_cmd.add_argument("--name", default=None)
 
     provider = sub.add_parser(
         "provider-latency", help="Time the embedding provider itself, cold and warm"
@@ -320,12 +360,140 @@ def main(argv: Sequence[str] | None = None) -> int:
             return asyncio.run(_freeze(args))
         if args.command == "sweep":
             return asyncio.run(_sweep(args))
+        if args.command == "capture":
+            return asyncio.run(_capture(args))
+        if args.command == "rescore":
+            return _rescore(args)
         if args.command == "provider-latency":
             return asyncio.run(_provider_latency(args))
         return asyncio.run(_run(args))
     except EvalError as exc:
         sys.stderr.write(f"{type(exc).__name__}: {exc}\n")
         return 1
+
+
+DEFAULT_CAPTURE_NAME = "c25-capture.json"
+
+
+async def _capture(args: argparse.Namespace) -> int:
+    """Phase B. One retrieval per query under the frozen fusion, persisted with its signals."""
+    from jbg_ai.db.engine import dispose_engine
+    from jbg_ai.evals.execute import build_search, harness_settings
+    from jbg_ai.evals.sweep import capture
+    from jbg_ai.evals.vectors import FrozenEmbeddingClient
+
+    golden = load_golden_set()
+    config = load_config(args.config)
+    settings = harness_settings()
+    search = build_search(settings)
+    embed = FrozenEmbeddingClient.from_file(settings.jpv_embedding_model or "")
+    try:
+        result = await capture(
+            config, golden, settings=settings, search=search, embed=embed
+        )
+    finally:
+        await dispose_engine()
+
+    from jbg_ai.evals.cag_run import RESULTS_DIR
+
+    path = (Path(args.out) if args.out else RESULTS_DIR) / DEFAULT_CAPTURE_NAME
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(result.to_json(), encoding="utf-8")
+    sys.stdout.write(
+        f"captured {len(result.windows)} windows under fusion "
+        f"{result.fusion.mode} rho="
+        f"{result.fusion.branch_weight_vector / result.fusion.branch_weight_lexical:.3f} "
+        f"-> {path}\n"
+    )
+    return 0
+
+
+def _rescore(args: argparse.Namespace) -> int:
+    """Phase C. Pure: it opens no session and calls no provider, and that is the point."""
+    from jbg_ai.evals.cag_run import RESULTS_DIR
+    from jbg_ai.evals.execute import harness_settings
+    from jbg_ai.evals.sweep import (
+        DECIDING_READING,
+        DECISION_METRIC,
+        FusionFingerprint,
+        business_grid,
+        check_fusion_matches,
+        load_capture,
+        rescore,
+    )
+
+    golden = load_golden_set()
+    config = load_config(args.config)
+    # No database is required here, and asking for one would contradict the guarantee this
+    # phase exists to provide. The fusion knobs it reads are the same defaults either way.
+    settings = harness_settings(requires_database=False)
+
+    path = Path(args.capture) if args.capture else RESULTS_DIR / DEFAULT_CAPTURE_NAME
+    captured = load_capture(path)
+    check_fusion_matches(captured, FusionFingerprint.of(config, settings))
+    if captured.golden_set_version != golden.version:
+        raise EvaluationUnavailable(
+            f"the windows were captured against golden set {captured.golden_set_version!r} "
+            f"and the set on disk is {golden.version!r}: re-capture rather than compare "
+            "figures that no longer share a provenance"
+        )
+
+    grid = business_grid(availability=(0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0))
+    rows: list[tuple[float, dict]] = []
+    for weights in grid:
+        readings = rescore(
+            captured,
+            golden,
+            weights,
+            buckets=captured.buckets or None,
+            depth=config.max_results,
+        )
+        rows.append((weights.availability, readings))
+
+    lines = [
+        "# C25 — barrido de los pesos de negocio por re-puntuado (fase C)",
+        "",
+        f"Ventanas: **{len(captured.windows)}**, capturadas bajo la fusión congelada "
+        f"`{captured.fusion.mode}` con `k={captured.fusion.rrf_k}` y profundidad "
+        f"`{captured.fusion.branch_depth}`. Golden set `{captured.golden_set_version}`.",
+        "",
+        "El re-puntuado **no llama al proveedor ni abre la base**: las señales viajan en la "
+        "ventana persistida. Dos corridas sobre las mismas ventanas dan lo mismo, y eso es "
+        "una propiedad **estructural** y no una promesa sobre semillas.",
+        "",
+        f"| w disponibilidad | {DECISION_METRIC} ({DECIDING_READING}) | operativo | global |",
+        "|---:|---:|---:|---:|",
+    ]
+    for availability, readings in rows:
+        deciding = readings[DECIDING_READING].values[DECISION_METRIC]
+        operational = readings["global"].values.get("ndcg_at_5_operational")
+        lines.append(
+            f"| {availability} | {deciding:.3f} | "
+            f"{'—' if operational is None else f'{operational:.3f}'} | "
+            f"{readings['global'].values[DECISION_METRIC]:.3f} |"
+        )
+    distinct = {
+        (
+            round(readings[DECIDING_READING].values[DECISION_METRIC], 6),
+            round(readings["global"].values[DECISION_METRIC], 6),
+        )
+        for _, readings in rows
+    }
+    lines += [
+        "",
+        f"> **{len(rows)} puntos de rejilla y {len(distinct)} resultados distintos.** No es un "
+        "defecto del barrido: con un único término binario el score de negocio toma dos "
+        "valores, así que **el orden es invariante al valor del peso y sólo depende de su "
+        "signo**. La calibración decide encender o apagar la señal, no cuánto pesa, y `1,0` "
+        "queda como unidad declarada y no como cifra ajustada.",
+    ]
+
+    name = args.name or "c25-rescore.md"
+    out = (Path(args.out) if args.out else RESULTS_DIR) / name
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    sys.stdout.write(f"wrote {out}\n")
+    return 0
 
 
 def run_module(argv: Sequence[str] | None = None) -> int:

@@ -40,7 +40,7 @@ El valor no es de usuario final —esta historia no entrega pantalla— sino de 
 
 | Tema | Decisión |
 |---|---|
-| Fuente del contrato | Reconstruir desde 3devs §6.8 más los deltas v3 (`materials[]`, familias, sobre-recuperación, `inventory/propose`). El plan C02 cita un "§6.8" que en el diseño v3 no existe: v3 termina en §6.4. |
+| Fuente del contrato | Reconstruir desde la tabla de contratos §6.8 de la variante para 3 desarrolladores, más los deltas v3 (`materials[]`, familias, sobre-recuperación, `inventory/propose`). El plan C02 cita un "§6.8" que en el diseño v3 no existe: v3 termina en §6.4. *(Aquel documento se retiró del repositorio el 2026-09-12 por obsoleto; la fuente de verdad del contrato es desde C02 `ai-service/openapi.json`, congelado y con test de snapshot.)* |
 | Autoridad del contrato | El snapshot `openapi.json` y la spec del change mandan sobre la prosa del diseño mientras no se sincronice el documento. |
 | Autenticación | JWT interno HS256 con `PyJWT`; secreto en settings y en Compose para local; claims `user_id`, `role`, `pos_id`, `trace_id`. |
 | Scope | El `pos_id` y el `role` del token prevalecen siempre sobre el body. El `pos_id` opcional del request se acepta por compatibilidad de OpenAPI pero se ignora. |
@@ -53,7 +53,6 @@ El valor no es de usuario final —esta historia no entrega pantalla— sino de 
 
 **Referencias:**
 [proyecto-final-diseno-rag-joiabagur.md](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) (§6.1–6.4 frontera y seguridad, §7.6 sobre-recuperación, §7.7 generación y placeholders),
-[proyecto-final-diseno-rag-joiabagur-3devs.md](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur-3devs.md) (§6.8 tabla de contratos),
 [proyecto-final-plan-changes-openspec.md](../../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (ficha C02),
 [HU-AIENG-001.md](HU-AIENG-001.md),
 change OpenSpec `openspec/changes/add-ai-service-contracts-and-auth/` y su ticket técnico.
@@ -148,7 +147,7 @@ change OpenSpec `openspec/changes/add-ai-service-contracts-and-auth/` y su ticke
 ## Notas adicionales
 
 - **Actor:** historia de plataforma y contratos para el equipo del PF. No hay pantalla de usuario final; el beneficiario directo es el desarrollador que implementa C03.
-- **Origen del "§6.8":** el plan C02 cita una sección que el diseño v3 no tiene (termina en §6.4). La tabla de contratos vive en el documento 3devs §6.8. Esta HU y el ticket documentan la reconstrucción; sincronizar el documento de diseño es trabajo editorial posterior y no bloquea.
+- **Origen del "§6.8":** el plan C02 cita una sección que el diseño v3 no tiene (termina en §6.4). La tabla de contratos vivía en la variante del diseño para 3 desarrolladores, §6.8 — documento **retirado del repositorio el 2026-09-12** por obsoleto, una vez que el contrato quedó congelado en `ai-service/openapi.json`. Esta HU y el ticket documentan la reconstrucción; sincronizar el documento de diseño es trabajo editorial posterior y no bloquea.
 - **Retirada de stubs:** cada change posterior (C09, C13, C14…) sustituye handlers concretos. No es trabajo de esta historia, pero el contrato que se congela aquí es el que deberán respetar.
 - **Determinismo:** los stubs deben ser reproducibles para el mismo input, porque C03 construirá sus tests de mapeo contra ellos.
 - **Riesgo de contrato fino:** se incluyen ya campos opcionales (`debug`, `usage`, `match_reasons`, `similarity_signals`) aunque los stubs los rellenen de forma mínima, para reducir la probabilidad de reabrir el contrato en la Ola 4.

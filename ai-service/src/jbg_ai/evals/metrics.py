@@ -20,11 +20,11 @@ configuration — it is an unmeasured one, and the two must not print the same.
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from uuid import UUID
 
-from jbg_ai.evals.golden import MAX_GRADE, RELEVANT_FROM, GoldenSet
+from jbg_ai.evals.golden import MAX_GRADE, OUT_OF_DOMAIN, RELEVANT_FROM, GoldenSet
 
 #: Where the acceptance criterion is applied and where the report reads its headline.
 CUTOFF = 5
@@ -49,6 +49,40 @@ def binary_gain(grade: int) -> float:
 
 READINGS: dict[str, GradeFn] = {"graded": graded_gain, "binary": binary_gain}
 
+#: The bucket that lowers the effective grade. One value, and the same constant the ordering
+#: uses, so the metric and the ranking can never disagree about what "exhausted" means.
+OUT_OF_STOCK_BUCKET = "0"
+
+
+def effective_grade(grade: int, bucket: str | None) -> int:
+    """The operational reading of a labelled grade. Declared 2026-09-11, before measuring.
+
+        g_efectivo = grade                   if bucket != '0'
+                     max(grade - 1, 0)       if bucket == '0'
+
+    **It reuses the rubric's own scale rather than inventing a constant.** `criterion.md`
+    already defines grade 1 as "a plausible substitute the operator would offer as a second
+    option", and a piece that cannot be put on the cloth is exactly that. Stepping down one
+    rung for being exhausted APPLIES the rubric instead of bending it, which is what separates
+    this from the `+0.3 if in stock` multiplier the design rejected as a magic number.
+
+    An ABSENT bucket keeps the grade. `None` means no reading scope ran, or this point of sale
+    does not carry the product; neither is evidence of zero stock, and treating absence as
+    exhausted would turn assortment coverage into a relevance penalty — the conflation the
+    projection capability exists to keep apart.
+
+    Grade 0 cannot fall further, hence the floor. The judgement file is never modified: this
+    is a third READING of the same annotation, alongside the graded and the binary ones.
+    """
+    if bucket == OUT_OF_STOCK_BUCKET:
+        return max(grade - 1, 0)
+    return grade
+
+
+def operational_gain(grade: int, bucket: str | None) -> float:
+    """`graded_gain` of the effective grade. Same exponential formulation, different input."""
+    return graded_gain(effective_grade(grade, bucket))
+
 
 @dataclass(frozen=True)
 class CaseMetrics:
@@ -67,11 +101,18 @@ class CaseMetrics:
     rerank_headroom: bool
     abstained: bool
     relevant_total: int
+    #: The third reading. `None` when no availability signal was read, which is the honest
+    #: report for a configuration that does not reorder by one: the reading is NOT APPLICABLE
+    #: rather than equal to the graded one, and printing them as the same number would hide
+    #: which is which. Defaulted so a configuration with no business signal constructs the
+    #: same way it always did.
+    ndcg_at_5_operational: float | None = None
 
     def as_dict(self) -> dict[str, float | bool | int | None]:
         return {
             "ndcg_at_5": self.ndcg_at_5,
             "ndcg_at_5_binary": self.ndcg_at_5_binary,
+            "ndcg_at_5_operational": self.ndcg_at_5_operational,
             "recall_at_5": self.recall_at_5,
             "recall_at_5_capped": self.recall_at_5_capped,
             "precision_at_3": self.precision_at_3,
@@ -126,6 +167,7 @@ def score_case(
     *,
     abstained: bool,
     origin: str | None = None,
+    buckets: Mapping[str, str] | None = None,
 ) -> CaseMetrics:
     """Score one query's ranked list. `origin` restricts which relevant documents count.
 
@@ -135,6 +177,11 @@ def score_case(
     inflated by making the task smaller.
     """
     judged = {item.product_id: item for item in golden.judgements_for(query_id)}
+    # An out-of-domain query has every document at grade zero BY the annotation criterion, so
+    # nothing about it is unjudged. Reading the absence of rows as "unjudged" would mark the
+    # whole category not comparable and hide the one figure it exists to produce; writing
+    # thousands of zero rows to say the same thing would be worse.
+    out_of_domain = golden.query(query_id).category == OUT_OF_DOMAIN
     relevant = [
         item
         for item in golden.relevant_documents(query_id)
@@ -144,7 +191,7 @@ def score_case(
     def grade_of(product_id: UUID) -> int | None:
         item = judged.get(str(product_id))
         if item is None:
-            return None
+            return 0 if out_of_domain else None
         if origin is not None and item.data_origin != origin:
             return 0
         return item.grade
@@ -161,6 +208,9 @@ def score_case(
         query_id=query_id,
         ndcg_at_5=ndcg(grades, ideal, gain=graded_gain),
         ndcg_at_5_binary=ndcg(grades, ideal, gain=binary_gain),
+        ndcg_at_5_operational=_operational_ndcg(
+            ranked, grades, relevant, buckets=buckets
+        ),
         recall_at_5=(found / total) if total else 0.0,
         recall_at_5_capped=(found / min(CUTOFF, total)) if total else 0.0,
         precision_at_3=precision_at(grades, PRECISION_CUTOFF),
@@ -177,6 +227,43 @@ def score_case(
         abstained=abstained,
         relevant_total=total,
     )
+
+
+def _operational_ndcg(
+    ranked: Sequence[UUID],
+    grades: Sequence[int],
+    relevant: Sequence[object],
+    *,
+    buckets: Mapping[str, str] | None,
+) -> float | None:
+    """nDCG@5 over the effective gains. `None` when no availability signal was read.
+
+    **The ideal is built with the same gain function**, so this is a proper nDCG and not a
+    penalised one: the denominator is the best ordering achievable given what the shop
+    actually has. A relevant document whose bucket is unknown keeps its grade, by the same
+    rule the numerator uses, so the two sides of the ratio can never disagree about a document.
+
+    The ordering of configurations is what this metric is for, and every configuration is
+    scored against the same denominator on the same query, so the choice is consistent by
+    construction rather than by luck.
+    """
+    if buckets is None:
+        return None
+    ranked_gains = [
+        operational_gain(grade, buckets.get(str(product_id)))
+        for product_id, grade in zip(ranked, grades, strict=False)
+    ]
+    ideal_gains = sorted(
+        (
+            operational_gain(item.grade, buckets.get(str(item.product_id)))
+            for item in relevant
+        ),
+        reverse=True,
+    )
+    ideal = dcg(ideal_gains[:CUTOFF])
+    if ideal <= 0:
+        return 0.0
+    return dcg(ranked_gains[:CUTOFF]) / ideal
 
 
 def _synthetic_displacement(
@@ -244,16 +331,32 @@ def aggregate(cases: Sequence[CaseMetrics]) -> Aggregate:
         if displacement
         else 0.0
     )
+    # Averaged over the queries that HAVE the reading, and omitted entirely when none does.
+    # A configuration that reads no availability signal has no operational reading, and
+    # printing a zero for it would rank it last on a metric it never competed in.
+    operational = [
+        case.ndcg_at_5_operational
+        for case in cases
+        if case.ndcg_at_5_operational is not None
+    ]
+    if operational:
+        values["ndcg_at_5_operational"] = sum(operational) / len(operational)
     return Aggregate(queries=len(cases), values=values)
 
 
 def abstention_rate(cases: Sequence[CaseMetrics]) -> float:
     """Share of queries the configuration declined to answer with confidence.
 
-    Reported over the out-of-domain category, and PROVISIONAL: the live distance threshold
-    admits essentially the whole catalogue, so what this measures is branch mechanics rather
-    than a confidence decision. Recalibrating the threshold is a later change; this change
-    publishes the distance distribution it will need.
+    Reported over the out-of-domain category. The flag it counts is the **union** of the two
+    ways a configuration declines: C25's relative abstention rule, and `low_confidence`, which
+    means the branches disagreed. Both land on the same field of the response — an abstention
+    empties the page and sets it — so this is not the rate of the rule alone, and a
+    configuration with the rule switched off still reports its `low_confidence`.
+
+    Separating them would need a second field on a response schema that is frozen by contract,
+    so the rule's own two-sided figures —how many impossible queries it catches, how many
+    answerable ones it silences— are fixed and published in the C25 implementation report
+    instead, against the out-of-domain category once it had grown to twenty.
     """
     if not cases:
         return 0.0

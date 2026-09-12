@@ -1,10 +1,10 @@
 """Weighted Reciprocal Rank Fusion over N ranked lists. Delivered by C21.
 
-Pure and domain-free on purpose: C23 (knowledge corpus), C25 (business signals) and C26
-(substitutes) fuse ranked lists **without going through `POST /v1/retrieval/products`**, and
-they import this module rather than restating it. Nothing here opens a session, calls a
-provider or knows what a product, a material or a word is — it sees ordered identifiers and
-weights, and nothing else.
+Pure and domain-free on purpose, and it has paid off twice already: C23 (knowledge corpus)
+imports it, and C25 composes it **with itself** — stage one inside the lexical branch, stage
+two between the branches — without a line of this module changing. C26 (substitutes) is the
+next caller. Nothing here opens a session, calls a provider or knows what a product, a
+material or a word is: it sees ordered identifiers and weights, and nothing else.
 
 `score(d) = sum over lists i of w_i / (k + rank_i(d))`, with `rank` one-based.
 

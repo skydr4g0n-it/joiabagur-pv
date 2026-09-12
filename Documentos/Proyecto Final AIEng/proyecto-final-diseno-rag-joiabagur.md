@@ -538,9 +538,48 @@ Pantalla de revisión con aprobar/rechazar por recomendación, señales visibles
 | **v0-cag** | Catálogo del POS entero en contexto, sin retrieval |
 | **v1-vectorial** | Solo pgvector + threshold |
 | **v2-hibrido** | Vectorial + léxico (RRF) + **sinónimos** + filtros estructurales |
-| **v3-señales** | v2 + disponibilidad, rotación y perfil de POS, con pesos calibrados |
+| **v2b-fusion** | la fusión **por rama** con ponderación adaptativa por cobertura, **sin** señales de negocio |
+| **v3-señales** | v2b + disponibilidad |
 
-Métricas: Recall@5, nDCG@5, MRR, P@3, abstención correcta, % sin resultado, p50/p95 y coste por consulta. Aceptación de v3: Recall@5 ≥ 0,85 en las tres primeras categorías; nDCG@5 ≥ 0,75; abstención correcta ≥ 0,80; p95 de retrieval < 500 ms.
+> **Revisado el 2026-09-11, al aplicar C25.** La tabla pasa de cinco filas a **seis** y el
+> criterio de aceptación, de absoluto a **relativo**.
+>
+> **`v3-señales` se parte en dos.** Sin una fila que aísle la fusión, una mejora en `v3` sería
+> **inatribuible**: no se sabría si el mérito es de la composición o de las señales. Y hubo que
+> aislarla porque la fusión de C21 resultó no fusionar sino **concatenar** — con sus pesos, los
+> sesenta documentos léxicos ganaban al mejor acierto vectorial en toda consulta, de modo que un
+> grado 2 que la vectorial ponía primero caía a la **posición 33**.
+>
+> **La fila pierde dos de sus tres señales.** *Rotación*: como desempate estricto decidía **cero**
+> pares del top-5 en las 48 consultas, y como clave de ordenación no desempataba sino que
+> particionaba —11.067 pares invertidos, el 71,2 % a más de diez puestos— con coste en relevancia.
+> `sales_30d` se lee para diagnóstico y **no ordena**. *Perfil de POS*: anulado con C19 el
+> 2026-08-31. Queda la disponibilidad, y su peso decide su **signo y no su valor**: con un único
+> término binario el orden es invariante a la magnitud, así que `1,0` es unidad declarada.
+>
+> **Los tres umbrales absolutos no se alcanzan, y se declaran en vez de cerrarse.** `Recall@5`
+> real llega a **0,758** contra 0,85; la abstención correcta a **0,150** contra 0,80. Los dos se
+> fijaron **antes de que existiera el golden set** que los mediría, y ninguna palanca de C25 puede
+> cerrarlos: el recall a cinco depende de **qué** entra en la ventana y las señales sólo reordenan
+> lo que ya entró. `nDCG@5 ≥ 0,75` sí se alcanza en global (0,740 en `v2b`, 0,729 en `v3`) pero no
+> sobre la porción real. **El `p95` sí se cumple con holgura: 128,6 ms contra 500.**
+>
+> **El criterio pasa a ser relativo:** cada configuración bate a aquella sobre la que se construye,
+> en la lectura que decide y por encima de un margen de 0,05. `v2b` lo cumple con **+0,083**;
+> `v3` **no** lo alcanza —+0,030 en la métrica operativa— y se adopta igualmente porque cumple su
+> propia regla de adopción y porque el golden set es **estructuralmente ciego** a la
+> disponibilidad: `criterion.md` no menciona stock ni rotación, así que lo que falta es resolución
+> del instrumento y no evidencia. Esa brecha queda declarada, no cerrada.
+>
+> **Y aparece una tercera lectura de la misma anotación**, la *operativa*, con una función de
+> ganancia declarada antes de medir: un grado 2 agotado cuenta como grado 1, porque la rúbrica ya
+> define el grado 1 como *«sustituto plausible que el operador ofrecería como segunda opción»* y
+> una pieza que no se puede poner sobre el paño es exactamente eso. No inventa constante y no toca
+> `judgements.jsonl`. La relevancia pura queda como **guardarraíl**.
+
+Métricas: Recall@5, nDCG@5 —en sus tres lecturas: graduada, binaria y **operativa**—, MRR, P@3, abstención correcta, % sin resultado, p50/p95 y coste por consulta. Aceptación **relativa** (revisada el 2026-09-11): cada fila bate a aquella sobre la que se construye por encima de 0,05 en la lectura que decide, sin que ninguna categoría medida caiga más de 0,05; el `p95` de retrieval sigue por debajo de 500 ms. La distancia a los umbrales absolutos originales —`Recall@5 ≥ 0,85` y abstención ≥ 0,80— se declara como limitación con sus cifras medidas.
+
+**Las lecturas de relevancia se promedian sobre las consultas contestables**, no sobre todas. Una consulta de fuera de dominio tiene el conjunto relevante vacío, así que puntúa 0 para **toda** configuración por construcción: promediarla no informa del orden y **comprime toda diferencia**. Medido al ampliar esa categoría de 5 a 20, la mejora de la fusión por rama leía +0,053 con ellas dentro y +0,084 fuera — con un margen de 0,05, una mejora real se quedó a tres milésimas de ser vetada por la composición del conjunto en vez de por su mérito. Esas consultas se informan por la métrica que sí las mide, que es la tasa de abstención.
 
 **Cada métrica se reporta tres veces: sobre la porción real, sobre la sintética y global** (§8.1.1). El umbral de aceptación se aplica a **la porción real**; si el global cumple y el real no, la conclusión es que el corpus sintético es demasiado fácil, no que el sistema funcione.
 

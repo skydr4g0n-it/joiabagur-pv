@@ -13,6 +13,7 @@ from pathlib import Path
 
 from jbg_ai.data.paths import AI_SERVICE_ROOT
 from jbg_ai.evals.metrics import CUTOFF
+from jbg_ai.evals.provenance import DIRTY_SUFFIX
 from jbg_ai.evals.runner import ConfigReport, Report
 
 RESULTS_DIR = AI_SERVICE_ROOT / "evals" / "results"
@@ -40,6 +41,16 @@ def _fmt(value: float | int | None, digits: int = 3) -> str:
     return f"{value:.{digits}f}"
 
 
+def _short_sha(value: str) -> str:
+    """Twelve characters identify a commit; the dirty marker is not decoration and survives.
+
+    Truncating it away would restore exactly the defect the marker exists to prevent: a run
+    taken on a modified tree presenting itself as the commit it merely started from.
+    """
+    base, sep, suffix = value.partition(DIRTY_SUFFIX)
+    return f"{base[:12]}{sep}{suffix}"
+
+
 def not_comparable(item: ConfigReport) -> bool:
     """True when too much of this row's top results carries no judgement to score it as final."""
     return item.readings["global"].values["unjudged_at_5"] > NOT_COMPARABLE_UNJUDGED
@@ -47,18 +58,44 @@ def not_comparable(item: ConfigReport) -> bool:
 
 def _ablation_table(report: Report) -> list[str]:
     lines = [
-        "| configuración | nDCG@5 | nDCG@5 bin | Recall@5 | P@3 | MRR | no juzgado@5 | coste/consulta |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|",
+        "| configuración | fusión | nDCG@5 | nDCG@5 bin | nDCG@5 oper | Recall@5 | P@3 "
+        "| MRR | no juzgado@5 | coste/consulta |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for item in report.configs:
         values = item.readings["global"].values
         mark = " ⚠ **no comparable**" if not_comparable(item) else ""
+        # An em dash and not a zero: a configuration that reorders by no business signal has
+        # no operational reading, and printing 0,000 would rank it last on a metric it never
+        # competed in.
+        operational = (
+            _fmt(values["ndcg_at_5_operational"])
+            if "ndcg_at_5_operational" in values
+            else "—"
+        )
         lines.append(
-            f"| `{item.config_id}`{mark} | {_fmt(values['ndcg_at_5'])} | "
-            f"{_fmt(values['ndcg_at_5_binary'])} | {_fmt(values['recall_at_5_capped'])} | "
+            f"| `{item.config_id}`{mark} | `{item.provenance.fusion_mode}` | "
+            f"{_fmt(values['ndcg_at_5'])} | "
+            f"{_fmt(values['ndcg_at_5_binary'])} | {operational} | "
+            f"{_fmt(values['recall_at_5_capped'])} | "
             f"{_fmt(values['precision_at_3'])} | {_fmt(values['mrr'])} | "
             f"{_fmt(values['unjudged_at_5'])} | ${item.cost_per_query_usd:.7f} |"
         )
+    if any("ndcg_at_5_operational" in item.readings["global"].values for item in report.configs):
+        lines += [
+            "",
+            "> **La lectura operativa** aplica `g_efectivo = grado` si `qty_bucket ≠ '0'` y "
+            "`máx(grado − 1, 0)` si es `'0'`, declarada el **2026-09-11 antes de calcular "
+            "ninguna métrica**. No inventa una constante: reutiliza la escala de "
+            "`criterion.md`, donde el grado 1 ya es *«sustituto plausible que el operador "
+            "ofrecería como segunda opción»* y una pieza que no se puede poner sobre el paño "
+            "es exactamente eso. Una fila con proyección **ausente conserva su grado**, porque "
+            "la ausencia no es evidencia de stock cero. `judgements.jsonl` no se modifica: es "
+            "una tercera lectura de la misma anotación, y la relevancia pura es su "
+            "**guardarraíl** — una configuración que mejore la operativa y degrade la pura "
+            "más de 0,05 no se adopta. Un guion significa que esa fila no reordena por "
+            "ninguna señal de negocio, no que puntúe cero.",
+        ]
     flagged = [item.config_id for item in report.configs if not_comparable(item)]
     if flagged:
         lines += [
@@ -131,13 +168,13 @@ def render_markdown(report: Report, *, title: str) -> str:
         "|---|---|",
         f"| versión del golden set | `{report.golden_set_version}` |",
         f"| huella del conjunto indexado | `{report.index_set_hash[:16]}…` |",
-        f"| revisión del código | `{report.git_sha[:12]}` |",
+        f"| revisión del código | `{_short_sha(report.git_sha)}` |",
         f"| identificador de la ejecución | `{report.run_id}` |",
         "",
         "Dos ejecuciones cuya procedencia no coincida **no son comparables**, y el arnés lo "
         "dice en lugar de compararlas igualmente.",
         "",
-        "## Tabla de ablations v0 → v2",
+        "## Tabla de ablations v0 → v3",
         "",
         *_ablation_table(report),
         "",
@@ -172,6 +209,21 @@ def render_markdown(report: Report, *, title: str) -> str:
     ]
     for item in report.configs:
         lines += _readings_table(item)
+
+    saturated = [item for item in report.configs if item.tuning_at_ceiling]
+    if saturated:
+        lines += [
+            "> **Saturación de la partición de ajuste.** "
+            + ", ".join(
+                f"`{item.config_id}` {item.tuning_at_ceiling}/{item.readings['tuning'].queries}"
+                for item in saturated
+            )
+            + " consultas ya están **en el techo** del nDCG@5. Una lectura saturada no puede "
+            "registrar una mejora: sólo empatar o caer. Por eso `tuning` se publica como "
+            "**diagnóstico de contaminación** y no veta una decisión — la lectura que decide "
+            "es `new`, y el lector puede ver aquí cuánto margen tenía la otra.",
+            "",
+        ]
 
     lines += [
         "## Desglose por origen del dato",
@@ -233,12 +285,25 @@ def render_markdown(report: Report, *, title: str) -> str:
         "",
         "## Abstención",
         "",
-        "**Provisional.** El umbral de distancia vigente deja pasar prácticamente todo el "
-        "catálogo, así que lo que se mide aquí es la mecánica de las ramas y no una decisión "
-        "de confianza. Este change **no** toca el umbral; su re-fijación es alcance del "
-        "siguiente, y la distribución que necesita se publica más abajo.",
+        "**La regla vigente es relativa por consulta**, y su forma la eligió una medición "
+        "bajo un criterio escrito **antes** de tomarla. Un umbral escalar sobre la distancia "
+        "no puede servir aquí: el mejor acierto de las contestables llega más lejos que el de "
+        "las imposibles, así que el rango de éstas cae **dentro** del de aquéllas y ningún "
+        "valor único las separa. La regla cuenta cuántos candidatos caen en una banda "
+        "alrededor del mejor —lee la **forma** del perfil y no su nivel—, corre **después** "
+        "de la fusión y **no altera el conjunto de candidatos**, que es lo que mantiene "
+        "válidas las ventanas persistidas del barrido. La distribución por consulta de la que "
+        "sale se publica más abajo.",
         "",
-        "| configuración | tasa de abstención sobre fuera de dominio |",
+        "**Qué cuenta exactamente esta columna.** Las dos maneras que tiene una configuración "
+        "de no contestar con confianza —la regla de abstención y `low_confidence`, que mide "
+        "desacuerdo entre ramas— terminan en la misma bandera de la respuesta, así que la "
+        "cifra es su **unión** y no la tasa de la regla sola. Una fila con la regla apagada "
+        "no marca cero: marca su `low_confidence`. Las dos caras del intercambio de cada "
+        "regla candidata —cuántas imposibles calla y cuántas contestables silencia— se "
+        "publican en el informe de implementación de C25, que es donde la regla se fijó.",
+        "",
+        "| configuración | sin respuesta confiada sobre fuera de dominio |",
         "|---|---:|",
     ]
     for item in report.configs:
@@ -295,6 +360,38 @@ def render_markdown(report: Report, *, title: str) -> str:
                 if gap <= 0
                 else "Las dos poblaciones **son separables por un valor único**, que es la "
                 "forma que tenía la respuesta en el corpus de conocimiento."
+            ),
+        ]
+
+    best = report.best_hit_distances
+    if best.get("answerable") and best.get("out_of_domain"):
+        si, no = best["answerable"], best["out_of_domain"]
+        hueco = min(no) - max(si)
+        lines += [
+            "",
+            "## Distribución del mejor acierto **por consulta**",
+            "",
+            "La distribución de arriba es **por documento** y contesta otra pregunta. Lo que "
+            "decide la abstención es el **mejor acierto de cada consulta**: un solape total "
+            "entre las distancias de documentos relevantes e irrelevantes no implica que el "
+            "mejor acierto de una consulta contestable no pueda separarse del de una "
+            "imposible. Son preguntas distintas, y la regla sale de ésta.",
+            "",
+            "| población | n | mín | mediana | máx |",
+            "|---|---:|---:|---:|---:|",
+            f"| contestables | {len(si)} | {si[0]:.4f} | {si[len(si) // 2]:.4f} | {si[-1]:.4f} |",
+            f"| fuera de dominio | {len(no)} | {no[0]:.4f} | {no[len(no) // 2]:.4f} | "
+            f"{no[-1]:.4f} |",
+            "",
+            (
+                f"**Un solo valor las separa**, con un hueco de {hueco:+.4f}."
+                if hueco > 0
+                else "**Ningún valor las separa.** El máximo de las contestables es "
+                f"{max(si):.4f} y el mínimo de las de fuera de dominio {min(no):.4f}, de modo "
+                f"que el rango entero de éstas cae **dentro** del de aquéllas (hueco "
+                f"{hueco:+.4f}). Por eso la regla adoptada es **relativa por consulta** y no "
+                "un umbral escalar, y por eso corre **después** de la fusión sin alterar el "
+                "conjunto de candidatos."
             ),
         ]
 

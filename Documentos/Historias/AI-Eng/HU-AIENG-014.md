@@ -58,14 +58,14 @@ El valor no es de operador: no hay pantalla. Desbloquea C15 (endpoint .NET), C20
 
 **Referencias:**
 
-[proyecto-final-plan-changes-openspec.md](../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (ficha C14, §0 `ai.query_log`, §6 nunca se recorta),
-[proyecto-final-diseno-rag-joiabagur.md](../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) (§6.2 frontera, §7.6 sobre-recuperación),
-[Retrieval que no es solo cosine](../Sesiones%20Master%20AIEng/S9_Fundamentos_RAG/Retrieval%20que%20no%20es%20solo%20cosine%20-%20top-K,%20threshold%20y%20filtros%20sobre%20pgvector.md) (guía: umbral + filtros; no dogma),
+[proyecto-final-plan-changes-openspec.md](../../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (ficha C14, §0 `ai.query_log`, §6 nunca se recorta),
+[proyecto-final-diseno-rag-joiabagur.md](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) (§6.2 frontera, §7.6 sobre-recuperación),
+[Retrieval que no es solo cosine](../../Sesiones%20Master%20AIEng/S9_Fundamentos_RAG/Retrieval%20que%20no%20es%20solo%20cosine%20-%20top-K,%20threshold%20y%20filtros%20sobre%20pgvector.md) (guía: umbral + filtros; no dogma),
 [epicas.md](../../epicas.md) (EP14),
 [modelo-de-datos.md](../../modelo-de-datos.md) (`ai.product_document`, HNSW cosine, GIN `materials`),
 [HU-AIENG-002.md](HU-AIENG-002.md), [HU-AIENG-003.md](HU-AIENG-003.md), [HU-AIENG-013.md](HU-AIENG-013.md),
 specs vivas `ai-service-api-contracts`, `ai-service-auth`, `ai-service-runtime`, `ai-vector-schema`, `catalog-source-text`, `product-document-indexer`, `ai-gateway-client`,
-change OpenSpec [`openspec/changes/add-vector-retrieval-endpoint/`](../../../openspec/changes/add-vector-retrieval-endpoint/) y su [ticket técnico](../../../openspec/changes/add-vector-retrieval-endpoint/ticket.md).
+change OpenSpec [`openspec/changes/add-vector-retrieval-endpoint/`](../../../openspec/changes/archive/2026-08-27-add-vector-retrieval-endpoint/) y su [ticket técnico](../../../openspec/changes/archive/2026-08-27-add-vector-retrieval-endpoint/ticket.md).
 
 ---
 

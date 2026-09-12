@@ -71,12 +71,12 @@ El valor no es de usuario de tienda —no hay pantalla ni ruta `/v1`— sino de 
 
 **Referencias:**
 
-[proyecto-final-plan-changes-openspec.md](../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (ficha C06b, §0 2026-08-22),
-[proyecto-final-diseno-rag-joiabagur.md](../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) (§7.5, §8.1.1 regla 2, §8.2, D1/D4, §8.4, §15.1),
+[proyecto-final-plan-changes-openspec.md](../../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) (ficha C06b, §0 2026-08-22),
+[proyecto-final-diseno-rag-joiabagur.md](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md) (§7.5, §8.1.1 regla 2, §8.2, D1/D4, §8.4, §15.1),
 [epicas.md](../../epicas.md) (EP12; EP13 para familias),
 [modelo-de-datos.md](../../modelo-de-datos.md) (`Product`, `Collection`, `ProductFamily` — esta HU no escribe la tercera),
 [HU-AIENG-006a.md](HU-AIENG-006a.md), spec viva [`real-catalog-corpus`](../../../openspec/specs/real-catalog-corpus/spec.md),
-change OpenSpec [`openspec/changes/add-synthetic-catalog-augmentation/`](../../../openspec/changes/add-synthetic-catalog-augmentation/) y su [ticket técnico](../../../openspec/changes/add-synthetic-catalog-augmentation/ticket.md).
+change OpenSpec [`openspec/changes/add-synthetic-catalog-augmentation/`](../../../openspec/changes/archive/2026-08-23-add-synthetic-catalog-augmentation/) y su [ticket técnico](../../../openspec/changes/archive/2026-08-23-add-synthetic-catalog-augmentation/ticket.md).
 
 ---
 

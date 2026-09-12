@@ -308,7 +308,9 @@ def test_lexical_query_runs_concurrently_with_embedding() -> None:
             return await super().embed(texts)
 
     class _SignallingSearch(FakeProductSearch):
-        async def search_lexical(self, request, *, depth, filters, pos_id=None):
+        async def search_lexical(
+            self, request, *, depth, filters, pos_id=None, signal_pos_id=None
+        ):
             lexical_started.set()
             return await super().search_lexical(
                 request, depth=depth, filters=filters, pos_id=pos_id
@@ -431,19 +433,24 @@ def test_retrieval_embed_client_uses_max_attempts_one_and_a_bounded_cache() -> N
 
 
 def test_two_weight_configurations_run_in_one_process() -> None:
-    """C24 sweeps in-process: an environment-only knob would force a restart per config."""
+    """C24 sweeps in-process: an environment-only knob would force a restart per config.
+
+    The knobs swept are the per-BRANCH weights, which are the effective ones under the live
+    two-stage fusion. C21's three flat weights remain reachable through `fusion="flat"`, and
+    `test_flat_fusion_mode_reproduces_the_published_baseline` is what exercises them.
+    """
     settings = build_settings()
     rows = [_row(A, "both", 0.1), _blind_row(B, "vector-only", 0.05)]
 
-    lexical_heavy = _serve(FakeProductSearch(rows), settings=settings, weight_vector=0.0)
+    lexical_heavy = _serve(
+        FakeProductSearch(rows), settings=settings, branch_weight_vector=0.0
+    )
     vector_heavy = _serve(
-        FakeProductSearch(rows),
-        settings=settings,
-        weight_typed=0.0,
-        weight_expanded=0.0,
+        FakeProductSearch(rows), settings=settings, branch_weight_lexical=0.0
     )
 
-    assert settings.jpv_rrf_weight_vector == 0.33, "the settings object is not mutated"
+    assert settings.jpv_branch_weight_lexical == 0.5, "the settings object is not mutated"
+    assert settings.jpv_branch_weight_vector == 0.5, "the settings object is not mutated"
     assert lexical_heavy.results[0].sku == "both"
     assert vector_heavy.results[0].sku == "vector-only"
 
@@ -664,7 +671,9 @@ def test_only_one_lexical_query_is_in_flight_at_a_time() -> None:
             self.in_flight = 0
             self.peak = 0
 
-        async def search_lexical(self, request, *, depth, filters, pos_id=None):
+        async def search_lexical(
+            self, request, *, depth, filters, pos_id=None, signal_pos_id=None
+        ):
             self.in_flight += 1
             self.peak = max(self.peak, self.in_flight)
             try:
@@ -707,3 +716,421 @@ def test_the_search_stage_does_not_borrow_the_response_confidence_field(
     assert "low_confidence=True" in fuse_entry, "no candidate came from both branches"
     assert response.low_confidence is True
     assert len(response.results) == 2, "a signal, not a suppression"
+
+
+# --------------------------------------------------------------------------------------
+# C25 — fusion in two stages, with the flat mode conserved.
+# --------------------------------------------------------------------------------------
+
+#: The three queries of `descripcion-sin-anclaje` where the grade-2 document the vector branch
+#: ranks FIRST lands at position 33 of the live hybrid. Measured on run `d9222333`.
+BURIED_QUERIES = (
+    ("la campanita que se cuelga a los bebes para protegerlos", "campanita"),
+    ("follaje seco que cae en septiembre", "follaje"),
+    ("una bicicleta antigua", "bicicleta"),
+)
+
+
+def _buried_corpus(decoy_word: str, *, decoys: int = 60):
+    """A lexical list of `decoys` documents that the vector branch cannot see, plus one
+    document only the vector branch sees and ranks first.
+
+    The decoys sit above the distance threshold on purpose, so the two branches are disjoint.
+    That is the regime the exploration modelled and the one the live queries are in: the
+    grade-2 document is not somewhere in the lexical list, it is absent from it.
+    """
+    rows = [
+        _row(
+            UUID(f"00000000-0000-0000-0000-{index:012d}"),
+            f"decoy-{index:02d}",
+            0.9,  # above the 0.65 threshold: invisible to the vector branch
+            doc_text=f"Tipo: {decoy_word} numero {index} de plata.",
+        )
+        for index in range(1, decoys + 1)
+    ]
+    target = _row(
+        UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
+        "vector-top-hit",
+        0.05,
+        doc_text="Tipo: broche. Materiales: laton.",
+    )
+    return [*rows, target]
+
+
+@pytest.mark.parametrize(("query", "decoy_word"), BURIED_QUERIES)
+def test_vector_top_hit_reaches_the_top_five_without_lexical_consensus(
+    query: str, decoy_word: str
+) -> None:
+    """The correction, stated as the property the baseline fails. C25 D5.
+
+    Under the flat fusion the sixty lexical documents outscore the vector branch's best hit
+    every time, so the document lands behind all of them. Under the two-stage fusion each
+    branch holds one vote and the best hit of each takes one of the first two places.
+    """
+    payload = _request(query=query, top_k=5)
+
+    branch = _serve(FakeProductSearch(_buried_corpus(decoy_word)), payload=payload)
+    flat = _serve(
+        FakeProductSearch(_buried_corpus(decoy_word)),
+        payload=payload,
+        fusion="flat",
+        weight_typed=0.5,
+        weight_expanded=0.5,
+        weight_vector=0.33,
+    )
+
+    top_five = [item.sku for item in branch.results[:5]]
+    assert "vector-top-hit" in top_five, f"buried under the two-stage fusion: {top_five}"
+    assert "vector-top-hit" not in [item.sku for item in flat.results[:5]], (
+        "the flat mode is supposed to bury it — if it no longer does, the baseline row "
+        "has changed and the comparison this change rests on is gone"
+    )
+
+
+def test_branch_vote_is_independent_of_how_many_of_its_lists_matched() -> None:
+    """The crossover stops being a property of the query nobody declared. C25 D5(a).
+
+    Live, the vector branch needs wC > 0,469 when only the expanded list matched and
+    wC > 0,938 when both did. Under the two-stage fusion the lexical branch votes `w_lex`
+    in both regimes, so the position the vector branch's best candidate can reach is the same.
+    """
+    from jbg_ai.retrieval.orchestrator import _fuse_two_stage
+
+    lexical_ids = [UUID(f"00000000-0000-0000-0000-{i:012d}") for i in range(1, 61)]
+    target = UUID("ffffffff-ffff-ffff-ffff-ffffffffffff")
+
+    both_lists = _fuse_two_stage(
+        lexical_ids,
+        lexical_ids,
+        [target],
+        k=60,
+        depth=60,
+        branch_weights=(0.5, 0.5),
+        internal_weights=(0.5, 0.5),
+    )
+    one_list_only = _fuse_two_stage(
+        [],
+        lexical_ids,
+        [target],
+        k=60,
+        depth=60,
+        branch_weights=(0.5, 0.5),
+        internal_weights=(0.5, 0.5),
+    )
+
+    def position_of(fused) -> int:
+        return [item.key for item in fused].index(target) + 1
+
+    assert position_of(both_lists) == position_of(one_list_only)
+    # And the branch leader holds exactly its declared weight in both regimes.
+    for fused in (both_lists, one_list_only):
+        by_key = {item.key: item.score for item in fused}
+        assert by_key[lexical_ids[0]] == pytest.approx(0.5 / 61)
+        assert by_key[target] == pytest.approx(0.5 / 61)
+
+
+def test_multi_list_branch_contributes_no_more_candidates_than_a_single_list_one() -> None:
+    """Sixty per branch, not a hundred and twenty. C25 D5(b).
+
+    The second, independent over-weighting the exploration found: `typed` and `expanded` are
+    truncated separately, so the lexical branch could present twice the slots of the vector
+    branch. Stage 1's output is truncated at `depth` too, which closes it.
+    """
+    from jbg_ai.retrieval.orchestrator import LEXICAL_BRANCH_LIST, VECTOR_LIST, _fuse_two_stage
+
+    typed_ids = [UUID(f"00000000-0000-0000-0000-{i:012d}") for i in range(1, 61)]
+    expanded_ids = [UUID(f"11111111-0000-0000-0000-{i:012d}") for i in range(1, 61)]
+    vector_ids = [UUID(f"22222222-0000-0000-0000-{i:012d}") for i in range(1, 61)]
+    assert not (set(typed_ids) & set(expanded_ids)), "the two lexical lists must be disjoint"
+
+    fused = _fuse_two_stage(
+        typed_ids,
+        expanded_ids,
+        vector_ids,
+        k=60,
+        depth=60,
+        branch_weights=(0.5, 0.5),
+        internal_weights=(0.5, 0.5),
+    )
+
+    from_lexical = [item for item in fused if LEXICAL_BRANCH_LIST in item.ranks]
+    from_vector = [item for item in fused if VECTOR_LIST in item.ranks]
+
+    assert len(from_lexical) == 60, f"the lexical branch contributed {len(from_lexical)}"
+    assert len(from_lexical) == len(from_vector) == 60
+
+
+def test_low_confidence_means_the_same_under_both_fusion_modes() -> None:
+    """Stage 2 has exactly two lists, and they are exactly the two branches. C25 D5(c).
+
+    Under the flat fusion, `len(reasons) > 1` needed a written nuance: a candidate seen by
+    both LEXICAL lists is not cross-branch, because with the expansion disabled the two lists
+    are identical and every lexical hit would qualify. Under the two-stage fusion the nuance
+    is structural rather than explained — the lexical branch presents ONE list — so the
+    signal cannot drift back to meaning "two lists agreed".
+
+    The requirement is unchanged, so the behaviour must be unchanged too.
+    """
+    agreeing = [_row(A, "both", 0.1)]
+    disagreeing = [_blind_row(B, "vector-only", 0.1), _row(C, "lexical-only", 0.9)]
+    flat = dict(fusion="flat", weight_typed=0.5, weight_expanded=0.5, weight_vector=0.33)
+
+    for rows, expected in ((agreeing, False), (disagreeing, True)):
+        branch_mode = _serve(FakeProductSearch(list(rows)))
+        flat_mode = _serve(FakeProductSearch(list(rows)), **flat)
+        assert branch_mode.low_confidence is expected
+        assert flat_mode.low_confidence is expected, "the signal changed meaning with the mode"
+
+
+def test_a_candidate_seen_by_both_lexical_lists_alone_is_not_cross_branch() -> None:
+    """The nuance that justified the rule, now witnessed under the live fusion.
+
+    `both-lexical-lists` matches the operator's literal text AND the equivalence groups, and
+    the vector branch cannot see it. It must NOT count as consensus, in either mode.
+    """
+    rows = [_row(A, "both-lexical-lists", 0.9)]  # above threshold: the vector branch is blind
+
+    for kwargs in ({}, dict(fusion="flat", weight_typed=0.5, weight_expanded=0.5, weight_vector=0.33)):
+        response = _serve(FakeProductSearch(list(rows)), **kwargs)
+        assert response.low_confidence is True, "two lexical lists are not two branches"
+        assert [item.sku for item in response.results] == ["both-lexical-lists"]
+
+
+# --------------------------------------------------------------------------------------
+# C25 - the adaptive coverage rule. The denominator is the change's number-one risk.
+# --------------------------------------------------------------------------------------
+
+#: The five categories measured at coverage 1,00 over the 48 judged queries, with one query
+#: each. `variante-talla` is the fifth and was NOT in the design's list: M2 found it, and it
+#: turned out to be the category the naive denominator would have damaged most - 0,655 naive
+#: against 1,000 corrected, on the best-scoring category of the live hybrid.
+#: Every one is a REAL query of the golden set, and every one is chosen to be a query the
+#: naive denominator would break: its naive coverage is below 1,00 while its corrected
+#: coverage is exactly 1,00. A fixture without a stop word would pass under either
+#: denominator and would witness nothing.
+FULL_COVERAGE_QUERIES = (
+    ("materiales", "sortija de plata"),  # naive 2/3
+    ("sinonimos", "dije de plata"),  # naive 2/3
+    ("lexico-exacto", "Colgante rosa de los vientos"),  # naive 2/4
+    ("piedra", "colgante de lapislazuli"),  # naive 2/3
+    ("variante-talla", "colgante de estrella de mar en talla XS"),  # naive 4/7
+)
+
+
+def _fully_anchored_text(query: str) -> str:
+    """A document matching every counting group of `query` whose tsquery is non-empty.
+
+    Built from the REAL expansion rather than from the query's words, because C20's dictionary
+    does not map one word to one group: `bano de oro` resolves to a single group of six
+    equivalent surface forms, and guessing at the words would silently produce a corpus the
+    expanded list never matches — a test that then passes for the wrong reason.
+    """
+    from jbg_ai.retrieval.lexical import counting_flags
+    from jbg_ai.retrieval.synonyms import expand_query
+    from support.fake_product_search import EMPTY_TSQUERY_FORMS
+
+    expanded = expand_query(query, enabled=True)
+    anchors = [
+        group[0]
+        for group, counts in zip(expanded.groups, counting_flags(expanded), strict=False)
+        if counts and any(form.strip() and form not in EMPTY_TSQUERY_FORMS for form in group)
+    ]
+    return "Tipo: " + ". ".join(anchors) + ". Materiales: plata."
+
+
+def _expanded_hits(search: FakeProductSearch):
+    """Re-run the EXPANDED lexical call the orchestrator just made, and return its hits.
+
+    The expanded list is the one carrying groups; the typed list carries none. Coverage is
+    read from this one and never from the typed one, which is the discriminator D8 rejected.
+    """
+    calls = [call for call in search.lexical_calls if call["request"].groups]
+    assert calls, "the orchestrator made no group-based lexical call"
+    call = calls[-1]
+    return _run(
+        search.search_lexical(call["request"], depth=60, filters=call["filters"])
+    )
+
+
+def _anchored_corpus(query: str):
+    """Two documents matching every expressible counting group, plus a vector-only one."""
+    text = _fully_anchored_text(query)
+    return [
+        _row(A, "anchored-1", 0.2, doc_text=text),
+        _row(B, "anchored-2", 0.3, doc_text=text),
+        _blind_row(C, "vector-only", 0.1),
+    ]
+
+
+@pytest.mark.parametrize(("category", "query"), FULL_COVERAGE_QUERIES)
+def test_full_coverage_leaves_the_lexical_weight_untouched(category: str, query: str) -> None:
+    """The gate of D7's falsifiable prediction. If this moves, something is wrong.
+
+    Measured over the golden set, these five categories have coverage 1,00 in every one of
+    their queries, so `w_lex x 1,00 = w_lex` and their ordering must be IDENTICAL with the
+    rule on and with it off. Their nDCG@5 must move by exactly zero.
+
+    With the NAIVE denominator - counting stop-word groups - they would score 0,64 to 0,88
+    and the rule would cut up to a third of the lexical weight off exactly the categories it
+    exists not to touch, while the global aggregate could rise anyway and hide it.
+    """
+    from jbg_ai.retrieval.orchestrator import _lexical_coverage
+
+    corpus = _anchored_corpus(query)
+    payload = _request(query=query, top_k=5)
+
+    # The premise, asserted rather than assumed: a corpus the expanded list does not match
+    # would make the comparison below pass for the wrong reason.
+    probe = FakeProductSearch(list(corpus))
+    _serve(probe, payload=payload)
+    assert _lexical_coverage(_expanded_hits(probe)) == pytest.approx(1.0), (
+        f"{category}: the fixture must actually reach full coverage"
+    )
+
+    with_rule = _serve(FakeProductSearch(list(corpus)), payload=payload)
+    # The control arm: the same fusion with the rule switched off.
+    without_rule = _serve(
+        FakeProductSearch(list(corpus)), payload=payload, coverage_rule="none"
+    )
+
+    assert [item.sku for item in with_rule.results] == [
+        item.sku for item in without_rule.results
+    ], f"{category}: full coverage must not change the order"
+    assert [item.score for item in with_rule.results] == pytest.approx(
+        [item.score for item in without_rule.results]
+    ), f"{category}: full coverage must not change the scores"
+
+
+@pytest.mark.parametrize(
+    ("query", "anchors"),
+    [
+        ("sortija de plata", ("sortija", "plata")),
+        ("anillo de plata y oro", ("anillo", "plata", "oro")),
+    ],
+)
+def test_stopword_group_does_not_lower_coverage(query: str, anchors: tuple[str, ...]) -> None:
+    """`de` and `y` are counting groups whose tsquery is empty. C25 D8.
+
+    `sortija de plata` scores nDCG 1,000 live. Under the naive denominator its coverage is
+    2/3 and the rule would cut a third of the lexical weight off it.
+    """
+    from jbg_ai.retrieval.orchestrator import _lexical_coverage
+
+    search = FakeProductSearch(_anchored_corpus(query))
+    _serve(search, payload=_request(query=query, top_k=5))
+
+    hits = _expanded_hits(search)
+    assert hits[0].coverage_denominator == len(anchors), "the empty group must not be counted"
+    assert _lexical_coverage(hits) == pytest.approx(1.0)
+
+
+def test_partial_coverage_lowers_the_lexical_weight() -> None:
+    """`una bicicleta antigua`: 1 of 2 expressible groups matched, so the branch keeps half.
+
+    `una` is a stop word and leaves the denominator, which is why the coverage is 1/2 and not
+    the naive 1/3. The category this query belongs to - `descripcion-sin-anclaje` - is the
+    one the fusion damages most, and it is where the rule is supposed to fire.
+    """
+    from jbg_ai.retrieval.orchestrator import _lexical_coverage, _scaled_lexical_weight
+
+    # Matches `bicicleta` but not `antigua`: one of the two expressible groups.
+    rows = [
+        _row(A, "half-anchored", 0.2, doc_text="Tipo: bicicleta de plata."),
+        _blind_row(B, "vector-only", 0.1),
+    ]
+    search = FakeProductSearch(rows)
+    _serve(search, payload=_request(query="una bicicleta antigua", top_k=5))
+
+    hits = _expanded_hits(search)
+
+    assert hits[0].coverage_denominator == 2, "`una` must not be in the denominator"
+    coverage = _lexical_coverage(hits)
+    assert coverage == pytest.approx(0.5)
+    assert _scaled_lexical_weight(0.5, coverage, rule="continuous") == pytest.approx(0.25)
+
+
+def test_empty_typed_list_does_not_by_itself_lower_the_weight() -> None:
+    """`bano de oro` matches nothing under the AND of `websearch` - the corpus spells it
+    with a tilde.
+
+    The scaling is read from the coordination tally of the GROUP-based list, never from
+    whether the typed list came back empty. That discriminator was measured and rejected: it
+    would crush a query that scores nDCG 1,000.
+    """
+    from jbg_ai.retrieval.orchestrator import _lexical_coverage
+
+    # No document contains the literal phrase `bano de oro`, so the typed list is empty; the
+    # equivalence groups answer it perfectly.
+    rows = [_row(A, "banado", 0.2, doc_text="Tipo: colgante dorado. Materiales: plata.")]
+    search = FakeProductSearch(rows)
+    _serve(search, payload=_request(query="bano de oro", top_k=5))
+
+    typed_call = [c for c in search.lexical_calls if not c["request"].groups][0]
+    typed_hits = _run(
+        search.search_lexical(typed_call["request"], depth=60, filters=typed_call["filters"])
+    )
+
+    assert typed_hits == [], "the literal phrasing matches nothing, which is the premise"
+    assert _lexical_coverage(_expanded_hits(search)) == pytest.approx(1.0)
+
+
+def test_coverage_introduces_no_configured_parameter() -> None:
+    """The property that made the continuous form the adopted one. C25 D7.
+
+    Nothing in `Settings` governs the strength of the scaling: the scaling IS the proportion.
+    `alpha` exists for the sweep's second candidate row and reaches the pipeline as a call
+    parameter, which is what keeps it out of the live system's configuration surface.
+    """
+    from jbg_ai.config.settings import FUSION_DEFAULTS
+
+    settings = build_settings()
+    # Nothing in the settings governs the COVERAGE scaling. The guard names the scaling
+    # rather than the word `alpha`, because the abstention rule legitimately has one and a
+    # test that forbade the letter would fail for a reason it does not mean.
+    for name in type(settings).model_fields:
+        assert "coverage" not in name, f"{name} is a coverage knob"
+    assert not any("coverage" in key for key in FUSION_DEFAULTS)
+    # And the rule itself takes no strength argument: only which of the two forms to apply.
+    import inspect
+
+    from jbg_ai.retrieval.orchestrator import _scaled_lexical_weight
+
+    assert set(inspect.signature(_scaled_lexical_weight).parameters) == {
+        "weight",
+        "coverage",
+        "rule",
+    }
+
+
+def test_the_control_arm_switches_the_rule_off_without_a_parameter() -> None:
+    """`none` is the control and the rollback, and there is no strength knob anywhere.
+
+    The arm that measured whether the adaptive rule is worth having at all. Against it, the
+    continuous rule buys +0,128 on `descripcion-sin-anclaje` and exactly zero on the other
+    seven categories, and flattens the branch-ratio sweep from a range of 0,070 into 0,007.
+
+    A third form - binary, with a declared alpha - was implemented and withdrawn: it produced
+    results identical to the continuous rule at every point of the sweep, so it lost on cost
+    rather than on result. Only two rules remain, and neither takes a number.
+    """
+    from jbg_ai.retrieval.orchestrator import COVERAGE_RULES, _scaled_lexical_weight
+
+    assert COVERAGE_RULES == ("continuous", "none"), "no third form, and no strength parameter"
+
+    # The rule on: the scaling IS the proportion.
+    assert _scaled_lexical_weight(0.5, 0.25, rule="continuous") == pytest.approx(0.125)
+    assert _scaled_lexical_weight(0.5, 1.0, rule="continuous") == pytest.approx(0.5)
+    # The rule off: the declared weight, whatever the branch matched.
+    for coverage in (0.0, 0.25, 0.5, 1.0):
+        assert _scaled_lexical_weight(0.5, coverage, rule="none") == 0.5
+
+    with pytest.raises(ValueError, match="unknown coverage rule"):
+        _scaled_lexical_weight(0.5, 0.5, rule="binary")
+
+
+def test_absent_or_unanswerable_coverage_does_not_scale_the_weight() -> None:
+    """`None` means "do not scale", and it must never be read as zero."""
+    from jbg_ai.retrieval.orchestrator import _lexical_coverage, _scaled_lexical_weight
+
+    assert _lexical_coverage([]) is None, "no lexical hits: the weight decides nothing"
+    assert _scaled_lexical_weight(0.5, None, rule="continuous") == 0.5
