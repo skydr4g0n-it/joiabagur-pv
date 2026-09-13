@@ -330,6 +330,44 @@ describe('ProfileReviewPage', () => {
     );
   });
 
+  it('should drop a judged profile from the page and move on to the next', async () => {
+    // Reviewing moves the profile's origin to human, so the server stops offering it. Leaving it
+    // on screen shows a queue that no longer exists — and once the page ran out, the screen
+    // looked like the end of the batch with hundreds of items still to review.
+    mocked.getQueue.mockResolvedValue({
+      state: 'loaded',
+      queue: aQueue([
+        anItem(),
+        anItem({ productId: '33333333-3333-3333-3333-333333333333', sku: 'SKU611', name: 'Pulsera onda' }),
+      ]),
+    });
+
+    const user = userEvent.setup();
+    render(<ProfileReviewPage />);
+
+    expect(await screen.findByText('Anillo erizo de mar talla M')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Aprobar y siguiente/ }));
+
+    await waitFor(() => expect(screen.getByText('Pulsera onda')).toBeInTheDocument());
+    expect(screen.queryByText('Anillo erizo de mar talla M')).not.toBeInTheDocument();
+  });
+
+  it('should fetch the next page when the current one is spent', async () => {
+    mocked.getQueue.mockResolvedValue({ state: 'loaded', queue: aQueue([anItem()]) });
+
+    const user = userEvent.setup();
+    render(<ProfileReviewPage />);
+
+    await screen.findByText('Anillo erizo de mar talla M');
+    expect(mocked.getQueue).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: /Aprobar y siguiente/ }));
+
+    // The batch is 180 and a page is 50, so running out of a page is not running out of work.
+    await waitFor(() => expect(mocked.getQueue).toHaveBeenCalledTimes(2));
+  });
+
   it('should send the measured duration when an individual review is saved', async () => {
     const user = userEvent.setup();
     render(<ProfileReviewPage />);

@@ -23,6 +23,7 @@ import {
   FileText,
   Keyboard,
   RefreshCw,
+  Target,
   Timer,
   Undo2,
 } from 'lucide-react';
@@ -195,6 +196,13 @@ export default function ProfileReviewPage() {
   const items = useMemo(() => queue?.items ?? [], [queue]);
   const current = items[cursor];
 
+  /** What the design asked for, and what has been judged against it. */
+  const quotaTotal = useMemo(
+    () => (queue?.strata ?? []).reduce((total, row) => total + row.quota, 0),
+    [queue],
+  );
+  const reviewedTotal = metrics?.profilesReviewedByHuman ?? 0;
+
   // The draft follows the cursor, and the clock restarts with it. Both have to move together:
   // a stopwatch that kept running across a change of item would attribute one reviewer's
   // hesitation to the next row.
@@ -238,7 +246,35 @@ export default function ProfileReviewPage() {
             : `Revisado con ${result.correctedFields} corrección(es).`,
         );
 
-        setCursor((index) => Math.min(index + 1, items.length - 1));
+        // Dropped from the page as soon as it is judged. Reviewing moves the profile's origin to
+        // human, so the server has already stopped offering it — leaving it on screen would show
+        // a queue that no longer exists and, once the page ran out, look like the end of the
+        // batch when there are hundreds left.
+        // Computed here rather than read back out of the state updater. React does not promise
+        // to run an updater synchronously, so reading a value assigned inside one is a race:
+        // it reported an empty page, refetched, and put the reviewer back on the item they had
+        // just judged.
+        const remaining = items.filter((item) => item.productId !== current.productId);
+
+        setQueue((previous) =>
+          previous
+            ? {
+                ...previous,
+                items: remaining,
+                totalCount: Math.max(previous.totalCount - 1, 0),
+              }
+            : previous,
+        );
+
+        // Only when the page is spent, never mid-page: a refetch reorders what is left, and a
+        // reviewer who loses their place in the middle of a run stops trusting the screen.
+        if (remaining.length === 0) {
+          await loadQueue(stratum);
+          setCursor(0);
+        } else {
+          setCursor((index) => Math.min(index, remaining.length - 1));
+        }
+
         void loadMetrics();
       } catch {
         toast.error('No se ha podido guardar la revisión.');
@@ -246,7 +282,7 @@ export default function ProfileReviewPage() {
         setSaving(false);
       }
     },
-    [current, draft, items.length, loadMetrics, saving, stopwatch],
+    [current, draft, items, loadMetrics, loadQueue, saving, stopwatch, stratum],
   );
 
   useReviewKeyboard({
@@ -325,6 +361,28 @@ export default function ProfileReviewPage() {
               ` · ${stopwatch.reviewedInSession} en esta sesión ` +
                 `(${stopwatch.sessionAverageSeconds.toFixed(1)} s)`}
           </Badge>
+
+          {/* Progress against the quota, because the queue advances rather than ends. A profile
+              a person judges leaves the universe the batch is drawn from, so the next one takes
+              its place and the screen would happily offer a four-hundredth item. The quota is
+              the design's sample size, so it has to be visible or it is not a sample size. */}
+          {metrics && queue && (
+            <Badge
+              variant={reviewedTotal >= quotaTotal ? 'primary' : 'outline'}
+              title="Revisados por estrato frente a la cuota del diseño"
+            >
+              <Target className="size-3" />
+              {queue.strata
+                .map((stratumRow) => {
+                  const done =
+                    metrics.strata.find((row) => row.stratum === stratumRow.stratum)
+                      ?.profilesReviewed ?? 0;
+                  return `${stratumRow.stratum} ${done}/${stratumRow.quota}`;
+                })
+                .join(' · ')}
+              {reviewedTotal >= quotaTotal && ' · lote completo'}
+            </Badge>
+          )}
 
           {queue && (
             /* The seed is on screen so the session can name the batch it produced. A figure
