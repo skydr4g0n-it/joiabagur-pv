@@ -487,6 +487,87 @@ que no toca `families/`. Es una pasada del agrupador, no un cambio de código.
 
 ---
 
+## C28 — lo que la revisión de perfiles destapó y no puede arreglar
+
+Anotado el 2026-09-13, durante el apply de `add-profile-review-ui-and-metrics`. Los dos hallazgos
+salieron de medir antes de revisar, no de la sesión, y ninguno cabe en ese change.
+
+### `StoneType` guarda una piedra y hay piezas que llevan dos
+
+Medido sobre los 1.168 perfiles `Approved`: de los **434 productos cuyo texto nombra al menos una
+piedra del vocabulario, 14 nombran dos**, y en los catorce el extractor eligió una y descartó la
+otra. Es el **3,2 %**, y no es un fallo del extractor: en una columna escalar no cabe la segunda
+piedra por bien que la lea.
+
+```
+  SKU1140  esmeralda     <- el texto dice esmeralda y zafiro
+  SKU1144  topacio       <- diamante y topacio
+  SKU579-581  cuarzo     <- cuarzo y esmeralda   (tres productos)
+  SKU582-584  onix       <- citrino y onix       (tres productos)
+  SKU1148  onix          <- onix y turquesa
+  SKU1149  amatista      <- amatista y nacar
+  SKU593   topacio       <- diamante y topacio
+  SKU795   amatista      <- amatista y topacio
+```
+
+La asimetría con `materials` es lo que lo hace visible: aquel es `jsonb` y admite lista —una pieza
+es rutinariamente plata *y* baño de oro— mientras que `StoneType` es `character varying`. La
+pantalla de revisión ofrece un solo valor porque refleja el esquema, no porque lo restrinja.
+
+**Por qué se aplazó:** cerrarlo es **una migración** —`StoneType` → `StoneTypesJson`— y C08 reservó
+el almacenamiento de esta capacidad precisamente para que C28 no necesitara ninguna. Y arrastra el
+**contrato congelado**: `AiProposedProfile.StoneType` pasaría de `AiProposedText?` a
+`AiProposedList`, lo que mueve `openapi.json` y obliga a acordar el cambio con el lado .NET. Son
+dos invariantes del change a la vez. **Sin ficha asignada**, y probablemente fuera del alcance del
+Proyecto Final.
+
+**Referencia:** `backend/src/JoiabagurPV.Domain/Entities/ProductAiProfile.cs:50` ·
+`backend/src/JoiabagurPV.Application/DTOs/Ai/AiEnrichResponse.cs:40`
+
+---
+
+### El extractor emite `plata` cuando el texto dice `platino`
+
+`platino` y `cobre` no están en el vocabulario cerrado de `materials`, que tiene nueve términos.
+Medido sobre los productos cuyo texto dice `platino` y **nunca** dice `plata`:
+
+| qué extrajo | productos | confianza | estrato |
+|---|---:|---|---|
+| `["plata"]` o `["oro","plata"]` | **11** | 0,45 | B |
+| `[]` | 9 | 0,20 | A |
+
+Los once son una alucinación: el modelo lee «platino», no lo encuentra entre los nueve canónicos y
+emite el metal más parecido que conoce. **El sistema de confianza los cazó a los once** —0,45 es
+literalmente *«lo afirmó sin que la frase esté en el texto»*— lo que confirma de paso la predicción
+falsable del diseño de C28: las retiradas se concentran en el estrato B. `cobre` aparece en 15
+productos, los 15 en el estrato A.
+
+**Por qué se aplazó:** ampliar el vocabulario **cambiaría el lote a mitad de medición**.
+`confidence.py` calcula el span contra el vocabulario, así que añadir los dos términos movería
+hasta 24 productos fuera del estrato A —que solo tiene 122— y los 180 dejarían de ser los 180 que
+produjeron la cifra publicada. Además obliga a re-enriquecer, y re-enriquecer reescribe
+`ProposedProfileJson`, que es la columna contra la que se mide la tasa de corrección.
+
+**Lo que costaría, completo:** los dos términos en `vocabularies.yaml`; sus fichas
+`material-platino.md` y `material-cobre.md`, que **no son opcionales** —la spec viva de
+`knowledge-corpus` exige exactamente una ficha por material canónico y
+`test_every_canonical_material_has_exactly_one_sheet` lo hace fallar nombrando el término que
+falta—; reindexar el corpus de conocimiento; y re-enriquecer con versión de prompt nueva, como
+FIX1 hizo con sus 22 productos en `enrichment/v2`.
+
+**Orden obligatorio:** la tasa de C28 tiene que estar **publicada antes**. Re-enriquecer primero
+mezcla dos poblaciones y ninguna de las dos cifras significa lo que dice.
+
+**Cautela heredada de la exploración:** igual que con `hilo`, «baño de platino» o «filigranas de
+cobre» no son necesariamente una pieza *de* platino o *de* cobre. Por eso el registro de huecos de
+la pantalla guarda el SKU y no solo el término: el change que amplíe la lista mira los textos
+reales antes de decidir.
+
+**Referencia:** `openspec/specs/knowledge-corpus/spec.md` §*Every canonical material has exactly
+one sheet* · `ai-service/tests/knowledge/test_corpus_rules.py:257`
+
+---
+
 ## Implementation Guidance
 
 When implementing deferred tasks:
