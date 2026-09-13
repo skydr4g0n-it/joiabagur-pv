@@ -1,8 +1,8 @@
 # C30a — mediciones de implementación: la capa estructurada de venta asistida
 
-**Change:** [`add-assist-structure-and-rule-warnings`](../../../openspec/changes/add-assist-structure-and-rule-warnings/) · **Fecha:** 2026-09-13
+**Change:** [`add-assist-structure-and-rule-warnings`](../../../openspec/changes/archive/2026-09-13-add-assist-structure-and-rule-warnings/) · **Fecha:** 2026-09-13
 **Rama:** `c30a-add-assist-structure-and-rule-warnings` · **Punto de nacimiento:** `0ae0fdd`
-**HU:** [HU-AIENG-030a](../../Historias/AI-Eng/HU-AIENG-030a.md) · **Ticket:** [T-AIENG-030a](../../../openspec/changes/add-assist-structure-and-rule-warnings/ticket.md)
+**HU:** [HU-AIENG-030a](../../Historias/AI-Eng/HU-AIENG-030a.md) · **Ticket:** [T-AIENG-030a](../../../openspec/changes/archive/2026-09-13-add-assist-structure-and-rule-warnings/ticket.md)
 **Exploración previa:** [c30-exploration-decisions.md](c30-exploration-decisions.md)
 
 ---
@@ -66,7 +66,7 @@ rojo existe y está **vacío**, que es el resultado, no una omisión.
 **La columna «después» es la del cierre real, no la del cierre de las 48 tareas.** Al cerrar la
 tarea 8.1 la suite daba **1192 en 323,4 s**; la pasada de QA recorrió después los 67 escenarios
 de las specs uno a uno y destapó **tres cuya cobertura era sólo por implicación**, que se
-cerraron con tres tests nuevos (§9.10 de [`qa.md`](../../../openspec/changes/add-assist-structure-and-rule-warnings/qa.md)).
+cerraron con tres tests nuevos (§9.10 de [`qa.md`](../../../openspec/changes/archive/2026-09-13-add-assist-structure-and-rule-warnings/qa.md)).
 De ahí el 1195. Los dos identificadores retirados son las dos parametrizaciones de
 `test_unimplemented_route_returns_501_when_stub_mode_off`, y ninguno es cobertura perdida: uno
 se rehospeda porque la ruta **ya no responde 501**, que es el objeto del change, y el otro sólo
