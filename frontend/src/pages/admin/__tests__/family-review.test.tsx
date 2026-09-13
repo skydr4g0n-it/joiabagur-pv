@@ -474,6 +474,53 @@ describe('family review screen', () => {
     );
   });
 
+  /**
+   * Pins which row a keystroke judges, which is the part of the keyboard wiring that is specific
+   * to this screen and has no coverage anywhere else.
+   *
+   * The hook's own behaviour — inert inside a text field, fires outside one — is tested once, on
+   * the profile review screen, and repeating it here would assert the same code twice. What is
+   * only here is the cursor over the audit tabs: if it pointed at the wrong row, a keystroke
+   * would record a judgement about a different product, silently and straight into the metric.
+   */
+  it('should judge the row under the cursor when a shortcut is used', async () => {
+    const user = userEvent.setup();
+    render(<FamilyReviewPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Marcados/ }));
+    await screen.findByText('Colgante Estrella de Mar');
+
+    // Away from any field, so the shortcut is live.
+    await user.click(document.body);
+    await user.keyboard('a');
+
+    await user.click(screen.getByRole('button', { name: /^Guardar/ }));
+
+    await waitFor(() => expect(mocked.recordVerdicts).toHaveBeenCalledTimes(1));
+    const sent = mocked.recordVerdicts.mock.calls[0][0];
+    expect(sent).toHaveLength(1);
+    expect(sent[0].productId).toBe(PRODUCT_ID);
+    expect(sent[0].familyId).toBe(FAMILY_ID);
+    expect(sent[0].outcome).toBe('Confirmed');
+    // And the stopwatch travelled with it, exactly as a mouse judgement does.
+    expect(sent[0].reviewSeconds).toEqual(expect.any(Number));
+  });
+
+  it('should leave the shortcuts inert on a tab that holds no queue', async () => {
+    // The families listing is not a review queue. A stray keystroke there must not judge a row
+    // on a tab the reviewer is not looking at.
+    const user = userEvent.setup();
+    render(<FamilyReviewPage />);
+
+    await screen.findByText('Colgante estrella de mar');
+    await user.click(document.body);
+    await user.keyboard('a');
+
+    await user.click(screen.getByRole('button', { name: /^Guardar/ }));
+
+    expect(mocked.recordVerdicts).not.toHaveBeenCalled();
+  });
+
   it('should create a family with its members from the review screen', async () => {
     // The gap this closes is structural, not a threshold. The audit nominates an unassigned
     // product by its margin **relative to a target family**, so a product whose piece type has

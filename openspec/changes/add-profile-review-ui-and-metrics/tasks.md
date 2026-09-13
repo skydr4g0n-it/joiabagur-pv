@@ -100,8 +100,8 @@
 ## 10. La sesión de revisión — el entregable
 
 - [x] 10.1 Fijar y declarar la semilla del muestreo, y obtener el lote de 180 (60 por estrato)
-- [x] 10.2 ~~Revisar los ~40 primeros ítems **a ratón**, alternando estratos~~ → hecho, pero **el término de comparación no sirvió**: el revisor acabó la sesión entera con ratón. Ver §4.2 del informe
-- [ ] 10.3 Revisar los ~140 restantes con teclado → **NO EJECUTADO**. Los atajos están implementados y probados en las dos pantallas, pero el revisor no los usó: *«no he encontrado diferencia… acabé aprobando todo con ratón»*. El A/B no existe y se declara, en vez de publicar la curva de aprendizaje como si fuera un efecto de interfaz
+- [x] 10.2 ~~Revisar los ~40 primeros ítems **a ratón**, alternando estratos~~ → hecho, pero **no sirvió como término de comparación**: los modos se entremezclaron durante toda la sesión. Ver §4.2 del informe
+- [ ] 10.3 ~~Revisar los ~140 restantes con teclado~~ → **se deja sin completar a propósito, y el motivo es el resultado.** Los atajos se implementaron, se probaron y **se usaron** sobre la cola real, pero el revisor no percibió ventaja y volvió al ratón: *«el teclado sí se usó, pero aporta poco o nada a la revisión»*. Separar los bloques ahora solo produciría un A/B de una interfaz que ya sabemos que no mueve el tiempo, sobre un lote ya revisado — **coste real, valor nulo**. Lo que el requisito de spec pide (una cola trabajada con ellos, no un handler enganchado) sí está cumplido; lo que no existe es la comparación, y se declara en §4.2 del informe en vez de fabricarla
 - [x] 10.4 Pasada corta sobre los 32 rechazados con la pregunta invertida, resolviendo el caso de `Presión Oro`
 - [x] 10.5 Comprobar que los productos corregidos vuelven a emitirse por el feed incremental y que sus documentos reflejan la corrección
 - [x] 10.6 Comprobar que un perfil rechazado por una persona desaparece del índice

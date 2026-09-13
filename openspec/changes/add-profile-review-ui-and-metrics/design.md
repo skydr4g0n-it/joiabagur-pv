@@ -154,8 +154,21 @@ Bulk approval leaves the duration absent by design. Therefore:
 
 ### D7 — Narrow shell extraction
 
-Only what has two real consumers moves: `useItemStopwatch()`, `<ThreeStateList>`,
+Only what has two real consumers moves: `useItemStopwatch()`, the three-state list module,
 `useReviewKeyboard()`. The table, the bulk bar and the metrics card are copied.
+
+**Precisión añadida durante el apply.** Los dos hooks acabaron con dos consumidores cada uno, como
+estaba previsto. El tercero no, y conviene decirlo en vez de dejar que la lectura literal engañe:
+`three-state-list.tsx` sí lo comparten las dos pantallas, pero por exportaciones distintas —
+`profile-review` usa `<ThreeStateList>`, y `family-review` usa `Unavailable` y `EmptyButComputed`
+sueltos, que es como ya los tenía declarados en local antes de la extracción.
+
+Se deja así a propósito. Hacer que `family-review` pase por el envoltorio significaría reescribir
+sus **nueve** puntos de render de tres estados en una pantalla de 920 líneas ya validada por una
+persona, que es exactamente el refactor contra el que argumenta la primera fila de la tabla de
+abajo. La intención de la decisión —generalizar solo lo que se comparte de verdad— se cumple: el
+módulo tiene dos consumidores. Lo que no se cumple es la lectura componente a componente, y el
+coste de forzarla es mayor que el de anotarla.
 
 | Alternative | Why not |
 |---|---|

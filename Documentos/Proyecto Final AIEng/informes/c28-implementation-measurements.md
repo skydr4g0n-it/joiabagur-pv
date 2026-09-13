@@ -163,13 +163,28 @@ técnica («hilo de plata») y no como material— pero con n = 2 eso no es un r
 28 candidatos, reportada aparte y **fuera** de la tasa estratificada, porque una muestra dirigida no
 es una muestra.
 
-### 4.2 — El A/B de teclado no existe
+### 4.2 — El A/B de teclado no se obtuvo, pero el teclado sí se probó
 
-La tarea 10.3 pedía revisar los ~140 últimos ítems con teclado para compararlos con los ~40 primeros
-a ratón. **No ocurrió.** Al terminar, el revisor:
+La tarea 10.3 pedía revisar los ~140 últimos ítems con teclado en bloque, para compararlos con los
+~40 primeros a ratón. **Los bloques no se separaron.** El revisor usó los atajos, no percibió
+ventaja, y acabó volviendo al ratón por defecto:
 
 > *«No he encontrado diferencia entre usar el ratón o el camino rápido con el teclado, no aporta
-> mucho el teclado (acabé aprobando todo con ratón).»*
+> mucho el teclado.»*
+>
+> *«El teclado sí se usó, pero aporta poco o nada a la revisión.»*
+
+**Esa distinción importa y conviene no comprimirla.** Hay dos afirmaciones separadas:
+
+- **El A/B no existe.** Con ambos modos entremezclados no hay dos poblaciones que comparar, y
+  ninguna partición de los tiempos mide la interfaz.
+- **Pero el requisito de teclado sí tiene la prueba que su spec pide.** El requisito de
+  `family-review` fue escrito precisamente porque C18b lo dio por entregado sin handler alguno, y
+  dice que *«la prueba que importa es una cola trabajada de principio a fin con ellos, no que haya
+  un manejador enganchado»*. Una persona los usó sobre la cola real. **Lo que la sesión añade es un
+  veredicto sobre su utilidad, que es un resultado y no una casilla**: los atajos funcionan y no
+  aportan tiempo apreciable en esta tarea, probablemente porque el cuello de botella es leer la
+  descripción y decidir, no desplazar la mano.
 
 Los tiempos por bloques de 25 ítems son éstos:
 
@@ -186,9 +201,9 @@ El pico de 51,8 s en los ítems 51-75 tampoco es un dato de la revisión: es el 
 sesión se interrumpió varias veces para corregir defectos de la pantalla (§8), y el cronómetro corre
 mientras el ítem está abierto.
 
-Lo que sí se puede afirmar es el **régimen estable de una persona entrenada revisando con ratón:
-~21 s por ítem** a partir del ítem 100. Los atajos quedan implementados y probados en las dos
-pantallas —lo que retira la afirmación falsa que C18b dejó archivada en su tarea 6.4— pero **su
+Lo que sí se puede afirmar es el **régimen estable de una persona entrenada: ~21 s por ítem** a
+partir del ítem 100, con ambos modos disponibles. Los atajos quedan implementados, probados y
+**usados**, lo que retira la afirmación falsa que C18b dejó archivada en su tarea 6.4 — pero **su
 efecto sobre el tiempo no está medido**, y estimarlo sería inventarlo.
 
 ### 4.3 — Las 22 filas de `enrichment/v2` siguen sin ser una comparación
