@@ -19,7 +19,7 @@
  * the correction rate, and the evidence that justifies widening the list in a later change.
  */
 import { useState } from 'react';
-import { Check, Plus, X } from 'lucide-react';
+import { AlertTriangle, Check, Plus, X } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,18 @@ export interface VocabularyFieldProps {
   onChange: (values: string[]) => void;
   /** Called when the reviewer records a term the vocabulary lacks. */
   onGap: (term: string) => void;
+  /**
+   * Gaps already recorded for this field of this product.
+   *
+   * Shown in the field, beside the values in force and deliberately unlike them. A reviewer
+   * needs to see what they have already annotated — without it they cannot tell an item they
+   * have finished from one they have not touched, and will record the same term twice or skip
+   * it. What they must *not* be able to do is mistake one for the other: a value in force
+   * travels to the catalogue and into the correction rate, and a gap does neither.
+   */
+  gaps?: string[];
+  /** Called to withdraw a gap recorded by mistake. */
+  onRemoveGap?: (term: string) => void;
 }
 
 export function VocabularyField({
@@ -51,6 +63,8 @@ export function VocabularyField({
   values,
   onChange,
   onGap,
+  gaps = [],
+  onRemoveGap,
 }: VocabularyFieldProps) {
   const [open, setOpen] = useState(false);
   const [gapOpen, setGapOpen] = useState(false);
@@ -97,6 +111,30 @@ export function VocabularyField({
             >
               <X className="size-3" />
             </button>
+          </Badge>
+        ))}
+
+        {/* Recorded gaps, in the field but never of it. Dashed and amber against the solid
+            chips of the values in force, and labelled with what they are: these do not travel
+            to the catalogue and do not enter the correction rate. */}
+        {gaps.map((term) => (
+          <Badge
+            key={`gap-${term}`}
+            variant="outline"
+            className="gap-1 border-dashed border-amber-500 text-amber-700"
+            data-vocabulary-gap="true"
+          >
+            <AlertTriangle className="size-3" />
+            {term} · fuera de vocabulario
+            {onRemoveGap && (
+              <button
+                type="button"
+                aria-label={`Quitar el hueco ${term} de ${label}`}
+                onClick={() => onRemoveGap(term)}
+              >
+                <X className="size-3" />
+              </button>
+            )}
           </Badge>
         ))}
 

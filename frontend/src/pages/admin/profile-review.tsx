@@ -492,6 +492,10 @@ export default function ProfileReviewPage() {
                                     + 'No cuenta como corrección.',
                                 );
                               }}
+                              gaps={gaps.termsFor(field.field, current.sku)}
+                              onRemoveGap={(term) =>
+                                gaps.withdraw(field.field, term, current.sku)
+                              }
                             />
                           ) : (
                             /* Free text, and only here. The size label is the one field the

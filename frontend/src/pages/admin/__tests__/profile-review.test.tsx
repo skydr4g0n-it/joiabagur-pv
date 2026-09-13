@@ -277,6 +277,59 @@ describe('ProfileReviewPage', () => {
     expect(mocked.recordReview.mock.calls[0][0].materials).toEqual(['plata']);
   });
 
+  it('should show a recorded gap in its own field without making it a value in force', async () => {
+    const user = userEvent.setup();
+    render(<ProfileReviewPage />);
+
+    const materialsRow = await screen.findByRole('row', { name: /Materiales/ });
+    await user.click(
+      within(materialsRow).getByRole('button', { name: /no está en la lista/ }),
+    );
+    await user.type(
+      screen.getByLabelText(/Término que falta en el vocabulario de Materiales/),
+      'platino',
+    );
+    await user.click(screen.getByRole('button', { name: 'Anotar' }));
+
+    // Visible in the field, so the reviewer can tell an item they have finished from one they
+    // have not touched, and does not record the same term twice.
+    const gap = await within(materialsRow).findByText(/platino · fuera de vocabulario/);
+    expect(gap.closest('[data-vocabulary-gap]')).not.toBeNull();
+
+    // And still not a value in force. "In force" is not a visual label: it is what travels to
+    // the catalogue, where the term would match no filter, and into the correction rate, where
+    // it would report the vocabulary's coverage as the extractor's error.
+    await user.click(screen.getByRole('button', { name: /Aprobar y siguiente/ }));
+    await waitFor(() => expect(mocked.recordReview).toHaveBeenCalledTimes(1));
+    expect(mocked.recordReview.mock.calls[0][0].materials).toEqual(['plata']);
+  });
+
+  it('should let a gap recorded by mistake be withdrawn', async () => {
+    const user = userEvent.setup();
+    render(<ProfileReviewPage />);
+
+    const materialsRow = await screen.findByRole('row', { name: /Materiales/ });
+    await user.click(
+      within(materialsRow).getByRole('button', { name: /no está en la lista/ }),
+    );
+    await user.type(
+      screen.getByLabelText(/Término que falta en el vocabulario de Materiales/),
+      'platino',
+    );
+    await user.click(screen.getByRole('button', { name: 'Anotar' }));
+    await within(materialsRow).findByText(/platino · fuera de vocabulario/);
+
+    await user.click(
+      within(materialsRow).getByRole('button', { name: /Quitar el hueco platino/ }),
+    );
+
+    await waitFor(() =>
+      expect(
+        within(materialsRow).queryByText(/platino · fuera de vocabulario/),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
   it('should send the measured duration when an individual review is saved', async () => {
     const user = userEvent.setup();
     render(<ProfileReviewPage />);

@@ -58,6 +58,10 @@ export interface VocabularyGapRegistry {
   gaps: VocabularyGap[];
   record: (field: string, term: string, sku: string) => void;
   remove: (index: number) => void;
+  /** Withdraws one gap by what it is rather than by where it sits in the list. */
+  withdraw: (field: string, term: string, sku: string) => void;
+  /** The terms recorded for one field of one product, so the field can show them. */
+  termsFor: (field: string, sku: string) => string[];
   clear: () => void;
   /** The findings as a table, ready to paste into the implementation report. */
   asMarkdown: () => string;
@@ -103,6 +107,23 @@ export function useVocabularyGaps(): VocabularyGapRegistry {
     [gaps, persist],
   );
 
+  const withdraw = useCallback(
+    (field: string, term: string, sku: string) =>
+      persist(
+        gaps.filter(
+          (gap) =>
+            !(gap.field === field && gap.term === term.trim().toLowerCase() && gap.sku === sku),
+        ),
+      ),
+    [gaps, persist],
+  );
+
+  const termsFor = useCallback(
+    (field: string, sku: string) =>
+      gaps.filter((gap) => gap.field === field && gap.sku === sku).map((gap) => gap.term),
+    [gaps],
+  );
+
   const clear = useCallback(() => persist([]), [persist]);
 
   const asMarkdown = useCallback(() => {
@@ -130,7 +151,7 @@ export function useVocabularyGaps(): VocabularyGapRegistry {
     ].join('\n');
   }, [gaps]);
 
-  return { gaps, record, remove, clear, asMarkdown };
+  return { gaps, record, remove, withdraw, termsFor, clear, asMarkdown };
 }
 
 export default useVocabularyGaps;
