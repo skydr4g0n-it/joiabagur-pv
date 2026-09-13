@@ -18,7 +18,7 @@ Este documento se escribió antes de implementar. Cuando una sesión de diseño 
 
 **`POST /v1/assist/sale` sirve la capa estructurada real con `STUB_MODE=false`.** Con ello
 **`/v1/inventory/propose` queda como la única ruta que responde 501**, y no por trabajo
-pendiente: su rama se canceló el 31 de agosto. La suite pasa de **1038 a 1192 tests con 0 en
+pendiente: su rama se canceló el 31 de agosto. La suite pasa de **1038 a 1195 tests con 0 en
 rojo antes y después**, `openapi.json` se regenera moviendo **sólo los cinco esquemas de
 assist** —cero rutas, cero esquemas añadidos o retirados, las otras nueve rutas idénticas— y
 **no hay ninguna migración**. Queda **implementado, no archivado**.

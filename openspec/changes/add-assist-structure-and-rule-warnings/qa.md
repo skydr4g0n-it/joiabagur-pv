@@ -588,4 +588,6 @@ El primer intento usó el `pos_id` del token de test, que **la proyección local
 
 **Y tres escenarios cuya cobertura era indirecta**, destapados por recorrer los 67 uno a uno y no por mirar un recuento verde (§9.10). Los tres cerrados, con tres tests nuevos.
 
-**Listo para archivar.** Con una nota que no bloquea: la implementación está **en árbol de trabajo y sin commitear** al cierre de esta pasada.
+**Listo para archivar.** La nota que esta pasada dejó abierta —la implementación estaba **en árbol de trabajo y sin commitear** al cerrarla— queda **resuelta**: se comprometió como [`186a8db`](https://github.com/skydr4g0n-it/joiabagur-pv/commit/186a8db) el 2026-09-13, con el árbol limpio.
+
+> **Verificación independiente del 2026-09-13, posterior a esta pasada.** Re-ejecutadas las dos puertas sobre el commit, sin fiarse del código de salida —que con `| tail` es el de `tail` y no el de `pytest`— sino leyendo la línea de resumen: `uv run pytest` **1195 passed, 0 failed, 1 warning en 422,65 s**, con **`skipped=0`**, lo que confirma que el test `db` del roster corrió de verdad contra pgvector en vez de omitirse; y `openspec validate --all --strict` **57 passed, 0 failed**. Comprobado además que los **91 nombres de test** que cita el §3 **existen** en el árbol de tests, uno a uno, en vez de dar la tabla por buena.

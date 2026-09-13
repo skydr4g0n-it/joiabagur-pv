@@ -17,7 +17,7 @@ es C30b, y el corte es lo que lo hace medible contra esta capa.
 
 | | |
 |---|---|
-| Suite `ai-service` | 1038 → **1192** · **0 en rojo antes y después** · 0 omitidos |
+| Suite `ai-service` | 1038 → **1195** · **0 en rojo antes y después** · 0 omitidos |
 | `openspec validate --all --strict` | **57 passed, 0 failed** |
 | `openapi.json` | **5 esquemas movidos, 0 rutas** · las otras nueve rutas idénticas |
 | Migraciones | **ninguna** — `alembic heads` sin revisión nueva |
@@ -57,11 +57,20 @@ rojo existe y está **vacío**, que es el resultado, no una omisión.
 
 | | antes | después |
 |---|---|---|
-| Tests | 1038 | **1192** (+156) |
+| Tests | 1038 | **1195** (**+157 netos**: 159 identificadores nuevos menos dos retirados) |
 | **Nombres en rojo** | **∅** | **∅** |
 | Omitidos | 0 | **0** |
-| Duración | 336,1 s | **323,4 s** |
+| Duración | 336,1 s | **425,5 s** |
 | `openspec validate --all --strict` | 57 passed, 0 failed | **57 passed, 0 failed** |
+
+**La columna «después» es la del cierre real, no la del cierre de las 48 tareas.** Al cerrar la
+tarea 8.1 la suite daba **1192 en 323,4 s**; la pasada de QA recorrió después los 67 escenarios
+de las specs uno a uno y destapó **tres cuya cobertura era sólo por implicación**, que se
+cerraron con tres tests nuevos (§9.10 de [`qa.md`](../../../openspec/changes/add-assist-structure-and-rule-warnings/qa.md)).
+De ahí el 1195. Los dos identificadores retirados son las dos parametrizaciones de
+`test_unimplemented_route_returns_501_when_stub_mode_off`, y ninguno es cobertura perdida: uno
+se rehospeda porque la ruta **ya no responde 501**, que es el objeto del change, y el otro sólo
+se renumera al salir assist de la lista.
 
 **Ningún nombre nuevo falla y ninguno dejó de fallar.** `skipped=0` en las dos pasadas y una
 duración del mismo orden dicen que las dos corrieron el árbol de base de datos entero: la pasada
@@ -325,7 +334,7 @@ proveedor — y queda anotado en `CLAUDE.md`.
 
 ## 5. Cobertura: los 19 escenarios de la historia contra sus tests
 
-**158 tests nuevos.** Los 19 escenarios tienen cobertura; ninguno queda sin test. La columna de
+**159 tests nuevos.** Los 19 escenarios tienen cobertura; ninguno queda sin test. La columna de
 la derecha nombra el test que lo cubre, y cuando son varios, el que lo cubre de forma más directa.
 
 | # | Escenario de la HU | Test |
