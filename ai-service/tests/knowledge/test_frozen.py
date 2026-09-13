@@ -7,6 +7,7 @@ not edit it»* — and a docstring is not a check. The hash is.
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 
 from support.paths import AI_SERVICE_ROOT, OPENAPI_SNAPSHOT
@@ -49,9 +50,33 @@ def test_the_frozen_files_still_exist_where_the_guard_looks() -> None:
 
 
 def test_knowledge_opens_no_http_surface() -> None:
-    """The `/v1` surface is frozen by a MUST that enumerates ten routes."""
-    snapshot = _normalised(OPENAPI_SNAPSHOT)
-    assert "knowledge" not in snapshot.casefold()
+    """The `/v1` surface is frozen by a MUST that enumerates ten routes.
+
+    **This assertion was sharpened by C30a, not weakened.** It used to search the whole
+    snapshot for the substring `knowledge`, prose included, and that proxy stopped meaning
+    what it says the moment a published *description* had a legitimate reason to name the
+    corpus: `Citation` documents itself as a fragment of the knowledge corpus, which is
+    precisely what the .NET side needs to read to render one honestly. Keeping the old form
+    would have forced the description to be vague to satisfy a string search.
+
+    What C23 promised is that the corpus opens **no route and no schema** — that its search
+    is a callable inside this process — and that is what is checked here now: paths,
+    schema names, tags and operation identifiers, which is where a surface would appear.
+    """
+    snapshot = json.loads(_normalised(OPENAPI_SNAPSHOT))
+
+    assert not [path for path in snapshot["paths"] if "knowledge" in path.casefold()]
+    assert not [
+        name
+        for name in snapshot["components"]["schemas"]
+        if "knowledge" in name.casefold()
+    ]
+    for path, operations in snapshot["paths"].items():
+        for method, operation in operations.items():
+            identifier = str(operation.get("operationId", ""))
+            tags = [str(tag) for tag in operation.get("tags", [])]
+            assert "knowledge" not in identifier.casefold(), f"{method} {path}"
+            assert not [tag for tag in tags if "knowledge" in tag.casefold()], path
 
 
 def test_the_knowledge_package_contains_no_ddl() -> None:

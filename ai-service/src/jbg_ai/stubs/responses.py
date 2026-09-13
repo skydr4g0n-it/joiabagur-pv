@@ -60,6 +60,13 @@ from jbg_ai.api.schemas.retrieval import (
     SubstitutesRequest,
     SubstitutesResponse,
 )
+from jbg_ai.assist.constants import (
+    INTENT_PRODUCT_PITCH,
+    INTENT_UNCLASSIFIED,
+    WARNING_FAMILY_HAS_VARIANTS,
+    WARNING_SIZE_LABEL_MISSING,
+)
+from jbg_ai.knowledge.constants import CLAIM_SCOPE_GENERAL
 
 OVER_RETRIEVAL_FACTOR = 3
 OVER_RETRIEVAL_CAP = 60
@@ -186,8 +193,45 @@ def retrieval_substitutes_stub(
     )
 
 
+#: Which fixture group has no family. **Every fourth, and the first of them is real
+#: coverage and not decoration**: a fixture where every response carries a family lets a
+#: client ship without ever handling the null case, and that case is ~58 % of the catalogue.
+#: The same reasoning `families_suggest_stub` and `families_audit_stub` wrote into their own
+#: code when they populated every list — "a stub that only returned proposals would let a
+#: client ship without ever handling the two kinds of refusal".
+_ASSIST_FAMILYLESS_EVERY = 4
+
+#: Sections of the corpus the fixture cites. Real slugs of real files, so a client that
+#: follows a `citation_id` from the fixture lands where it would land in production.
+_ASSIST_CITATION_CYCLE: tuple[tuple[str, str, str, str, str], ...] = (
+    (
+        "material-plata",
+        "Plata",
+        "cuidados-y-limpieza-en-casa",
+        "Cuidados y limpieza en casa",
+        "material",
+    ),
+    (
+        "material-plata",
+        "Plata",
+        "piel-sensible-y-alergias",
+        "Piel sensible y alergias",
+        "material",
+    ),
+    (
+        "tallas-anillos",
+        "Tallas de anillo",
+        "de-la-talla-espanola-a-los-milimetros",
+        "De la talla española a los milímetros",
+        "talla",
+    ),
+)
+
+
 def _assist_group(index: int) -> AssistGroup:
-    family_id = f"F-{index:03d}"
+    """Every fourth group carries no family, and then it carries exactly one member."""
+    familyless = index % _ASSIST_FAMILYLESS_EVERY == 0
+    size = 1 if familyless else VARIANTS_PER_FAMILY
     members = [
         AssistGroupMember(
             product_id=f"P-{index:03d}-{member:02d}",
@@ -195,41 +239,70 @@ def _assist_group(index: int) -> AssistGroup:
             variant_label=_variant_label(member),
             materials=_materials(index + member),
             score=_score(index * VARIANTS_PER_FAMILY + member),
+            match_reasons=["vector", "lexical"] if member % 2 == 0 else ["vector"],
         )
-        for member in range(VARIANTS_PER_FAMILY)
+        for member in range(size)
     ]
     return AssistGroup(
-        family_id=family_id,
-        family_label=f"Familia {index:03d}",
+        family_id=None if familyless else f"F-{index:03d}",
+        family_label=None if familyless else f"Familia {index:03d}",
         members=members,
     )
 
 
+def _assist_citation(index: int, product_id: str) -> Citation:
+    document_slug, document_title, section_slug, section_title, doc_type = (
+        _ASSIST_CITATION_CYCLE[index % len(_ASSIST_CITATION_CYCLE)]
+    )
+    return Citation(
+        citation_id=f"{document_slug}#{section_slug}",
+        document_title=document_title,
+        section_title=section_title,
+        doc_type=doc_type,
+        # `general` throughout: the fixture must not model a commitment of the house as if
+        # it were routine, and the mode that cites without being asked admits only `general`.
+        claim_scope=CLAIM_SCOPE_GENERAL,
+        score=_score(index),
+        snippet=f"Fragmento de «{section_title}» en «{document_title}».",
+        product_id=product_id,
+    )
+
+
 def assist_sale_stub(request: AssistRequest, principal: ServicePrincipal) -> AssistResponse:
+    """The fixture, adjusted to the contract C30a moved. Still a pure function of its input.
+
+    `warnings` carries **codes of the closed vocabulary** and no longer a sentence: the
+    invariant is that every warning any response emits belongs to that vocabulary, and a
+    fixture exempt from it would be the one response a client learns the wrong shape from.
+    `intent` obeys the same structural rule the real path does, for the same reason.
+    """
     groups = [_assist_group(index) for index in range(request.top_k)]
-    intent = "gift_search" if "regalo" in request.query.lower() else "product_search"
+    anchored = request.product_id is not None and request.query is None
+    intent = INTENT_PRODUCT_PITCH if anchored else INTENT_UNCLASSIFIED
+    subject = request.query.strip() if request.query else f"la pieza {request.product_id}"
     pitch = (
-        f"Para «{request.query.strip()}» te encajan {len(groups)} familias. "
+        f"Para «{subject}» te encajan {len(groups)} familias. "
         f"Precio {PRICE_PLACEHOLDER} y quedan {STOCK_PLACEHOLDER} unidades en tu punto de venta."
     )
     citations = [
-        Citation(
-            source=f"catalog:{group.family_id}",
-            snippet=f"Familia {group.family_id} con {len(group.members)} variantes.",
-            product_id=group.members[0].product_id,
-        )
-        for group in groups
+        _assist_citation(index, group.members[0].product_id)
+        for index, group in enumerate(groups)
     ]
+    warnings = [WARNING_SIZE_LABEL_MISSING]
+    if any(len(group.members) > 1 for group in groups):
+        warnings.insert(0, WARNING_FAMILY_HAS_VARIANTS)
     return AssistResponse(
         intent=intent,
         groups=groups,
         pitch=pitch,
         citations=citations,
-        warnings=[STUB_WARNING],
+        warnings=warnings,
         clarification_question=(
             "¿Prefieres alguna de estas familias en concreto?" if len(groups) > 1 else None
         ),
         usage=Usage(),
+        abstained=False,
+        prompt_version=None,
         trace_id=principal.trace_id,
         effective_pos_id=principal.pos_id,
     )

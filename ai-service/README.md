@@ -87,7 +87,7 @@ The **C20 synonym dictionary is curated against the corpus, not against observed
 | `GET` | `/health` | public | unchanged since C01 |
 | `POST` | `/v1/retrieval/products` | Bearer | returns `min(top_k × 3, 60)` candidates, reported in `candidates_returned` |
 | `POST` | `/v1/retrieval/substitutes` | Bearer | retrieval result shape plus `similarity_signals` |
-| `POST` | `/v1/assist/sale` | Bearer | `groups[]` by `family_id`; `pitch` keeps `{{price}}` / `{{stock}}` unresolved |
+| `POST` | `/v1/assist/sale` | Bearer | `groups[]` by **nullable** `family_id`, rule warnings as codes, citations that resolve. Real since C30a; `pitch` is empty until C30b, and keeps `{{price}}` / `{{stock}}` unresolved in stub mode |
 | `POST` | `/v1/inventory/propose` | Bearer | prioritized proposals, never quantities |
 | `POST` | `/v1/enrich/products` | Bearer | proposed profiles with per-field confidence |
 | `POST` | `/v1/families/suggest` | Bearer (catalog) | family proposals plus the groups a guard refused and the products the gate excluded; writes nothing |
@@ -119,7 +119,7 @@ Rules that C03 must rely on:
 
 With `STUB_MODE=true` (the local and test default) every `/v1` route answers from deterministic fixtures: no LLM, no embeddings, no database, no clock. The same request always returns the same body, so the .NET client can assert its mapping against them.
 
-With `STUB_MODE=false` a route whose real logic does not exist yet answers **501** naming the change that will deliver it (C30 assist, C35 inventory). `POST /v1/enrich/products` is C09: the real pipeline, or 503 if `JPV_RAG_LLM_API_KEY` is missing — never 501. `POST /v1/index/sync` and `GET /v1/index/status` are C13: the catalog drain, or 503 if feed/embed settings or `sku_provenance.json` are missing — never 501. `POST /v1/retrieval/products` is C14: the vector retriever, or 503 if `JPV_EMBEDDING_API_KEY`, `DATABASE_URL` or a compatible index is missing — never 501. `POST /v1/retrieval/substitutes` is C26: the substitutes engine over the stored embedding, or 503 if `DATABASE_URL` is missing — never 501, and **never a provider key**, because that route embeds nothing. It is the last 501 the service could close: `/v1/inventory/propose` also answers 501, but its branch was cancelled on 2026-08-31 and that is declared as a limitation rather than as pending work. Later changes replace remaining handlers one at a time; the contract frozen here is the one they must respect.
+With `STUB_MODE=false` a route whose real logic does not exist yet answers **501** naming the change that will deliver it. **Exactly one route is still in that state: `/v1/inventory/propose` (C35).** `POST /v1/enrich/products` is C09: the real pipeline, or 503 if `JPV_RAG_LLM_API_KEY` is missing — never 501. `POST /v1/index/sync` and `GET /v1/index/status` are C13: the catalog drain, or 503 if feed/embed settings or `sku_provenance.json` are missing — never 501. `POST /v1/retrieval/products` is C14: the vector retriever, or 503 if `JPV_EMBEDDING_API_KEY`, `DATABASE_URL` or a compatible index is missing — never 501. `POST /v1/retrieval/substitutes` is C26: the substitutes engine over the stored embedding, or 503 if `DATABASE_URL` is missing — never 501, and **never a provider key**, because that route embeds nothing. `POST /v1/assist/sale` is **C30a**: the structured assistance layer, or 503 if `JPV_EMBEDDING_API_KEY` or `DATABASE_URL` is missing — never 501, and 422 when the body anchors a piece the index cannot serve. With it, `/v1/inventory/propose` is the **only** route left answering 501, and it is not pending work: its branch was cancelled on 2026-08-31 and that is declared as a limitation. Later changes replace remaining handlers one at a time; the contract frozen here is the one they must respect.
 
 ## Enrichment prompt versions
 
@@ -710,6 +710,114 @@ denominator of a table published twice. `GoldenSet.retrieval_queries` enforces t
 code — the ablation runner and the sweep measure it, `judged_queries` stays the composition of
 the set — and `test_the_published_ablation_denominator_is_the_one_c25_measured` pins it at 63.
 
+## Structured sale assistance (C30a)
+
+`POST /v1/assist/sale` was frozen into the contract by C02 and served a fixture until C30a.
+It now serves a real response with `STUB_MODE=false` — **and still writes no prose**. The
+argument in Spanish, its versioned prompt and the numeric gate that guards it are C30b, and
+the split is the point: same route, same candidates, same citations, with an argument and
+without, which is the one ablation the design's §11.2 asks for that no other row supplies.
+
+**The contract moved once, in this change, while the route had zero consumers.**
+`IAiGatewayClient` had no assist method and C34 did not exist, so the cost was nil; after C34
+it would not have been. The frozen shape could not serve its own consumer anyway — `family_id`
+was required against a catalogue where **58 % of products have no family**, and `query` was
+required against two .NET routes both anchored to a piece.
+
+```
+AssistRequest    + product_id (optional) · query now optional · validator: AT LEAST ONE
+AssistGroup        family_id → nullable · invariant: null ⇒ exactly one member
+AssistGroupMember + match_reasons
+Citation           + citation_id · document_title · section_title · claim_scope · doc_type
+                   + score   ·   − source
+AssistResponse   + abstained · prompt_version
+```
+
+### Three modes, chosen by the anchors and by nothing else
+
+| | `product_id` | `query` | `intent` | citations |
+|---|---|---|---|---|
+| **free query** | — | ✓ | `unclassified` | `search_knowledge`, unfiltered |
+| **piece alone** | ✓ | — | `product_pitch` | addressed by primary key, no search at all |
+| **piece + question** | ✓ | ✓ | `unclassified` | `search_knowledge` with the piece-scoped filter |
+
+`intent` is **derived from that table**, never from the wording. Classifying a query is C31
+entire; a keyword router built here would be work C31 deletes, and the value reported for a
+piece with no question stays correct after C31 because that router replaces `unclassified`,
+never `product_pitch`.
+
+### Warnings are codes, and there are exactly two
+
+`family_has_variants` and `size_label_missing`, from `jbg_ai.assist.constants`. **The model
+never sees the vocabulary and cannot add to it**, which is what makes "warnings are
+rule-derived" a property a test can witness rather than a promise. The Spanish a human reads
+belongs to the frontend — the same rule the assisted-search panel already follows for the
+retriever's match reasons.
+
+`stock_critical` and `family_members_out_of_stock` are **deliberately absent**: they need real
+stock, and this service holds only an availability bucket for ranking that may be minutes
+stale. "Critical stock" said out loud with twelve units in the drawer is the assistant's
+credibility at the counter. They belong to C34, after hydration.
+
+`family_has_variants` is computed from **`family_roster(family_id)`**, a new method of
+`ProductSearchPort` reading `ai.product_document` alone in one statement, capped at 24 — three
+times the largest family the live index holds (measured 2026-09-13: 156 families, 491
+memberships, maximum 8). Grouping cannot know about members the retrieval never returned, and
+the warning is exactly a statement about them.
+
+### Citations resolve, and carry their scope
+
+Citations are fragments of the **knowledge corpus and nothing else**: citing the catalogue
+would verify nothing, since the product's metadata already travels in the response. The
+anchoring of a candidate in the catalogue is expressed with `match_reasons`.
+
+For a **piece with no question** the fragments are addressed by `chunk_id(document, section)`
+over an explicit allow-list — `cuidados-y-limpieza-en-casa` and `piel-sensible-y-alergias`,
+present and `general` in all nine canonical sheets — for at most two declared materials, plus
+`material-piezas-mixtas#limpiar-una-pieza-mixta-sin-estropear-nada` when the piece declares
+two or more. **Only `claim_scope: general` enters.** That is not caution: `material-bano-de-oro`
+carries a seventh section, «Nuestra garantía sobre el baño», scoped `establecimiento`, whose
+last paragraph says the conditions are confirmed in store before being passed to a customer.
+"All the sections of the sheet" would put a workshop guarantee into an argument nobody asked
+for, and only for plated pieces. The allow-list and the cap travel **by parameter** so C30b can
+sweep 1/2/3 sections in one process.
+
+### The knowledge filter is asymmetric, and the asymmetry is measured
+
+`search_knowledge` gains an optional **per-document exclusion**, applied in **both** branches
+on the document's primary key — `document_id(slug)` — with the same conditional-clause shape
+as the `doc_type` filter. No migration, no new column, and its rollback is passing nothing.
+
+With a piece anchored, the caller excludes the sheets of the canonical materials the piece does
+**not** declare, and **nothing else**: `faq`, `politica`, `talla`, the stone sheets,
+`material-piezas-mixtas` and `material-marcajes-y-punzones` always pass. The last two carry
+`doc_type: material` without being outputs of `material_sheet_slug`, and that is correct —
+*«¿qué significa el 925?»* is answerable about a steel piece.
+
+Measured over the 72 golden queries against the **live index at the production threshold of
+0,51** (report of 2026-09-13): the filter removes a mean of **36,4 foreign-sheet citations** per
+anchored material while moving abstentions only from **41 to 44,3 of 72** — so it does not
+silence what the corpus can answer. It also **promotes**: the 36,4 removed cost a net 24,6,
+because the clause filters before the `LIMIT` and about 11,8 correct fragments per anchor rise
+into the freed slots.
+
+The same measurement settled the open question of whether the free-query mode needs a threshold
+of its own. **It does not:** of 101 citations only one is unambiguously spurious, and the
+threshold already abstains on 41 of the 72 queries.
+
+### What it never does
+
+Abstention is **honoured and declared** in `abstained`, never expressed by reusing
+`low_confidence` — that signal means cross-branch consensus, and on the judged set it fires on
+1 of 20 out-of-domain queries against 10 of 43 answerable ones, which is the opposite of what a
+reader would conclude. A piece the index cannot serve — unknown, inactive, or held without an
+embedding — is **422 naming which**, never a 200 with `abstained` set: that would claim the
+catalogue has no answer when the problem is the piece.
+
+No field of the response carries a price, a stock quantity or an availability bucket, and the
+test that checks it walks the **whole serialised response** rather than the pitch — which is
+empty, and would make a pitch-only check pass having asserted nothing.
+
 ## Tests
 
 ```bash
@@ -738,7 +846,7 @@ These four tests exist to catch failures that produce **no error at all**: an HN
 
 ## Explicit non-goals
 
-- No real retrieval or agent loops — stubs are replaced route by route in later changes. Enrichment is real when `STUB_MODE=false` (C09). Catalog index sync is real when `STUB_MODE=false` (C13). Product retrieval is real when `STUB_MODE=false` (C14), **hybrid since C21** and **fused in two stages since C25**: the two lexical lists are fused with each other and the result with the vector list under per-branch weights, so a branch's vote is the one declared however many of its lists matched. The scalar distance threshold 0.65 remains a floor rather than a discriminator, and C25 answers that with a relative per-query rule instead of moving it. Substitutes are real when `STUB_MODE=false` (C26), over the embedding the index already holds. No `query_log`, `indexing/embeddings.py` and `openapi.json` unchanged
+- No real retrieval or agent loops — stubs are replaced route by route in later changes. Enrichment is real when `STUB_MODE=false` (C09). Catalog index sync is real when `STUB_MODE=false` (C13). Product retrieval is real when `STUB_MODE=false` (C14), **hybrid since C21** and **fused in two stages since C25**: the two lexical lists are fused with each other and the result with the vector list under per-branch weights, so a branch's vote is the one declared however many of its lists matched. The scalar distance threshold 0.65 remains a floor rather than a discriminator, and C25 answers that with a relative per-query rule instead of moving it. Substitutes are real when `STUB_MODE=false` (C26), over the embedding the index already holds. **Sale assistance is real when `STUB_MODE=false` (C30a)** — structure, rule warnings and citations — but writes **no prose**: `pitch` is empty, `prompt_version` null and `usage` zero until C30b, and the split is what makes C30b measurable against it. No `query_log`, `indexing/embeddings.py` and `openapi.json` unchanged
 - No `POST /v1/retrieval/complementary` — later OpenAPI negotiation. `POST /v1/families/suggest` **exists since C18a**, which is the change that first called it; `POST /v1/families/audit` since C18b, for the same reason
 - `ai.product_document` is written by C13 from the catalog feed; `ai.pos_projection` is **written by C22** from the POS availability feed; `ai.knowledge_document` and `ai.knowledge_chunk` are **written by C23**, by `python -m jbg_ai.indexing sync-knowledge`, from the corpus in `data/knowledge/`
 - No `ai.query_log` (unassigned; the pipeline logs `stage=expand|embed|search|lexical|filters|fuse` with `trace_id` instead). The `ai.eval_*` tables **exist since C24** and are written only with `--persist`
@@ -772,8 +880,13 @@ ai-service/
     retrieval/      # C14 vector retriever (embed max_attempts=1, <=> HNSW, body filters)
                     # + C20 query expansion: synonyms.py, query_synonyms.yaml, measure.py CLI
     knowledge/      # C23 second index: corpus.py (seven authoring rules), chunking.py (pure),
-                    # indexer.py (uuid5 identity, idempotent), search.py (callable, no route),
+                    # indexer.py (uuid5 identity, idempotent), search.py (callable, no route;
+                    # + C30a per-document exclusion and address_fragments, neither a route),
                     # sizing.py (D16 ring table), offline.py + measure.py (fixture, no provider)
+    assist/         # C30a structured sale assistance: modes.py (three modes, structural intent),
+                    # grounding.py (M2 addressing, general scope only), knowledge_scope.py (the
+                    # asymmetric exclusion set), orchestrator.py, constants.py (closed warning
+                    # vocabulary, allow-list, caps). No provider client, no prose: that is C30b
     evals/          # C24 harness: golden.py (load + the composition validation that fails the
                     # load), pooling.py (adaptive depth), metrics.py (graded and binary),
                     # configs.py + baselines.py (the two v0 replicas), cag.py (context-only),
@@ -795,7 +908,9 @@ ai-service/
     data/           # C06b catalog CLI + C10 world/ (no provider sockets)
     families/       # C18a grouping and C18b audit (fakes; no provider sockets)
     indexing/       # C11 embeddings, C13 catalog drain, C22 POS drain (marked `db` where SQL)
+    assist/         # C30a three modes, grouping, rule warnings, addressing (fakes; offline)
     knowledge/      # C23 corpus rules, chunking, sizing, indexer, search, measurement
+                    # + C30a exclusion filter and addressing by identity
     migrations/     # schema, indexes, reversibility (marked `db`)
     retrieval/      # C14 vector retriever + C20 expansion (fakes; no provider sockets)
     support/        # shared helpers and injectable fakes

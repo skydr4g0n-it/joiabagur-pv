@@ -195,6 +195,7 @@ async def retrieve_products(
     signal_pos_id: UUID | None = None,
     business_weight_availability: float | None = None,
     on_fused_candidates: Callable[[Sequence[object]], None] | None = None,
+    on_abstention: Callable[[bool], None] | None = None,
     projection_max_age_seconds: int | None = None,
     freshness: ProjectionFreshness | None = None,
 ) -> RetrievalResponse:
@@ -453,6 +454,19 @@ async def retrieve_products(
             distances=distances,
             abstained=abstained,
         )
+    # The second observability seam of this function, and it exists for the same reason as
+    # `on_fused_candidates`: the decision is not recoverable from `RetrievalResponse`. An
+    # empty `results` is also what a query that simply found nothing produces, and the one
+    # field that does move with an abstention — `low_confidence` — carries a DIFFERENT,
+    # measured meaning (cross-branch consensus: 1 of 20 out-of-domain against 10 of 43
+    # answerable). A caller reading it as abstention would report the opposite of the truth
+    # on the judged set, which is exactly what C30a's `abstained` field exists to avoid.
+    #
+    # It reports, and changes nothing: the gating below is unchanged, and a caller that
+    # passes nothing sees the function it has always seen.
+    if on_abstention is not None and vector_ran:
+        on_abstention(abstained)
+
     if abstained:
         # A decision about the query, applied to the WHOLE response: no candidate is removed
         # one by one, because an abstention built by filtering is indistinguishable from a

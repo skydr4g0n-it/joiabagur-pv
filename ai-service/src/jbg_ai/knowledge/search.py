@@ -75,6 +75,11 @@ KNOWLEDGE_BRANCH_DEPTH = 60
 
 DEFAULT_TOP_K = 5
 
+#: The score an ADDRESSED fragment carries. One, because an address is exact: the value
+#: reports "this is the fragment that was asked for", not a similarity that was never
+#: measured. See `address_fragments`.
+ADDRESSED_SCORE = 1.0
+
 
 @dataclass(frozen=True)
 class KnowledgeHit:
@@ -110,7 +115,19 @@ class KnowledgeCitation:
 
 
 class KnowledgeSearchIndex(Protocol):
-    """Injectable index port. An implementation may be SQL, or may be in memory."""
+    """Injectable index port. An implementation may be SQL, or may be in memory.
+
+    `exclude_documents` is **additive and its rollback is passing nothing**: absent or empty
+    must behave exactly as before, down to the order of the fragments returned. It names
+    whole documents by the deterministic identity `document_id(slug)` derives, so applying it
+    needs no new column, no `jsonb` read and no migration.
+
+    Both branches take it, and that is the point rather than symmetry for its own sake: a
+    fragment the vector branch was told to exclude must not walk back in through the lexical
+    one. C23 added that second branch precisely because nine structurally identical material
+    sheets are told apart by a short lexical token, which is exactly the signal that would
+    re-admit the sheet of the wrong material.
+    """
 
     async def vector_search(
         self,
@@ -119,6 +136,7 @@ class KnowledgeSearchIndex(Protocol):
         threshold: float,
         depth: int,
         doc_type: str | None = None,
+        exclude_documents: Sequence[UUID] = (),
         model_version_key: str,
         model_id: str,
     ) -> list[KnowledgeHit]: ...
@@ -129,7 +147,18 @@ class KnowledgeSearchIndex(Protocol):
         *,
         depth: int,
         doc_type: str | None = None,
+        exclude_documents: Sequence[UUID] = (),
     ) -> list[KnowledgeHit]: ...
+
+    async def fetch_chunks(self, chunk_ids: Sequence[UUID]) -> list[KnowledgeHit]:
+        """Fragments by identity. No vector, no `tsquery`, no provider call. C30a.
+
+        The third way into this index, and the only one that is **exact**. An identifier
+        that names nothing comes back as an absence rather than as an error: the nine
+        sheets do not all carry the same sections, so a section a document does not have is
+        an ordinary outcome and not a fault.
+        """
+        ...
 
 
 def _citation(hit: KnowledgeHit, score: float) -> KnowledgeCitation:
@@ -168,6 +197,7 @@ async def search_knowledge(
     index: KnowledgeSearchIndex,
     top_k: int = DEFAULT_TOP_K,
     doc_type: str | None = None,
+    exclude_documents: Sequence[UUID] = (),
     distance_threshold: float,
     hybrid_enabled: bool = True,
     expansion_enabled: bool = True,
@@ -184,6 +214,14 @@ async def search_knowledge(
     `distance_threshold`, `hybrid_enabled` and `expansion_enabled` arrive **as parameters**
     and not read from the environment inside: `Settings` supplies only the default, so a
     sweep can compare configurations in one process without restarting anything.
+
+    `exclude_documents` is the caller's, and deciding it here would be the router this
+    module opens by refusing to build: the caller states its intent, and inferring the
+    exclusion set from the wording of the question is the same guess by another name. C30a
+    passes the sheets of the canonical materials the anchored piece does **not** declare,
+    and nothing else — measured 2026-09-13 over the 72 golden queries, that removes a mean
+    of 36,4 foreign-sheet citations per anchor while raising abstentions only from 41 to
+    44,3 of 72, so it does not silence what the corpus can answer.
     """
     started = time.perf_counter()
     cleaned = question.strip()
@@ -199,6 +237,7 @@ async def search_knowledge(
         threshold=distance_threshold,
         depth=branch_depth,
         doc_type=doc_type,
+        exclude_documents=exclude_documents,
         model_version_key=f"{embed.model_id}:{EMBEDDING_DIM}",
         model_id=embed.model_id,
     )
@@ -206,12 +245,13 @@ async def search_knowledge(
     if not vector_hits:
         logger.info(
             "stage=knowledge trace_id=%s latency_ms=%.1f abstained=1 threshold=%s "
-            "hybrid=%s doc_type=%s citations=0",
+            "hybrid=%s doc_type=%s excluded=%s citations=0",
             trace_id,
             (time.perf_counter() - started) * 1000,
             distance_threshold,
             hybrid_enabled,
             doc_type,
+            len(exclude_documents),
         )
         return ()
 
@@ -229,7 +269,10 @@ async def search_knowledge(
     if hybrid_enabled:
         expanded = expand_query(cleaned, enabled=expansion_enabled)
         lexical_hits = await index.lexical_search(
-            expanded_request(expanded), depth=branch_depth, doc_type=doc_type
+            expanded_request(expanded),
+            depth=branch_depth,
+            doc_type=doc_type,
+            exclude_documents=exclude_documents,
         )
         # Filtered **before** fusing, not after: ranks stay dense over the admitted
         # candidates, so the branch votes at full strength among the fragments the
@@ -247,13 +290,15 @@ async def search_knowledge(
 
     logger.info(
         "stage=knowledge trace_id=%s latency_ms=%.1f abstained=0 threshold=%s hybrid=%s "
-        "expansion=%s doc_type=%s vector=%s lexical=%s citations=%s distance_min=%s",
+        "expansion=%s doc_type=%s excluded=%s vector=%s lexical=%s citations=%s "
+        "distance_min=%s",
         trace_id,
         (time.perf_counter() - started) * 1000,
         distance_threshold,
         hybrid_enabled,
         expansion_enabled,
         doc_type,
+        len(exclude_documents),
         len(vector_hits),
         lexical_count,
         len(citations),
@@ -262,6 +307,43 @@ async def search_knowledge(
         else None,
     )
     return citations
+
+
+async def address_fragments(
+    addresses: Sequence[tuple[str, str]],
+    *,
+    index: KnowledgeSearchIndex,
+) -> tuple[KnowledgeCitation, ...]:
+    """Citable fragments obtained by ADDRESS rather than by search. Delivered by C30a.
+
+    `addresses` are `(document_slug, section_slug)` pairs. `chunk_id` turns each into the
+    `uuid5` the indexer wrote, so the read is a primary-key lookup: **no embedding is
+    computed, no similarity is measured and no provider is called.** For "the care section
+    of the sheet of the material this piece declares" the address is exact, and a search
+    would pay a vector to answer a question a key answers — while reintroducing the one
+    failure a key cannot have, a fragment about a different material.
+
+    A fragment comes back with **the same citation fields** a searched one carries, so a
+    consumer cannot tell which path produced it and both are equally verifiable.
+
+    `score` is `1.0`, and it means something different here from what it means after a
+    fusion: not "this is how close it came" but "this is the fragment that was asked for".
+    An exact address admits no other value, and leaving the field empty would have made the
+    two paths distinguishable at the point where they must not be.
+
+    The result preserves the order of `addresses` and silently omits the ones that resolve
+    to nothing — an absent section is normal, and failing the whole call over one would make
+    the caller's allow-list depend on which sheet it happened to be applied to.
+    """
+    from jbg_ai.knowledge.indexer import chunk_id
+
+    wanted = [chunk_id(document, section) for document, section in addresses]
+    if not wanted:
+        return ()
+    hits = {hit.chunk_id: hit for hit in await index.fetch_chunks(wanted)}
+    return tuple(
+        _citation(hits[key], ADDRESSED_SCORE) for key in wanted if key in hits
+    )
 
 
 _VECTOR_SQL = """SELECT
@@ -277,7 +359,7 @@ WHERE c.embedding IS NOT NULL
     OR c.embedding_model = :model_id
   )
   AND c.embedding <=> CAST(:q AS vector) <= :threshold
-{doc_type_clause}
+{doc_type_clause}{exclude_clause}
 ORDER BY c.embedding <=> CAST(:q AS vector) ASC
 LIMIT :depth
 """
@@ -291,26 +373,53 @@ _LEXICAL_SQL = """SELECT
 FROM ai.knowledge_chunk c
 JOIN ai.knowledge_document d ON d.id = c.document_id
 WHERE c.tsv @@ {match}
-{doc_type_clause}
+{doc_type_clause}{exclude_clause}
 ORDER BY coordination DESC, ts_rank DESC
 LIMIT :depth
 """
 
+#: Fragments by primary key. No join to `ai.knowledge_document` at all: everything a
+#: citation needs already lives in `c.metadata`, written there by the indexer, so addressing
+#: costs one indexed read and touches one table.
+_FETCH_CHUNKS_SQL = """SELECT
+  c.id,
+  c.content,
+  c.metadata
+FROM ai.knowledge_chunk c
+WHERE c.id = ANY(CAST(:chunk_ids AS uuid[]))
+"""
+
 _DOC_TYPE_CLAUSE = "  AND d.doc_type = :doc_type\n"
 
+#: The exclusion, in the same shape and the same place as the clause above it: conditional,
+#: bound, and on the document's PRIMARY KEY. `document_id(slug)` derives that key with the
+#: `uuid5` the indexer already computes, so naming a document to exclude costs no new column,
+#: no `jsonb` lookup and no migration.
+#:
+#: It filters **before** the `LIMIT`, which is why the caller cannot do it afterwards instead:
+#: dropping a foreign sheet in Python would leave the slot it occupied empty, whereas here the
+#: branch depth is spent on documents that can actually be cited and the fragments below the
+#: cut move up. Measured over the 72 golden queries on 2026-09-13, that promotion is real — a
+#: mean of 36,4 foreign-sheet citations removed costs a net 24,6, so about 11,8 correct
+#: fragments per anchor rise into the answer rather than the answer simply shrinking.
+_EXCLUDE_CLAUSE = "  AND d.id <> ALL(CAST(:exclude_documents AS uuid[]))\n"
 
-def compile_vector_sql(*, doc_type: str | None) -> str:
+
+def compile_vector_sql(*, doc_type: str | None, exclude_documents: bool = False) -> str:
     """The k-NN statement. `<=>` and nothing else, to stay aligned with the HNSW class.
 
     The index is built with `vector_cosine_ops`; querying it with any other operator would
     make the planner ignore it **without an error** — the silent failure `ai-vector-schema`
     exists to prevent.
     """
-    return _VECTOR_SQL.format(doc_type_clause=_DOC_TYPE_CLAUSE if doc_type else "")
+    return _VECTOR_SQL.format(
+        doc_type_clause=_DOC_TYPE_CLAUSE if doc_type else "",
+        exclude_clause=_EXCLUDE_CLAUSE if exclude_documents else "",
+    )
 
 
 def compile_lexical_sql(
-    request: LexicalRequest, *, doc_type: str | None
+    request: LexicalRequest, *, doc_type: str | None, exclude_documents: bool = False
 ) -> tuple[str, dict[str, object]]:
     """The full-text statement and its bound terms.
 
@@ -324,7 +433,10 @@ def compile_lexical_sql(
     sql = (
         _LEXICAL_SQL.replace("{match}", fragments.match)
         .replace("{coordination}", fragments.coordination)
-        .format(doc_type_clause=_DOC_TYPE_CLAUSE if doc_type else "")
+        .format(
+            doc_type_clause=_DOC_TYPE_CLAUSE if doc_type else "",
+            exclude_clause=_EXCLUDE_CLAUSE if exclude_documents else "",
+        )
     )
     return sql, dict(fragments.params)
 
@@ -352,9 +464,11 @@ class SqlAlchemyKnowledgeIndex:
         threshold: float,
         depth: int,
         doc_type: str | None = None,
+        exclude_documents: Sequence[UUID] = (),
         model_version_key: str,
         model_id: str,
     ) -> list[KnowledgeHit]:
+        excluded = list(exclude_documents)
         params: dict[str, object] = {
             "q": _vector_literal(embedding),
             "threshold": threshold,
@@ -364,11 +478,12 @@ class SqlAlchemyKnowledgeIndex:
         }
         if doc_type:
             params["doc_type"] = doc_type
+        if excluded:
+            params["exclude_documents"] = [str(item) for item in excluded]
+        sql = compile_vector_sql(doc_type=doc_type, exclude_documents=bool(excluded))
         try:
             async with session_scope(self._settings) as session:
-                rows = (
-                    await session.execute(text(compile_vector_sql(doc_type=doc_type)), params)
-                ).mappings().all()
+                rows = (await session.execute(text(sql), params)).mappings().all()
         except SQLAlchemyError as exc:
             raise KnowledgeSearchError(f"database query failed: {exc}") from exc
         return [
@@ -381,17 +496,47 @@ class SqlAlchemyKnowledgeIndex:
             for row in rows
         ]
 
+    async def fetch_chunks(self, chunk_ids: Sequence[UUID]) -> list[KnowledgeHit]:
+        """One statement for the whole address list. Order is the caller's to restore."""
+        wanted = list(chunk_ids)
+        if not wanted:
+            return []
+        try:
+            async with session_scope(self._settings) as session:
+                rows = (
+                    await session.execute(
+                        text(_FETCH_CHUNKS_SQL),
+                        {"chunk_ids": [str(item) for item in wanted]},
+                    )
+                ).mappings().all()
+        except SQLAlchemyError as exc:
+            raise KnowledgeSearchError(f"database query failed: {exc}") from exc
+        return [
+            KnowledgeHit(
+                chunk_id=UUID(str(row["id"])),
+                content=str(row["content"]),
+                metadata=_metadata(row["metadata"]),
+            )
+            for row in rows
+        ]
+
     async def lexical_search(
         self,
         request: LexicalRequest,
         *,
         depth: int,
         doc_type: str | None = None,
+        exclude_documents: Sequence[UUID] = (),
     ) -> list[KnowledgeHit]:
-        sql, terms = compile_lexical_sql(request, doc_type=doc_type)
+        excluded = list(exclude_documents)
+        sql, terms = compile_lexical_sql(
+            request, doc_type=doc_type, exclude_documents=bool(excluded)
+        )
         params: dict[str, object] = {"depth": depth, **terms}
         if doc_type:
             params["doc_type"] = doc_type
+        if excluded:
+            params["exclude_documents"] = [str(item) for item in excluded]
         try:
             async with session_scope(self._settings) as session:
                 rows = (await session.execute(text(sql), params)).mappings().all()

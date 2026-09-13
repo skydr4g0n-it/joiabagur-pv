@@ -31,6 +31,7 @@ from jbg_ai.db.engine import session_scope
 from jbg_ai.retrieval.errors import RetrievalDependencyError
 from jbg_ai.retrieval.lexical import LexicalRequest, build_fragments
 from jbg_ai.retrieval.ports import (
+    FamilyMember,
     LexicalHit,
     NeighbourHit,
     SearchFilters,
@@ -259,6 +260,35 @@ def compile_lexical_sql(
 # statement. That is also why there is no `threshold` and no model-compatibility predicate
 # here — both belong to a query the provider just embedded, and there is no query.
 # ---------------------------------------------------------------------------------------
+
+# One statement, one connection, and no join to anything. `ai.product_document` holds the
+# membership, so enumerating a family is a single indexed read on `family_id` — never one
+# statement per member, which with a pool capped at five and no overflow is how a listing
+# becomes a pool exhaustion.
+#
+# `is_active` is filtered here and not reported as a value, which is the opposite of what
+# `SOURCE_DOCUMENT_SQL` above does, deliberately: that one reads an ANCHOR, where the three
+# unusable cases are three different sentences at the boundary. This one produces
+# CANDIDATES, and every candidate-producing read of this module already drops inactive rows.
+# A discontinued variant is not something the operator can offer.
+#
+# The LIMIT is the caller's declared cap and it truncates under the ORDER BY below, so the
+# member a cap drops is the last one a reader would have seen rather than whichever one the
+# planner happened to emit last.
+FAMILY_ROSTER_SQL = """
+SELECT
+  d.product_id,
+  d.sku,
+  d.variant_label,
+  d.materials,
+  d.size_label,
+  d.family_name
+FROM ai.product_document d
+WHERE d.family_id = :family_id
+  AND d.is_active IS TRUE
+ORDER BY d.variant_label ASC NULLS LAST, d.product_id ASC
+LIMIT :cap
+"""
 
 SOURCE_DOCUMENT_SQL = """
 SELECT
@@ -561,6 +591,31 @@ class SqlAlchemyProductSearch:
             is_active=bool(row["is_active"]),
             has_embedding=bool(row["has_embedding"]),
         )
+
+    async def family_roster(self, family_id: UUID, *, cap: int) -> list[FamilyMember]:
+        """Every active member of one family. One statement, one connection, no provider."""
+        if cap < 1:
+            raise ValueError("family_roster cap must be >= 1")
+        try:
+            async with session_scope(self._settings) as session:
+                rows = (
+                    await session.execute(
+                        text(FAMILY_ROSTER_SQL), {"family_id": family_id, "cap": cap}
+                    )
+                ).mappings().all()
+        except SQLAlchemyError as exc:
+            raise RetrievalDependencyError(f"database query failed: {exc}") from exc
+        return [
+            FamilyMember(
+                product_id=UUID(str(row["product_id"])),
+                sku=str(row["sku"]),
+                variant_label=_optional_str(row["variant_label"]),
+                materials=_materials_list(row["materials"]),
+                size_label=_optional_str(row["size_label"]),
+                family_name=_optional_str(row["family_name"]),
+            )
+            for row in rows
+        ]
 
     async def neighbours_of(
         self,
