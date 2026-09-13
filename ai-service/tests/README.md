@@ -27,7 +27,8 @@ tests/
 ├── families/         # name-root grouping, material fusion, guards, relative embedding veto
 ├── indexing/         # source text, hashing, embeddings, upsert, drift
 ├── retrieval/        # vector/lexical search, RRF, filters, ranking, substitutes
-├── assist/           # generation, guardrails, agent loops, inventory proposals
+├── assist/           # sale-assistance structure (C30a): modes, grouping, rule warnings,
+│                     # deterministic grounding. Generation and agent loops arrive later
 └── evals/            # harness, metrics, baselines, scenario replays
 ```
 
@@ -48,7 +49,7 @@ parallel taxonomy later.
 | `indexing/` | C11 (landed: source-text/v1 + embeddings), C13 (landed: catalog drain + `sku_provenance.json`), C22 (landed: typed POS feed items, the `ai.pos_projection` repository whose tombstone is a soft delete, and the POS drain with its own `pos-availability` checkpoint and per-page failures), C23 (landed: the `sync-knowledge` subcommand only — everything it drives is tested in `knowledge/`) |
 | `retrieval/` | C14, C20 (landed: two-layer synonym dictionary, equivalence-group expansion, directional bridges, the enable flag swept in-process, and the measurement CLI's safe `tsquery` composition), C21 (landed: safe `tsquery` composition with coordination ordering, weighted RRF over three ranked lists, structural filters that demote and never exclude, and the bounded cache of the embedding singleton), C22 (landed: the point-of-sale scope as the only hard filter, availability as the last demotion block, freshness read from the checkpoint and never from the rows, and the 503-on-empty / degrade-on-stale pair), FIX1 (landed: the four closed gaps gone from the exclusions, the guard test re-aimed at `filigrana`, and the plural canonical reached from its singular), C24 (landed: the deterministic tiebreak both statements needed — the compiled `ORDER BY` asserted key by key so removing it from the SQL breaks the test, and truncation proved stable where distance ties and where `coordination` and `ts_rank` tie together), C25, C26 (landed: `test_substitutes.py` — the hard filter, the continuous ordering key and the block it must not be, the inert size term, the declared signals and the provider that is never called), C27 |
 | `knowledge/` | C23 (landed: the seven authoring rules and the coverage invariant derived from the enrichment vocabulary, pure section chunking, deterministic `uuid5` identity whose citations resolve to a file and a heading of `data/knowledge/`, idempotent indexing that re-embeds nothing unchanged, the callable search with its own abstention threshold, the D16 ring-size table, and the offline fixture measurement) |
-| `assist/` | C30, C31, C32, C33, C35 |
+| `assist/` | C30a (landed: three modes, family grouping, rule warnings, deterministic grounding), C30b, C31, C32, C33, C35 |
 | `evals/` | C24 (landed: the golden set validation that **fails the load** when the composition stops being able to arbitrate what the set exists for, adaptive-depth pooling with appendable judgements, nDCG against a hand-computed fixture with the binary reading beside it, the two `v0` baselines and the guard that breaks when the canonical renderer drifts, deterministic truncation of the context-only catalogue with the omitted count recorded, provenance-gated comparability over frozen query vectors, and the default-change rule exercised in all four of its outcomes), C26 (landed: `test_substitutes_slice.py` — the anchored queries and the split that keeps the published ablation denominator from moving), C38 |
 
 Changes with no Python zone (C03, C04, C07, C08, C12, C15, C16, C19, C28, C29,
@@ -67,9 +68,11 @@ Ask what would have to break for the test to fail:
   `api/`, even when the endpoint belongs to another domain. `test_assist_stub.py`
   lives in `api/` because it asserts the frozen contract, not sales reasoning.
 - **A computation** — ranking order, similarity, extracted fields, metrics →
-  the module that computes it. When C30 replaces the assist stub with real
-  generation, the behavioural tests are born in `assist/`; the contract test stays
-  in `api/`.
+  the module that computes it. **C30a did exactly this**: it replaced the assist stub
+  with a real structural layer, the behavioural tests were born in `assist/`
+  (`test_modes.py`, `test_grounding.py`, `test_orchestrator.py`) and the contract test
+  stayed in `api/` — joined there by `test_assist_contract.py` for the moved schemas and
+  `test_assist_real.py` for the route with stubs disabled.
 - **Both** — split it. A contract assertion buried in a ranking test makes the
   contract regression invisible.
 
@@ -164,6 +167,15 @@ detail. The route answers now, so the 501 property was **re-homed onto `/v1/assi
 (waiting on C30) instead of being deleted, and a new
 `test_no_retrieval_route_is_left_answering_501` asserts the obligation C26 lifted, in the
 negative.
+
+**And C30a moved it a second time.** `/v1/assist/sale` now serves its real implementation, so
+the 501 parametrisation carries **only `/v1/inventory/propose`**, whose branch was cancelled on
+2026-08-31 and which is therefore a declared limitation rather than pending work. The property
+was re-homed the same way it was the first time —
+`test_the_assistance_route_is_no_longer_left_answering_501` asserts it in the negative — which
+is why the pattern is worth naming: a route that starts answering does not delete the 501 test,
+it hands it to the next route in line. When `/v1/inventory/propose` is the last one, the
+parametrisation stops being a list and becomes a statement about one route.
 
 **A trap this change walked into, recorded so the next route does not.** FastAPI publishes a
 handler's **docstring** as the operation `description`. `retrieve_substitutes` had none in the

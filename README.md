@@ -180,7 +180,7 @@ En producción (AWS): EC2 con nginx (TLS) y un contenedor Docker con API .NET + 
 
 - **Backend:** xUnit, Moq, FluentAssertions; tests unitarios de servicios y validadores; tests de integración con Testcontainers (PostgreSQL). Nomenclatura tipo `Method_Scenario_ExpectedResult`. Los controladores críticos (por ejemplo ventas) tienen tests de integración que cubren creación, validación de stock, método de pago y permisos.
 - **Frontend:** Vitest, React Testing Library, MSW para simular API; pruebas de componentes y de flujos; E2E con Playwright (en progreso). Documentación en [Documentos/testing-backend.md](Documentos/testing-backend.md) y [Documentos/testing-frontend.md](Documentos/testing-frontend.md).
-- **Servicio de IA (`jbg-ai`):** pytest con el `TestClient` de FastAPI (`uv run pytest`); cubre autenticación de servicio, conformidad de los contratos, respuestas stub, extracción de catálogo con LLM falso (`tests/enrichment/`), retriever vectorial con fakes (`tests/retrieval/`) y estabilidad del snapshot OpenAPI. Los tests no llaman a proveedores LLM, APIs de embeddings ni RDS.
+- **Servicio de IA (`jbg-ai`):** pytest con el `TestClient` de FastAPI (`uv run pytest`); cubre autenticación de servicio, conformidad de los contratos, respuestas stub, extracción de catálogo con LLM falso (`tests/enrichment/`), retriever vectorial con fakes (`tests/retrieval/`), búsqueda y direccionamiento sobre el corpus de conocimiento (`tests/knowledge/`), la capa estructurada de venta asistida (`tests/assist/`) y estabilidad del snapshot OpenAPI. Los tests no llaman a proveedores LLM, APIs de embeddings ni RDS.
 
 ---
 
