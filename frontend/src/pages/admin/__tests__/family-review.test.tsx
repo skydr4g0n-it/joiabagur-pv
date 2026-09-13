@@ -11,11 +11,12 @@
  * project (`onUnhandledRequest: 'warn'`), so a test could pass having asserted nothing at all.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import FamilyReviewPage from '../family-review';
 import { familyReviewService } from '@/services/family-review.service';
+import { productService } from '@/services/product.service';
 import type {
   FamilyAudit,
   FamilyDetail,
@@ -25,15 +26,19 @@ import type {
 } from '@/types/family-review.types';
 
 vi.mock('@/services/family-review.service');
+vi.mock('@/services/product.service');
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));
 
 const mocked = vi.mocked(familyReviewService);
+const mockedProducts = vi.mocked(productService);
 
 const FAMILY_ID = '11111111-1111-1111-1111-111111111111';
 const PRODUCT_ID = '22222222-2222-2222-2222-222222222222';
+const CHAIN_ONE = '88888888-8888-8888-8888-888888888881';
+const CHAIN_TWO = '88888888-8888-8888-8888-888888888882';
 
 const emptyAudit: FamilyAudit = {
   flaggedMembers: [],
@@ -168,6 +173,20 @@ beforeEach(() => {
   mocked.getMetrics.mockResolvedValue(metrics);
   mocked.getFamily.mockResolvedValue(familyDetail);
   mocked.relabelMember.mockResolvedValue(undefined);
+  mocked.createFamily.mockResolvedValue({
+    id: '77777777-7777-7777-7777-777777777777',
+    name: 'Cadena de plata',
+    description: null,
+    origin: 'Manual',
+    members: [],
+  });
+  // Declared explicitly, like every other boundary here. An auto-mocked method returns
+  // undefined, and a screen that then calls `.map` on it fails with a render error rather than
+  // an assertion — which is a slower way to learn that a stub was missing.
+  mockedProducts.searchProducts.mockResolvedValue([
+    { id: CHAIN_ONE, sku: 'SKU-CAD-1', name: 'Cadena de plata 45 cm' },
+    { id: CHAIN_TWO, sku: 'SKU-CAD-2', name: 'Cadena de plata 50 cm' },
+  ] as never);
 });
 
 describe('family review screen', () => {
@@ -452,6 +471,93 @@ describe('family review screen', () => {
 
     await waitFor(() =>
       expect(mocked.relabelMember).toHaveBeenCalledWith(FAMILY_ID, PRODUCT_ID, 'S baño de oro'),
+    );
+  });
+
+  /**
+   * Pins which row a keystroke judges, which is the part of the keyboard wiring that is specific
+   * to this screen and has no coverage anywhere else.
+   *
+   * The hook's own behaviour — inert inside a text field, fires outside one — is tested once, on
+   * the profile review screen, and repeating it here would assert the same code twice. What is
+   * only here is the cursor over the audit tabs: if it pointed at the wrong row, a keystroke
+   * would record a judgement about a different product, silently and straight into the metric.
+   */
+  it('should judge the row under the cursor when a shortcut is used', async () => {
+    const user = userEvent.setup();
+    render(<FamilyReviewPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Marcados/ }));
+    await screen.findByText('Colgante Estrella de Mar');
+
+    // Away from any field, so the shortcut is live.
+    await user.click(document.body);
+    await user.keyboard('a');
+
+    await user.click(screen.getByRole('button', { name: /^Guardar/ }));
+
+    await waitFor(() => expect(mocked.recordVerdicts).toHaveBeenCalledTimes(1));
+    const sent = mocked.recordVerdicts.mock.calls[0][0];
+    expect(sent).toHaveLength(1);
+    expect(sent[0].productId).toBe(PRODUCT_ID);
+    expect(sent[0].familyId).toBe(FAMILY_ID);
+    expect(sent[0].outcome).toBe('Confirmed');
+    // And the stopwatch travelled with it, exactly as a mouse judgement does.
+    expect(sent[0].reviewSeconds).toEqual(expect.any(Number));
+  });
+
+  it('should leave the shortcuts inert on a tab that holds no queue', async () => {
+    // The families listing is not a review queue. A stray keystroke there must not judge a row
+    // on a tab the reviewer is not looking at.
+    const user = userEvent.setup();
+    render(<FamilyReviewPage />);
+
+    await screen.findByText('Colgante estrella de mar');
+    await user.click(document.body);
+    await user.keyboard('a');
+
+    await user.click(screen.getByRole('button', { name: /^Guardar/ }));
+
+    expect(mocked.recordVerdicts).not.toHaveBeenCalled();
+  });
+
+  it('should create a family with its members from the review screen', async () => {
+    // The gap this closes is structural, not a threshold. The audit nominates an unassigned
+    // product by its margin **relative to a target family**, so a product whose piece type has
+    // no family at all cannot be nominated: there is nothing to compute a margin against. The
+    // seven chains and the two plain wedding bands sit in exactly that position.
+    const user = userEvent.setup();
+    render(<FamilyReviewPage />);
+
+    await user.type(
+      await screen.findByLabelText('Nombre de la familia'),
+      'Cadena de plata',
+    );
+    await user.type(screen.getByLabelText('Buscar productos'), 'cadena');
+    await user.click(screen.getByRole('button', { name: 'Buscar' }));
+
+    const first = await screen.findByRole('row', { name: /Cadena de plata 45 cm/ });
+    await user.click(within(first).getByRole('button', { name: 'Añadir' }));
+
+    const second = screen.getByRole('row', { name: /Cadena de plata 50 cm/ });
+    await user.click(within(second).getByRole('button', { name: 'Añadir' }));
+
+    await user.type(
+      screen.getByLabelText('Etiqueta de variante de Cadena de plata 45 cm'),
+      '45 cm',
+    );
+    await user.type(
+      screen.getByLabelText('Etiqueta de variante de Cadena de plata 50 cm'),
+      '50 cm',
+    );
+
+    await user.click(screen.getByRole('button', { name: /Crear con 2 miembro\(s\)/ }));
+
+    await waitFor(() =>
+      expect(mocked.createFamily).toHaveBeenCalledWith('Cadena de plata', [
+        { productId: CHAIN_ONE, variantLabel: '45 cm' },
+        { productId: CHAIN_TWO, variantLabel: '50 cm' },
+      ]),
     );
   });
 

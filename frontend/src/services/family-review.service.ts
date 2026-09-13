@@ -148,6 +148,33 @@ export const familyReviewService = {
     return response.data;
   },
 
+  /**
+   * Creates a family with its members and their variant labels, in one operation.
+   *
+   * The gap this closes has a measured population behind it. The audit nominates an unassigned
+   * product by its **margin relative to a target family**, so a product whose piece type has no
+   * family at all cannot be nominated: there is nothing to compute a margin against. No amount
+   * of tuning the audit reaches those products, because the obstacle is the absence of a target
+   * and not the value of a threshold — only a person creating the first family does.
+   *
+   * The endpoint has existed since C07, so this is frontend only.
+   */
+  createFamily: async (
+    name: string,
+    members: { productId: string; variantLabel: string | null }[],
+  ): Promise<FamilyDetail> => {
+    const response = await apiClient.post<FamilyDetail>(FAMILIES_ENDPOINT, {
+      name,
+      members: members.map((member) => ({
+        productId: member.productId,
+        // Blank means the base piece, which is a legitimate variant value rather than a missing
+        // one. It is only refused downstream when the family already has one.
+        variantLabel: member.variantLabel?.trim() ? member.variantLabel.trim() : null,
+      })),
+    });
+    return response.data;
+  },
+
   /** Reads one family with its members, so a label can be corrected in place. */
   getFamily: async (familyId: string, signal?: AbortSignal): Promise<FamilyDetail> => {
     const response = await apiClient.get<FamilyDetail>(`${FAMILIES_ENDPOINT}/${familyId}`, {

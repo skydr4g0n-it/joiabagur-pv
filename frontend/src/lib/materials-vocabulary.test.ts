@@ -1,9 +1,15 @@
 import { describe, it, expect } from 'vitest';
 
 import {
+  CLOSED_VOCABULARIES,
+  COLOR_TAG_OPTIONS,
   MATERIAL_OPTIONS,
+  OCCASION_TAG_OPTIONS,
   PIECE_TYPE_OPTIONS,
+  STONE_TYPE_OPTIONS,
+  STYLE_TAG_OPTIONS,
   EXAMPLE_QUERIES,
+  hasClosedVocabulary,
 } from './materials-vocabulary';
 
 /**
@@ -56,9 +62,64 @@ describe('materials vocabulary', () => {
     }
   });
 
+  it('should carry the thirty-three canonical stones when compared with the enrichment vocabulary', () => {
+    expect(STONE_TYPE_OPTIONS).toHaveLength(33);
+    expect(STONE_TYPE_OPTIONS.map((option) => option.value)).toEqual([
+      'piedra', 'ambar', 'onix', 'perla', 'coral', 'turquesa', 'cuarzo', 'amatista', 'jade',
+      'lapislazuli', 'citrino', 'granate', 'malaquita', 'nacar', 'howlita', 'aventurina',
+      'obsidiana', 'hematites', 'ojo de tigre', 'piedra luna', 'labradorita', 'amazonita',
+      'agata', 'jaspe', 'madreperla', 'circonita', 'diamante', 'zafiro', 'esmeralda', 'rubi',
+      'topacio', 'opalo', 'calcedonia',
+    ]);
+  });
+
+  it('should carry the canonical commercial tags when compared with the enrichment vocabulary', () => {
+    expect(COLOR_TAG_OPTIONS.map((option) => option.value)).toEqual([
+      'plateado', 'dorado', 'blanco', 'negro', 'azul', 'verde', 'rojo', 'rosa', 'beige', 'marron',
+    ]);
+    expect(STYLE_TAG_OPTIONS.map((option) => option.value)).toEqual([
+      'clasico', 'moderno', 'minimalista', 'boho', 'marino', 'vintage', 'etnico', 'romantico',
+    ]);
+    expect(OCCASION_TAG_OPTIONS.map((option) => option.value)).toEqual([
+      'diario', 'regalo', 'fiesta', 'boda', 'verano', 'ceremonia',
+    ]);
+  });
+
+  it('should follow the vocabulary file about diacritics rather than tidying them', () => {
+    // The YAML is **not uniform about this**, and the asymmetry has to be mirrored rather than
+    // smoothed: `materials` keeps its diacritics in the canonical, every other closed vocabulary
+    // strips them. The canonical travels to the index and is compared by exact equality, so
+    // "correcting" either side of this — writing `bano de oro`, or writing `ámbar` — produces a
+    // term that matches nothing and reports it as an empty result rather than as an error.
+    expect(MATERIAL_OPTIONS.map((option) => option.value)).toContain('baño de oro');
+    expect(MATERIAL_OPTIONS.map((option) => option.value)).toContain('latón');
+
+    const unaccented = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+    for (const [field, options] of Object.entries(CLOSED_VOCABULARIES)) {
+      if (field === 'materials') continue;
+      for (const option of options) {
+        expect(option.value).toBe(unaccented(option.value));
+      }
+    }
+  });
+
+  it('should leave the size label out of the closed vocabularies', () => {
+    // The one field the extractor produces from a deterministic rule — all 539 of them — and the
+    // rule emits ring sizes and chain lengths the vocabulary never contained: the corpus carries
+    // twenty distinct labels against twelve terms, the extra ones being `05`, `17`, `40`, `2mm`.
+    // Offering a closed list there would make a size of 17 unrecordable.
+    expect(hasClosedVocabulary('size_label')).toBe(false);
+    expect(hasClosedVocabulary('materials')).toBe(true);
+    expect(hasClosedVocabulary('piece_type')).toBe(true);
+    expect(hasClosedVocabulary('stone_type')).toBe(true);
+  });
+
   it('should give every option a label when rendered in the quick filters', () => {
-    for (const option of [...MATERIAL_OPTIONS, ...PIECE_TYPE_OPTIONS]) {
-      expect(option.label.trim().length).toBeGreaterThan(0);
+    for (const options of Object.values(CLOSED_VOCABULARIES)) {
+      for (const option of options) {
+        expect(option.label.trim().length).toBeGreaterThan(0);
+      }
     }
   });
 

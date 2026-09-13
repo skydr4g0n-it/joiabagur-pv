@@ -31,29 +31,44 @@ public class AiCatalogController : ControllerBase
     private readonly IProductAiProfileService _profileService;
     private readonly IFamilySuggestionService _familySuggestionService;
     private readonly IFamilyAuditService _familyAuditService;
+    private readonly IProfileReviewService _profileReviewService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IValidator<EnrichBatchRequest> _validator;
     private readonly IValidator<ApplyFamilySuggestionsRequest> _applyValidator;
     private readonly IValidator<RecordFamilyVerdictsRequest> _verdictsValidator;
+    private readonly IValidator<ProfileReviewQueueRequest> _queueValidator;
+    private readonly IValidator<RecordProfileReviewRequest> _reviewValidator;
+    private readonly IValidator<BulkApproveProfilesRequest> _bulkValidator;
+    private readonly IValidator<RestoreRejectedProfileRequest> _restoreValidator;
     private readonly ILogger<AiCatalogController> _logger;
 
     public AiCatalogController(
         IProductAiProfileService profileService,
         IFamilySuggestionService familySuggestionService,
         IFamilyAuditService familyAuditService,
+        IProfileReviewService profileReviewService,
         ICurrentUserService currentUserService,
         IValidator<EnrichBatchRequest> validator,
         IValidator<ApplyFamilySuggestionsRequest> applyValidator,
         IValidator<RecordFamilyVerdictsRequest> verdictsValidator,
+        IValidator<ProfileReviewQueueRequest> queueValidator,
+        IValidator<RecordProfileReviewRequest> reviewValidator,
+        IValidator<BulkApproveProfilesRequest> bulkValidator,
+        IValidator<RestoreRejectedProfileRequest> restoreValidator,
         ILogger<AiCatalogController> logger)
     {
         _profileService = profileService;
         _familySuggestionService = familySuggestionService;
         _familyAuditService = familyAuditService;
+        _profileReviewService = profileReviewService;
         _currentUserService = currentUserService;
         _validator = validator;
         _applyValidator = applyValidator;
         _verdictsValidator = verdictsValidator;
+        _queueValidator = queueValidator;
+        _reviewValidator = reviewValidator;
+        _bulkValidator = bulkValidator;
+        _restoreValidator = restoreValidator;
         _logger = logger;
     }
 
@@ -370,5 +385,241 @@ public class AiCatalogController : ControllerBase
         {
             return BadRequest(new { errors = new[] { exception.Message } });
         }
+    }
+
+    // ── Profile review (C28) ──────────────────────────────────────────────────────────────
+    //
+    // Six routes under the same prefix and the same administrator policy as the family review
+    // ones, rather than a controller of their own: they share both, and splitting on the grounds
+    // that a file is growing would put the same policy in two places to maintain. A review
+    // rewrites what the catalog asserts about a piece, and those assertions reach a customer
+    // through an operator — so it is not an operator's call.
+
+    /// <summary>
+    /// Draws the stratified batch a reviewer works through. Writes nothing.
+    /// </summary>
+    /// <param name="request">Stratum filter, page, and the seed and quota overrides.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The batch, with what each stratum holds and what it contributed.</returns>
+    /// <remarks>
+    /// Drawn by review <em>origin</em> over approved status, never by status. The indexing feed
+    /// selects approved profiles, so opening a batch into a pending status would withdraw those
+    /// documents from the vector index for the length of the session — degrading the corpus the
+    /// demo runs on, in order to review it.
+    /// </remarks>
+    [HttpGet("profile-review-queue")]
+    [ProducesResponseType(typeof(ProfileReviewQueueDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetProfileReviewQueue(
+        [FromQuery] ProfileReviewQueueRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (!_currentUserService.UserId.HasValue)
+        {
+            return Unauthorized(new { message = "User not authenticated." });
+        }
+
+        var query = request ?? new ProfileReviewQueueRequest();
+
+        // Validated explicitly: this project registers validators but wires no automatic
+        // pipeline, so an uninvoked validator is worse than none — it looks like validation.
+        var validationResult = await _queueValidator.ValidateAsync(query, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(new { errors = validationResult.Errors.Select(e => e.ErrorMessage) });
+        }
+
+        return Ok(await _profileReviewService.GetQueueAsync(query, cancellationToken));
+    }
+
+    /// <summary>
+    /// Records one reviewer's judgement on one profile, with the time it took.
+    /// </summary>
+    /// <param name="request">The values in force after the review, and the measured duration.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The direction of every reviewed field.</returns>
+    [HttpPost("profile-reviews")]
+    [ProducesResponseType(typeof(RecordProfileReviewResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> RecordProfileReview(
+        [FromBody] RecordProfileReviewRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (!_currentUserService.UserId.HasValue)
+        {
+            return Unauthorized(new { message = "User not authenticated." });
+        }
+
+        if (request is null)
+        {
+            return BadRequest(new { errors = new[] { "A review body is required." } });
+        }
+
+        var validationResult = await _reviewValidator.ValidateAsync(request, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(new { errors = validationResult.Errors.Select(e => e.ErrorMessage) });
+        }
+
+        try
+        {
+            // The reviewer comes from the authenticated caller and never from the body: a
+            // request that could name its own reviewer would let the metric be attributed to
+            // somebody who reviewed nothing.
+            var response = await _profileReviewService.RecordReviewAsync(
+                request, _currentUserService.UserId.Value, cancellationToken);
+
+            return Ok(response);
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { errors = new[] { exception.Message } });
+        }
+    }
+
+    /// <summary>
+    /// Approves one field across many profiles of one stratum.
+    /// </summary>
+    /// <param name="request">The field, the stratum, and the profiles.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>What was marked.</returns>
+    /// <remarks>
+    /// Bounded to one field within one stratum, and refused otherwise. Approving three hundred
+    /// colour tags at once is cheap and legitimate; bulk-approving a whole stratum empties the
+    /// change of its content, because a stratum approved wholesale yields a correction rate of
+    /// zero that says nothing about the extractor.
+    /// </remarks>
+    [HttpPost("profile-reviews/bulk")]
+    [ProducesResponseType(typeof(BulkApproveProfilesResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> BulkApproveProfiles(
+        [FromBody] BulkApproveProfilesRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (!_currentUserService.UserId.HasValue)
+        {
+            return Unauthorized(new { message = "User not authenticated." });
+        }
+
+        if (request is null)
+        {
+            return BadRequest(new { errors = new[] { "A bulk approval body is required." } });
+        }
+
+        var validationResult = await _bulkValidator.ValidateAsync(request, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(new { errors = validationResult.Errors.Select(e => e.ErrorMessage) });
+        }
+
+        try
+        {
+            var response = await _profileReviewService.BulkApproveAsync(
+                request, _currentUserService.UserId.Value, cancellationToken);
+
+            return Ok(response);
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { errors = new[] { exception.Message } });
+        }
+    }
+
+    /// <summary>
+    /// Lists the rejected profiles, to be asked the inverted question.
+    /// </summary>
+    /// <param name="page">Page, one-based.</param>
+    /// <param name="pageSize">Items per page, capped at fifty.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The rejected profiles. They consume no stratum's quota.</returns>
+    [HttpGet("profile-reviews/rejected")]
+    [ProducesResponseType(typeof(RejectedProfilesDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetRejectedProfiles(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = ProfileReviewQueueRequest.MaxPageSize,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_currentUserService.UserId.HasValue)
+        {
+            return Unauthorized(new { message = "User not authenticated." });
+        }
+
+        return Ok(await _profileReviewService.GetRejectedAsync(page, pageSize, cancellationToken));
+    }
+
+    /// <summary>
+    /// Returns a wrongly rejected profile to approved, recording who decided it.
+    /// </summary>
+    /// <param name="request">The product, and the duration when the judgement was timed.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>What the profile now claims.</returns>
+    [HttpPost("profile-reviews/restore")]
+    [ProducesResponseType(typeof(RecordProfileReviewResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> RestoreRejectedProfile(
+        [FromBody] RestoreRejectedProfileRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (!_currentUserService.UserId.HasValue)
+        {
+            return Unauthorized(new { message = "User not authenticated." });
+        }
+
+        if (request is null)
+        {
+            return BadRequest(new { errors = new[] { "A restore body is required." } });
+        }
+
+        var validationResult = await _restoreValidator.ValidateAsync(request, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(new { errors = validationResult.Errors.Select(e => e.ErrorMessage) });
+        }
+
+        try
+        {
+            var response = await _profileReviewService.RestoreRejectedAsync(
+                request, _currentUserService.UserId.Value, cancellationToken);
+
+            return Ok(response);
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { errors = new[] { exception.Message } });
+        }
+    }
+
+    /// <summary>
+    /// The correction rate and the review times the delivery checklist asks for.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The rate per field, per stratum and per direction, and the two time populations.</returns>
+    /// <remarks>
+    /// Computed from the two stored columns rather than tallied in a screen: the rate is the
+    /// difference between the raw proposal and the values in force, and a figure that lives in
+    /// component state is gone when the tab closes.
+    /// </remarks>
+    [HttpGet("profile-review-metrics")]
+    [ProducesResponseType(typeof(ProfileReviewMetricsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetProfileReviewMetrics(CancellationToken cancellationToken)
+    {
+        if (!_currentUserService.UserId.HasValue)
+        {
+            return Unauthorized(new { message = "User not authenticated." });
+        }
+
+        return Ok(await _profileReviewService.GetMetricsAsync(cancellationToken));
     }
 }

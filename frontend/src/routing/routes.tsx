@@ -43,6 +43,7 @@ export const ROUTES = {
   },
   AI_MODEL: '/admin/ai-model',
   FAMILY_REVIEW: '/admin/family-review',
+  PROFILE_REVIEW: '/admin/profile-review',
   RETURNS: {
     ROOT: '/returns',
     NEW: '/returns/new',
