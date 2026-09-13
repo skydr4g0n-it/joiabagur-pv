@@ -343,6 +343,38 @@ Sobre los dos primeros conviene una precisión que ahorra tests engañosos. Al p
 > El detalle está en
 > `openspec/changes/archive/2026-09-01-add-family-review-ui-and-orphan-alert/qa.md` §2 y §11.
 
+> **Actualización del 2026-09-13, sobre `c28-add-profile-review-ui-and-metrics`.** La suite tiene
+> ahora **1.060 tests**: C28 añade 76 —62 unitarios repartidos en cuatro clases nuevas y 14 de
+> integración en `ProfileReviewControllerTests`, doce de ellos las dos teorías de permisos sobre las
+> seis rutas—. La línea base dio **52 fallos de 984**; al cierre, **46 de 1.060**. Comparados por
+> **nombre**, catorce de las diecisiete clases con fallos tienen recuento idéntico; las tres que se
+> mueven son `InventoryIntegrationTests` (10 → 4), `SalesControllerTests` (5 → 4) y
+> `ReturnsControllerTests` (4 → 5), las de siempre. **Cero fallos en los 77 tests del change.**
+>
+> **Esta quinta medición aporta la variación más extrema del expediente, y por un orden de
+> magnitud.** Sobre el **mismo árbol limpio**, verificado con `git stash push -u`, dos ejecuciones
+> de la línea base dieron **420 fallos en una pasada de 42 segundos y 52 en otra de 10 minutos**.
+> No son dos conjuntos distintos del mismo tamaño como en las cuatro mediciones anteriores: es un
+> factor de ocho. La diferencia de duración señala la causa —la pasada rápida no llegó a levantar
+> los Testcontainers y los ~370 tests de integración cayeron en bloque— y de ahí sale la regla
+> práctica que conviene añadir a las de más abajo:
+>
+> **Antes de comparar nada, mira la duración.** Una pasada de la suite completa que termine en
+> menos de un minuto **no ha ejecutado la integración**, y su recuento no es comparable con nada.
+> El recuento por sí solo no lo delata: 420 parece una regresión catastrófica y es un contenedor
+> que no arrancó.
+>
+> **Dos trampas de método que ya estaban documentadas más arriba y volvieron a morder**, así que
+> quedan confirmadas en una segunda ocasión: la API de desarrollo en marcha bloquea las DLL y la
+> compilación muere sin que se ejecute un solo test, y una clase de integración ejecutada **en
+> aislamiento** revienta con *«No tables found»* porque `ResetDatabaseAsync` construye Respawn antes
+> de que nada haya levantado el host que aplica las migraciones. Lo segundo se resolvió en el
+> propio `ProfileReviewControllerTests` pidiendo un cliente a la factoría antes de resetear —lo que
+> arranca el host— y así la clase se puede correr sola, que es como se depura.
+>
+> El detalle está en
+> `Documentos/Proyecto Final AIEng/informes/c28-implementation-measurements.md`.
+
 ### Por qué se acumularon sin que nadie los viera
 
 Los dos árboles se comportan de forma muy distinta, y esa es la clave:

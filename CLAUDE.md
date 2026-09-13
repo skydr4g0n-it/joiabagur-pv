@@ -61,8 +61,13 @@ The full inventory — root causes, and why a tree of 270 tests went unrun for w
 ## Frontend test suite: same story, and it catches people out harder
 
 `npm run test` in `frontend/` **also comes back red before you touch anything**: measured on
-2026-08-29, **118 failures of 482 tests, across 17 of the 40 files**. The method is identical
-to the backend's — baseline first, then compare the failing **test names**, never the count.
+2026-09-13, **113 failures of 595 tests, across 14 of the 48 files** (it was 118 of 482 on
+2026-08-29 — the suite grew and the red did not). The method is identical to the backend's —
+baseline first, then compare the failing **test names**, never the count.
+
+Unlike the backend's, **this set of names is stable between runs**: C28 measured an identical
+113 names at baseline and at close. Compare by name here because the *count* moves whenever
+somebody adds tests, not because the set rotates.
 
 It catches people out harder than the backend one for two reasons. Nobody expects a frontend
 suite to be red, and `vitest` exits **0** when you pipe it (`npm run test | tail` reports the

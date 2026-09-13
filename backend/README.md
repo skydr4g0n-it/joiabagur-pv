@@ -245,6 +245,12 @@ The system has two roles:
 | `POST /api/ai/catalog/family-verdicts` | ✅ | ❌ |
 | `GET /api/ai/catalog/family-verdicts` | ✅ | ❌ |
 | `GET /api/ai/catalog/family-review-metrics` | ✅ | ❌ |
+| `GET /api/ai/catalog/profile-review-queue` | ✅ | ❌ |
+| `POST /api/ai/catalog/profile-reviews` | ✅ | ❌ |
+| `POST /api/ai/catalog/profile-reviews/bulk` | ✅ | ❌ |
+| `GET /api/ai/catalog/profile-reviews/rejected` | ✅ | ❌ |
+| `POST /api/ai/catalog/profile-reviews/restore` | ✅ | ❌ |
+| `GET /api/ai/catalog/profile-review-metrics` | ✅ | ❌ |
 | `GET /api/product-families` | ✅ | ❌ |
 | `POST /api/product-families` | ✅ | ❌ |
 | `GET /api/product-families/{id}` | ✅ | ✅ |

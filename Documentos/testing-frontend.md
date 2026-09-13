@@ -292,7 +292,17 @@ describe('ProductCard', () => {
 
 *Medido el 2026-08-29 sobre `c16-add-frontend-assisted-search-panel`, con el árbol de trabajo idéntico a `HEAD` para aislar la línea base. Node + Vitest 4 + jsdom.*
 
-**482 tests, 118 fallos, en 17 de los 40 ficheros.** Duración: 252 s. Ninguno tiene que ver con el código de producción: son defectos de los propios tests, mocks incompletos y aserciones que se quedaron atrás cuando la interfaz cambió. Se documentan aquí por la misma razón que los del backend — sin este registro, cada persona que ejecuta la suite pierde una hora concluyendo que ha roto algo — y por una razón más, que el backend no tiene.
+**482 tests, 118 fallos, en 17 de los 40 ficheros.** Duración: 252 s.
+
+> **Re-medido el 2026-09-13, al cerrar C28: 595 tests, 113 fallos, en 14 de 48 ficheros.** La suite
+> ha crecido 113 tests en dos semanas y el rojo **no ha crecido con ella**: cae de 118 a 113 y de 17
+> ficheros a 14. La proporción pasa del 24 % al 19 %. El conjunto de nombres fallidos de C28 fue
+> **idéntico entre línea base y cierre** —ni uno nuevo, ni uno resuelto— sobre 113 nombres, lo que
+> dice algo que el backend no puede decir: **aquí el conjunto de fallos sí es estable entre
+> ejecuciones**. La rotación que obliga a comparar por nombres en el backend no tiene equivalente en
+> el frontend; lo que sí se mantiene es la razón para comparar por nombres, porque el **recuento**
+> cambia en cuanto alguien añade tests. Detalle en
+> `Documentos/Proyecto Final AIEng/informes/c28-implementation-measurements.md`. Ninguno tiene que ver con el código de producción: son defectos de los propios tests, mocks incompletos y aserciones que se quedaron atrás cuando la interfaz cambió. Se documentan aquí por la misma razón que los del backend — sin este registro, cada persona que ejecuta la suite pierde una hora concluyendo que ha roto algo — y por una razón más, que el backend no tiene.
 
 > **`vitest` sale con código 0 si canalizas su salida.** `npm run test | tail` devuelve el código de `tail`, no el de la suite. Un prompt verde no significa nada: hay que leer la línea de resumen.
 
