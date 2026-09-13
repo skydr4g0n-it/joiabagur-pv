@@ -28,7 +28,7 @@ Es el **décimo change consecutivo cuya exploración refuta lo escrito antes**.
 | [`knowledge/search.py`](../../../ai-service/src/jbg_ai/knowledge/search.py) | `search_knowledge()` **es un callable, no una ruta**, y su docstring declara que *«the only consumer is C30»* | La recuperación citable, ya construida y medida |
 | [`knowledge/indexer.py`](../../../ai-service/src/jbg_ai/knowledge/indexer.py) | `document_id(slug)` y `chunk_id(doc_slug, sec_slug)` = `uuid5(KNOWLEDGE_NAMESPACE, …)` | Direccionamiento por **clave primaria**: D-E y D-F se construyen sobre esto, sin migración |
 | [`knowledge/corpus.py`](../../../ai-service/src/jbg_ai/knowledge/corpus.py) | `material_sheet_slug(canonical)` y `missing_material_sheets()` | El invariante 1:1 ficha↔material, ya sostenido por un test |
-| [`retrieval/abstention.py`](../../../ai-service/src/jbg_ai/retrieval/abstention.py) | Regla relativa de C25, **`jpv_abstention_enabled = false` por defecto** | La señal de «el catálogo no puede contestar», construida y apagada (D-G) |
+| [`retrieval/abstention.py`](../../../ai-service/src/jbg_ai/retrieval/abstention.py) | Regla relativa de C25, **activa por defecto** (`jpv_abstention_enabled = True`, `α = 0,03`, `N = 15` en [`settings.py`](../../../ai-service/src/jbg_ai/config/settings.py)) | La señal de «el catálogo no puede contestar», construida y **encendida** — lo que falta es que el camino de assist la **honre y la reporte** (D-G) |
 | [`enrichment/llm.py`](../../../ai-service/src/jbg_ai/enrichment/llm.py) | Puerto `EnrichLlm` + adaptador LiteLLM, temperatura 0, *backoff* de proveedor, un reintento de parseo | El patrón de cliente generativo a replicar (D-K) |
 | `prompts/<área>/<vN>.md` + `PROMPT_VERSION` | Convención viva en `enrichment/`, `catalog-synth/`, `knowledge/`, con test que fija fichero↔constante | El versionado de prompt, sin decidir nada nuevo |
 | `ai-service/src/jbg_ai/assist/` | **No existe** | La zona de C30, limpia |
@@ -45,7 +45,7 @@ histórico ahora mismo** y crece de forma monótona a partir de C34.
 | **H2** | `POST /v1/assist/sale` se sirve con una consulta de texto | Su único consumidor previsto, C34, expone **`GET /api/ai/products/{id}/sales-assist`** y `.../substitutes` — las dos **ancladas a pieza**. Y `AssistRequest` no tiene `product_id`, con `query` obligatoria | D-B |
 | **H3** | Los cuatro avisos los calcula C30 | Dos son afirmaciones de stock, y `SearchHit.qty_bucket` está declarado como algo que **nunca sale al cable**, además de poder estar desfasado. C34 hidrata la verdad | D-C |
 | **H4** | El pitch lleva `citations[]` verificables | `Citation` del contrato tiene **3 campos** (`source`, `snippet`, `product_id`) contra los **10** de `KnowledgeCitation`. Se pierden `citation_id` y **`claim_scope`** — 25 de 161 fragmentos son compromisos de la casa | D-D |
-| **H5** | C31 se encarga de lo que está fuera de dominio, después | La abstención medida por C25 es **10 %**: abstiene en **2 de 20** consultas fuera de dominio y en **0 de 43** contestables, y está **desactivada por defecto**. El golden set tiene **20 de 72** fuera de dominio | D-G |
+| **H5** | C31 se encarga de lo que está fuera de dominio, después | La abstención medida por C25 es **10 %**: activa por defecto, abstiene en **2 de 20** consultas fuera de dominio y en **0 de 43** contestables, así que **18 de 20 llegan con candidatos**. El golden set tiene **20 de 72** fuera de dominio, su categoría mayor | D-G |
 
 **Dos contradicciones menores anotadas de paso.** (a) La tabla maestra del §2 dice que la cadena
 crítica *«pasa a arrancar en C34»*: arranca en **C30**, que C34 lleva de prerrequisito. (b) El §9.1
@@ -381,17 +381,27 @@ superficie de operario en esta ronda, y una entrada concreta para los casos adve
 ### D-G · La abstención se activa en el camino de assist, y no se llama `low_confidence`
 
 **Decisión.** C30 **no clasifica intención** —eso es C31—, pero **no genera pitch cuando la capa de
-recuperación dice que el catálogo no puede contestar**. La regla relativa de C25 se activa en el
-camino de assist **por parámetro**, no por variable de entorno. La respuesta lo declara en
-**`abstained: bool`**.
+recuperación dice que el catálogo no puede contestar**. La regla relativa de C25 **ya corre**, así
+que lo que falta no es encenderla: es que el camino de assist la **honre y la reporte**. El valor
+efectivo viaja **por parámetro** y no leído del entorno, como en C20, C23 y C25, para que el arnés
+pueda barrer configuraciones en un proceso. La respuesta lo declara en **`abstained: bool`**.
 
-**Evidencia.** Medido por C25 y citado de su informe: con `jpv_abstention_enabled = false` por
-defecto, **18 de 20** consultas fuera de dominio llegan con candidatos, y el golden set tiene **20
-de 72** en esa categoría. Sin esta puerta, C30 contestaría *«¿qué tiempo hace mañana?»* con cinco
+**Evidencia.** `jpv_abstention_enabled` está **en `true` por defecto**, con `α = 0,03` y `N = 15`
+([`settings.py`](../../../ai-service/src/jbg_ai/config/settings.py)), y su propio descriptor de
+campo lo fija: *«at the configured band it abstains on 2 of the 20 and on NONE of the 43»*. O sea
+que **18 de 20 consultas fuera de dominio llegan con candidatos**, y el golden set tiene **20 de
+72** en esa categoría. Sin esta puerta, C30 contestaría *«¿qué tiempo hace mañana?»* con cinco
 familias de joyería y un argumentario convencido, y lo haría durante toda una vuelta de manivela
 —porque el arreglo es C31 y C31 lleva C30 de prerrequisito. Se comprobó si el orden se puede
 invertir: no limpiamente, porque C31 lleva *«rechazo cortés sin llamar al retriever»* y
 *«validación de salida contra JSON schema»*, y las dos necesitan que la ruta y el generador existan.
+
+> **Corregido el 2026-09-13, el mismo día.** La primera versión de este informe decía que la regla
+> estaba **desactivada por defecto**, tomándolo del §583 del informe de implementación de C25
+> —donde sí lo estaba, con `α = 0,05` y `N = 10`—. Ese era un estado intermedio del apply: los
+> ajustes vivos son `true`, `0,03` y `15`. **La decisión no cambia y su motivo tampoco**, porque lo
+> que la sostiene es el 18 de 20, que es idéntico en la banda configurada. Lo que cambia es el
+> trabajo: C30a no enciende una regla apagada, **propaga y declara** una que ya decide.
 
 **Por qué el nombre importa.** `low_confidence` ya tiene en este repo un significado medido
 —consenso entre ramas— que está **anticorrelacionado** con lo que aquí hace falta: dispara en
@@ -574,8 +584,8 @@ fakes inyectados por la misma costura de constructor que usa `LiteLlmEnrichClien
 | `ai-service/openapi.json` | **Regenerado** con el bloque completo, en C30a | D-A |
 | `openspec/specs/ai-service-api-contracts` | `MODIFIED` *Sale assistance groups results by family* · `MODIFIED` *Generated text never contains resolved price or stock* · `MODIFIED` *Versioned OpenAPI snapshot…* (nota de regeneración) | D-A, D-H |
 | `openspec/specs/knowledge-corpus` | `MODIFIED` para el filtro por documento y el direccionamiento por `chunk_id` | D-E, D-F |
-| `openspec/specs/retrieval-abstention` | `MODIFIED`: la regla se activa por parámetro en el camino de assist | D-G |
-| **capability nueva** (`assist-generation` o `sale-assist`) | `ADDED`: los tres modos, agrupación, avisos por códigos, citas, no-persistencia, puerta numérica | todas |
+| `openspec/specs/retrieval-abstention` | `MODIFIED`: la decisión de la regla —ya activa— se **propaga al camino de assist y se declara** en la respuesta, con el valor efectivo por parámetro | D-G |
+| **capability nueva `assist-generation`** | `ADDED`: los tres modos, agrupación, avisos por códigos, citas, no-persistencia, puerta numérica. **Nombre fijado el 13 sep**: C30b añade requisitos sobre ella en vez de crear otra, y `sale-assist` se descartó porque nombra el caso de uso y no la capacidad, con `assisted-search-panel` y `ai-assisted-search` ya ocupando ese registro semántico | todas |
 
 ### Fichas del plan
 
