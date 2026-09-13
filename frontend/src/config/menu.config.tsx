@@ -1,4 +1,5 @@
 import {
+  ClipboardCheck,
   LayoutGrid,
   Package,
   Warehouse,
@@ -66,6 +67,11 @@ export const MENU_ADMINISTRATOR: MenuConfig = [
         title: 'Revisión de familias',
         icon: Users,
         path: ROUTES.FAMILY_REVIEW,
+      },
+      {
+        title: 'Revisión de perfiles',
+        icon: ClipboardCheck,
+        path: ROUTES.PROFILE_REVIEW,
       },
       {
         title: 'Métodos de Pago',
