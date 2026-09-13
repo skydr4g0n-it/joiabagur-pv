@@ -31,6 +31,7 @@ import math
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from uuid import UUID
 
 from jbg_ai.enrichment.vocab import fold
 from jbg_ai.indexing.constants import EMBEDDING_DIM
@@ -187,6 +188,25 @@ class InMemoryKnowledgeIndex:
             **extra,
         )
 
+    def _excluded_slugs(self, exclude_documents: Sequence[UUID]) -> set[str]:
+        """Mirrors the statement's predicate on the document primary key.
+
+        The stand-in holds chunks rather than rows, so it resolves `document_id(slug)` per
+        document once and compares slugs. What matters is that it drops the fragments
+        **before** the depth cut, exactly as the `WHERE` clause does: filtering afterwards
+        would leave the freed slots empty and hide the promotion the real clause produces.
+        """
+        if not exclude_documents:
+            return set()
+        from jbg_ai.knowledge.indexer import document_id
+
+        wanted = set(exclude_documents)
+        return {
+            chunk.document_slug
+            for chunk in self.chunks
+            if document_id(chunk.document_slug) in wanted
+        }
+
     async def vector_search(
         self,
         embedding: Sequence[float],
@@ -194,13 +214,16 @@ class InMemoryKnowledgeIndex:
         threshold: float,
         depth: int,
         doc_type: str | None = None,
+        exclude_documents: Sequence[UUID] = (),
         model_version_key: str = "",
         model_id: str = "",
     ) -> list[KnowledgeHit]:
+        dropped = self._excluded_slugs(exclude_documents)
         scored = [
             (cosine_distance(embedding, self.vectors[chunk.citation_id]), chunk)
             for chunk in self.chunks
-            if doc_type is None or chunk.doc_type == doc_type
+            if (doc_type is None or chunk.doc_type == doc_type)
+            and chunk.document_slug not in dropped
         ]
         within = sorted(
             ((distance, chunk) for distance, chunk in scored if distance <= threshold),
@@ -208,18 +231,27 @@ class InMemoryKnowledgeIndex:
         )
         return [self._hit(chunk, distance=distance) for distance, chunk in within[:depth]]
 
+    async def fetch_chunks(self, chunk_ids: Sequence[UUID]) -> list[KnowledgeHit]:
+        """By identity, like the statement: whatever exists, in no particular order."""
+        wanted = set(chunk_ids)
+        return [self._hit(chunk) for chunk in self.chunks if self._key(chunk) in wanted]
+
     async def lexical_search(
         self,
         request: LexicalRequest,
         *,
         depth: int,
         doc_type: str | None = None,
+        exclude_documents: Sequence[UUID] = (),
     ) -> list[KnowledgeHit]:
         groups = request.groups or tuple((token,) for token in tokenise(request.text))
         counting = request.counting or tuple(True for _ in groups)
+        dropped = self._excluded_slugs(exclude_documents)
         results: list[tuple[int, float, KnowledgeChunk]] = []
         for chunk in self.chunks:
             if doc_type is not None and chunk.doc_type != doc_type:
+                continue
+            if chunk.document_slug in dropped:
                 continue
             tokens = self.tokens[chunk.citation_id]
             matched = [_group_matches(group, tokens) for group in groups]

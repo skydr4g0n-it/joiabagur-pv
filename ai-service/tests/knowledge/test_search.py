@@ -9,6 +9,7 @@ socket, which is exactly what the change promised not to need in its tests.
 from __future__ import annotations
 
 import asyncio
+import json
 
 from jbg_ai.knowledge.chunking import chunk_corpus
 from jbg_ai.knowledge.corpus import KnowledgeCorpus
@@ -146,8 +147,19 @@ def test_fusion_consumes_ranks_and_not_raw_scores(corpus: KnowledgeCorpus) -> No
 
 
 def test_knowledge_search_opens_no_http_surface() -> None:
-    snapshot = OPENAPI_SNAPSHOT.read_text(encoding="utf-8")
-    assert "knowledge" not in snapshot.casefold()
+    """No path and no schema of its own — the sharpened form `test_frozen.py` explains.
+
+    A substring search over the prose of the snapshot stopped meaning this the moment C30a
+    gave a published description an honest reason to name the corpus.
+    """
+    snapshot = json.loads(OPENAPI_SNAPSHOT.read_text(encoding="utf-8"))
+
+    assert not [path for path in snapshot["paths"] if "knowledge" in path.casefold()]
+    assert not [
+        name
+        for name in snapshot["components"]["schemas"]
+        if "knowledge" in name.casefold()
+    ]
 
 
 def test_a_care_question_about_one_material_answers_from_that_sheet(

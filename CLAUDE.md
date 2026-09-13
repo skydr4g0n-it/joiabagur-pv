@@ -18,6 +18,18 @@ Run `--all --strict` before archiving a change, not just the single-change form:
 change can be green while the live specs it syncs into are broken. That is exactly how
 three malformed specs survived unnoticed until 2026-08-06.
 
+### El validador lee sólo la PRIMERA LÍNEA FÍSICA de la descripción de un requisito
+
+Esto cuesta una sesión la primera vez. En una delta, la descripción que sigue a
+`### Requirement: …` se valida **leyendo únicamente su primera línea física**. Si editas una
+spec y el `SHALL` cae en la segunda línea por un ajuste de ancho, falla con
+*«must contain SHALL or MUST»* **aunque lo contenga**, y el mensaje no da ninguna pista de que
+el problema es tipográfico.
+
+Las deltas se escriben con la descripción en **una sola línea larga**, sin ajustar a 90
+columnas, exactamente como están las archivadas. Los párrafos siguientes sí pueden ajustarse:
+la regla sólo afecta al primero.
+
 ## Live specs vs delta specs
 
 Delta syntax belongs **only** to a change, never to a live spec:
@@ -95,6 +107,21 @@ The full inventory — the five root causes and which files each one accounts fo
 
 - `uv sync` and `uv run` need `--system-certs` on this machine, otherwise PyPI fails with
   `invalid peer certificate: UnknownIssuer`.
+- **`--system-certs` arregla a `uv`, no al proceso Python.** En tiempo de ejecución `litellm`
+  sale por `aiohttp`/`httpx`, que usan el bundle de `certifi` y **no** el almacén de Windows, y
+  esta máquina tiene un MITM de **Norton Web/Mail Shield** cuya raíz vive sólo en ese almacén.
+  Cualquier llamada real al proveedor —un spike, una pasada de `evals`, un `sync` de índice—
+  muere con `CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate`. La salida:
+  exportar el almacén a un PEM y apuntar `SSL_CERT_FILE` (y `REQUESTS_CA_BUNDLE`) a él.
+  `ssl.enum_certificates('ROOT'|'CA')` concatenado al `certifi.where()` basta. **Filtrar por la
+  bandera de confianza no basta**: la raíz de Norton no la lleva y el bundle sale incompleto.
+  **No afecta a ningún test** — ninguno llama al proveedor.
+- **Windows: `psycopg` rechaza el `ProactorEventLoop`**, que es el que Python instala por
+  defecto. Cualquier script suelto que abra el motor asíncrono necesita
+  `asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())`. En los tests eso ya
+  lo resuelve `support/async_db.run_db`, que además dispone el motor a ambos lados: el motor es
+  de proceso y sus conexiones pertenecen al bucle que las abrió, así que **dos `asyncio.run` en
+  un mismo test fallan con `InterfaceError`**. Un escenario, un bucle.
 - `ai-service/openapi.json` is a frozen contract with the .NET side. If
   `test_openapi_snapshot_is_stable` fails, the boundary moved — agree the change with
   whoever owns the .NET client before regenerating it with the README one-liner.

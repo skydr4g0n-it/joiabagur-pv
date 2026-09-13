@@ -13,6 +13,7 @@ from uuid import UUID
 from jbg_ai.enrichment.vocab import fold
 from jbg_ai.retrieval.lexical import LexicalRequest
 from jbg_ai.retrieval.ports import (
+    FamilyMember,
     LexicalHit,
     NeighbourHit,
     SearchFilters,
@@ -69,6 +70,7 @@ class FakeIndexedRow:
     distance: float
     materials: list[str] = field(default_factory=list)
     family_id: UUID | None = None
+    family_name: str | None = None
     variant_label: str | None = None
     piece_type: str | None = None
     price: float | None = None
@@ -111,6 +113,7 @@ class FakeProductSearch:
         self.synced_at_calls = 0
         self.source_document_calls: list[UUID] = []
         self.neighbour_calls: list[dict[str, object]] = []
+        self.family_roster_calls: list[tuple[UUID, int]] = []
 
     def _scope(self, pos_id: UUID) -> dict[UUID, FakeAssignment]:
         """What this point of sale actually carries, by product identifier."""
@@ -348,6 +351,34 @@ class FakeProductSearch:
                 has_embedding=row.has_embedding,
             )
         return None
+
+    # --- C30a family roster -------------------------------------------------------------
+
+    async def family_roster(self, family_id: UUID, *, cap: int) -> list[FamilyMember]:
+        """Mirrors `FAMILY_ROSTER_SQL`: active members only, same order, same truncation.
+
+        Dropping the inactive rows here and not reporting them as a value is the statement's
+        own choice, and the fake must not be laxer: a roster that counted a discontinued
+        variant would raise the variants warning for something the operator cannot offer.
+        """
+        self.family_roster_calls.append((family_id, cap))
+        members = [
+            FamilyMember(
+                product_id=row.product_id,
+                sku=row.sku,
+                variant_label=row.variant_label,
+                materials=list(row.materials),
+                size_label=row.size_label,
+                family_name=row.family_name,
+            )
+            for row in self.rows
+            if row.family_id == family_id and row.is_active
+        ]
+        # `NULLS LAST` on `variant_label`, then `product_id`. A fake that truncated under a
+        # weaker order than the statement would let a test about the cap pass while the real
+        # read cut arbitrarily.
+        members.sort(key=lambda item: (item.variant_label is None, item.variant_label or "", item.product_id))
+        return members[:cap]
 
     async def neighbours_of(
         self,

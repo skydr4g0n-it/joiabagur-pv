@@ -49,11 +49,19 @@
         "type": "object"
       },
       "AssistGroup": {
-        "description": "One product family; members are the variants the operator can disambiguate.",
+        "description": "One product family; members are the variants the operator can disambiguate.\n\n`family_id` is **nullable**, and the invariant that comes with it is *null implies exactly\none member*. A synthetic identifier would have been a lie on the wire: .NET and the\nfrontend would have to recognise a prefix no schema declares, and nothing in the type\nwould stop the variants warning from firing on a group of one.",
         "properties": {
           "family_id": {
-            "title": "Family Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the product belongs to no family; such a group holds one member",
+            "title": "Family Id"
           },
           "family_label": {
             "anyOf": [
@@ -75,7 +83,6 @@
           }
         },
         "required": [
-          "family_id",
           "members"
         ],
         "title": "AssistGroup",
@@ -83,6 +90,14 @@
       },
       "AssistGroupMember": {
         "properties": {
+          "match_reasons": {
+            "description": "Why the retrieval produced this candidate, in its own vocabulary. Reused rather than restated: these codes carry real provenance since C21 and the panel already maps them to badges",
+            "items": {
+              "type": "string"
+            },
+            "title": "Match Reasons",
+            "type": "array"
+          },
           "materials": {
             "items": {
               "type": "string"
@@ -126,6 +141,7 @@
         "type": "object"
       },
       "AssistRequest": {
+        "description": "One of the two anchors is required, and **at least** one rather than exactly one.\n\n\"Exactly one\" would exclude the mode that carries the most value for the least cost —\na piece on the screen plus the question the customer just asked — which is the mode\nthat finally gives the ten counter-conversation documents of the corpus a route to an\noperator's screen. `IndexSyncRequest` with `full` against `since` is the same shape.",
         "properties": {
           "context": {
             "anyOf": [
@@ -154,11 +170,32 @@
             "description": "Accepted for client compatibility and ignored; scope comes from the token",
             "title": "Pos Id"
           },
+          "product_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Anchor the assistance to one indexed piece. Null means a free query",
+            "title": "Product Id"
+          },
           "query": {
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Query",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the operator asked. Null means the piece itself is the request",
+            "title": "Query"
           },
           "top_k": {
             "default": 5,
@@ -169,14 +206,16 @@
             "type": "integer"
           }
         },
-        "required": [
-          "query"
-        ],
         "title": "AssistRequest",
         "type": "object"
       },
       "AssistResponse": {
         "properties": {
+          "abstained": {
+            "description": "The retrieval's abstention rule decided the catalogue cannot answer this query, so no group is returned. Emitted in every mode — constantly false for a piece with no question, where there is no retrieval to abstain from — and deliberately **not** `low_confidence`, whose measured meaning is cross-branch consensus and fires on answerable queries far more often than on out-of-domain ones",
+            "title": "Abstained",
+            "type": "boolean"
+          },
           "citations": {
             "items": {
               "$ref": "#/components/schemas/Citation"
@@ -208,7 +247,7 @@
             "type": "array"
           },
           "intent": {
-            "description": "Detected intent, open vocabulary while stubbed",
+            "description": "Derived from the request shape and never from the wording: `product_pitch` for a piece with no question, `unclassified` otherwise. Classifying a query is C31",
             "title": "Intent",
             "type": "string"
           },
@@ -216,6 +255,18 @@
             "description": "Generated prose with unresolved {{price}} / {{stock}} placeholders",
             "title": "Pitch",
             "type": "string"
+          },
+          "prompt_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Version of the prompt that wrote the pitch. Null while there is no pitch",
+            "title": "Prompt Version"
           },
           "trace_id": {
             "description": "Correlation id, from the token claim when present",
@@ -226,6 +277,7 @@
             "$ref": "#/components/schemas/Usage"
           },
           "warnings": {
+            "description": "Rule-derived codes, from the closed vocabulary of the assistance capability: family_has_variants, size_label_missing. Never a sentence: the Spanish a human reads belongs to the frontend",
             "items": {
               "type": "string"
             },
@@ -239,13 +291,34 @@
           "intent",
           "groups",
           "pitch",
-          "usage"
+          "usage",
+          "abstained"
         ],
         "title": "AssistResponse",
         "type": "object"
       },
       "Citation": {
+        "description": "A fragment of the knowledge corpus, carrying everything needed to present it honestly.\n\n**Citations are corpus fragments and nothing else.** Citing the catalogue would verify\nnothing — the product's metadata already travels in the response — so the anchoring of a\ncandidate in the catalogue is expressed with `match_reasons` instead.\n\n`citation_id` is `<documento>#<sección>`: with the corpus in git it *resolves, locates and\nopens* a file and a heading. `claim_scope` is not decoration either — it separates a fact\nof the world from a commitment of the establishment, which is the failure the whole\nmarking mechanism of C23 exists to prevent, and 25 of the corpus's 161 fragments carry it.",
         "properties": {
+          "citation_id": {
+            "description": "`<document>#<section>`; resolves to a file and a heading in git",
+            "title": "Citation Id",
+            "type": "string"
+          },
+          "claim_scope": {
+            "description": "`general` for a fact of the world, `establecimiento` for a commitment of the house, which is never read to a customer without confirming it in store",
+            "title": "Claim Scope",
+            "type": "string"
+          },
+          "doc_type": {
+            "description": "Corpus document type: material, faq, politica, talla",
+            "title": "Doc Type",
+            "type": "string"
+          },
+          "document_title": {
+            "title": "Document Title",
+            "type": "string"
+          },
           "product_id": {
             "anyOf": [
               {
@@ -255,20 +328,31 @@
                 "type": "null"
               }
             ],
+            "description": "The piece this claim supports, when the request anchored one",
             "title": "Product Id"
+          },
+          "score": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "type": "number"
+          },
+          "section_title": {
+            "title": "Section Title",
+            "type": "string"
           },
           "snippet": {
             "title": "Snippet",
             "type": "string"
-          },
-          "source": {
-            "description": "Corpus document or product the claim comes from",
-            "title": "Source",
-            "type": "string"
           }
         },
         "required": [
-          "source",
+          "citation_id",
+          "document_title",
+          "section_title",
+          "doc_type",
+          "claim_scope",
+          "score",
           "snippet"
         ],
         "title": "Citation",

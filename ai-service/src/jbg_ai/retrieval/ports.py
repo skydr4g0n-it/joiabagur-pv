@@ -98,6 +98,28 @@ class SourceDocument:
 
 
 @dataclass(frozen=True)
+class FamilyMember:
+    """One member of a product family, as the index holds it. C30a.
+
+    Deliberately **not** a `SearchHit`: there is no query here, so there is no distance and
+    no threshold, and inventing either to answer "enumerate this family" would be false.
+
+    It carries **no price and no availability bucket**, and that is the boundary rule rather
+    than an oversight: nothing in this dataclass may cross to a `/v1` response, and the two
+    fields that must never cross are simply not read.
+    """
+
+    product_id: UUID
+    sku: str
+    variant_label: str | None
+    materials: list[str]
+    size_label: str | None
+    #: Denormalised onto every member row by the projection, so the group's label comes back
+    #: with the roster instead of costing a second read of a table this port does not have.
+    family_name: str | None = None
+
+
+@dataclass(frozen=True)
 class NeighbourHit:
     """One candidate substitute: a neighbour of a STORED embedding, not of a query. C26.
 
@@ -195,6 +217,40 @@ class ProductSearchPort(Protocol):
         Absence is a RESULT and not an exception, and so are `is_active` and `has_embedding`:
         the three unusable cases — unknown, inactive, unindexed — are one HTTP error each,
         and which sentence a caller writes is not a decision the SQL layer gets to make.
+        """
+        ...
+
+    async def family_roster(self, family_id: UUID, *, cap: int) -> list[FamilyMember]:
+        """Every active member of one family, from `ai.product_document` alone. C30a.
+
+        **Why this is not `search` with a family filter.** That method answers "what does
+        this query look like", and answering it costs a query vector, a distance threshold
+        and a branch depth. None of the three means anything for "enumerate the members of
+        this family": there is no query, so there is no similarity to threshold, and paying
+        an embedding for a listing would buy a number nobody reads. Reusing it would also
+        make the answer depend on a threshold, which is how a family of four silently starts
+        reporting three.
+
+        **Why it exists at all**, rather than being inferred from the candidates already
+        retrieved: a product can belong to a family of four and the retrieval return two.
+        Grouping cannot know about the members that never came, and the warning that says
+        "this family has other variants" is exactly a statement about them. It also serves a
+        second real consumer — C32's `listar_familia` tool — which is the bar this project
+        sets before extracting a shared piece.
+
+        **Reads only the index schema**, like every other method of this port: never
+        `public`, and never the point-of-sale projection. Availability is not read here at
+        all, so no bucket can leak into a response through this door.
+
+        `cap` is a **declared** ceiling and not an incidental limit, applied under the same
+        order the statement uses. Measured on the live index on 2026-09-13, the largest
+        family holds 8 members of 156 families and 491 memberships, so the cap bounds a
+        worst case rather than trimming anything real.
+
+        The roster is the index's picture **as of the last sync**. The warning it feeds can
+        therefore lag that window, which degrades the advice and never deletes a candidate —
+        and asking .NET for it instead would cross the boundary backwards for a fact about
+        catalogue structure, which is the index's.
         """
         ...
 
