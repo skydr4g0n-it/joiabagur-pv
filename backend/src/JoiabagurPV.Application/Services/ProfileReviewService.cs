@@ -39,6 +39,19 @@ public class ProfileReviewService : IProfileReviewService
     /// <summary>The question the rejected list asks, which is the opposite one.</summary>
     private const string QuestionIsThisRejectionWrong = "¿Hay algún rechazo incorrecto?";
 
+    /// <summary>
+    /// Provenance reported for a field the extractor proposed nothing for.
+    /// </summary>
+    /// <remarks>
+    /// A presentation value: it is never written to <c>FieldSourceJson</c>, which carries only
+    /// what the enrichment contract emits. It exists because defaulting an absent field to
+    /// <c>inferred</c> is a false statement about the extractor — measured on 2026-09-13, 613 of
+    /// the 1.114 queued profiles carry no size label at all, and reporting those as inferred at
+    /// 0,20 reads as "the model asserted this with no evidence" about a field the model never
+    /// spoke to.
+    /// </remarks>
+    public const string AbsentSource = "absent";
+
     private readonly IRepository<ProductAiProfile> _profiles;
     private readonly IRepository<Product> _products;
     private readonly IUnitOfWork _unitOfWork;
@@ -614,14 +627,15 @@ public class ProfileReviewService : IProfileReviewService
 
         ProfileReviewFieldDto Decorate(ProfileReviewFieldDto field)
         {
-            var source = sources.GetValueOrDefault(field.Field, ProfileFieldSources.Inferred);
+            // Absent, not inferred. The extractor writes a provenance for every field it spoke
+            // to, so a missing key means it proposed nothing — and saying "inferred" there
+            // accuses it of a guess it never made.
+            var source = sources.GetValueOrDefault(field.Field, AbsentSource);
             var sensitive = ProfileReviewPolicy.SensitiveFields.Contains(field.Field);
 
             field.Confidence = confidence.GetValueOrDefault(field.Field, 0.20);
             field.Source = source;
             field.Sensitive = sensitive;
-            // Sensitive and inferred. A size read off a SKU by a regex is not a guess, and
-            // marking it would spend a reviewer's attention on the one field that needs none.
             field.PendingReview = sensitive && source == ProfileFieldSources.Inferred;
             field.AlreadyCorrected =
                 corrections.TryGetValue(field.Field, out var correction)

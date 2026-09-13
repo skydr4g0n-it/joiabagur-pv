@@ -22,7 +22,6 @@ import {
   Circle,
   FileText,
   Keyboard,
-  RefreshCw,
   Target,
   Timer,
   Undo2,
@@ -397,10 +396,6 @@ export default function ProfileReviewPage() {
             {REVIEW_SHORTCUTS.map((s) => `${s.keys} ${s.description}`).join(' · ')}
           </Badge>
 
-          <Button variant="outline" size="sm" onClick={() => void loadQueue(stratum)}>
-            <RefreshCw className="size-4" />
-            Recalcular
-          </Button>
         </div>
       </div>
 
@@ -505,23 +500,9 @@ export default function ProfileReviewPage() {
                   </TableHeader>
                   <TableBody>
                     {current.fields.map((field) => (
-                      <TableRow
-                        key={field.field}
-                        data-pending-review={field.pendingReview ? 'true' : undefined}
-                        className={field.pendingReview ? 'bg-amber-50/60' : undefined}
-                      >
+                      <TableRow key={field.field}>
                         <TableCell className="font-medium">
-                          <div className="flex items-center gap-1">
-                            {FIELD_LABELS[field.field]}
-                            {field.pendingReview && (
-                              /* Sensitive and inferred: the hybrid policy needs a person for
-                                 exactly these. A size read off a SKU by a regex is not marked,
-                                 because re-reading it would spend attention on a certainty. */
-                              <Badge variant="destructive" className="text-[10px]">
-                                pendiente de revisión
-                              </Badge>
-                            )}
-                          </div>
+                          {FIELD_LABELS[field.field]}
                         </TableCell>
                         <TableCell className="text-muted-foreground font-mono text-xs">
                           {field.isList
@@ -579,8 +560,29 @@ export default function ProfileReviewPage() {
                           {field.confidence.toLocaleString('es-ES')}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={field.source === 'rule' ? 'secondary' : 'outline'}>
-                            {field.source === 'rule' ? 'regla' : 'inferido'}
+                          {/* Three cases, not two. A field the extractor proposed nothing for is
+                              absent, not inferred: calling it inferred accuses the model of a
+                              guess it never made, and it is the majority case for the size
+                              label. With the per-field mark gone, this column and the confidence
+                              beside it are the whole signal — so they cannot say something
+                              untrue. */}
+                          <Badge
+                            variant={
+                              field.source === 'rule'
+                                ? 'secondary'
+                                : field.source === 'absent'
+                                  ? 'outline'
+                                  : 'outline'
+                            }
+                            className={
+                              field.source === 'absent' ? 'text-muted-foreground italic' : undefined
+                            }
+                          >
+                            {field.source === 'rule'
+                              ? 'regla'
+                              : field.source === 'absent'
+                                ? 'ausente'
+                                : 'inferido'}
                           </Badge>
                         </TableCell>
                       </TableRow>

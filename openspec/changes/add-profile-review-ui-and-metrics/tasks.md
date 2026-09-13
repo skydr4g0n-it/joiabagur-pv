@@ -72,7 +72,7 @@
 
 - [x] 7.1 Crear `src/types/profile-review.types.ts`, espejo de los DTOs
 - [x] 7.2 Crear `src/services/profile-review.service.ts` con resultado discriminado para distinguir «vino vacío» de «no se pudo calcular», replicando `family-review.service.ts`
-- [x] 7.3 Crear `src/pages/admin/profile-review.tsx`: tabla editable, confianza y procedencia por campo, texto de origen completo al lado, y destacado de los sensibles inferidos
+- [x] 7.3 Crear `src/pages/admin/profile-review.tsx`: tabla editable, confianza y procedencia por campo (`regla` / `inferido` / `ausente`), y texto de origen completo al lado. ~~destacado de los sensibles inferidos~~: retirado tras medirlo — era constante y no informaba
 - [x] 7.4 Presentar la pregunta según el estrato: *«¿falta algo?»* en el de máxima confianza, *«¿es correcto?»* en los demás
 - [x] 7.5 Declarar explícitamente la ausencia de descripción en lugar de dejar un hueco
 - [x] 7.6 Barra de aprobación masiva, acotada a un campo dentro de un estrato en la propia interfaz
@@ -83,7 +83,7 @@
 
 ## 8. Tests de frontend
 
-- [x] 8.1 `should highlight inferred sensitive fields pending review` *(nombrado por la ficha del plan)*
+- [x] 8.1 ~~`should highlight inferred sensitive fields pending review`~~ *(nombrado por la ficha del plan, **refutado por medición durante la sesión**)* → sustituido por `should distinguish a rule from an inference in the provenance of each field` y `should report a field the extractor never proposed as absent rather than inferred`. La marca por campo resultó **constante en 6 de los 7 campos** sobre los 1.114 perfiles de la cola, y el séptimo solo variaba porque un campo ausente se reportaba como inferido en **613 de ellos**. Spec enmendada en consecuencia
 - [x] 8.2 `should record correction when material list is edited` *(nombrado por la ficha del plan)*
 - [x] 8.3 `should send the measured duration when an individual review is saved`
 - [x] 8.4 `should report that the queue could not be computed when the read fails`

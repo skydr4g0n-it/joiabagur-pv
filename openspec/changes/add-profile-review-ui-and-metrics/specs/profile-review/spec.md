@@ -113,23 +113,46 @@ convention a reviewer is left to infer.
 - **WHEN** its profile is presented for review
 - **THEN** the absence of a description is stated explicitly
 
-### Requirement: Sensitive inferred fields are marked as pending, fields from a rule are not
+### Requirement: Every field carries its confidence and its provenance, and an absence is not an inference
 
-The system SHALL mark, per field, the fields a model inferred and which the hybrid review policy
-therefore requires a person to confirm, and MUST NOT mark a sensitive field whose value came from a
-deterministic rule. Every field MUST be presented with its confidence and its provenance.
+The system SHALL present every field with its confidence and its provenance, and the provenance
+MUST distinguish three cases: a deterministic rule produced the value, a model inferred it, or the
+extractor proposed nothing for that field. A field the extractor never proposed MUST NOT be
+reported as inferred.
 
-#### Scenario: An inferred sensitive field is marked
+A per-field *pending review* mark was specified here first and is deliberately not required, because
+measuring it against the corpus showed it carries no information. Over the 1.114 profiles of the
+queue the mark is **constant in six of the seven fields** — always on for piece type, materials and
+stone type, always off for the three commercial tags — because the extractor marks those six the
+same way in every single product. A signal that never varies is not a signal. What tells a reviewer
+where the risk is, and does vary, is the pair the fields already carry: a value at `0,45` asserted
+by a model is a different proposition from one at `1,00` produced by a rule.
 
-- **GIVEN** a profile whose piece type, materials and stone type were inferred and whose size label came from a rule
+The third provenance case is what that measurement uncovered. The seventh field, the size label, is
+the only one whose mark varied — and it varied because an absent field was being defaulted to
+inferred: **613 of those 1.114 profiles carry no size label at all**, and reporting them as inferred
+at `0,20` reads as "the model asserted this with no evidence" about a field the model never spoke
+to. That is an accusation against the extractor rather than a description of the data, and it would
+inflate a reviewer's sense of how much of the catalogue was guessed.
+
+#### Scenario: Provenance distinguishes a rule from an inference
+
+- **GIVEN** a profile whose materials were inferred and whose size label came from a rule
 - **WHEN** it is presented for review
-- **THEN** the piece type, the materials and the stone type are marked as pending review
-- **AND** the size label is not
+- **THEN** the materials report that a model inferred them
+- **AND** the size label reports that a rule produced it
 
-#### Scenario: Confidence and provenance travel with every field
+#### Scenario: A field the extractor never proposed is reported as absent
+
+- **GIVEN** a profile for which the extractor proposed no size label
+- **WHEN** it is presented for review
+- **THEN** that field's provenance reports an absence
+- **AND** it is not reported as inferred
+
+#### Scenario: Confidence travels with every field
 
 - **WHEN** a profile is presented for review
-- **THEN** each field reports its confidence and whether it came from a rule or from inference
+- **THEN** each field reports its confidence
 
 ### Requirement: A correction is recorded with its direction, and the raw proposal is never rewritten
 

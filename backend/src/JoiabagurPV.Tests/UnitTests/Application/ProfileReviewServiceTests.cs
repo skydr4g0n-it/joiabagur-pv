@@ -280,6 +280,29 @@ public class ProfileReviewServiceTests
     }
 
     [Fact]
+    public async Task Queue_FieldTheExtractorNeverProposed_IsReportedAbsentNotInferred()
+    {
+        // Not a nicety. Measured on the corpus on 2026-09-13, 613 of the 1.114 queued profiles
+        // carry no size label at all, and defaulting those to "inferred" says the model asserted
+        // something with no evidence about a field it never spoke to — an accusation against the
+        // extractor rather than a description of the data. With the per-field review mark
+        // withdrawn, this column and the confidence beside it are the whole signal a reviewer
+        // reads, so neither may state something untrue.
+        var pair = APair(Id(1), sizeLabel: null);
+        var service = CreateService([pair.Profile], [pair.Product]);
+
+        var item = (await service.GetQueueAsync(new ProfileReviewQueueRequest())).Items.Single();
+
+        var size = item.Fields.Single(field => field.Field == ProfileFields.SizeLabel);
+        size.Source.Should().Be(ProfileReviewService.AbsentSource);
+        size.Source.Should().NotBe(ProfileFieldSources.Inferred);
+
+        // And a field the extractor did speak to keeps saying so.
+        item.Fields.Single(field => field.Field == ProfileFields.Materials)
+            .Source.Should().Be(ProfileFieldSources.Inferred);
+    }
+
+    [Fact]
     public async Task Queue_RejectedProfiles_DoNotAppear()
     {
         var approved = APair(Id(1));

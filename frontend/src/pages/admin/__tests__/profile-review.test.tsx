@@ -189,24 +189,62 @@ beforeEach(() => {
 });
 
 describe('ProfileReviewPage', () => {
-  it('should highlight inferred sensitive fields pending review', async () => {
+  /**
+   * Replaces `should highlight inferred sensitive fields pending review`, which the plan card
+   * named and the corpus refuted.
+   *
+   * That mark was **constant in six of the seven fields** across the 1.114 queued profiles —
+   * always on for piece type, materials and stone type, always off for the three commercial tags
+   * — so it distinguished nothing. What varies, and what a reviewer actually reads, is the
+   * provenance of each field.
+   */
+  it('should distinguish a rule from an inference in the provenance of each field', async () => {
     render(<ProfileReviewPage />);
 
-    const pieceType = await screen.findByRole('row', { name: /Tipo de pieza/ });
-    expect(pieceType).toHaveAttribute('data-pending-review', 'true');
+    const size = await screen.findByRole('row', { name: /Talla/ });
+    expect(within(size).getByText('regla')).toBeInTheDocument();
 
-    expect(screen.getByRole('row', { name: /Materiales/ })).toHaveAttribute(
-      'data-pending-review',
-      'true',
-    );
+    expect(
+      within(screen.getByRole('row', { name: /Materiales/ })).getByText('inferido'),
+    ).toBeInTheDocument();
 
-    // The size came from a deterministic rule. Marking it would spend a reviewer's attention on
-    // the one sensitive field that needs none, which is the trade that makes reviewing a catalog
-    // of this size conceivable at all.
-    expect(screen.getByRole('row', { name: /Talla/ })).not.toHaveAttribute('data-pending-review');
+    // The mark itself is gone: a signal that never varies is not a signal.
+    expect(screen.queryByText('pendiente de revisión')).not.toBeInTheDocument();
+  });
 
-    // And a commercial tag is not sensitive, however it was produced.
-    expect(screen.getByRole('row', { name: /Color/ })).not.toHaveAttribute('data-pending-review');
+  it('should report a field the extractor never proposed as absent rather than inferred', async () => {
+    // Measured on the corpus: 613 of the 1.114 queued profiles carry no size label at all.
+    // Reporting those as inferred at 0,20 reads as "the model asserted this with no evidence"
+    // about a field the model never spoke to — and with the per-field mark gone, this column and
+    // the confidence beside it are the whole signal, so they cannot say something untrue.
+    mocked.getQueue.mockResolvedValue({
+      state: 'loaded',
+      queue: aQueue([
+        anItem({
+          fields: [
+            {
+              field: 'size_label',
+              isList: false,
+              value: null,
+              values: [],
+              proposedValue: null,
+              proposedValues: [],
+              confidence: 0.2,
+              source: 'absent',
+              sensitive: true,
+              pendingReview: false,
+              alreadyCorrected: false,
+            },
+          ],
+        }),
+      ]),
+    });
+
+    render(<ProfileReviewPage />);
+
+    const size = await screen.findByRole('row', { name: /Talla/ });
+    expect(within(size).getByText('ausente')).toBeInTheDocument();
+    expect(within(size).queryByText('inferido')).not.toBeInTheDocument();
   });
 
   it('should record correction when material list is edited', async () => {
