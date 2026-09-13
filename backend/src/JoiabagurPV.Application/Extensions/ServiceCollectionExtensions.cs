@@ -87,6 +87,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IProfileReviewPolicy, ProfileReviewPolicy>();
         services.AddScoped<IProductAiProfileService, ProductAiProfileService>();
 
+        // Human review of those profiles, and the figures it produces (C28). A separate service
+        // from the one that enriches, because that one's contract already assigns reading,
+        // approving and measuring to the review capability.
+        services.AddScoped<IProfileReviewService, ProfileReviewService>();
+
         // Register product families (EP13)
         services.AddScoped<IProductFamilyService, ProductFamilyService>();
         services.AddScoped<IFamilySuggestionService, FamilySuggestionService>();
@@ -126,6 +131,15 @@ public static class ServiceCollectionExtensions
             .Validate(
                 o => o.MinimumFieldConfidence is >= 0 and <= 1,
                 $"{ProfileReviewOptions.SectionName}:MinimumFieldConfidence must be between 0 and 1.")
+            // An empty seed still samples, deterministically and reproducibly, which is why this
+            // has to be refused at start-up rather than left to look like it worked: the figure
+            // a blank seed produces is reconstructable only by someone who knows it was blank.
+            .Validate(
+                o => !string.IsNullOrWhiteSpace(o.SamplingSeed),
+                $"{ProfileReviewOptions.SectionName}:SamplingSeed must not be empty.")
+            .Validate(
+                o => o.QuotaPerStratum > 0,
+                $"{ProfileReviewOptions.SectionName}:QuotaPerStratum must be greater than zero.")
             .ValidateOnStart();
 
         return services;

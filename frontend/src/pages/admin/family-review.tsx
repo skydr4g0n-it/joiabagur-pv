@@ -12,13 +12,12 @@
  * materialised — a degraded path that looked correct. The states are per list rather than per page
  * so that reviewing the families, which needs no vectors, stays usable while the audit does not.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Check,
-  CheckCircle2,
-  CloudOff,
   Inbox,
+  Keyboard,
   Pencil,
   RefreshCw,
   Timer,
@@ -29,7 +28,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -45,7 +43,13 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
+import { EmptyButComputed, Unavailable } from '@/components/admin/three-state-list';
+import { useItemStopwatch } from '@/hooks/use-item-stopwatch';
+import { REVIEW_SHORTCUTS, useReviewKeyboard } from '@/hooks/use-review-keyboard';
+
 import { familyReviewService } from '@/services/family-review.service';
+import { productService } from '@/services/product.service';
+import type { ProductListItem } from '@/types/product.types';
 import type {
   FamilyAudit,
   FamilyListItem,
@@ -60,36 +64,6 @@ import type {
 /** Formats a similarity margin the way the reviewer reads it: three decimals, Spanish comma. */
 const formatMargin = (value: number) =>
   value.toLocaleString('es-ES', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-
-/**
- * A list that is unavailable, said plainly.
- *
- * Deliberately not a spinner and not an empty table. The whole point is that this cannot be
- * mistaken for "there is nothing here".
- */
-function Unavailable({ reason }: { reason: string }) {
-  return (
-    <Alert variant="destructive">
-      <CloudOff className="size-4" />
-      <AlertTitle>No se ha podido calcular</AlertTitle>
-      <AlertDescription>
-        {reason} Esto <strong>no</strong> significa que no haya nada que revisar: significa que no
-        se sabe.
-      </AlertDescription>
-    </Alert>
-  );
-}
-
-/** A list that was computed and came back with nothing, said just as plainly. */
-function EmptyButComputed({ children }: { children: React.ReactNode }) {
-  return (
-    <Alert>
-      <CheckCircle2 className="size-4" />
-      <AlertTitle>Sin hallazgos</AlertTitle>
-      <AlertDescription>{children}</AlertDescription>
-    </Alert>
-  );
-}
 
 export default function FamilyReviewPage() {
   const [auditState, setAuditState] = useState<ListState>('loading');
@@ -113,12 +87,23 @@ export default function FamilyReviewPage() {
   const [labels, setLabels] = useState<Record<string, string>>({});
   const [applying, setApplying] = useState<string | null>(null);
 
-  // Per-item stopwatch. The average it produces is a delivery metric, and it is also the only
-  // signal that a review has degraded into clicking through: a queue worked at two seconds an
-  // item is not being read.
-  const openedAt = useRef<number>(Date.now());
-  const [reviewed, setReviewed] = useState(0);
-  const [elapsedMs, setElapsedMs] = useState(0);
+  // Per-item stopwatch, shared with the profile review screen. The measurement travels in the
+  // request that records the judgement; the counters it leaves behind are only a signal that a
+  // review has degraded into clicking through — a queue worked at two seconds an item is not
+  // being read.
+  const stopwatch = useItemStopwatch();
+
+  // Controlled so the keyboard knows which queue is on screen. An uncontrolled tab set would
+  // leave the shortcuts judging rows of whichever list happened to be first.
+  const [tab, setTab] = useState('families');
+  const [cursor, setCursor] = useState(0);
+
+  // Creating a family by hand, for the piece types the audit structurally cannot reach.
+  const [newFamilyName, setNewFamilyName] = useState('');
+  const [productQuery, setProductQuery] = useState('');
+  const [candidates, setCandidates] = useState<ProductListItem[]>([]);
+  const [newMembers, setNewMembers] = useState<{ productId: string; variantLabel: string }[]>([]);
+  const [creating, setCreating] = useState(false);
 
   const loadAudit = useCallback(async (signal?: AbortSignal) => {
     setAuditState('loading');
@@ -260,10 +245,7 @@ export default function FamilyReviewPage() {
       // Measured here and **sent with the judgement**, not merely accumulated. The average the
       // delivery checklist asks for has to survive the tab closing, and the first review session
       // lost its timings precisely because this number lived only in component state.
-      const spentMs = Date.now() - openedAt.current;
-      setElapsedMs((current) => current + spentMs);
-      openedAt.current = Date.now();
-      setReviewed((current) => current + 1);
+      const spentMs = stopwatch.measure();
       const timed = { ...verdict, reviewSeconds: Math.round((spentMs / 1000) * 10) / 10 };
       // Last one wins for a pair, mirroring the server: ticking a row twice before submitting is
       // a person correcting themselves, and sending both would break the unique index.
@@ -274,8 +256,41 @@ export default function FamilyReviewPage() {
         timed,
       ]);
     },
-    [],
+    [stopwatch],
   );
+
+  const searchProducts = useCallback(async () => {
+    try {
+      setCandidates(await productService.searchProducts(productQuery.trim()));
+    } catch {
+      toast.error('No se ha podido buscar productos.');
+    }
+  }, [productQuery]);
+
+  const createFamily = useCallback(async () => {
+    if (newFamilyName.trim().length === 0 || newMembers.length === 0) return;
+
+    setCreating(true);
+    try {
+      const family = await familyReviewService.createFamily(newFamilyName.trim(), newMembers);
+      toast.success(`Familia «${family.name}» creada con ${newMembers.length} miembro(s).`);
+      setNewFamilyName('');
+      setNewMembers([]);
+      setCandidates([]);
+      setProductQuery('');
+      await Promise.all([loadFamilies(page), loadAudit()]);
+    } catch {
+      // The uniqueness index on the variant label within a family is the likely refusal, and
+      // saying so beats a generic failure: it is a question the reviewer can answer by typing a
+      // different label.
+      toast.error(
+        'No se ha podido crear la familia. Revisa que dos miembros no compartan la misma '
+          + 'etiqueta de variante.',
+      );
+    } finally {
+      setCreating(false);
+    }
+  }, [loadAudit, loadFamilies, newFamilyName, newMembers, page]);
 
   const submitPending = useCallback(async () => {
     if (pending.length === 0) return;
@@ -309,10 +324,64 @@ export default function FamilyReviewPage() {
     [loadAudit, loadFamilies, page],
   );
 
-  const averageSeconds = useMemo(
-    () => (reviewed === 0 ? 0 : elapsedMs / reviewed / 1000),
-    [elapsedMs, reviewed],
+  // Session figures, not delivery figures. The published average is the server's, computed from
+  // the durations it persisted — these two vanish with the tab, and are meant to.
+  const { reviewedInSession: reviewed, sessionAverageSeconds: averageSeconds } = stopwatch;
+
+  /**
+   * The rows the keyboard walks, whichever audit tab is open.
+   *
+   * A flagged member and an orphan candidate are different questions, but a judgement about
+   * either is the same shape — a product, a family and an outcome — so one cursor serves both
+   * tabs rather than two that could disagree about which row is current.
+   */
+  const keyboardQueue = useMemo(() => {
+    if (auditState !== 'loaded' || !audit) return [];
+
+    if (tab === 'flagged') {
+      return audit.flaggedMembers.map((member) => ({
+        productId: member.productId,
+        familyId: member.familyId,
+        marginAtReview: member.margin,
+      }));
+    }
+
+    if (tab === 'orphans') {
+      return audit.orphanCandidates.map((candidate) => ({
+        productId: candidate.productId,
+        familyId: candidate.familyId,
+        marginAtReview: candidate.margin,
+      }));
+    }
+
+    return [];
+  }, [audit, auditState, tab]);
+
+  // Back to the top whenever the queue underneath changes. A cursor left pointing at index nine
+  // of a list that now holds three is a reviewer judging a row they cannot see.
+  useEffect(() => setCursor(0), [tab, audit]);
+
+  const judgeCurrent = useCallback(
+    (outcome: FamilyReviewOutcome) => {
+      const item = keyboardQueue[cursor];
+      if (!item) return;
+
+      recordVerdict({ ...item, outcome });
+      setCursor((current) => Math.min(current + 1, keyboardQueue.length - 1));
+    },
+    [cursor, keyboardQueue, recordVerdict],
   );
+
+  useReviewKeyboard({
+    onApprove: () => judgeCurrent('Confirmed'),
+    onReject: () => judgeCurrent('Rejected'),
+    onNext: () => setCursor((current) => Math.min(current + 1, keyboardQueue.length - 1)),
+    onPrevious: () => setCursor((current) => Math.max(current - 1, 0)),
+    onSave: () => void submitPending(),
+    // Off on the tabs that hold no queue, so a stray keystroke on the families listing does
+    // not silently judge a row on a tab the reviewer is not looking at.
+    enabled: keyboardQueue.length > 0,
+  });
 
   /**
    * What the reviewer decided about a pair, or undefined if they have not.
@@ -351,6 +420,12 @@ export default function FamilyReviewPage() {
               : '—'}
             {reviewed > 0 && ` · ${reviewed} en esta sesión (${averageSeconds.toFixed(1)} s)`}
           </Badge>
+          {/* Announced rather than discoverable. A shortcut nobody knows about is one nobody
+              uses, and the point of adding them is that a queue can be worked without the mouse. */}
+          <Badge variant="outline" className="gap-1" title="Atajos de teclado">
+            <Keyboard className="size-3" />
+            {REVIEW_SHORTCUTS.map((shortcut) => `${shortcut.keys} ${shortcut.description}`).join(' · ')}
+          </Badge>
           <Button
             variant="outline"
             size="sm"
@@ -368,7 +443,7 @@ export default function FamilyReviewPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="families">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="families">Familias ({familiesTotal})</TabsTrigger>
           <TabsTrigger value="flagged">
@@ -467,7 +542,123 @@ export default function FamilyReviewPage() {
         </TabsContent>
 
         {/* ── Families: needs no vectors, so it stays usable while the audit does not ────────── */}
-        <TabsContent value="families">
+        <TabsContent value="families" className="flex flex-col gap-4">
+          {/* ── Creating a family by hand ──────────────────────────────────────────────────
+              The audit nominates an unassigned product by its margin **relative to a target
+              family**, so a product whose piece type has no family at all cannot be nominated:
+              there is nothing to compute a margin against. Seven chains and two plain wedding
+              bands sit in exactly that position, and no tuning of the audit reaches them. */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="size-4" />
+                Crear una familia
+              </CardTitle>
+              <CardDescription>
+                Para los tipos de pieza que no tienen ninguna familia todavía: la auditoría no
+                puede proponer nada ahí porque no hay contra qué comparar.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium" htmlFor="new-family-name">
+                    Nombre de la familia
+                  </label>
+                  <Input
+                    id="new-family-name"
+                    aria-label="Nombre de la familia"
+                    value={newFamilyName}
+                    onChange={(event) => setNewFamilyName(event.target.value)}
+                    placeholder="Cadena de plata"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium" htmlFor="new-family-search">
+                    Buscar productos
+                  </label>
+                  <Input
+                    id="new-family-search"
+                    aria-label="Buscar productos"
+                    value={productQuery}
+                    onChange={(event) => setProductQuery(event.target.value)}
+                    placeholder="nombre o SKU"
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  disabled={productQuery.trim().length === 0}
+                  onClick={() => void searchProducts()}
+                >
+                  Buscar
+                </Button>
+                <Button
+                  disabled={newFamilyName.trim().length === 0 || newMembers.length === 0 || creating}
+                  onClick={() => void createFamily()}
+                >
+                  Crear con {newMembers.length} miembro(s)
+                </Button>
+              </div>
+
+              {candidates.length > 0 && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Producto</TableHead>
+                      <TableHead>Etiqueta de variante</TableHead>
+                      <TableHead />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {candidates.map((candidate) => {
+                      const member = newMembers.find((m) => m.productId === candidate.id);
+                      return (
+                        <TableRow key={candidate.id}>
+                          <TableCell>
+                            <div className="font-medium">{candidate.name}</div>
+                            <div className="text-muted-foreground text-xs">{candidate.sku}</div>
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              aria-label={`Etiqueta de variante de ${candidate.name}`}
+                              value={member?.variantLabel ?? ''}
+                              disabled={!member}
+                              placeholder="vacío = pieza base"
+                              onChange={(event) =>
+                                setNewMembers((current) =>
+                                  current.map((m) =>
+                                    m.productId === candidate.id
+                                      ? { ...m, variantLabel: event.target.value }
+                                      : m,
+                                  ),
+                                )
+                              }
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant={member ? 'destructive' : 'outline'}
+                              size="sm"
+                              onClick={() =>
+                                setNewMembers((current) =>
+                                  member
+                                    ? current.filter((m) => m.productId !== candidate.id)
+                                    : [...current, { productId: candidate.id, variantLabel: '' }],
+                                )
+                              }
+                            >
+                              {member ? 'Quitar' : 'Añadir'}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -650,8 +841,16 @@ export default function FamilyReviewPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {audit!.flaggedMembers.map((member) => (
-                      <TableRow key={`${member.productId}-${member.familyId}`}>
+                    {audit!.flaggedMembers.map((member, index) => (
+                      <TableRow
+                        key={`${member.productId}-${member.familyId}`}
+                        // The cursor has to be visible or the shortcuts are unusable: a reviewer
+                        // pressing A needs to know which row they just judged.
+                        aria-current={tab === 'flagged' && index === cursor ? 'true' : undefined}
+                        className={
+                          tab === 'flagged' && index === cursor ? 'bg-muted/60' : undefined
+                        }
+                      >
                         <TableCell>
                           <div className="font-medium">{member.name}</div>
                           <div className="text-muted-foreground text-xs">
@@ -729,8 +928,14 @@ export default function FamilyReviewPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {audit!.orphanCandidates.map((candidate) => (
-                      <TableRow key={`${candidate.productId}-${candidate.familyId}`}>
+                    {audit!.orphanCandidates.map((candidate, index) => (
+                      <TableRow
+                        key={`${candidate.productId}-${candidate.familyId}`}
+                        aria-current={tab === 'orphans' && index === cursor ? 'true' : undefined}
+                        className={
+                          tab === 'orphans' && index === cursor ? 'bg-muted/60' : undefined
+                        }
+                      >
                         <TableCell>
                           <div className="font-medium">{candidate.name}</div>
                           <div className="text-muted-foreground text-xs">
