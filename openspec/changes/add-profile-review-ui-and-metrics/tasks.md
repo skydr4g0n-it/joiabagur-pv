@@ -95,23 +95,23 @@
 
 - [x] 9.1 Añadir a `family-review.tsx` la creación de familia con nombre y miembros con su etiqueta de variante, consumiendo el `POST /api/product-families` que ya existe
 - [x] 9.2 Test `should create a family with its members from the review screen`
-- [ ] 9.3 Verificar a mano el caso real heredado: los siete productos de `piece_type` `cadena` y las dos alianzas
+- [x] 9.3 Verificar a mano el caso real heredado: los siete productos de `piece_type` `cadena` y las dos alianzas
 
 ## 10. La sesión de revisión — el entregable
 
-- [ ] 10.1 Fijar y declarar la semilla del muestreo, y obtener el lote de 180 (60 por estrato)
-- [ ] 10.2 Revisar los ~40 primeros ítems **a ratón**, alternando estratos, para tener el término de comparación del teclado
-- [ ] 10.3 Revisar los ~140 restantes con teclado
-- [ ] 10.4 Pasada corta sobre los 32 rechazados con la pregunta invertida, resolviendo el caso de `Presión Oro`
-- [ ] 10.5 Comprobar que los productos corregidos vuelven a emitirse por el feed incremental y que sus documentos reflejan la corrección
-- [ ] 10.6 Comprobar que un perfil rechazado por una persona desaparece del índice
+- [x] 10.1 Fijar y declarar la semilla del muestreo, y obtener el lote de 180 (60 por estrato)
+- [x] 10.2 ~~Revisar los ~40 primeros ítems **a ratón**, alternando estratos~~ → hecho, pero **el término de comparación no sirvió**: el revisor acabó la sesión entera con ratón. Ver §4.2 del informe
+- [ ] 10.3 Revisar los ~140 restantes con teclado → **NO EJECUTADO**. Los atajos están implementados y probados en las dos pantallas, pero el revisor no los usó: *«no he encontrado diferencia… acabé aprobando todo con ratón»*. El A/B no existe y se declara, en vez de publicar la curva de aprendizaje como si fuera un efecto de interfaz
+- [x] 10.4 Pasada corta sobre los 32 rechazados con la pregunta invertida, resolviendo el caso de `Presión Oro`
+- [x] 10.5 Comprobar que los productos corregidos vuelven a emitirse por el feed incremental y que sus documentos reflejan la corrección
+- [x] 10.6 Comprobar que un perfil rechazado por una persona desaparece del índice
 
 ## 11. Cierre
 
 - [x] 11.1 `openspec validate --all --strict` con **0 failed**
 - [x] 11.2 Confirmar que no hay diff en `ai-service/` ni en `openapi.json`, y que no se ha creado ninguna migración
 - [x] 11.3 Comparar ambas suites contra la línea base por **nombres** de test, y `npm run build` en verde
-- [ ] 11.4 Escribir `Documentos/Proyecto Final AIEng/informes/c28-implementation-measurements.md` con los dos números, su desglose por estrato y dirección, la semilla, el resultado del A/B de teclado con su confundido declarado, y los hallazgos de vocabulario que la revisión destape
-- [ ] 11.5 Actualizar la limitación 2 del §15 del diseño con el porcentaje realmente revisado
+- [x] 11.4 Escribir `Documentos/Proyecto Final AIEng/informes/c28-implementation-measurements.md` con los dos números, su desglose por estrato y dirección, la semilla, el resultado del A/B de teclado con su confundido declarado, y los hallazgos de vocabulario que la revisión destape
+- [x] 11.5 Actualizar la limitación 2 del §15 del diseño con el porcentaje realmente revisado
 - [ ] 11.6 Actualizar `Documentos/epicas.md` y el plan de changes al archivar
-- [ ] 11.7 Anotar como hallazgo, sin corregirlos aquí, los términos de vocabulario que la revisión demuestre que faltan
+- [x] 11.7 Anotar como hallazgo, sin corregirlos aquí, los términos de vocabulario que la revisión demuestre que faltan

@@ -526,6 +526,40 @@ Proyecto Final.
 
 ---
 
+### `vidrio` falta en `materials`, y alcanza 67 productos
+
+**Lo encontró la sesión de revisión, no una consulta.** La exploración de C28 midió omisiones
+buscando los términos que **ya estaban** en el vocabulario —`hilo`, `perla`, `plata`, `acero`,
+`latón`— y por construcción no podía ver un hueco de cobertura. Una persona leyendo 204 productos sí.
+
+| término | campo | anotados en la sesión | **en el corpus** |
+|---|---|---:|---:|
+| `vidrio` | `materials` | 13 | **67 (5,6 %)** |
+| `naturaleza` | `style_tags` | 8 | **38** |
+| `platino` | `materials` | 11 | 20 |
+| `cobre` | `materials` | 9 | 15 |
+| `cuarzo rosa` | `stone_type` | 1 | 7 |
+| `turmalina` | `stone_type` | 1 | 5 |
+| `titanio` · `bronce` · `marfil` · `hierro` · `madera` | `materials` | 7 | 1-5 cada uno |
+
+`naturaleza` es el **segundo hueco conocido de `style_tags`**, junto al `filigrana` que FIX1 dejó
+abierto más arriba en este documento y que alcanza 66 documentos. Ese eje empieza a tener un caso
+propio.
+
+Dos anotaciones **no son huecos de cobertura** y conviene no mezclarlas: `cuarzo rosa` es un
+problema de **granularidad** —`cuarzo` sí está en `stone_type`, y la ficha de conocimiento ya
+describe el rosa como una de sus variedades—, y `nácar` anotado bajo `materials` es una **frontera
+de campo**, porque `nacar` está en el vocabulario de `stone_type`: la pregunta es si el nácar es el
+material de la pieza o la piedra que lleva.
+
+**Por qué se aplazó:** el mismo motivo que el término siguiente, y cuantificado en el informe —
+añadir estos términos sacaría 21 de los 122 productos del estrato A y unos 30 de los 284 del B,
+cambiando el lote que produjo la cifra publicada.
+
+**Referencia:** [c28-implementation-measurements.md](../Documentos/Proyecto%20Final%20AIEng/informes/c28-implementation-measurements.md) §5
+
+---
+
 ### El extractor emite `plata` cuando el texto dice `platino`
 
 `platino` y `cobre` no están en el vocabulario cerrado de `materials`, que tiene nueve términos.
