@@ -213,9 +213,11 @@ describe('ProfileReviewPage', () => {
     const user = userEvent.setup();
     render(<ProfileReviewPage />);
 
-    const materials = await screen.findByLabelText('Materiales');
-    await user.clear(materials);
-    await user.type(materials, 'plata, oro');
+    // Chosen from the closed vocabulary rather than typed. A material outside it is not merely
+    // wrong: `materials && ARRAY[…]` is how the retriever filters, and the search offers the
+    // same closed list, so no query could ever name it again.
+    await user.click(await screen.findByRole('button', { name: 'Materiales' }));
+    await user.click(screen.getByRole('button', { name: 'Oro' }));
 
     await user.click(screen.getByRole('button', { name: /Aprobar y siguiente/ }));
 
@@ -225,6 +227,54 @@ describe('ProfileReviewPage', () => {
     expect(sent.materials).toEqual(['plata', 'oro']);
     expect(sent.productId).toBe(PRODUCT_ID);
     expect(sent.verdict).toBe('approved');
+  });
+
+  it('should offer only the closed vocabulary for a governed field', async () => {
+    const user = userEvent.setup();
+    render(<ProfileReviewPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Materiales' }));
+
+    // The nine canonical terms, and no way to type a tenth.
+    expect(screen.getByRole('button', { name: 'Plata' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Baño de oro' })).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Materiales' })).not.toBeInTheDocument();
+  });
+
+  it('should keep a free text field for the size label', async () => {
+    render(<ProfileReviewPage />);
+
+    // The one field the extractor produces from a deterministic rule, and the rule emits ring
+    // sizes and chain lengths the vocabulary never contained — twenty distinct labels in the
+    // corpus against twelve terms. A closed list would make a size of 17 unrecordable.
+    expect(await screen.findByRole('textbox', { name: 'Talla' })).toBeInTheDocument();
+  });
+
+  it('should record a vocabulary gap as a finding and not as a correction', async () => {
+    const user = userEvent.setup();
+    render(<ProfileReviewPage />);
+
+    const materialsRow = await screen.findByRole('row', { name: /Materiales/ });
+    await user.click(
+      within(materialsRow).getByRole('button', { name: /no está en la lista/ }),
+    );
+    await user.type(
+      screen.getByLabelText(/Término que falta en el vocabulario de Materiales/),
+      'platino',
+    );
+    await user.click(screen.getByRole('button', { name: 'Anotar' }));
+
+    // It is recorded as a finding...
+    await user.click(screen.getByRole('tab', { name: /Huecos de vocabulario \(1\)/ }));
+    expect(await screen.findByText('platino')).toBeInTheDocument();
+
+    // ...and it does not become a value in force, which is what keeps it out of the rate: the
+    // extractor could not have produced a term its vocabulary does not contain.
+    await user.click(screen.getByRole('tab', { name: /^Cola/ }));
+    await user.click(await screen.findByRole('button', { name: /Aprobar y siguiente/ }));
+
+    await waitFor(() => expect(mocked.recordReview).toHaveBeenCalledTimes(1));
+    expect(mocked.recordReview.mock.calls[0][0].materials).toEqual(['plata']);
   });
 
   it('should send the measured duration when an individual review is saved', async () => {
@@ -264,14 +314,14 @@ describe('ProfileReviewPage', () => {
     const user = userEvent.setup();
     render(<ProfileReviewPage />);
 
-    const materials = await screen.findByLabelText('Materiales');
-    await user.clear(materials);
+    // The size label is the field that stays free text, so it is the one that can still swallow
+    // a shortcut. "ara" carries the approve key twice and the reject key is one letter away;
+    // every one of them would fire on a screen whose shortcuts were not inert inside a field.
+    const size = await screen.findByRole('textbox', { name: 'Talla' });
+    await user.clear(size);
+    await user.type(size, 'ara');
 
-    // "aro" carries the approve key, the reject key is one letter away, and every one of them
-    // would fire on a screen whose shortcuts were not inert inside a field.
-    await user.type(materials, 'aro');
-
-    expect(materials).toHaveValue('aro');
+    expect(size).toHaveValue('ara');
     expect(mocked.recordReview).not.toHaveBeenCalled();
   });
 

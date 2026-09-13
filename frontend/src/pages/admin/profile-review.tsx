@@ -45,8 +45,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { ThreeStateList } from '@/components/admin/three-state-list';
+import { VocabularyField } from '@/components/admin/vocabulary-field';
+import { CLOSED_VOCABULARIES } from '@/lib/materials-vocabulary';
 import { useItemStopwatch } from '@/hooks/use-item-stopwatch';
 import { REVIEW_SHORTCUTS, useReviewKeyboard } from '@/hooks/use-review-keyboard';
+import { useVocabularyGaps } from '@/hooks/use-vocabulary-gaps';
 
 import { profileReviewService } from '@/services/profile-review.service';
 import type {
@@ -120,6 +123,10 @@ export default function ProfileReviewPage() {
   const [bulkField, setBulkField] = useState<ProfileFieldName>('color_tags');
 
   const stopwatch = useItemStopwatch();
+
+  // Findings, not corrections. A term the vocabulary lacks could not have been produced by the
+  // extractor, so it never reaches the rate — it feeds the change that widens the list.
+  const gaps = useVocabularyGaps();
 
   const loadQueue = useCallback(
     async (which: EvidenceStratumCode | 'all', signal?: AbortSignal) => {
@@ -347,6 +354,7 @@ export default function ProfileReviewPage() {
           <TabsTrigger value="rejected">
             Rechazados{rejectedState === 'loaded' ? ` (${rejected?.totalCount ?? 0})` : ''}
           </TabsTrigger>
+          <TabsTrigger value="gaps">Huecos de vocabulario ({gaps.gaps.length})</TabsTrigger>
           <TabsTrigger value="metrics">Métricas</TabsTrigger>
         </TabsList>
 
@@ -463,18 +471,47 @@ export default function ProfileReviewPage() {
                             : (field.proposedValue ?? '—')}
                         </TableCell>
                         <TableCell>
-                          <Input
-                            aria-label={FIELD_LABELS[field.field]}
-                            value={draft[field.field] ?? ''}
-                            onChange={(event) =>
-                              setDraft((previous) =>
-                                previous
-                                  ? { ...previous, [field.field]: event.target.value }
-                                  : previous,
-                              )
-                            }
-                            placeholder={field.isList ? 'separados por comas' : 'vacío'}
-                          />
+                          {CLOSED_VOCABULARIES[field.field] ? (
+                            <VocabularyField
+                              field={field.field}
+                              label={FIELD_LABELS[field.field]}
+                              options={CLOSED_VOCABULARIES[field.field]}
+                              isList={field.isList}
+                              values={toList(draft[field.field] ?? '')}
+                              onChange={(next) =>
+                                setDraft((previous) =>
+                                  previous
+                                    ? { ...previous, [field.field]: next.join(', ') }
+                                    : previous,
+                                )
+                              }
+                              onGap={(term) => {
+                                gaps.record(field.field, term, current.sku);
+                                toast.success(
+                                  `Anotado «${term}» como hueco de ${FIELD_LABELS[field.field]}. `
+                                    + 'No cuenta como corrección.',
+                                );
+                              }}
+                            />
+                          ) : (
+                            /* Free text, and only here. The size label is the one field the
+                               extractor produces from a deterministic rule, and the rule emits
+                               ring sizes and chain lengths the vocabulary never contained — the
+                               corpus carries twenty distinct labels against twelve terms. A
+                               closed list would make a size of 17 unrecordable. */
+                            <Input
+                              aria-label={FIELD_LABELS[field.field]}
+                              value={draft[field.field] ?? ''}
+                              onChange={(event) =>
+                                setDraft((previous) =>
+                                  previous
+                                    ? { ...previous, [field.field]: event.target.value }
+                                    : previous,
+                                )
+                              }
+                              placeholder="vacío"
+                            />
+                          )}
                         </TableCell>
                         <TableCell className="text-right font-mono">
                           {field.confidence.toLocaleString('es-ES')}
@@ -655,6 +692,81 @@ export default function ProfileReviewPage() {
                   </TableBody>
                 </Table>
               </ThreeStateList>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Vocabulary gaps: findings, deliberately outside the rate ──────────────────── */}
+        <TabsContent value="gaps">
+          <Card>
+            <CardHeader>
+              <CardTitle>Términos que el vocabulario no tiene</CardTitle>
+              <CardDescription>
+                <strong>No son correcciones del extractor</strong>: no podía producirlos. Contarlos
+                en la tasa reportaría la cobertura del vocabulario como error del modelo, que son
+                dos cosas distintas y se arreglan de forma distinta. Ampliar el vocabulario no cabe
+                en este change —la confianza se calcula contra él, así que añadir un término mueve
+                productos de estrato y el lote dejaría de ser el mismo—, así que esta lista es la
+                evidencia que justifica hacerlo en el siguiente.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              {gaps.gaps.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                  Todavía no has anotado ninguno.
+                </p>
+              ) : (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Campo</TableHead>
+                        <TableHead>Término</TableHead>
+                        <TableHead>SKU</TableHead>
+                        <TableHead />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {gaps.gaps.map((gap, index) => (
+                        <TableRow key={`${gap.field}-${gap.term}-${gap.sku}`}>
+                          <TableCell>{FIELD_LABELS[gap.field as ProfileFieldName]}</TableCell>
+                          <TableCell className="font-mono">{gap.term}</TableCell>
+                          <TableCell className="font-mono text-xs">{gap.sku}</TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              aria-label={`Quitar ${gap.term}`}
+                              onClick={() => gaps.remove(index)}
+                            >
+                              Quitar
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        void navigator.clipboard?.writeText(gaps.asMarkdown());
+                        toast.success('Tabla copiada. Pégala en el informe de implementación.');
+                      }}
+                    >
+                      Copiar como tabla
+                    </Button>
+                    <span className="text-muted-foreground text-xs">
+                      Se guardan en este navegador, así que cerrar la pestaña no los pierde.
+                    </span>
+                  </div>
+
+                  <pre className="bg-muted overflow-x-auto rounded-md p-3 text-xs">
+                    {gaps.asMarkdown()}
+                  </pre>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
