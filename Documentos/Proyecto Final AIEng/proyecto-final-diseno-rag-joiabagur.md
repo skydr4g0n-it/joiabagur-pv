@@ -348,6 +348,55 @@ La respuesta es **estructurada**, no prosa libre:
 
 **Toda cifra de precio o stock se emite como placeholder** (`{{price}}`, `{{stock}}`) que el modelo no puede rellenar; .NET los sustituye al hidratar y **rechaza la respuesta** si alguno queda sin resolver.
 
+> **Revisado el 2026-09-13, al explorar C30 y partirlo en C30a y C30b.** Lo de arriba se conserva
+> porque sigue siendo la forma de la respuesta; lo que cambia es **quién calcula cada cosa y en qué
+> orden se entrega**. Cinco correcciones, todas comprobadas contra el árbol; las once decisiones
+> con sus alternativas están en
+> [`informes/c30-exploration-decisions.md`](informes/c30-exploration-decisions.md).
+>
+> **1 · La respuesta tiene tres modos, no uno.** El `groups[]` de arriba describe el modo anclado a
+> una consulta, pero el flujo por consulta **ya lo sirve** `POST /api/ai/search` (C15) con su panel
+> (C16), y el único consumidor previsto de `/v1/assist/sale` —C34— expone rutas **por pieza**. Así
+> que el contrato acepta `product_id` y `query` con validación de «al menos uno»: **M1** pregunta
+> libre, **M2** argumentario de la pieza elegida, **M3** pregunta sobre la pieza elegida. M3 es el
+> que hace realizable el *«¿este anillo se puede mojar?»* de esta misma sección, y hasta ahora no
+> tenía ruta: se abre con `?question=` en `/sales-assist` y una caja en el card.
+>
+> **2 · `family_id` puede ser nulo, y el agrupado tiene que admitirlo.** **~58 % del catálogo no
+> pertenece a ninguna familia** (C18b: 156 familias y 486 miembros sobre ~1.168 filas indexadas),
+> mientras el esquema congelado exigía `family_id` obligatorio y no nulable. Pasa a nulable con el
+> invariante *sin familia ⇒ exactamente un miembro*. Y el `reason` por candidato de arriba **no
+> tenía campo**: se sirve reusando `match_reasons`, que desde C21 ya lleva procedencia real.
+>
+> **3 · Dos de los cuatro avisos son de .NET.** «Stock crítico» y «familia con miembros sin stock»
+> necesitan el stock **real**, y en Python sólo existe `qty_bucket`, que el §6.2 mantiene fuera del
+> cable y el §15.10 permite desfasado. Los calcula **C34 tras hidratar** y los apila sobre los dos
+> estructurales, que sí son del índice. Los `warnings[]` viajan como **códigos de vocabulario
+> cerrado** y el castellano lo escribe el frontend — lo que además hace del *«nunca generados
+> libremente»* de arriba algo verificable, porque el modelo no ve el vocabulario.
+>
+> **4 · La citación tiene que llevar `claim_scope`, o el mecanismo del §7.8 se muere en la
+> frontera.** El `Citation` congelado llevaba tres campos y `KnowledgeCitation` tiene diez: se
+> perdían el `citation_id` —el que resuelve, **localiza** y abre el fichero y el encabezado en
+> git— y la marca de alcance, que son **25 de los 161** fragmentos. Se reforma. Y `citations[]`
+> pasa a ser **lo que el pitch usó**, no lo que el retriever devolvió, con la integridad
+> referencial comprobada **en código después de generar**: citar todo lo recuperado no es
+> atribuir, es decorar.
+>
+> **5 · El placeholder protege un flanco y deja el otro abierto.** .NET rechaza un placeholder sin
+> resolver, pero un pitch que escriba «39,90 €» **literal** no deja placeholder alguno y pasa. El
+> validador determinista del §11.3 lo caza en evaluación, no en ejecución. Así que C30b añade una
+> puerta **en ejecución**: el pitch sólo puede contener cifras **presentes en el payload que se le
+> entregó** —tallas, mm, `925`, dígitos de SKU— más los dos tokens. Lista blanca y no lista negra,
+> porque este dominio está lleno de números legítimos.
+>
+> **Y una precisión sobre el «no se persiste» de arriba: incluye no loguearlo.** Una línea de log
+> es almacenamiento durable fuera de la base y **sin el `effective_pos_id` que la respuesta sí
+> lleva**, así que el texto no se escribe en ningún log — sólo su longitud, su hash y los
+> `citation_id` usados. Es viable porque a temperatura 0 y con prompt versionado el texto es
+> re-derivable. La **excepción declarada** es el arnés del §11.3–11.4, que sí guarda las
+> generaciones atadas a `run_id`, `git_sha` y `prompt_version`, fuera del camino de servicio.
+
 ### 7.8. Revisión humana híbrida (respuesta a la decisión 5)
 
 | Campo | Política |
@@ -458,10 +507,17 @@ Eran dos hasta el 2026-08-31; el de inventario se anuló con toda su rama de imp
 
 | Agente | Qué decide | Tools (todas de lectura) | Salida |
 |---|---|---|---|
-| **Asistente de venta** (síncrono) | Si buscar, si pedir aclaración, si pivotar a sustitutos o variantes, si consultar conocimiento | `buscar_catalogo`, `consultar_disponibilidad` (.NET), `listar_familia`, `buscar_sustitutos`, `buscar_complementarios`, `consultar_conocimiento`, `pedir_aclaracion` | Resultados estructurados + borrador de venta que confirma el operador |
+| **Asistente de venta** (síncrono) | Si buscar, si pedir aclaración, si pivotar a sustitutos o variantes, si consultar conocimiento | `buscar_catalogo`, `consultar_disponibilidad` (.NET), `listar_familia`, `buscar_sustitutos`, ~~`buscar_complementarios`~~, `consultar_conocimiento`, `pedir_aclaracion` — **seis** *(corregido el 2026-09-13)* | Resultados estructurados + borrador de venta que confirma el operador |
 | ~~**Agente de inventario** (batch)~~ | ~~Qué priorizar, qué sustituto proponer, cómo redactar el motivo~~ | ~~`senales_demanda`, `stock_por_pos`, `buscar_sustitutos`, `perfil_punto_venta`~~ | **Fuera desde el 31 ago** |
 
-**Siete tools, no ocho.** `perfil_punto_venta` sale del registro con el perfil por POS: registrar una tool cuyo servicio no existe le da al modelo una herramienta que falla siempre, y una tool que devuelve error es peor que una tool ausente — el bucle la reintenta y quema presupuesto. Si el perfil por POS se rescata, vuelve. Y `buscar_complementarios` sale también si se dispara el corte nº 1 del §13.4.
+~~**Siete tools, no ocho.**~~ → **Seis** *(corregido el 2026-09-13; el documento hermano ya lo había bajado a seis el 12 de septiembre y esta sección no se sincronizó).* `perfil_punto_venta` sale del registro con el perfil por POS: registrar una tool cuyo servicio no existe le da al modelo una herramienta que falla siempre, y una tool que devuelve error es peor que una tool ausente — el bucle la reintenta y quema presupuesto. Si el perfil por POS se rescata, vuelve. Y `buscar_complementarios` **salió el 12 de septiembre**, al dispararse el corte nº 1 del §13.4 sobre complementarios: la condición era exactamente ésta y se cumplió. **El recuento no es lo que el PF evalúa del agente**: lo son el bucle, el presupuesto duro, el invariante de solo-lectura y el `partial: true`.
+
+> **Dos de las seis llegan medio construidas** *(anotado el 2026-09-13, al partir C30)*.
+> `listar_familia` la sirve el `family_roster(family_id)` que C30a añade al puerto de búsqueda para
+> su aviso de variantes, y `consultar_conocimiento` la sirve el `search_knowledge` que C23 dejó
+> **con forma de tool a propósito**, al que C30a añade el filtro por ficha de material. Cuando el
+> bucle las invoque sobre una pieza concreta, la segunda ya no podrá citar la ficha de un material
+> que la pieza no declara. Lo nuevo del change del agente es el bucle, no las herramientas.
 
 **Los números nunca los calcula el LLM.** Sigue siendo el principio rector, y sigue siendo verificable con lo que queda: precio y stock viajan como **placeholders** que el modelo no puede rellenar (§7.7), el hidratador .NET los resuelve, y el validador determinista del §11.3 rechaza la respuesta si sobrevive alguna cifra sin contrastar. Es exactamente la matriz §7.3 de las especificaciones v2.
 
@@ -590,6 +646,16 @@ Métricas: Recall@5, nDCG@5 —en sus tres lecturas: graduada, binaria y **opera
 ### 11.3. Generación
 
 - **Validador anti-alucinación determinista** (sin LLM juez): extrae toda cifra de precio/stock de la respuesta final y la contrasta con el hidratador. **Umbral: 0 fallos.** Es la pieza de evaluación con mejor retorno y convierte el principio 2 en garantía verificable.
+
+  > **Revisado el 2026-09-13.** Este validador **mide** en evaluación una garantía que ahora se
+  > sostiene también **en ejecución**: C30b lleva una puerta por **lista blanca** —el argumentario
+  > sólo puede contener cifras presentes en el payload que se le entregó, más los dos tokens de
+  > placeholder— porque un pitch que escriba «39,90 €» literal no deja ningún placeholder sin
+  > resolver y por tanto **pasa el rechazo de .NET** del §7.7. Lo que cambia aquí es que este
+  > validador deja de ser la primera línea y pasa a ser la que comprueba que la primera funciona,
+  > que es un test más fuerte. Y la **excepción de persistencia** que el §7.7 declara vive
+  > precisamente aquí: el arnés sí guarda las generaciones, atadas a `run_id`, `git_sha` y
+  > `prompt_version`.
 - **RAGAS** (faithfulness, answer relevancy, context precision, context recall) sobre el subconjunto con citas.
 - **Verificación de citas**: toda afirmación del corpus apunta a un `chunk_id` existente y realmente recuperado.
 - ~~**Test de fidelidad del perfil por POS**~~: fuera desde el 31 ago — evaluaba el perfil por POS, anulado. Vuelve si el perfil se rescata.
@@ -715,6 +781,10 @@ Los cortes **1 y 2 están confirmados de antemano** y se aplican desde el princi
 10. **La proyección de disponibilidad puede desfasarse minutos**; por eso solo pondera el ranking y nunca excluye.
 11. **La telemetría de búsqueda no tiene política de retención** *(añadido el 2026-08-10, al diseñar C04)*. `ProductSearchEvent.SearchText` es texto libre escrito por un operador y se conserva indefinidamente; en un punto de venta de hotel puede recoger incidentalmente una referencia a un huésped. Las medidas adoptadas son proporcionadas al riesgo real —tope de 500 caracteres, el texto confinado a nivel `Debug` en los logs, y **ninguna ruta de lectura por API**: solo se consulta con SQL—, y no se aplica anonimización porque este texto nunca entra en el espacio vectorial ni se recupera semánticamente. La supresión por usuario queda operable: el enlace `Sale.SearchEventId` es `ON DELETE SET NULL`, así que borrar eventos no destruye ni bloquea ventas.
 
+12. **La pregunta libre sin pieza elegida no tiene pantalla** *(añadido el 2026-09-13, al partir C30)*. De los tres modos de la venta asistida, el servicio implementa los tres, pero sólo dos llegan al operario: el **argumentario de una pieza** y la **pregunta sobre una pieza**, los dos en el card de venta. El tercero —**la pregunta libre, sin pieza delante**— existe en el servicio y su consumidor es el bucle del agente y el arnés de evaluación, no una caja de texto. La consecuencia concreta es que el *«no lo sé»* del sistema ante una consulta fuera de dominio **se demuestra con escenarios y no en pantalla**, y que las diez fichas de mostrador del corpus —playa y piscina, piel sensible, niños, viajar, regalar sin saber la talla, cosmética— sólo se alcanzan si el cliente tiene ya una pieza en la mano. Exponerlo son una ruta nueva en .NET y un bloque de respuesta en el panel de búsqueda; está identificado, acotado y **no hecho**.
+
+13. **La abstención del catálogo está al 10 %, y en el camino de venta asistida se aplica sin clasificar la intención** *(añadido el 2026-09-13)*. La brecha de la tasa ya se declara en el §11.2 desde C25 —llegar a 0,80 costaba silenciar 21 de 43 consultas contestables—, pero conviene decir lo que eso significa aguas abajo: la capa de generación **no redacta** cuando el perfil de candidatos es plano, y eso es una red, no un clasificador. Distinguir *«el catálogo no puede contestar esto»* de *«esto no es una pregunta de joyería»* es trabajo del enrutador de intención, que llega después. Hasta entonces, una consulta fuera de dominio recibe una abstención honesta y no un rechazo cortés, que son dos cosas distintas y la segunda es la buena.
+
 **Próximos pasos**, en orden de madurez del diseño: **agente de inventario completo** —señales de demanda, motor de reglas, perfil comercial por POS, ciclo de aprobación y vista imprimible—, cuyo diseño está íntegro en el §10 y solo espera implementación; **perfil comercial por POS** por separado, que es la mitad barata de lo anterior y devuelve al agente de venta una octava tool; packing list completa; liquidación y políticas de inventario; prioridad comercial por margen (los datos existen en `ProductComponentAssignment`); reranking medido; reranking aprendido con `ProductSearchEvent` reales; fusión de señal visual y textual; evaluación online con A/B por POS.
 
 ---
@@ -731,4 +801,7 @@ Los cortes **1 y 2 están confirmados de antemano** y se aplican desde el princi
 - [ ] Tag `v1.0-final-[INICIALES]`
 - [ ] Acceso al TA si el repositorio es privado
 - [ ] **Tres declaraciones que el README debe llevar explícitas** *(añadido el 2026-08-31)*: **un solo agente**, con el §10 adjunto como diseño del que falta; **golden set sin acuerdo entre anotadores**, por etiquetador único; y **proyecto individual**, no en pareja
+- [ ] **Dos declaraciones más** *(añadido el 2026-09-13, al partir C30)*: la **pregunta libre sin pieza no tiene pantalla** (§15.12) y la **abstención se aplica sin clasificar intención** hasta que llegue el enrutador (§15.13). Las dos están acotadas y con su solución identificada, que es lo que el rubro premia frente a un hueco callado
+- [ ] **Ablación de la capa de generación** *(añadido el 2026-09-13)*: misma ruta, mismos candidatos y mismas citas, **con argumentario y sin él**. Sale gratis del corte de C30 en dos mitades —la estructurada no llama a ningún proveedor— y es la única fila de la tabla del §11.2 que aísla lo que aporta el LLM frente a lo que ya aportaba la recuperación
+- [ ] **El argumentario no tiene copia durable en ninguna parte** *(añadido el 2026-09-13)*: ni en base de datos ni en logs, con la excepción declarada del arnés de evaluación (§7.7, §11.3). Es una propiedad comprobable, así que o se declara cierta o no se declara
 - [ ] ~~Entrega antes del 3 de septiembre de 2026~~ → **prórroga abierta desde el 2026-08-31**; el objetivo es entregar cuanto antes, sin fecha comprometida

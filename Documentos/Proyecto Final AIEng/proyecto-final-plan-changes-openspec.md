@@ -4,7 +4,7 @@
 **Documento hermano de:** [proyecto-final-diseno-rag-joiabagur.md](proyecto-final-diseno-rag-joiabagur.md)
 **Ventana:** arranque el 3 de agosto de 2026 · **prórroga abierta desde el 31 de agosto** — no hay fecha de entrega, el objetivo es entregar cuanto antes
 **Equipo:** **1 desarrollador**, trabaja en Python, .NET y frontend
-**Total:** 41 fichas (39 de la v3, más los partos de C06 y C18) · **37 vivas** tras anular la rama de C19 y cortar C27 — **27 archivadas · 10 pendientes**
+**Total:** **44 fichas** — **42 numeradas** (39 de la v3, más los partos de C06, C18 y **C30**) más `FIX1` y `C25bis`, fuera de la numeración C · **38 vivas** tras anular la rama de C19 y cortar C27 — **30 archivadas · 8 pendientes** *(recuento rehecho el 13 sep: la cifra anterior mezclaba dos bases, contando sólo las numeradas en el total y las 37 con `FIX1` y `C25bis` en las vivas)*
 
 > **Dos supuestos de la versión 3 ya no valen, y conviene leer el resto del documento con eso puesto.** Se escribió para **dos personas** y con **entrega el 3 de septiembre de 2026**. Desde el 31 de agosto de 2026 hay **prórroga abierta** y el proyecto lo desarrolla **una sola persona**. En consecuencia: no se planifica por calendario ni por «carga por persona y semana», sino por **desbloqueo del grafo**; los marcadores 👥 son de una sola persona; y las olas del §5 se conservan como registro de lo ya ejecutado, no como plan.
 
@@ -13,6 +13,31 @@
 ## 0. Revisiones posteriores a la versión 3
 
 Este documento se escribió antes de implementar. Cuando una sesión de diseño de un change concreto altera lo que su ficha decía, el cambio se registra aquí con fecha y motivo, y la ficha afectada se corrige en el sitio.
+
+### 2026-09-13 — C30 se parte en C30a y C30b, y cinco supuestos de su ficha se caen contra el árbol
+
+**C30 se desdobla por la regla 5 del §1** —*«si un change se desborda de la sesión, se parte y se entrega primero la mitad que desbloquea el grafo»*—, y el corte no es por tamaño solamente: es por **dependencia real de sus consumidores**. C34 y C36 necesitan **la forma** de la respuesta, no la prosa. Así que la mitad que desbloquea es la estructurada, y llega sin una sola llamada a un proveedor.
+
+| Mitad | Qué entrega | Llamadas a LLM |
+|---|---|---|
+| **C30a** `add-assist-structure-and-rule-warnings` | contrato, tres modos, agrupación, roster, avisos por reglas, filtro de slug, abstención y **citas verificables ya** | **cero** |
+| **C30b** `add-assist-pitch-generation` | el argumentario en prosa, la integridad referencial de citas y la puerta numérica | sí |
+
+**El corte deja una ablación que no se buscaba.** C30a demuestra por sí solo recuperación, atribución resoluble y abstención —`search_knowledge` ya existe y el direccionamiento de fichas de material es determinista—, y C30b añade la prosa como **capa separable cuyo valor se mide contra C30a**. Es la estructura que el §11.2 del diseño y el checklist de C39 piden, y sale gratis del propio corte.
+
+**Convención de lectura:** donde este documento dice **C30** sin sufijo, se refiere **al par**. Los prerrequisitos, el grafo del §4 y las tablas de los §5 y §6 sí llevan el sufijo, porque ahí la distinción decide qué se abre.
+
+**Y cinco supuestos de la ficha resultaron falsos del árbol**, comprobados antes de escribir una línea. Es el **décimo change consecutivo cuya exploración refuta lo escrito antes**:
+
+1. **El contrato congelado no puede agrupar por familia.** `AssistGroup.family_id` es **obligatorio y no nullable**, y **~58 % del catálogo no tiene familia** (C18b: 156 familias y 486 miembros sobre ~1.168 filas indexadas). Se renegocia `openapi.json` en C30a, **en un solo bloque y al momento más barato posible**: `IAiGatewayClient` no tiene método de assist y C34 y C36 no existen, así que hoy la ruta tiene **cero consumidores** y el coste sólo puede subir. Precedente propio: C18a y C18b regeneraron el snapshot en el mismo change en que movieron la frontera.
+2. **El único consumidor previsto está anclado a pieza, y la request sólo acepta texto.** C34 expone `GET /api/ai/products/{id}/sales-assist` y `.../substitutes`, las dos por producto; `AssistRequest` no tiene `product_id` y su `query` es obligatoria. Nacen **tres modos** con validación de «al menos uno»: **M1** pregunta libre, **M2** argumentario de la pieza, **M3** pregunta sobre la pieza. El flujo por consulta **ya estaba servido** por `POST /api/ai/search` (C15) y el panel (C16).
+3. **Dos de los cuatro avisos no son de Python.** «Stock crítico» y «miembros sin stock» necesitan el stock real, y `SearchHit.qty_bucket` está declarado como algo que *«never emitted: a bucket on the wire would be the beginning of one»*, además de poder desfasarse. Pasan a **C34, calculados tras hidratar**. Es **el segundo caso de la misma forma**: la ficha de C34 ya lleva anotada la exclusión por stock que C26 retiró de la suya el 12 de septiembre por el mismo motivo.
+4. **Las citas se morían en la frontera.** `Citation` del contrato tiene 3 campos contra los 10 de `KnowledgeCitation`, y se perdían `citation_id` —el que *«resolves, locates and opens the file and the heading in git»*— y **`claim_scope`**, que C23 declaró no opcional precisamente para que un compromiso de la casa no se lea como un hecho del mundo: son **25 de 161** fragmentos, el 15,5 %.
+5. **La abstención está al 10 % y desactivada por defecto.** Medido por C25: abstiene en **2 de 20** consultas fuera de dominio y en **0 de 43** contestables, y el golden set tiene **20 de 72** fuera de dominio. Sin puerta, C30 contestaría *«¿qué tiempo hace mañana?»* con cinco familias y un argumentario convencido **durante toda una vuelta de manivela**, porque el arreglo es C31 y C31 lleva C30 de prerrequisito. C30a **no clasifica intención** —eso sigue siendo de C31— pero **no genera cuando la recuperación dice que el catálogo no puede contestar**, y lo declara en `abstained`. **No se llama `low_confidence` a propósito**: ese nombre ya significa consenso entre ramas y está *anticorrelacionado* con lo que aquí hace falta (dispara en 1 de 20 fuera de dominio y en 10 de 43 contestables).
+
+**Un hueco que la exploración descubre y que no es de C30.** El corpus de C23 —32 documentos, 161 fragmentos, indexado y calibrado— **no tiene hoy ninguna ruta hasta la pantalla del joyero**: C34 expone dos rutas por pieza y C36 pinta un card. Diez de los 32 documentos son mostrador puro (la piscina, la piel sensible, el regalo sin talla, los niños, el perfume). Se cierra por el camino más barato que existe —**`?question=` en la ruta que C34 ya va a escribir y una caja de pregunta en el card que C36 ya va a construir**—, y **M1 se implementa en Python sin superficie de operario en esta ronda**: su consumidor es el bucle de C32 y el arnés de C38.
+
+Las once decisiones, con sus alternativas descartadas, las mediciones estáticas del corpus y los tres spikes previos, en [`c30-exploration-decisions.md`](informes/c30-exploration-decisions.md).
 
 ### 2026-09-12 — El corte nº 1 se dispara, y no por juicio: C27 sale del alcance con cinco mediciones
 
@@ -711,15 +736,16 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 | ~~**C27**~~ | ~~`add-complementary-recommendations`~~ | ~~Python + .NET 🗄️~~ | C10, C25 | ⛔ | **rev. dec. 8** · **corte nº 1 disparado el 2026-09-12** con cinco mediciones (§0) |
 | **C28** | `add-profile-review-ui-and-metrics` | Frontend + .NET | C08 | ✅ **archivado 2026-09-13** | **rev. dec. 5** · *lo pide el checklist §16* · entrega 20,9 % ponderado y 32,1 s |
 | ~~**C29**~~ | ~~`add-inventory-recommendation-entity`~~ | .NET 🗄️ | C19 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
-| **C30** | `add-assist-generation-with-rule-warnings` | Python | C07, C21, C23 | 🔴 | **rev. dec. 4** |
-| **C31** | `add-guardrails-and-intent-router` | Python | C30 | 🔴 | — |
-| **C32** | `add-sales-assistant-agent-loop` | Python | C30, C31 | 🔴 | — |
+| **C30a** | `add-assist-structure-and-rule-warnings` | Python | C07, C21, C23 | 🔴 | **rev. dec. 4** · **partido el 13 sep**; renombrado desde `add-assist-generation-with-rule-warnings` · *mueve el contrato congelado* |
+| **C30b** | `add-assist-pitch-generation` | Python | C30a | 🔴 | **nace el 13 sep** al partir C30 · *la única mitad que llama a un LLM* |
+| **C31** | `add-guardrails-and-intent-router` | Python | C30b | 🔴 | — · *prereq afinado el 13 sep: su validación de salida necesita una salida* |
+| **C32** | `add-sales-assistant-agent-loop` | Python | C30b, C31 | 🔴 | — |
 | ~~**C33**~~ | ~~`add-pos-sales-profile`~~ | .NET + Python | ~~C19~~ → C08, C12 | ⛔ | **rev. dec. 7** · **anulado el 31 ago** · *rescatable suelto* |
-| **C34** | `add-dotnet-assist-and-recommendation-endpoints` | .NET | C15, C26, C30 *(+ C27 si sobrevive)* | 🔴 | — |
+| **C34** | `add-dotnet-assist-and-recommendation-endpoints` | .NET | C15, C26, **C30a** *(C27 cortado el 12 sep)* | 🔴 | — · *prereq afinado el 13 sep: depende de la **forma**, no de la prosa — es la razón del corte* · **gana los dos avisos de stock y `?question=`** |
 | ~~**C35**~~ | ~~`add-inventory-agent-proposals`~~ | Python | C26, C29, C32, C33 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
 | **C36** | `add-frontend-assist-card-and-family-disambiguation` | Frontend | C16, C34 | 🔴 | — |
 | ~~**C37**~~ | ~~`add-frontend-inventory-review-and-print`~~ | Frontend | C29, C35 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
-| **C38** | `add-generation-and-agent-evals` | Python + .NET | C24, C30, C32, C34 | 🔴 | — · *sin escenarios de inventario* |
+| **C38** | `add-generation-and-agent-evals` | Python + .NET | C24, **C30b**, C32, C34 | 🔴 | — · *sin escenarios de inventario* · **la excepción de persistencia del arnés la declara C30b** |
 | **C39** | `finalize-pf-readme-and-evidence` | Docs | todos los vivos | 🔴 | — |
 
 **Origen** indica de dónde sale el change: en **negrita**, los que existen por la revisión del compañero.
@@ -728,7 +754,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 
 **⛔ Cortado el 2026-09-12 (1):** **C27**, complementarios — el corte nº 1 del §6, disparado **con medición y no por juicio de plazo**. Sus dos señales están vacías (co-ocurrencia: 98,6 % de los pares vistos **una sola vez** y ninguno tres veces, sobre un generador que **diversifica las cestas a propósito**; etiquetas de color/estilo: **1 de 404** productos reales con estilo) y el proyecto nunca le reservó categoría en el golden set. Ficha conservada con el sello y la condición de reactivación; detalle en el §0 y en [`c27-cut-measurements.md`](informes/c27-cut-measurements.md).
 
-**Vivos: 37** (35 numerados más `FIX1` y `C25bis`). Archivados **30** (C01–C18b, C20, C21, C22, C23, C24, C25, `FIX1`, `C25bis`, **C26** y **C28**). Pendientes **7**: C30, C31, C32, C34, C36, C38 y C39. **C23 se archivó el 2026-09-06** y su corte pre-autorizado —bajar a 15 documentos— se refutó por su propia unidad de medida: el diseño fija el tamaño en fragmentos y quince documentos dan la mitad del mínimo, con lo que la abstención dejaba de poder demostrarse. **C21 se archivó el 2026-09-02**, y con él caen los prerrequisitos de C24 y C30, o sea las dos mitades del proyecto que estaban esperando a la fusión. **C22 y `FIX1` se archivaron el 2026-09-05**, con lo que la ventana que `FIX1` tenía que respetar —entrar antes de que C24 etiquete su línea base— queda cumplida. **C24 se archivó el 2026-09-11 y C25 el 2026-09-12**, con lo que la cadena crítica `C21 → C24 → C25 → C26 → C34 → C36` arranca ahora en **C26**. C25 se archiva habiendo **refutado tres puntos de su propia ficha con mediciones** — la penalización de variante ambigua, la calibración de `1-2` frente a `3+` y la rotación como criterio de orden — y habiendo corregido un defecto que no estaba en su alcance: la fusión de C21 **concatenaba en vez de fusionar**. Deja **tres brechas declaradas y no cerradas** (`Recall@5` 0,758 contra 0,85, abstención 0,150 contra 0,80, y `v3` sin batir a `v2b` por el margen) y **desbloquea C25bis** (`clean-plain-fusion`), que retira el andamio de la fusión plana. **`C25bis` y C26 se archivaron el 2026-09-12**, y con ellos la cadena crítica deja de arrancar en C26 y pasa a arrancar en **C34**. C26 se archiva habiendo cerrado el **último 501 cerrable** del contrato congelado —`/v1/inventory/propose` sigue en 501, pero por una rama anulada y ya declarada como limitación— y habiendo **refutado tres puntos de su propia ficha con mediciones**: «misma familia primero» estaba invertida, la exclusión por stock no le correspondía y `style_similarity` no tiene dato sobre catálogo real. Deja **dos limitaciones medidas y declaradas**, y anotada en la ficha de C34 la exclusión por stock que sí es suya. **C28 se archivó el 2026-09-13**, entregando las dos cifras del §16 que no existían —**20,9 % ponderado** y **32,1 s de media** sobre 204 perfiles, **204 cronometrados**— y publicándolas partidas, porque los **10,4 %** de los campos sensibles y los **42,3 %** de las etiquetas comerciales no miden lo mismo: aquéllas llegaban vacías y el revisor las rellenó con su criterio. Es el **noveno change consecutivo cuya exploración refuta lo escrito antes**, y el primero que además se refuta a sí mismo **durante la revisión**: la marca «pendiente de revisión» por campo resultó constante en seis de los siete campos y se retiró enmendando la spec. Confirma media predicción —las retiradas se concentran en el estrato B, 8 de 9— y refuta la otra mitad. **Deja tres cosas declaradas sin medir** (el A/B de teclado, la tesis de ceguera del span y la comparación de versiones de prompt) y **un hallazgo que ninguna consulta podía encontrar**: `vidrio` falta en el vocabulario de `materials` y alcanza 67 productos, el 5,6 % del catálogo.
+**Vivos: 38** (36 numerados más `FIX1` y `C25bis`). Archivados **30** (C01–C18b, C20, C21, C22, C23, C24, C25, `FIX1`, `C25bis`, **C26** y **C28**). Pendientes **8**: **C30a**, **C30b**, C31, C32, C34, C36, C38 y C39. **C23 se archivó el 2026-09-06** y su corte pre-autorizado —bajar a 15 documentos— se refutó por su propia unidad de medida: el diseño fija el tamaño en fragmentos y quince documentos dan la mitad del mínimo, con lo que la abstención dejaba de poder demostrarse. **C21 se archivó el 2026-09-02**, y con él caen los prerrequisitos de C24 y C30, o sea las dos mitades del proyecto que estaban esperando a la fusión. **C22 y `FIX1` se archivaron el 2026-09-05**, con lo que la ventana que `FIX1` tenía que respetar —entrar antes de que C24 etiquete su línea base— queda cumplida. **C24 se archivó el 2026-09-11 y C25 el 2026-09-12**, con lo que la cadena crítica `C21 → C24 → C25 → C26 → C34 → C36` arranca ahora en **C26**. C25 se archiva habiendo **refutado tres puntos de su propia ficha con mediciones** — la penalización de variante ambigua, la calibración de `1-2` frente a `3+` y la rotación como criterio de orden — y habiendo corregido un defecto que no estaba en su alcance: la fusión de C21 **concatenaba en vez de fusionar**. Deja **tres brechas declaradas y no cerradas** (`Recall@5` 0,758 contra 0,85, abstención 0,150 contra 0,80, y `v3` sin batir a `v2b` por el margen) y **desbloquea C25bis** (`clean-plain-fusion`), que retira el andamio de la fusión plana. **`C25bis` y C26 se archivaron el 2026-09-12**, y con ellos la cadena crítica deja de arrancar en C26 y pasa a arrancar en ~~**C34**~~ → **C30a** *(corregido el 13 sep: C34 lleva C30 de prerrequisito, así que nunca pudo ser el eslabón de arranque; era un error de la frase y no un cambio de plan)*. C26 se archiva habiendo cerrado el **último 501 cerrable** del contrato congelado —`/v1/inventory/propose` sigue en 501, pero por una rama anulada y ya declarada como limitación— y habiendo **refutado tres puntos de su propia ficha con mediciones**: «misma familia primero» estaba invertida, la exclusión por stock no le correspondía y `style_similarity` no tiene dato sobre catálogo real. Deja **dos limitaciones medidas y declaradas**, y anotada en la ficha de C34 la exclusión por stock que sí es suya. **C28 se archivó el 2026-09-13**, entregando las dos cifras del §16 que no existían —**20,9 % ponderado** y **32,1 s de media** sobre 204 perfiles, **204 cronometrados**— y publicándolas partidas, porque los **10,4 %** de los campos sensibles y los **42,3 %** de las etiquetas comerciales no miden lo mismo: aquéllas llegaban vacías y el revisor las rellenó con su criterio. Es el **noveno change consecutivo cuya exploración refuta lo escrito antes**, y el primero que además se refuta a sí mismo **durante la revisión**: la marca «pendiente de revisión» por campo resultó constante en seis de los siete campos y se retiró enmendando la spec. Confirma media predicción —las retiradas se concentran en el estrato B, 8 de 9— y refuta la otra mitad. **Deja tres cosas declaradas sin medir** (el A/B de teclado, la tesis de ceguera del span y la comparación de versiones de prompt) y **un hallazgo que ninguna consulta podía encontrar**: `vidrio` falta en el vocabulario de `materials` y alcanza 67 productos, el 5,6 % del catálogo.
 
 ---
 
@@ -983,7 +1009,7 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 #### C18a · `add-family-suggestion-and-approval` 🟢 *(archivado 2026-08-31)*
 
-**Objetivo.** La mitad que desbloquea del flujo mixto: la IA propone y el administrador aprueba **por lotes**. Es lo que hace que `family_id` deje de ser nulo, y con ello que dejen de ser vacuos los tests de familia de C25, C26, C30 y C36.
+**Objetivo.** La mitad que desbloquea del flujo mixto: la IA propone y el administrador aprueba **por lotes**. Es lo que hace que `family_id` deje de ser nulo, y con ello que dejen de ser vacuos los tests de familia de C25, C26, **C30a** y C36.
 **Prereq.** C07, C13 · **Zona.** `ai-service/src/jbg_ai/families/`, `backend/` · **Lleva `design.md`**
 **Alcance.** Motor determinista sin LLM: raíz normalizada, **fusión por material** (nunca stripping global), guarda de raíz degenerada, puerta de `piece_type` con el nulo como valor propio, **veto relativo por embedding** que marca y no elimina, `variant_label` verbatim y `position` por rango canónico. **Novena ruta del contrato congelado**, `POST /v1/families/suggest`. En .NET, `POST /api/ai/catalog/family-suggestions` y `/apply`, que persiste vía `ProductFamilyService` —nunca por SQL— y escribe `Origin = AiApproved` con aprobador e instante. Sin migración, sin frontend, sin persistir propuestas.
 
@@ -1261,20 +1287,67 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ---
 
-#### C30 · `add-assist-generation-with-rule-warnings` 🔴
+#### C30a · `add-assist-structure-and-rule-warnings` 🔴
 
-**Objetivo.** Capa de generación: agrupación por **familia**, avisos **por reglas**, argumentario **no persistido** con citas. Implementa la decisión 4.
-**Prereq.** C07, C21, C23 · **Zona.** `ai-service/src/jbg_ai/assist/`
-**Alcance.** `POST /v1/assist/sale`: agrupación por `family_id` con `variant_label` destacado; `reason` construido desde datos; **`warnings[]` calculados por reglas** (existen variantes, falta talla, stock crítico, miembros sin stock) y nunca generados libremente; `pitch` generado en tiempo de consulta desde metadatos aprobados + chunks con `citations[]`, **sin persistir**; **placeholders `{{price}}`/`{{stock}}`** que el modelo no puede rellenar; prompt versionado.
-**Tests.** `test_response_contains_no_literal_price_or_stock_number`; `test_warnings_are_rule_derived_not_model_generated`; `test_variants_grouped_by_family_id`; `test_citations_reference_retrieved_chunk_ids_only`; `test_pitch_is_not_persisted_anywhere`.
+> **Partido el 2026-09-13** desde `add-assist-generation-with-rule-warnings` (§0). Es la mitad que
+> desbloquea: C34 y C36 dependen de **la forma** de la respuesta y no de la prosa. **Cero llamadas a
+> un proveedor**, y aun así entrega citas verificables — `search_knowledge` ya existe y el
+> direccionamiento de las fichas de material es determinista. Las once decisiones, en
+> [`c30-exploration-decisions.md`](informes/c30-exploration-decisions.md).
+
+**Objetivo.** La capa estructurada de la venta asistida: **tres modos**, agrupación por **familia**, avisos **por reglas** y **citas resolubles**. Implementa la decisión 4 salvo la prosa.
+**Prereq.** C07, C21, C23 · **Zona.** `ai-service/src/jbg_ai/assist/` *(no existe)*
+**Alcance.**
+
+- **Movimiento del contrato congelado, en un solo bloque** *(D-A)*: `product_id` en `AssistRequest` con validación de «al menos uno» frente a `query`; `AssistGroup.family_id` **nullable** con el invariante *sin familia ⇒ un solo miembro*; `match_reasons` en el miembro —que es el `reason` por candidato del §7.7, sin vocabulario nuevo—; `Citation` reformada con `citation_id`, `document_title`, `section_title`, **`claim_scope`**, `doc_type` y `score`, retirando `source`; `abstained` y `prompt_version` en la respuesta. `openapi.json` **se regenera aquí**, mientras la ruta tiene cero consumidores.
+- **Tres modos** *(D-B)*: **M1** consulta libre · **M2** pieza sin pregunta · **M3** pieza con pregunta. `intent` se deriva **estructuralmente**: `product_pitch` en M2, `unclassified` en M1 y M3 — sin heurística de palabras clave, que C31 borraría.
+- **Agrupación** por `family_id` con `variant_label` destacado, más `family_roster(family_id)` **nuevo en `ProductSearchPort`**, leyendo sólo `ai.product_document`. Sirve a la vez el aviso de variantes y la futura tool `listar_familia` de C32. *Agrupar opera sobre lo recuperado; avisar de que existen variantes necesita el roster — son dos consultas distintas.*
+- **`warnings[]` como códigos de vocabulario cerrado** *(D-C)*, no prosa: **`family_has_variants` y `size_label_missing`**. El copy castellano es del frontend, con el precedente de `assisted-search-panel` —*«MUST NOT render the retriever's raw match reason values, which are engineering vocabulary»*. **Los dos avisos de stock pasan a C34.**
+- **Citas verificables, sin LLM** *(D-D, D-E, D-F)*: en **M2**, direccionamiento **determinista** por `chunk_id(document_slug, section_slug)` sobre una **lista blanca** de secciones, y **sólo `claim_scope: general`** — la ficha de `baño de oro` lleva una séptima sección que es compromiso de la casa. En **M1/M3**, `search_knowledge` con **filtro de slug asimétrico**: excluye las fichas de las **nueve** materiales canónicas que la pieza no declara, y deja pasar `faq`, `politica`, `talla`, `piedras-*`, `piezas-mixtas` y `marcajes-y-punzones`. Un filtro general por material cortaría **23 de los 32 documentos**.
+- **Puerta de abstención** *(D-G)*: la regla relativa de C25 se activa **por parámetro** en el camino de assist, y la respuesta lo declara en `abstained` — **nunca `low_confidence`**, cuyo significado medido está anticorrelacionado.
+- `pitch: ""`, `prompt_version: null`, `usage` a cero. **Ninguna llamada a un proveedor.**
+
+**Tests.** `test_variants_grouped_by_family_id`; `test_warnings_are_rule_derived_not_model_generated`; `test_citations_reference_retrieved_chunk_ids_only`; `test_group_without_family_has_exactly_one_member`; `test_pitch_context_excludes_establishment_claim_scope`; `test_slug_filter_keeps_faq_politica_talla_and_mixed_sheets`; `test_abstains_when_candidate_profile_is_flat`.
+**Conflicto de zona.** Misma zona que C30b, C31 y C32 → **nunca simultáneos**.
+
+---
+
+#### C30b · `add-assist-pitch-generation` 🔴
+
+> **Nace el 2026-09-13** al partir C30 (§0). Es la única mitad que llama a un LLM, y su valor **se
+> mide contra C30a**: misma ruta, mismos candidatos, mismas citas, con prosa y sin ella. Esa
+> ablación sale gratis del propio corte y es la que el §11.2 del diseño pide.
+
+**Objetivo.** El argumentario en prosa sobre la base que C30a deja, con la garantía anti-alucinación **en ejecución** y no sólo en evaluación.
+**Prereq.** C30a · **Zona.** `ai-service/src/jbg_ai/assist/`
+**Alcance.**
+
+- **Prompt versionado**: `prompts/assist/v1.md` con `PROMPT_VERSION = "assist/v1"` y su test de fichero↔constante, como `enrichment/` y `knowledge/`.
+- **Cliente generativo** por la costura de `LiteLlmEnrichClient`: LiteLLM, `JPV_RAG_LLM_*`, **`gpt-4o-mini` a temperatura 0** *(D-K)*, *backoff* de proveedor, un reintento de parseo, fake inyectable. Temperatura 0 no es sólo reproducibilidad de las evaluaciones: es lo que hace viable no guardar el texto.
+- **Salida estructurada donde el modelo declara qué `citation_id` usó**, y **verificación de integridad referencial en código, después de generar** *(D-D)*. `citations[]` son las que el pitch **usó**, no las que el retriever devolvió: emitir todo lo recuperado es decoración y hace imposible la comprobación. Cita colgante → un reintento con instrucción más dura, y si reincide se entrega la parte estructurada **sin pitch**. Nunca se ignora.
+- **Placeholders `{{price}}`/`{{stock}}`** que el modelo no puede rellenar, y **la puerta que el mecanismo no cubría** *(D-H)*: el pitch sólo puede contener cifras **presentes literalmente en el payload que se le entregó** —tallas, mm, `925`, dígitos de SKU— más los dos tokens. Es **lista blanca y no lista negra**, porque `talla 12` y `plata de ley 925` son cifras legítimas. Un pitch con «39,90 €» literal pasa hoy el rechazo de C34 —no hay placeholder sin resolver— y llega al operario: eso es lo que esta puerta cierra, en ejecución.
+- **El pitch no se persiste, y eso incluye no loguearlo** *(D-I)*. Se registran `trace_id`, `prompt_version`, `model`, `usage`, latencia, los `citation_id` usados, los códigos de aviso, `abstained`, longitud y hash — **nunca el texto**. Una línea de log es almacenamiento durable fuera de la base, sin el `effective_pos_id` que la respuesta sí lleva. **Excepción declarada**: el arnés de C38 sí guarda el texto generado, en `evals/results/` y en `ai.eval_*`, atado a `run_id`, `git_sha` y `prompt_version`, fuera del camino de servicio.
+- **Barrido de contexto**: la lista blanca de secciones y el tope de materiales viajan **por parámetro**, para comparar 1/2/3 secciones en un proceso y publicar el efecto sobre la tasa de rechazo de la puerta numérica y sobre *faithfulness*. Es la progresión de prompts que el §11.6 y C39 piden.
+
+**Tests.** `test_response_contains_no_literal_price_or_stock_number`; `test_pitch_is_not_persisted_anywhere` *(con listener `before_cursor_execute` contando DML, no «el módulo no importa un repositorio»)*; `test_pitch_text_is_never_written_to_the_log`; `test_dangling_citation_triggers_single_retry_then_drops_the_pitch`; `test_figure_absent_from_context_is_rejected_even_if_plausible`.
+**Conflicto de zona.** Misma zona que C30a, C31 y C32 → **nunca simultáneos**.
 
 ---
 
 #### C31 · `add-guardrails-and-intent-router` 🔴
 
 **Objetivo.** Que el sistema sepa cuándo no debe responder y no se deje instruir por la consulta.
-**Prereq.** C30 · **Zona.** `ai-service/src/jbg_ai/assist/`
+**Prereq.** **C30b** *(afinado el 13 sep: su validación de salida necesita una salida que validar, y el rechazo cortés necesita la ruta; las dos cosas las tiene C30b)* · **Zona.** `ai-service/src/jbg_ai/assist/`
 **Alcance.** Clasificador de intención (catálogo / conocimiento / ambos / fuera de dominio); rechazo cortés sin llamar al retriever; consulta tratada como dato; validación de salida contra JSON schema con reintento único.
+
+> **Lo que C30a ya deja hecho, y lo que sigue siendo de aquí** *(13 sep)*. C30a **no clasifica
+> intención**: eso es de este change entero. Lo que sí trae es la **puerta de abstención**, para
+> que la capa de generación no redacte sobre un perfil de candidatos plano durante la vuelta de
+> manivela que separa a C30 de C31 — medido, **18 de 20** consultas fuera de dominio llegan hoy con
+> candidatos, y son la categoría más grande del golden set. Aquí esa puerta pasa de red a
+> decisión: el clasificador corta **antes de llamar al retriever**, que es lo que la puerta de
+> C30a no puede hacer porque necesita los candidatos para leer su forma. Y `intent` deja de valer
+> `unclassified`, que es el único valor que C30a puede emitir en M1 y M3.
 **Tests.** `test_out_of_domain_query_short_circuits_before_retrieval`; `test_prompt_injection_does_not_change_system_behavior`; `test_invalid_model_output_triggers_single_retry_then_safe_error`; `test_care_question_routes_to_knowledge_index`.
 
 ---
@@ -1282,9 +1355,10 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 #### C32 · `add-sales-assistant-agent-loop` 🔴
 
 **Objetivo.** Capa de decisión: bucle con function calling, tools de solo lectura, presupuesto duro.
-**Prereq.** C30, C31 · **Zona.** `ai-service/src/jbg_ai/assist/`
+**Prereq.** **C30b**, C31 *(afinado el 13 sep)* · **Zona.** `ai-service/src/jbg_ai/assist/`
 **Alcance.** Tools `buscar_catalogo`, `consultar_disponibilidad` (.NET), `listar_familia`, `buscar_sustitutos`, `consultar_conocimiento`, `pedir_aclaracion` — **seis** *(corregido el 12 sep; eran siete)*; máx. 5 iteraciones y 6 llamadas; errores como datos; `partial: true` al agotar presupuesto; **ninguna tool escribe**; decorador de trazado con tokens y coste por iteración.
 **Tools retiradas** *(31 ago y 12 sep)*. **`perfil_punto_venta`** sale del registro: la servía C33, anulada con la rama de C19 (§0). Registrarla sin servicio detrás daría al modelo una herramienta que falla siempre, y una tool que devuelve error es peor que una tool ausente — el bucle la reintenta y quema presupuesto. Si C33 se rescata (su ficha explica cómo), vuelve. **`buscar_complementarios`** sale el **12 de septiembre** al dispararse el corte nº 1 sobre C27 (§0), por la misma regla y no por una distinta. **Seis tools, y el recuento no es lo que el PF evalúa del agente**: lo son el bucle, el presupuesto duro, el invariante de solo-lectura y el `partial: true`.
+**Dos tools llegan medio construidas** *(13 sep)*. **`listar_familia`** la sirve `family_roster(family_id)`, el método que C30a añade a `ProductSearchPort` para su aviso de variantes: aquí sólo hay que envolverlo como tool. Y **`consultar_conocimiento`** la sirve `search_knowledge`, que C23 dejó con la forma de una tool a propósito y a la que C30a añade el **filtro de slug** — así que cuando el agente la invoque sobre una pieza concreta ya no podrá citar la ficha de un material que la pieza no declara. Ninguna de las dos es trabajo nuevo de este change; lo nuevo es el bucle.
 **Tests.** `test_loop_stops_at_iteration_budget_and_flags_partial`; `test_tool_error_is_returned_as_data_not_exception`; `test_out_of_stock_query_triggers_substitutes_tool`; `test_no_registered_tool_performs_writes` (introspección del registro); `test_token_usage_accumulated_across_iterations`.
 
 ---
@@ -1305,9 +1379,14 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 #### C34 · `add-dotnet-assist-and-recommendation-endpoints` 🔴
 
 **Objetivo.** Exponer venta asistida, sustitutos y complementarios con hidratación y resolución de placeholders.
-**Prereq.** C15, C26, C30 *(C27 **cayó** el 12 sep: la cláusula condicional se ejecuta — fuera la ruta `.../recommendations` y fuera su test `Recommendations_ManualPairsRankedFirst`, y el resto del change no se toca, tal como esta ficha ya instruía)* · **Zona.** `API/Controllers/`, `Application/`
+**Prereq.** C15, C26, **C30a** *(afinado el 13 sep: este change depende de la **forma** de la respuesta y no de la prosa, y ésa es precisamente la razón por la que C30 se partió — con C30a archivado, C34 puede abrirse sin esperar al argumentario)* *(C27 **cayó** el 12 sep: la cláusula condicional se ejecuta — fuera la ruta `.../recommendations` y fuera su test `Recommendations_ManualPairsRankedFirst`, y el resto del change no se toca, tal como esta ficha ya instruía)* · **Zona.** `API/Controllers/`, `Application/`
 **Alcance.** `GET /api/ai/products/{id}/sales-assist` y `.../substitutes?pointOfSaleId=`; **sustitución de `{{price}}`/`{{stock}}`** por valores reales; **rechazo de la respuesta si queda algún placeholder sin resolver**.
-**Tests.** `SalesAssist_ReplacesPlaceholdersWithRealValues`; `SalesAssist_WhenPlaceholderUnresolved_ReturnsErrorInsteadOfRawTemplate`; `Substitutes_ExcludeProductsWithoutStockAtTargetPos`; `SalesAssist_AsOperatorOfAnotherPos_Returns403`. *(`Recommendations_ManualPairsRankedFirst` no se escribe: su ruta se retiró con C27.)*
+**Dos añadidos del 13 sep, y los dos vienen de que la autoridad sobre el dato es de aquí:**
+
+- **Los dos avisos de stock.** `stock_critical` y `family_members_out_of_stock` **se calculan aquí, tras hidratar**, y se apilan sobre los códigos estructurales que trae C30a (`family_has_variants`, `size_label_missing`). En Python sólo existe `qty_bucket`, declarado como algo que *«never emitted: a bucket on the wire would be the beginning of one»* y capaz de desfasarse minutos: un aviso «stock crítico» mostrado cuando hay doce unidades en el cajón no es un matiz, es la credibilidad del asistente en el mostrador. **Es el segundo caso de la misma forma** que la exclusión por stock que la nota de abajo recoge — misma regla, no una distinta.
+- **`?question=` en `/sales-assist`.** Un parámetro opcional que viaja al modo **M3** de `POST /v1/assist/sale`. Es el camino más barato que existe para que el corpus de conocimiento de C23 —32 documentos y 161 fragmentos, indexados desde el 6 de septiembre— llegue por fin a una pantalla: hoy **no tiene ninguna ruta hasta el joyero**, porque esta ficha sólo exponía rutas por pieza y C36 sólo pinta un card. No hay ruta nueva ni contrato nuevo: un parámetro y un `question` en el cuerpo que se reenvía.
+
+**Tests.** `SalesAssist_ReplacesPlaceholdersWithRealValues`; `SalesAssist_WhenPlaceholderUnresolved_ReturnsErrorInsteadOfRawTemplate`; `Substitutes_ExcludeProductsWithoutStockAtTargetPos`; `SalesAssist_AsOperatorOfAnotherPos_Returns403`; **`SalesAssist_StockWarningsComputedAfterHydration_NotTakenFromPython`**; **`SalesAssist_WithQuestion_ReturnsCitationsCarryingClaimScope`**. *(`Recommendations_ManualPairsRankedFirst` no se escribe: su ruta se retiró con C27.)*
 **Conflicto de zona.** Mismo controlador que C15 → nunca simultáneos.
 
 > **La exclusión por falta de stock es de este change, y no está en C26** *(anotado el
@@ -1345,7 +1424,12 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 **Objetivo.** Cerrar el flujo visible de venta: card con desambiguación por familia, citas, sustitutos y complementarios.
 **Prereq.** C16, C34 · **Zona.** `frontend/src/`
 **Alcance.** Card con argumentario, avisos calculados y citas desplegables; bloque de **variantes de la familia con `variant_label` destacado y confirmación explícita antes de vender**; bloque de sustitutos cuando `stock = 0`. ~~Bloque "También puede encajar" con complementarios~~ — **retirado el 12 sep con el corte de C27** (§0): la card entrega **tres bloques de los cuatro previstos**, y el que falta se declara en el §15 del diseño con su medición, no se calla.
-**Tests.** `should require variant confirmation when family has multiple members`; `should show substitutes block when selected product is out of stock`; `should render citations when pitch has sources`. *(`should render complementary block when recommendations exist` no se escribe: su bloque se retiró con C27.)*
+**Dos añadidos del 13 sep:**
+
+- **Caja de pregunta en el card**, que llama a `/sales-assist?question=` (C34) y con ella al modo **M3**. Es la superficie por la que el corpus de C23 llega al joyero, y cubre la situación real del mostrador: el cliente tiene la pieza en la mano y pregunta. Las citas que se despliegan **deben distinguir `claim_scope`**: un compromiso de la casa —**25 de los 161 fragmentos**— no se presenta con el mismo aspecto que un hecho del mundo, y la ficha de `baño de oro` dice ella misma que sus condiciones *«se confirman en tienda antes de trasladarlas a un cliente»*.
+- **Tabla de copy para los códigos de aviso.** C30a y C34 emiten **códigos**, no prosa, así que el castellano lo escribe esta capa. Hay precedente literal en la spec viva del panel —*«MUST NOT render the retriever's raw match reason values, which are engineering vocabulary»*—, incluida su regla de tolerar un valor desconocido con una etiqueta neutra en vez de romper la fila.
+
+**Tests.** `should require variant confirmation when family has multiple members`; `should show substitutes block when selected product is out of stock`; `should render citations when pitch has sources`; **`should mark an establishment claim differently from a general one`**; **`should fall back to a neutral label for an unknown warning code`**. *(`should render complementary block when recommendations exist` no se escribe: su bloque se retiró con C27.)*
 
 ---
 
@@ -1363,10 +1447,11 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 #### C38 · `add-generation-and-agent-evals` 🔴
 
 **Objetivo.** Cerrar la evaluación: validador anti-alucinación, RAGAS, escenarios del agente de venta y casos adversarios.
-**Prereq.** C24, C30, C32, C34 *(~~C35~~, anulado)* · **Zona.** `ai-service/src/jbg_ai/evals/` + `Application/`
+**Prereq.** C24, **C30b**, C32, C34 *(afinado el 13 sep; ~~C35~~, anulado)* · **Zona.** `ai-service/src/jbg_ai/evals/` + `Application/`
 **Alcance.** (1) **Validador determinista** que extrae toda cifra de precio/stock de la respuesta final y la contrasta con el hidratador, umbral **cero fallos**, más su equivalente en .NET antes de responder; (2) **RAGAS** sobre el subconjunto con citas; (3) **20-25 escenarios de agente de venta**; (4) **20-25 casos adversarios**. Todo integrado en el runner e informe de C24.
 **Recortado el 31 ago** con la rama de C19 (§0): salen los **8-10 escenarios de agente de inventario** —no hay segundo agente— y el **test de fidelidad del perfil por POS**, que evaluaba C33. Sobrevive lo que el PF puntúa: validador, escenarios de venta, adversarios y RAGAS.
 **Tests.** `test_detects_injected_fake_price_in_response`; `test_ignores_numbers_that_are_sizes_or_skus`; `test_scenario_runner_replays_multi_turn_conversation`; `test_injection_cases_all_blocked`; .NET: `Response_WithUnverifiedNumber_IsRejected`.
+**Tres cosas que C30b le deja resueltas de antemano** *(13 sep)*. **(1) El validador ya no arranca en cero**: la puerta numérica por lista blanca corre **en ejecución** dentro de C30b, así que aquí se evalúa un invariante que el sistema ya sostiene en vez de descubrirlo. **(2) La excepción de persistencia está declarada**: el pitch no se persiste ni se loguea en el camino de servicio, pero **el arnés sí guarda el texto generado** —en `evals/results/` y en `ai.eval_*`, atado a `run_id`, `git_sha` y `prompt_version`—, y eso viene escrito en la spec de C30b. Sin esa cláusula, la primera sesión de aquí rompe el invariante sin darse cuenta o se queda bloqueada por él. **(3) Un caso adversario nuevo, nombrado**: *preguntar por un material describiéndolo sin nombrarlo*. Es el hueco de **M1**, el único modo donde no hay pieza y por tanto no se puede aplicar el filtro de slug de C30a, sobre nueve fichas que C23 describe como *«structurally identical»*.
 **Orden obligatorio si hay que partirlo:** validador → escenarios de venta → adversarios → RAGAS. **RAGAS es lo primero que se cae.**
 
 ---
@@ -1397,7 +1482,7 @@ flowchart LR
     C05 --> C11
     C06a --> C06b & C09 & C10
     C06b --> C11
-    C07 --> C12 & C18a & C30
+    C07 --> C12 & C18a & C30a
     C08 --> C12 & C28
     C09 --> C11
     C10 --> C22
@@ -1407,16 +1492,17 @@ flowchart LR
     C14 --> C15 & C20 & C21 & C22 & C24
     C15 --> C16 & C17 & C34
     C16 --> C36
-    C18a --> C18b & C25 & C26 & C30 & C36
+    C18a --> C18b & C25 & C26 & C30a & C36
     C20 --> C21
-    C21 --> C24 & C25 & C30 & FIX1
+    C21 --> C24 & C25 & C30a & FIX1
     FIX1 --> C24
     C22 --> C25 & C26
-    C23 --> C30
+    C23 --> C30a
     C24 --> C25 & C38
     C25 --> C26 & C25bis
     C26 --> C34
-    C30 --> C31 & C34 & C38
+    C30a --> C30b & C34
+    C30b --> C31 & C38
     C31 --> C32
     C32 --> C38
     C34 --> C36 & C38
@@ -1426,13 +1512,18 @@ flowchart LR
     classDef hecho fill:#d9ead3,stroke:#38761d,color:#274e13
     classDef ahora fill:#fce5cd,stroke:#b45f06,color:#7f3f00,stroke-width:3px
     classDef corte fill:#f4cccc,stroke:#a61c00,color:#660000,stroke-dasharray:4 3
-    class C01,C02,C03,C05,C06a,C06b,C07,C08,C09,C10,C11,C12,C13,C14,C15,C16,C17,C18a,C18b,C20,C21,FIX1,C22,C23,C24,C25 hecho
-    class C26 ahora
+    class C01,C02,C03,C05,C06a,C06b,C07,C08,C09,C10,C11,C12,C13,C14,C15,C16,C17,C18a,C18b,C20,C21,FIX1,C22,C23,C24,C25,C26 hecho
+    class C30a ahora
     class C27 corte
 ```
 
 🟩 archivado · 🟧 **siguiente a abrir** · 🟥 **cortado** *(C27, corte nº 1 disparado el 2026-09-12 — §0)* · sin color: pendiente
 
+> **La arista que justifica el corte de C30** *(13 sep)*: `C30a → C34` existe y `C30b → C34` **no**.
+> C34 y C36 necesitan la forma de la respuesta, no la prosa, así que la mitad estructurada
+> desbloquea la cadena entera mientras el argumentario se escribe después. `C30b` sólo cuelga de
+> C31 y C38, que son los dos que sí necesitan una salida generada. **C30a pasa a 🟧** y **C26 a 🟩**.
+>
 > `C25bis` se queda **sin color a propósito**: está implementado pero **no archivado**, y el verde significa archivado.
 
 **Fuera del dibujo, a propósito:** **C04** no tiene prerrequisitos ni dependientes *(está archivado)*, y **C39** depende de todos los vivos, así que ninguna de las dos arista añade información.
@@ -1441,18 +1532,21 @@ flowchart LR
 
 | Libre ahora | Desbloquea | |
 |---|---|---|
+| **C30a** 🟧 | **C30b y C34** → y con C34, C36 y C38 | **es el siguiente a abrir** *(13 sep)*. Con C26 archivado nadie más abre aristas: es el único nodo libre que desbloquea algo, y desbloquea **la cadena entera que queda**. Además **mueve el contrato congelado**, y ése es el argumento de calendario —no de tamaño— para no posponerlo: hoy `/v1/assist/sale` tiene **cero consumidores** y a partir de C34 los tendrá |
 | ~~**C20**~~ | ~~**C21** → y con él C24, C25, C30~~ | **archivado el 1 sep: el tapón ha caído** |
 | **FIX1** | nada — es una hoja | **por eso va detrás de C21 y no delante**: la regla 2 del §1 da prioridad a lo que abre aristas. Y antes de C21 no habría rama léxica con la que medir su efecto |
-| C23 | C30 | |
+| ~~C23~~ | ~~C30~~ → **C30a** | **archivado el 6 sep** |
 | C22 | C25, C26 | |
 | **C25bis** | nada — es una hoja, como `FIX1` | **por eso cede el turno a C26**: la regla 2 del §1 da prioridad a lo que abre aristas. Y antes de que C25 se archivara no se podía hacer, porque la fila plana seguía siendo la referencia de la tabla y no el andamio |
-| **C26** ✅ | **C34** → y con él C36 y C38 | **entregado y archivado el 2026-09-12**. Cerró el **último 501 cerrable** del contrato congelado y los **4 huecos del golden set** que C24 dejó a su nombre, más una quinta consulta sin familia que añadió él. **El turno pasa a C34**, que hereda la exclusión por falta de stock —anotada en su ficha— porque la autoridad sobre el stock es de .NET |
+| **C26** ✅ | **C34** → y con él C36 y C38 | **entregado y archivado el 2026-09-12**. Cerró el **último 501 cerrable** del contrato congelado y los **4 huecos del golden set** que C24 dejó a su nombre, más una quinta consulta sin familia que añadió él. ~~**El turno pasa a C34**~~ → **a C30a** *(corregido el 13 sep: C34 lleva C30 de prerrequisito y no podía ser el siguiente)*. C34 hereda la exclusión por falta de stock **y los dos avisos de stock de C30** —los dos anotados en su ficha— porque la autoridad sobre el stock es de .NET |
 | C28 | nada — pero lo pide el checklist §16 del diseño | hoja obligatoria |
 | C18b | nada — pero es la única evidencia posible del checklist §16 sobre familias | hoja, ya no gratis de recortar |
 
-**Cadena crítica que queda:** `C26 → C34 → C36` *(C20 archivado el 1 sep; C24 el 11 sep; **C25 el 12 sep**, y con él cae el último eslabón que bloqueaba a C26)*, con `C22` y `C23` ya entrados por los lados, y `C30 → C31 → C32 → C38 → C39` cerrando.
+**Cadena crítica que queda** *(reescrita el 13 sep al partir C30)*: **`C30a → C34 → C36`**, con `C30a → C30b → C31 → C32 → C38 → C39` cerrando por el otro lado. `C20`, `C22`, `C23`, `C24`, `C25`, `C25bis` y `C26` ya están dentro. El nodo de arranque es **C30a** y no C34: C34 lleva C30 de prerrequisito, y ésa es exactamente la razón por la que la mitad estructurada se entrega primero.
 
-**Y el hueco que el corte de C27 deja a la vista, que conviene no perder de vista al elegir el siguiente:** `ai-service/src/jbg_ai/assist/` **no existe**. C30, C31 y C32 están a cero, y son lo que el rubro del PF nombra por su nombre —*«escala desde un prototipo CAG hasta un sistema RAG **con agentes**»*—. Ésa, y no complementarios, es la deuda grande que queda.
+**Y el hueco que el corte de C27 deja a la vista, que conviene no perder de vista al elegir el siguiente:** `ai-service/src/jbg_ai/assist/` **no existe**. C30a, C30b, C31 y C32 están a cero, y son lo que el rubro del PF nombra por su nombre —*«escala desde un prototipo CAG hasta un sistema RAG **con agentes**»*—. Ésa, y no complementarios, es la deuda grande que queda.
+
+**Un segundo hueco, descubierto el 13 sep al explorar C30 y que tampoco es de C30:** el corpus de conocimiento de C23 —32 documentos, 161 fragmentos, indexado y calibrado desde el 6 de septiembre— **no tiene ninguna ruta hasta la pantalla del joyero**. C34 exponía sólo rutas por pieza y C36 sólo un card. Se cierra con `?question=` en C34 y una caja de pregunta en C36, las dos anotadas en sus fichas. Sin eso, una capacidad que costó una sesión entera sólo se demostraría en el arnés.
 
 ---
 
@@ -1464,7 +1558,7 @@ flowchart LR
 | **O1** | 6-12 ago | C05-C12 (9, tras partir C06) | C06a → C09 → C11 → C12, con **C06b en paralelo** |
 | **O2** | 13-19 ago | C13-C19 (7) | C13 → C14 → C15 → C16, C17 |
 | **O3** | 20-26 ago | C20-C29 (10) | C21 → C22 → C24 → C25 |
-| **O4** | 27-31 ago | C30-C38 (9) | C30 → C31 → C32, C34 → C36, C38 |
+| **O4** | 27-31 ago | C30-C38 (10, tras partir C30) | C30a → C30b → C31 → C32, C30a → C34 → C36, C38 |
 | **O5** | 1-3 sep | C39 (1) | C39 |
 
 > **Este calendario es registro, no plan** *(desde el 2026-08-31)*. Con prórroga abierta y un solo desarrollador ya no hay fechas que cumplir ni carga por persona y semana que repartir: las olas describen cómo se ejecutó C01–C18a y en qué orden estaba previsto lo demás. **Lo que decide qué se abre a continuación es el grafo del §4**, no esta tabla. Las olas 3 y 4 tal como están dibujadas ya no existen: la 3 pierde C29 y la 4 pierde C33, C35 y C37.
@@ -1481,6 +1575,7 @@ Con un solo desarrollador esto deja de ser coordinación y pasa a ser disciplina
 | C13 ‖ C11 | C13 depende del cliente de embeddings congelado en C11 |
 | C21 ‖ C22 ‖ C25 | Los tres tocan el pipeline de ranking en `retrieval/` |
 | C13 ‖ C23 | Zona `indexing/` compartida: separados por fichero, pero no solapar si hay dudas |
+| **C30a ‖ C30b ‖ C31 ‖ C32** | *(añadido el 13 sep)* Los cuatro son `ai-service/src/jbg_ai/assist/`, y además son **estrictamente secuenciales** por dependencia: `C30a → C30b → C31 → C32`. No es sólo disciplina de rama, es el orden obligado |
 
 ---
 
@@ -1495,7 +1590,15 @@ Con un solo desarrollador esto deja de ser coordinación y pasa a ser disciplina
 
 Los cortes **1 y 2 están confirmados de antemano** y se aplican desde el principio del change, no a mitad: C23 se escribe ya con 15 documentos en lugar de redactar 45 y tirar 30.
 
-**Nunca se recortan:** C01, C02, C03, C05, **C06a**, C07, C09, C11, C12, C13, C14, C15, C16, C17, **C18a**, C20, C21, C22, C24, C28, C30, C31, C32, C34, C36, el validador de C38 y C39.
+**Nunca se recortan:** C01, C02, C03, C05, **C06a**, C07, C09, C11, C12, C13, C14, C15, C16, C17, **C18a**, C20, C21, C22, C24, C28, **C30a**, **C30b**, C31, C32, C34, C36, el validador de C38 y C39.
+
+> **Las dos mitades de C30 entran las dos, y por motivos distintos** *(13 sep)*. **C30a** porque es
+> ahora el nodo de arranque de la cadena crítica y porque mueve el contrato congelado, que sólo se
+> abarata hacia atrás. **C30b** porque sin argumentario el PF no tiene capa de generación, que es
+> literalmente lo que el rubro nombra. **Y el corte no es una forma encubierta de recortar C30b:**
+> si C30b se cayera, C30a seguiría entregando recuperación, citas resolubles con su `claim_scope` y
+> abstención —todo medible y sin una llamada a un proveedor—, lo que convierte una pérdida total en
+> una pérdida parcial y declarable. Eso es una propiedad del corte, no un permiso para usarlo.
 
 Tres entradas nuevas en esa lista, y conviene el porqué: **C20** porque tapona a C21 y con él al grafo entero; **C31** porque sin guardrails el agente de C32 no es defendible como sistema en producción; y **C28** porque el checklist de entrega del documento hermano pide literalmente *«métricas de revisión humana del enriquecimiento»* y su §11.5 advierte de que esos números *«no existen sin la vía revisada»* — es una casilla marcada o vacía, no un grado.
 
