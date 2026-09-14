@@ -74,7 +74,17 @@ El conjunto en rojo es **vacío en las dos puntas**, así que el criterio se cum
 | `tests/db/test_engine.py` | 9 → **13** | *(+4)* el aislamiento del motor, §10.4 |
 | | **107 + 18 = 125** | = 1320 − 1195 ✓ |
 
-**Dos tests renombrados y ninguno borrado.** `test_the_argument_is_empty_its_provenance_absent_and_the_usage_zero` → `test_without_a_generation_client_the_argument_is_empty_and_its_provenance_absent`, y `test_no_language_model_provider_is_called_in_any_mode` → `test_no_language_model_provider_is_called_when_no_client_is_configured`. Los dos afirmaban como **requisito universal** lo que tras C30b es un **estado de despliegue**; la propiedad no se pierde, se condiciona, y sigue verde. Mismo gesto que C26 y C30a hicieron con sus 501.
+**Tres tests renombrados y ninguno borrado.** Medido sobre los conjuntos de *node id* de las dos puntas, no sobre la tabla: **128 node id aparecen y 3 desaparecen**, y los tres que desaparecen reaparecen con otro nombre, así que los tests **nuevos** son 128 − 3 = **125** y la tabla de arriba los reparte enteros.
+
+| Antes | Después |
+|---|---|
+| `tests/assist/test_orchestrator.py::test_the_argument_is_empty_its_provenance_absent_and_the_usage_zero` | `test_without_a_generation_client_the_argument_is_empty_and_its_provenance_absent` |
+| `tests/assist/test_orchestrator.py::test_no_language_model_provider_is_called_in_any_mode` | `test_no_language_model_provider_is_called_when_no_client_is_configured` |
+| `tests/api/test_assist_real.py::test_the_real_path_emits_an_empty_pitch_a_null_prompt_and_zero_usage` | `test_without_a_provider_credential_the_route_emits_no_pitch_and_a_null_prompt_version` |
+
+Los tres afirmaban como **requisito universal** lo que tras C30b es un **estado de despliegue**; la propiedad no se pierde, se condiciona, y sigue verde. Mismo gesto que C26 y C30a hicieron con sus 501.
+
+> **La primera redacción de este informe decía «dos».** El tercero —el de la ruta HTTP— es el mismo gesto que los otros dos y se renombró en el mismo commit, pero no se listó. Lo destapó la pasada de verificación comparando los conjuntos de *node id* en lugar de leer la tabla: el neto de 125 cuadraba igual, porque una renombrada suma y resta a la vez.
 
 ---
 
@@ -329,11 +339,13 @@ El requisito *This capability generates no prose and calls no provider* se retir
 `git diff f0d5a0c..HEAD --stat` sobre las zonas declaradas fuera de alcance:
 
 ```
-backend/.env.example | 40 ++++++++++++++++++++++++++++++++++++++--
-1 file changed, 38 insertions(+), 2 deletions(-)
+backend/.env.example | 24 ++++++++++++++++++++----
+1 file changed, 21 insertions(+), 3 deletions(-)
 ```
 
-**Un solo fichero fuera de `ai-service/`**, y es el que se pidió expresamente después de entregar: el ejemplo de entorno, sin ningún secreto. `backend/.env` sigue ignorado por git, comprobado con `git check-ignore`.
+**Un solo fichero de código fuera de `ai-service/`**, y es el que se pidió expresamente después de entregar: el ejemplo de entorno, sin ningún secreto. `backend/.env` sigue ignorado por git, comprobado con `git check-ignore`. El resto del diff fuera de `ai-service/` es **documentación** y está dentro del alcance declarado: `Documentos/` —el informe, `epicas.md` y el plan— y `openspec/` —los artefactos del change y `DEFERRED_TASKS.md`—.
+
+> **Esta cifra estuvo mal en la primera redacción**, que citaba `38 insertions(+), 2 deletions(-)`: es el estado de `9645176`. El commit que añadió este mismo `qa.md` —`6e765f2`— adelgazó el ejemplo de entorno en la misma pasada y el bloque no se volvió a ejecutar. La conclusión no se mueve; el número sí, y se corrige en vez de repetirse.
 
 Vacío en: `frontend/`, `terraform/`, `.github/workflows/`, `ai-service/migrations/`, `ai-service/src/jbg_ai/retrieval/`, `ai-service/src/jbg_ai/knowledge/`, `ai-service/src/jbg_ai/enrichment/`, `ai-service/src/jbg_ai/indexing/embeddings.py`.
 
@@ -394,7 +406,19 @@ Los tres ajustes nuevos —`JPV_ASSIST_PITCH_TIMEOUT_SECONDS`, `JPV_ASSIST_LLM_A
 
 **0 de 120 generaciones.** El diseño declara como riesgo mayor del change que *«la puerta numérica se coma los argumentarios buenos»*. No ocurrió ni una vez: las 121 violaciones del barrido son **todas** de correspondencia.
 
-La lectura honesta **no** es que la puerta sobre. La regla de adyacencia nace de una medición del corpus —`750` y `585` viven en `material-oro.md`— que sigue siendo cierta, y la puerta está probada por unitarios incluido el caso de `750 €` que la motivó. Lo que el barrido dice es que **su tasa de falso positivo es cero en 120 generaciones**, que es exactamente la cifra que el riesgo declarado exigía conocer. La prevención en el prompt hizo el trabajo y la detección no tuvo que actuar.
+La lectura honesta **no** es que la puerta sobre. La regla de adyacencia nace de una medición del corpus —`750` y `585` viven en `material-oro.md`— que sigue siendo cierta, y la puerta está probada por unitarios incluido el caso de `750 €` que la motivó. La prevención en el prompt hizo el trabajo y la detección no tuvo que actuar.
+
+**Y el denominador de ese cero no es 120.** Contados los numerales de los 120 argumentarios generados del artefacto:
+
+| Medida sobre los 120 argumentarios | Valor |
+|---|---|
+| Contienen **algún** dígito | **2** |
+| Numerales totales que la puerta tuvo que juzgar | **2** — el mismo `2` de «anillo de 2mm» (`SKU315`), en la lista blanca por la talla |
+| Rechazados por la puerta | **0** |
+| Usan `{{price}}` y `{{stock}}` | **106** |
+| Contienen `€` | **0** |
+
+Así que la frase correcta es **«2 numerales vistos, 0 rechazados»**, y no «tasa de falso positivo cero en 120 generaciones», que es lo que la primera redacción de este informe decía. La conclusión no cambia —sale reforzada: **118 de 120 argumentarios no escriben un solo dígito**, que es la prevención del prompt medida directamente en vez de inferida del silencio de la puerta—. Lo que cambia es qué se puede afirmar con esta cifra: el barrido **no** mide la discriminación de la puerta sobre prosa con cifras, porque el modelo casi nunca escribió una. Medir eso exige un brazo que induzca cifras a propósito, y este change no lo corre.
 
 ### 10.2. El coste real es 1,9 × el estimado
 
@@ -427,7 +451,7 @@ Corregido en `a149f26`, **fuera del alcance de C30b y a petición expresa**, con
 |---|---|---|
 | *«backoff de proveedor propio»* (tarea 5.1) | **No se replica** | `ENRICH_BACKOFF_BASE_SECONDS` son 2 s contra un presupuesto de 4, y con reintentos debajo la garantía de *«no más de dos llamadas»* sería **falsa**: dos llamadas de generación serían cuatro HTTP. Medido: 0 errores de proveedor en 175 llamadas |
 | La consulta forma parte del *«payload entregado»* | **No entra en la lista blanca** | Es qué contestar, no qué es cierto; y es la única superficie que controla alguien fuera del código, así que ensancharía la puerta desde el teclado |
-| *«`JPV_RAG_LLM_*` ya existen, reutilizables»* | **Clave y modelo propios** | `JPV_RAG_LLM_MODEL` es el de enriquecimiento; heredarlo movería un modelo de mostrador cuyas cifras se midieron sobre otro. `JPV_ASSIST_LLM_API_KEY` separa gasto, cupo y rotación |
+| *«`JPV_RAG_LLM_*` ya existen, reutilizables»* | **Modelo propio; clave propia con repliegue** | `JPV_RAG_LLM_MODEL` es el de enriquecimiento y **no se lee**: heredarlo movería un modelo de mostrador cuyas cifras se midieron sobre otro. `JPV_ASSIST_LLM_API_KEY` separa gasto, cupo y rotación, pero es **opcional y se repliega a `JPV_RAG_LLM_API_KEY`** —exigirla habría dejado de generar a un despliegue existente el día que apareció el campo, y en silencio, porque la ruta degrada a 200 sin prosa en vez de fallar—. Cuál está en vigor se registra una vez, `stage=assist_client credential=assist\|rag_fallback`, así que «tenemos credenciales separadas» es comprobable y no supuesto. Degradar exige por tanto que **falten las dos** |
 
 ### 10.6. Una corrección de este mismo informe, sobre Terraform
 

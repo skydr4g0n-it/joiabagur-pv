@@ -79,9 +79,27 @@ Lo que **no** se puede concluir con estas cifras es que la puerta sea innecesari
 corre en el modo sin pregunta, a temperatura 0, con un contexto estrecho y sin texto de
 operario; la regla de adyacencia existe por una medición del corpus —`750` y `585` viven en
 `material-oro.md`— y esa medición sigue siendo cierta. La puerta está probada por los tests
-unitarios, incluido el caso de `750 €` que la motivó; lo que el barrido dice es que **su tasa de
-falso positivo en producción es cero en 120 generaciones**, que es justo el número que el riesgo
-declarado exigía conocer.
+unitarios, incluido el caso de `750 €` que la motivó.
+
+**Y el denominador de ese cero no es 120: es 2.** Contados los numerales de los 120
+argumentarios del artefacto:
+
+```
+argumentarios con ALGÚN dígito      2 de 120
+numerales que la puerta juzgó       2  ← el mismo «2» de «anillo de 2mm» (SKU315),
+                                       en la lista blanca por la talla
+rechazados                          0
+argumentarios con {{price}}/{{stock}}   106 de 120
+argumentarios con «€»                     0 de 120
+```
+
+Así que la cifra defendible es **«2 numerales vistos, 0 rechazados»**, y no «tasa de falso
+positivo cero en 120 generaciones», que es lo que decía la primera redacción de este informe. La
+conclusión sale **reforzada**, no debilitada: que **118 de 120 argumentarios no escriban un solo
+dígito** es la prevención del prompt medida de frente, en vez de inferida del silencio de la
+puerta. Lo que cae es otra cosa — con estas cifras el barrido **no mide la discriminación de la
+puerta sobre prosa con cifras**, porque el modelo casi nunca escribió una. Medir eso exige un
+brazo que induzca cifras a propósito, y este change no lo corre.
 
 ### 2.2 · La correspondencia es la única que dispara, y crece con el ancho del contexto
 
