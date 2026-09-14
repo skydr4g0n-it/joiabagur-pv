@@ -42,6 +42,20 @@ POOL_TIMEOUT_SECONDS = 2.0
 _engine: AsyncEngine | None = None
 _sessionmaker: async_sessionmaker[AsyncSession] | None = None
 
+#: The URL the cached engine was built from. Kept because the engine is process-wide and
+#: `get_engine` **takes a `Settings`**: without it the signature promises an engine for those
+#: settings and returns one for whoever asked first, which is a lie that costs nothing in a
+#: service — one process, one configuration — and poisons every later caller in a test run.
+#:
+#: Diagnosed on 2026-09-14, from two failures that looked like flakiness and were not:
+#: `tests/api/test_retrieval_real.py` configures `postgresql+psycopg://u:p@db:5432/jpv` on
+#: purpose, to prove the route answers 503 for an unreachable database. That built the global
+#: engine, and `tests/evals/test_reproducibility.py`, running later in the same process against
+#: a real container, got it back and died with `failed to resolve host 'db'`. Reproducible in
+#: one command — the two files in that order fail, in the other order they pass — and invisible
+#: in the full suite only because a `tests/db/` test in between happened to dispose the engine.
+_engine_url: str | None = None
+
 
 class DatabaseNotConfiguredError(RuntimeError):
     """Raised when the database is used without `DATABASE_URL` being set.
@@ -52,8 +66,30 @@ class DatabaseNotConfiguredError(RuntimeError):
 
 
 def get_engine(settings: Settings) -> AsyncEngine:
-    """Return the process-wide engine, building it the first time it is needed."""
-    global _engine
+    """Return the process-wide engine, building it the first time it is needed.
+
+    **Rebuilt when the URL changes**, which is what makes the `settings` argument honest. A
+    service has one configuration for its whole life, so this costs nothing there; what it buys
+    is that a caller can no longer be handed an engine pointing at somebody else's database.
+
+    The old pool is released with `close=False` — SQLAlchemy's documented way of abandoning a
+    pool from a context that cannot await — rather than closed: this is a synchronous function,
+    and the case that reaches it is an engine whose connections either never opened or belong to
+    a configuration nobody is using any more.
+    """
+    global _engine, _engine_url, _sessionmaker
+
+    if (
+        _engine is not None
+        and settings.database_url
+        and _engine_url != settings.database_url
+    ):
+        _engine.sync_engine.dispose(close=False)
+        _engine = None
+        _engine_url = None
+        # The factory is bound to the engine that is going away; leaving it would hand out
+        # sessions on the pool this call just released.
+        _sessionmaker = None
 
     if _engine is None:
         if not settings.database_url:
@@ -63,6 +99,7 @@ def get_engine(settings: Settings) -> AsyncEngine:
                 "postgresql+psycopg://user:password@host:5432/db"
             )
 
+        _engine_url = settings.database_url
         _engine = create_async_engine(
             settings.database_url,
             pool_size=settings.db_pool_size,
@@ -79,14 +116,17 @@ def get_engine(settings: Settings) -> AsyncEngine:
 
 
 def get_sessionmaker(settings: Settings) -> async_sessionmaker[AsyncSession]:
-    """Return the process-wide session factory, built on first use."""
+    """Return the process-wide session factory, built on first use.
+
+    `get_engine` is asked **first and unconditionally**, and the order is the whole point: it is
+    what decides whether the engine still matches these settings, and a factory cached from an
+    earlier call would otherwise short-circuit that decision and keep serving the old pool.
+    """
     global _sessionmaker
 
+    engine = get_engine(settings)
     if _sessionmaker is None:
-        _sessionmaker = async_sessionmaker(
-            bind=get_engine(settings),
-            expire_on_commit=False,
-        )
+        _sessionmaker = async_sessionmaker(bind=engine, expire_on_commit=False)
 
     return _sessionmaker
 
@@ -111,10 +151,11 @@ async def dispose_engine() -> None:
     Used by tests and by an orderly shutdown; after this, the next call to
     `get_engine` builds a fresh engine.
     """
-    global _engine, _sessionmaker
+    global _engine, _engine_url, _sessionmaker
 
     if _engine is not None:
         await _engine.dispose()
 
     _engine = None
+    _engine_url = None
     _sessionmaker = None
