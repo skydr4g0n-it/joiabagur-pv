@@ -24,11 +24,18 @@ DUMMY_URL = "postgresql+psycopg://user:password@localhost:5432/jpv"
 
 @pytest.fixture(autouse=True)
 def _reset_engine_state():
-    """The engine is process-wide, so each test starts from a clean slate."""
+    """The engine is process-wide, so each test starts from a clean slate.
+
+    `_engine_url` is reset with the rest: it records which URL the cached engine was built
+    from, and a leftover value beside a cleared engine is the kind of half-reset state these
+    tests exist to keep out.
+    """
     engine_module._engine = None
+    engine_module._engine_url = None
     engine_module._sessionmaker = None
     yield
     engine_module._engine = None
+    engine_module._engine_url = None
     engine_module._sessionmaker = None
 
 
@@ -110,3 +117,65 @@ def test_engine_without_database_url_fails_naming_the_missing_setting() -> None:
 def test_sessionmaker_without_database_url_fails_the_same_way() -> None:
     with pytest.raises(DatabaseNotConfiguredError):
         get_sessionmaker(build_settings())
+
+
+# --- the engine follows the settings it is handed ------------------------------------------
+#
+# Added 2026-09-14, from two failures that looked like flakiness and were not. `get_engine`
+# cached the engine and ignored its `settings` argument, so the FIRST caller in a process
+# decided the database for every later one. `tests/api/test_retrieval_real.py` configures an
+# unreachable `…@db:5432/jpv` on purpose — to prove the route answers 503 — and that poisoned
+# `tests/evals/test_reproducibility.py`, which runs later against a real container and died
+# with `failed to resolve host 'db'`. Reproducible in one command, and invisible in the full
+# suite only because a test in between happened to dispose the engine.
+
+
+OTHER_URL = "postgresql+psycopg://user:password@elsewhere:5432/other"
+
+
+def test_a_different_database_url_gets_a_different_engine() -> None:
+    """The `settings` argument is a promise, and this is what makes it true.
+
+    One process serves one configuration, so this costs a service nothing. What it buys is that
+    a caller can never be handed an engine pointing at somebody else's database.
+    """
+    first = get_engine(_settings_with_database())
+
+    second = get_engine(build_settings(database_url=OTHER_URL))
+
+    assert second is not first
+    assert str(second.url) != str(first.url)
+    assert "elsewhere" in str(second.url)
+
+
+def test_the_sessionmaker_does_not_outlive_the_engine_it_was_bound_to() -> None:
+    """The factory is cached too, and it used to short-circuit the check above.
+
+    `get_sessionmaker` returned early when it already had one, so `get_engine` was never asked
+    whether the engine still matched — and the stale pool kept being served through it.
+    """
+    first = get_sessionmaker(_settings_with_database())
+
+    second = get_sessionmaker(build_settings(database_url=OTHER_URL))
+
+    assert second is not first
+    assert "elsewhere" in str(second.kw["bind"].url)
+
+
+def test_the_same_url_still_reuses_the_one_engine() -> None:
+    """The rebuild is triggered by a CHANGE, never by asking twice: the process-wide pool is
+    the point of the singleton and must survive an identical second call."""
+    settings = _settings_with_database()
+
+    assert get_engine(settings) is get_engine(_settings_with_database())
+    assert get_sessionmaker(settings) is get_sessionmaker(_settings_with_database())
+
+
+def test_an_absent_url_does_not_silently_reuse_somebody_elses_engine() -> None:
+    """Unchanged behaviour, pinned because the fix passes near it: with no URL and an engine
+    already built, the caller still gets the engine rather than an error — the case that bit us
+    was a DIFFERENT url, not an absent one, and widening the fix would have moved a boundary
+    nobody asked to move."""
+    built = get_engine(_settings_with_database())
+
+    assert get_engine(build_settings()) is built

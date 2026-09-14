@@ -8,6 +8,13 @@ from typing import Any
 from pydantic import Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Imported rather than restated, so the library default and the environment default cannot
+# drift: `assist/constants.py` carries the value together with the measurement that set it.
+from jbg_ai.assist.constants import (
+    DEFAULT_ASSIST_MODEL,
+    PITCH_TIMEOUT_SECONDS as DEFAULT_ASSIST_PITCH_TIMEOUT_SECONDS,
+)
+
 PRODUCTION_ENV_NAMES = frozenset({"prod", "production"})
 
 CANONICAL_OPENAPI_SERVICE_VERSION = "0.1.0"
@@ -266,6 +273,43 @@ class Settings(BaseSettings):
             "each item; exhaustion persists a resume cursor."
         ),
     )
+    jpv_assist_llm_api_key: str | None = Field(
+        default=None,
+        description=(
+            "C30b credential for the sale argument (JPV_ASSIST_LLM_API_KEY). **Optional, and "
+            "it falls back to JPV_RAG_LLM_API_KEY**: making it required would stop an existing "
+            "deployment generating the day this field appeared, and it would do it silently — "
+            "the route degrades to 200 without prose rather than failing. Set it to bill, "
+            "rate-limit and rotate counter-side generation apart from C09 enrichment; the "
+            "resolved choice is logged when the client is built. Not required to boot /health."
+        ),
+    )
+    jpv_assist_llm_model: str = Field(
+        default=DEFAULT_ASSIST_MODEL,
+        min_length=1,
+        description=(
+            "C30b model that writes the sale argument (JPV_ASSIST_LLM_MODEL). Deliberately its "
+            "OWN variable and never JPV_RAG_LLM_MODEL: that one is C09's enrichment model, and "
+            "inheriting it would let a change to enrichment move a counter-side model whose "
+            "cost, latency and rejection rate were measured on another. The default is the "
+            "model every C30b figure was measured on. It must support structured output; one "
+            "that does not degrades to the structured response and records the cause."
+        ),
+    )
+    jpv_assist_pitch_timeout_seconds: float = Field(
+        default=DEFAULT_ASSIST_PITCH_TIMEOUT_SECONDS,
+        gt=0,
+        le=60,
+        description=(
+            "C30b seconds one generation call of POST /v1/assist/sale may take "
+            "(JPV_ASSIST_PITCH_TIMEOUT_SECONDS). Per call and not per request: the ceiling "
+            "is two calls. Supplies only the DEFAULT — the effective value travels as a "
+            "parameter of the client, so an evaluation can sweep it in one process. "
+            "Exceeding it degrades to the structured response with 200, never an error. "
+            "Not required to boot /health."
+        ),
+    )
+
     jpv_retrieval_distance_threshold: float = Field(
         default=0.65,
         gt=0,
@@ -620,6 +664,29 @@ class Settings(BaseSettings):
             return 180
         return value
 
+    @field_validator("jpv_assist_llm_api_key", mode="before")
+    @classmethod
+    def blank_assist_llm_key_is_unset(cls, value: object) -> object:
+        """A blank export means "unset", so it falls back rather than configuring an empty key."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("jpv_assist_llm_model", mode="before")
+    @classmethod
+    def blank_assist_llm_model_is_default(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return DEFAULT_ASSIST_MODEL
+        return value
+
+    @field_validator("jpv_assist_pitch_timeout_seconds", mode="before")
+    @classmethod
+    def blank_pitch_timeout_is_default(cls, value: object) -> object:
+        """A blank export means "unset", the same rule every other optional value follows."""
+        if isinstance(value, str) and not value.strip():
+            return DEFAULT_ASSIST_PITCH_TIMEOUT_SECONDS
+        return value
+
     @field_validator("jpv_retrieval_distance_threshold", mode="before")
     @classmethod
     def blank_retrieval_threshold_is_default(cls, value: object) -> object:
@@ -751,6 +818,11 @@ def canonical_openapi_settings() -> Settings:
         jpv_index_feed_api_key=None,
         jpv_index_sync_time_budget_seconds=180,
         jpv_retrieval_distance_threshold=0.65,
+        # Pinned like the rest: a value exported in the process environment must not
+        # reach the committed snapshot, even through a field no route publishes today.
+        jpv_assist_pitch_timeout_seconds=DEFAULT_ASSIST_PITCH_TIMEOUT_SECONDS,
+        jpv_assist_llm_api_key=None,
+        jpv_assist_llm_model=DEFAULT_ASSIST_MODEL,
         jpv_query_expansion_enabled=True,
         jpv_pos_prefilter_enabled=True,
         jpv_pos_projection_max_age_seconds=3600,

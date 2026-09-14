@@ -7,6 +7,21 @@ class AssistError(Exception):
     """Base class, so a caller can catch the layer without catching the world."""
 
 
+class PitchProviderError(AssistError, RuntimeError):
+    """The generative provider failed, timed out, or returned something that did not parse.
+
+    **It never reaches the router.** C30b's rule is that a provider fault degrades to the
+    structured response with 200: the structured half is already computed and correct, and
+    discarding it because the prose failed turns a partial loss into a total one. The class
+    exists so the degradation has one thing to catch and one `cause` to log, rather than a
+    bare `except Exception` whose reason nobody can read afterwards.
+    """
+
+    def __init__(self, message: str, *, cause: str) -> None:
+        self.cause = cause
+        super().__init__(message)
+
+
 class NoAnchorError(AssistError, ValueError):
     """The request carried neither a piece nor a question.
 

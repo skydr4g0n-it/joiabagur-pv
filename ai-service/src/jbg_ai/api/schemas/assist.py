@@ -173,5 +173,7 @@ class AssistResponse(ScopedResponse):
     )
     prompt_version: str | None = Field(
         default=None,
-        description="Version of the prompt that wrote the pitch. Null while there is no pitch",
+        description=(
+            "Version of the prompt the generation layer ran with; null when it did not run"
+        ),
     )

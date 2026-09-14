@@ -265,7 +265,7 @@
                 "type": "null"
               }
             ],
-            "description": "Version of the prompt that wrote the pitch. Null while there is no pitch",
+            "description": "Version of the prompt the generation layer ran with; null when it did not run",
             "title": "Prompt Version"
           },
           "trace_id": {
