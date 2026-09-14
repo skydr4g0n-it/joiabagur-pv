@@ -1,15 +1,20 @@
-"""Sale assistance routes. Real when stub mode is off since C30a; the fixture survives it.
+"""Sale assistance routes. Real since C30a, and writing prose since C30b.
 
 `DELIVERED_BY` went with the 501, exactly as `SUBSTITUTES_DELIVERED_BY` did when C26 served
 its route: a constant announcing a future delivery, left behind on a route that answers, is
 a lie the next reader has to disprove. Checked by search before removing it, not by memory.
 
-**The prose is still absent, and that is the shape of the change rather than an omission.**
-`pitch` is empty, `prompt_version` null and `usage` zero until C30b, which is what makes
-C30b measurable: same route, same candidates, same citations, with an argument and without.
+**The generation layer is a dependency this route can serve without.** With no provider
+credential configured it answers exactly what C30a answered — structure, warnings and
+citations, empty argument, absent prompt version — rather than 503, because the half of the
+response that matters is already computed and correct. That is also the rollback: removing the
+client leaves the route in C30a's behaviour without touching a schema. A provider that is
+configured and then fails degrades the same way, from inside the layer, and never as a 5xx.
 """
 
 from __future__ import annotations
+
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
@@ -21,6 +26,7 @@ from jbg_ai.api.deps import (
 )
 from jbg_ai.api.schemas.assist import AssistRequest, AssistResponse
 from jbg_ai.assist.errors import NoAnchorError, UnusableAnchorProductError
+from jbg_ai.assist.llm import AssistLlm, LiteLlmAssistClient
 from jbg_ai.assist.orchestrator import assist_sale as run_assist_sale
 from jbg_ai.config import Settings
 from jbg_ai.db.engine import DatabaseNotConfiguredError
@@ -36,6 +42,8 @@ from jbg_ai.retrieval.orchestrator import build_retrieval_embed_client
 from jbg_ai.retrieval.ports import ProductSearchPort
 from jbg_ai.retrieval.search import SqlAlchemyProductSearch
 from jbg_ai.stubs import assist_sale_stub
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/assist", tags=["assist"], responses=V1_RESPONSES)
 
@@ -87,6 +95,60 @@ def _resolve_knowledge(request: Request, settings: Settings) -> KnowledgeSearchI
     return SqlAlchemyKnowledgeIndex(settings)
 
 
+def _resolve_pitch_client(request: Request, settings: Settings) -> AssistLlm | None:
+    """The generation client, or **None**, which is a deployment state and not a failure.
+
+    With no provider credential at all the route serves exactly what C30a served — structure,
+    warnings and citations, with an empty argument and an absent prompt version — instead of
+    answering 503 the way the paths that cannot work without their credential do. The
+    difference is that those paths have nothing to return and this one has most of the
+    response already computed and correct.
+
+    **Its own credential, with a fallback that is logged rather than silent.**
+    `JPV_ASSIST_LLM_API_KEY` bills, rate-limits and rotates counter-side generation apart from
+    C09 enrichment, which is worth having: the two have different shapes — one is a batch with
+    nobody waiting, the other is a call with a customer in front of it. It is **optional** on
+    purpose: requiring it would stop an existing deployment generating the day the field
+    appeared, and would do it invisibly, because the layer degrades to 200 without prose rather
+    than failing. So it falls back to `JPV_RAG_LLM_API_KEY` — and the line below says which one
+    is in force, so "we have separate credentials" is something a deployment can check instead
+    of assume.
+
+    **Its own model too**, and never `JPV_RAG_LLM_MODEL`: that setting is C09's enrichment
+    model, and inheriting it would let a change to enrichment move the model of a counter-side
+    call whose cost, latency and rejection rate were measured on another.
+    """
+    injected = getattr(request.app.state, "assist_pitch_client", None)
+    if injected is not None:
+        return injected  # type: ignore[no-any-return]
+
+    dedicated = bool(settings.jpv_assist_llm_api_key)
+    api_key = settings.jpv_assist_llm_api_key or settings.jpv_rag_llm_api_key
+    if not api_key:
+        return None
+    client = LiteLlmAssistClient(
+        api_key=api_key,
+        # The base URL stays C09's: it names the PROVIDER endpoint, not the account, so a
+        # separate credential against the same provider needs no second one. A deployment that
+        # ever points the two at different gateways needs a field here, and would notice.
+        base_url=settings.jpv_rag_llm_base_url,
+        model=settings.jpv_assist_llm_model,
+        # Settings supplies the default and the value travels by parameter, the pattern C20,
+        # C23 and C25 established: an evaluation can sweep it inside one process.
+        timeout=settings.jpv_assist_pitch_timeout_seconds,
+    )
+    # Once per process, never per request, and it carries no secret — only WHICH of the two
+    # credentials was resolved, which is the whole point of having two.
+    logger.info(
+        "stage=assist_client model=%s timeout_s=%s credential=%s",
+        client.model_id,
+        settings.jpv_assist_pitch_timeout_seconds,
+        "assist" if dedicated else "rag_fallback",
+    )
+    request.app.state.assist_pitch_client = client
+    return client
+
+
 @router.post(
     "/sale",
     response_model=AssistResponse,
@@ -111,6 +173,7 @@ async def assist_sale(
             embed=_resolve_embed(request, settings),
             search=_resolve_search(request, settings),
             knowledge=_resolve_knowledge(request, settings),
+            pitch_client=_resolve_pitch_client(request, settings),
         )
     except UnusableAnchorProductError as exc:
         # 422 and not 404, like the substitutes route: the body named something this service

@@ -52,7 +52,7 @@ Boundary rule: *Python computes similarity and writes prose; .NET computes numbe
 | `JPV_CATALOG_LLM_MODEL` | no | — | optional; CLI default `gpt-4o` |
 | `JPV_CATALOG_LLM_BASE_URL` | no | — | optional OpenAI-compatible proxy; empty = api.openai.com |
 | `JPV_PG*` | no | — | Host CLI ingest only (C06b catalog, C10 world). `backend/.env`, port 5433. Absence does not block `/health` |
-| `JPV_RAG_LLM_API_KEY` | no | — | C09 runtime enrichment (LiteLLM). Distinct from `JPV_CATALOG_LLM_API_KEY`. Absence does not block `/health`; real enrich requires it |
+| `JPV_RAG_LLM_API_KEY` | no | — | C09 runtime enrichment, and the **fallback** for the C30b sale argument when `JPV_ASSIST_LLM_API_KEY` is absent (LiteLLM). Distinct from `JPV_CATALOG_LLM_API_KEY`. Absence does not block `/health`; real enrich requires it, and `/v1/assist/sale` **degrades to C30a's response with 200** rather than refusing. `JPV_RAG_LLM_MODEL` is C09's model and is **not** read by the assistance layer, whose model is a constant of the module: inheriting it would move the model of a counter-side call whose cost and rejection rate were measured on another |
 | `JPV_RAG_LLM_MODEL` | no | — | provider-prefixed id (e.g. `openai/gpt-4o`) |
 | `JPV_RAG_LLM_BASE_URL` | no | — | optional LiteLLM `api_base`; empty = provider default |
 | `JPV_RAG_LLM_CONCURRENCY` | no | `8` | in-flight enrichment calls inside a batch of ≤ 50 |
@@ -63,6 +63,9 @@ Boundary rule: *Python computes similarity and writes prose; .NET computes numbe
 | `JPV_INDEX_FEED_BASE_URL` | no | — | C13 catalog feed origin. Distinct from `JWT_SECRET`. Absence does not block `/health`; real sync requires it |
 | `JPV_INDEX_FEED_API_KEY` | no | — | C13 `X-Index-Feed-Key`. Distinct from `JWT_SECRET` and `JPV_EMBEDDING_*`. Never falls back to `JWT_SECRET` |
 | `JPV_INDEX_SYNC_TIME_BUDGET_SECONDS` | no | `180` | wall-clock budget for one catalog drain; blank → the default |
+| `JPV_ASSIST_LLM_API_KEY` | no | — | C30b credential for the sale argument. **Optional, and it falls back to `JPV_RAG_LLM_API_KEY`** — requiring it would stop an existing deployment generating the day it appeared, and silently, because the route degrades to **200 without prose** rather than failing. Set it to bill, rate-limit and rotate counter-side generation apart from C09's batch enrichment: the two calls have different shapes, one with nobody waiting and one with a customer in front of it. Which credential was resolved is logged once as `stage=assist_client credential=assist\|rag_fallback`, so a deployment can check that it really separated them instead of assuming it |
+| `JPV_ASSIST_LLM_MODEL` | no | `openai/gpt-4o-mini` | C30b model that writes the sale argument. Its **own** variable and never `JPV_RAG_LLM_MODEL`: that one is C09's enrichment model — `gpt-4o` here — and inheriting it would let a change to enrichment move a counter-side model whose cost, latency and rejection rate were measured on another. The default is the model **every C30b figure was measured on**. It must support structured output; one that does not degrades to the structured response and records the cause |
+| `JPV_ASSIST_PITCH_TIMEOUT_SECONDS` | no | `4` | C30b seconds **one generation call** of `/v1/assist/sale` may take — per call, not per request: the ceiling is two calls. Supplies only the **default**; the value travels by parameter. Exceeding it degrades to the structured response with **200**. Opened at 3 s as a product judgement with no measurement behind it; the C30b sweep took one over 175 real calls — p50 2.216 ms, **p95 2.863 ms**, 4,6 % over three seconds and 0,6 % over four — so 3 s sat at 1,05 × p95 and cut jitter rather than slow generations. That latency is an upper bound taken on a developer machine through a TLS interceptor: measure your own and set it here |
 | `JPV_RETRIEVAL_DISTANCE_THRESHOLD` | no | `0.65` | C14 cosine-distance cutoff `(0, 2]`. Absence does not block `/health`; blank → the default. Distinct from `JPV_EMBEDDING_*` |
 | `JPV_QUERY_EXPANSION_ENABLED` | no | `true` | C20 query-side synonym expansion. Supplies only the **default**: the effective value travels as a parameter of the retrieval orchestration call, so C24 can sweep configurations in one process without restarting and without moving the frozen `openapi.json`. Default on because, measured on the live index, the lexical branch answers **nothing at all** without it for ordinary surface-form variants of catalogue vocabulary. Turning it off is also the rollback for C20. Absence does not block `/health`, which never loads the dictionary |
 | `JPV_RRF_K` | no | `60` | C21 smoothing constant of the reciprocal rank fusion; blank → the default. **Not independent of `JPV_BRANCH_DEPTH`**: `k` governs how slowly a document's vote decays as its rank grows, so a deeper branch keeps more of its tail voting and the two are swept together, never separately. Absence does not block `/health` |
@@ -87,7 +90,7 @@ The **C20 synonym dictionary is curated against the corpus, not against observed
 | `GET` | `/health` | public | unchanged since C01 |
 | `POST` | `/v1/retrieval/products` | Bearer | returns `min(top_k × 3, 60)` candidates, reported in `candidates_returned` |
 | `POST` | `/v1/retrieval/substitutes` | Bearer | retrieval result shape plus `similarity_signals` |
-| `POST` | `/v1/assist/sale` | Bearer | `groups[]` by **nullable** `family_id`, rule warnings as codes, citations that resolve. Real since C30a; `pitch` is empty until C30b, and keeps `{{price}}` / `{{stock}}` unresolved in stub mode |
+| `POST` | `/v1/assist/sale` | Bearer | `groups[]` by **nullable** `family_id`, rule warnings as codes, citations that resolve. Real since C30a; **writes the argument since C30b** in the two piece-anchored modes, always keeping `{{price}}` / `{{stock}}` unresolved. Without `JPV_RAG_LLM_API_KEY` it serves C30a's response with 200, never 503 |
 | `POST` | `/v1/inventory/propose` | Bearer | prioritized proposals, never quantities |
 | `POST` | `/v1/enrich/products` | Bearer | proposed profiles with per-field confidence |
 | `POST` | `/v1/families/suggest` | Bearer (catalog) | family proposals plus the groups a guard refused and the products the gate excluded; writes nothing |
@@ -119,7 +122,7 @@ Rules that C03 must rely on:
 
 With `STUB_MODE=true` (the local and test default) every `/v1` route answers from deterministic fixtures: no LLM, no embeddings, no database, no clock. The same request always returns the same body, so the .NET client can assert its mapping against them.
 
-With `STUB_MODE=false` a route whose real logic does not exist yet answers **501** naming the change that will deliver it. **Exactly one route is still in that state: `/v1/inventory/propose` (C35).** `POST /v1/enrich/products` is C09: the real pipeline, or 503 if `JPV_RAG_LLM_API_KEY` is missing — never 501. `POST /v1/index/sync` and `GET /v1/index/status` are C13: the catalog drain, or 503 if feed/embed settings or `sku_provenance.json` are missing — never 501. `POST /v1/retrieval/products` is C14: the vector retriever, or 503 if `JPV_EMBEDDING_API_KEY`, `DATABASE_URL` or a compatible index is missing — never 501. `POST /v1/retrieval/substitutes` is C26: the substitutes engine over the stored embedding, or 503 if `DATABASE_URL` is missing — never 501, and **never a provider key**, because that route embeds nothing. `POST /v1/assist/sale` is **C30a**: the structured assistance layer, or 503 if `JPV_EMBEDDING_API_KEY` or `DATABASE_URL` is missing — never 501, and 422 when the body anchors a piece the index cannot serve. With it, `/v1/inventory/propose` is the **only** route left answering 501, and it is not pending work: its branch was cancelled on 2026-08-31 and that is declared as a limitation. Later changes replace remaining handlers one at a time; the contract frozen here is the one they must respect.
+With `STUB_MODE=false` a route whose real logic does not exist yet answers **501** naming the change that will deliver it. **Exactly one route is still in that state: `/v1/inventory/propose` (C35).** `POST /v1/enrich/products` is C09: the real pipeline, or 503 if `JPV_RAG_LLM_API_KEY` is missing — never 501. `POST /v1/index/sync` and `GET /v1/index/status` are C13: the catalog drain, or 503 if feed/embed settings or `sku_provenance.json` are missing — never 501. `POST /v1/retrieval/products` is C14: the vector retriever, or 503 if `JPV_EMBEDDING_API_KEY`, `DATABASE_URL` or a compatible index is missing — never 501. `POST /v1/retrieval/substitutes` is C26: the substitutes engine over the stored embedding, or 503 if `DATABASE_URL` is missing — never 501, and **never a provider key**, because that route embeds nothing. `POST /v1/assist/sale` is **C30a and C30b**: the structured assistance layer, or 503 if `JPV_EMBEDDING_API_KEY` or `DATABASE_URL` is missing — never 501, and 422 when the body anchors a piece the index cannot serve. **`JPV_RAG_LLM_API_KEY` is the exception to that pattern and deliberately so**: without it the route answers **200 with C30a's response** rather than 503, because the half that matters is already computed and correct, and a provider that is configured and then fails degrades the same way. With it, `/v1/inventory/propose` is the **only** route left answering 501, and it is not pending work: its branch was cancelled on 2026-08-31 and that is declared as a limitation. Later changes replace remaining handlers one at a time; the contract frozen here is the one they must respect.
 
 ## Enrichment prompt versions
 
@@ -815,8 +818,130 @@ embedding — is **422 naming which**, never a 200 with `abstained` set: that wo
 catalogue has no answer when the problem is the piece.
 
 No field of the response carries a price, a stock quantity or an availability bucket, and the
-test that checks it walks the **whole serialised response** rather than the pitch — which is
-empty, and would make a pitch-only check pass having asserted nothing.
+test that checks it walks the **whole serialised response**. Since C30b that check runs over a
+response carrying a **real argument**: its C30a equivalent ran over an empty `pitch` and
+therefore passed having asserted nothing about prose.
+
+## The generated sale argument (C30b)
+
+The two piece-anchored modes now call a language model and write three to five sentences of
+continuous Spanish prose over the context C30a already distils. The free query does not, and
+neither does an abstained request — both cut **before** the call.
+
+```
+POST /v1/assist/sale --> modo · recuperacion · roster · avisos · contexto citable
+                            |
+      consulta libre  <-----+  sin llamada · pitch "" · prompt_version null
+      abstencion      <-----+  sin llamada · pitch "" · prompt_version null
+                            |
+                            v  pieza anclada
+                     generar --> 1 resolucion · 2 correspondencia · 3 puerta numerica
+                            |
+                            +--> UNA reparacion con TODAS las violaciones juntas
+                                     |
+                       dura  <-------+-------> correspondencia
+                  sin argumentario            argumentario, ESA cita retirada
+```
+
+**Its own credential and its own model, both optional.** `JPV_ASSIST_LLM_API_KEY` and
+`JPV_ASSIST_LLM_MODEL` separate counter-side generation from C09's batch enrichment, which is
+worth separating: different cost to attribute, different rate limit to hit, different rotation,
+and a much smaller blast radius. Neither is required — the key falls back to
+`JPV_RAG_LLM_API_KEY` and the model defaults to the one every figure here was measured on —
+because making them required would have stopped an existing deployment generating the day the
+fields appeared, and would have done it **invisibly**: this route degrades to 200 without prose
+rather than failing. The fallback is therefore **logged**, once per process:
+`stage=assist_client model=… timeout_s=… credential=assist|rag_fallback`. Nothing about a key
+but which of the two it was.
+
+**`prompt_version` changed meaning, and that is the only thing `openapi.json` moved.** It now
+says *the generation layer ran* rather than *there is a pitch*, which is what distinguishes "we
+do not write" from "we tried and the guard refused it" — the only evidence a consumer has that
+the guard acted. One description, verified field by field: 1102 leaves before and after, one
+changed leaf, same `anyOf`, same type, same title, no field added, removed or retyped.
+
+### The three checks, and the one that is not there
+
+| | what it buys | policy if it survives the repair |
+|---|---|---|
+| **resolution** | the source exists and was in the context | **hard** → served without the argument |
+| **correspondence** | the citation was used *for text actually written* | **proportionate** → **that** citation withheld, the prose is served |
+| **numeric gate** | no price or stock figure reaches the counter | **hard** → served without the argument |
+| ~~semantic fidelity~~ | *that the fragment says what the sentence asserts* | **not checked here** — declared in the capability, measured with RAGAS in C38 |
+
+The last row is the *alucinación con coartada* and it is declared rather than implied. No model
+judge runs in the serving path: it would double the latency and the cost where a customer is
+waiting, and using a model to catch another model's fabrications is circular.
+
+**Correspondence is why the output carries a supporting span.** `{pitch, citation_ids[]}` — the
+obvious shape — verifies only that an identifier resolves, so a model that echoes back the five
+identifiers it was handed passes perfectly and trivially having used none. Declaring a span of
+its own prose per citation makes "these are the ones it used" checkable: five citations oblige
+five real fragments of the text that was written, and an invented fragment is a substring of
+nothing. The span is **internal** — it never reaches the wire, so the verification costs zero
+contract movement.
+
+### The numeric gate is a whitelist plus one blacklist, and the corpus is why
+
+Every numeral of the argument must belong to the set of numerals of the **payload object**, and
+the gate reads that object rather than the rendered prompt — reading the text would admit the
+numerals of the instructions themselves and open the gate on its own. `prompts/assist/v1.md` is
+written **without a single digit** so that rule costs nothing, and a test pins it.
+
+Membership alone is not enough, and the measurement is the corpus's own: `material-oro.md`
+states that eighteen carats are **750** thousandths and fourteen are **585**, and
+`material-plata.md` that sterling is **925**. With the gold sheet in context, `750` *belongs to
+the whitelist*, so "750 €" walks through a pure whitelist — exactly the hole the gate exists to
+close. Therefore **adjacency to a currency or stock marker refuses whether or not the numeral is
+admitted**. It is the single blacklist of the design and it is correct here because that set is
+closed and unambiguous, unlike "numbers in jewellery"; and it applies to the numeral's
+**context**, never to the numeral.
+
+The operator's query is handed to the model as **delimited data in the user message** — never
+concatenated into the system one — and is deliberately **not** part of the admitted set: it is
+what to answer, not what is true, and it is the one surface a person outside this code controls.
+
+Rejections are recorded by **cause** — `figure_not_in_context`, `currency_adjacent_figure`,
+`stock_adjacent_figure`, `enumeration_format`, `decimal_form` — because an aggregate rejection
+rate cannot tell a gate that works from a gate that gets in the way.
+
+### Nothing is written down, and that includes the log
+
+Serving one request executes **no data-manipulation statement**, checked with a
+`before_cursor_execute` listener on the `Engine` class that counts DML — not by asking which
+modules were imported, which is what a module check cannot see. The log line carries the trace,
+the prompt version, the model, the usage, the latency, the citation identifiers used, the
+warning codes, the abstention, the length and a **hash** — and never the text. A log line is
+durable storage outside the database and carries no point-of-sale scope, while the response
+does; the text is re-derivable from a versioned prompt at temperature zero, which is what makes
+not storing it viable rather than merely cautious.
+
+**The declared exception is the evaluation harness.** `python -m jbg_ai.evals.assist_sweep`
+stores the **complete generation object** — the prose plus every declared citation with its
+span, and the pre-repair object too — bound to `run_id`, `git_sha` and `prompt_version`, outside
+the serving path. C38 inherits it that way on purpose: with the spans, claim-citation pairs
+arrive already aligned.
+
+### Failure is a state of the contract, not an exception
+
+| outcome | `pitch` | `prompt_version` | `citations[]` |
+|---|---|---|---|
+| generated and verified | prose | `assist/v1` | the ones it used |
+| correspondence failed on one | prose | `assist/v1` | the ones it used, **minus that one** |
+| hard violation survives | `""` | `assist/v1` | **the ones that grounded the response** |
+| provider down or timed out | `""` | `assist/v1` | the ones that grounded the response |
+| free query, or abstention | `""` | `null` | the ones that grounded the response |
+| no `JPV_RAG_LLM_API_KEY` | `""` | `null` | the ones that grounded the response |
+
+Degrading never leaves the response poorer than the structured layer's own — that is what keeps
+the generation measurable as an **ablation** against C30a, which needs the same route, the same
+candidates and the same citations with prose and without it. The last row is also the rollback:
+removing the client leaves C30a's behaviour without touching a schema.
+
+The ceiling is **two provider calls per request**: the generation and at most one repair,
+carrying every violation of every check together. It is literal — there is no transient-retry
+backoff underneath it, and that is a deliberate departure from C09's seam, whose two-second base
+backoff would consume two thirds of the per-call budget before the retried call started.
 
 ## Tests
 
@@ -826,6 +951,12 @@ uv run --system-certs pytest
 ```
 
 Tests inject required env / settings in-process, sign their own tokens, and never call LLM providers, embedding APIs, or production RDS. The stub tests additionally block socket connections to prove it.
+
+**C30b's generation tests are no exception, and the seam is deliberately low.** They build the
+**real** `LiteLlmAssistClient` over a scripted `complete`, so the parsing, the timeout, the usage
+extraction and its accumulation are all under test and only the socket is replaced — a stand-in
+for the whole client would have tested the stand-in. The one measurement that does call a
+provider lives outside the suite, in `python -m jbg_ai.evals.assist_sweep`, and is dated.
 
 The suite mirrors the `src/jbg_ai/` package — `tests/api/`, `tests/config/`, `tests/data/`, `tests/migrations/`, and a
 `tests/support/` for shared helpers (including `fake_llm.py`). [`tests/README.md`](tests/README.md) explains where a new test
@@ -846,7 +977,7 @@ These four tests exist to catch failures that produce **no error at all**: an HN
 
 ## Explicit non-goals
 
-- No real retrieval or agent loops — stubs are replaced route by route in later changes. Enrichment is real when `STUB_MODE=false` (C09). Catalog index sync is real when `STUB_MODE=false` (C13). Product retrieval is real when `STUB_MODE=false` (C14), **hybrid since C21** and **fused in two stages since C25**: the two lexical lists are fused with each other and the result with the vector list under per-branch weights, so a branch's vote is the one declared however many of its lists matched. The scalar distance threshold 0.65 remains a floor rather than a discriminator, and C25 answers that with a relative per-query rule instead of moving it. Substitutes are real when `STUB_MODE=false` (C26), over the embedding the index already holds. **Sale assistance is real when `STUB_MODE=false` (C30a)** — structure, rule warnings and citations — but writes **no prose**: `pitch` is empty, `prompt_version` null and `usage` zero until C30b, and the split is what makes C30b measurable against it. No `query_log`, `indexing/embeddings.py` and `openapi.json` unchanged
+- No real retrieval or agent loops — stubs are replaced route by route in later changes. Enrichment is real when `STUB_MODE=false` (C09). Catalog index sync is real when `STUB_MODE=false` (C13). Product retrieval is real when `STUB_MODE=false` (C14), **hybrid since C21** and **fused in two stages since C25**: the two lexical lists are fused with each other and the result with the vector list under per-branch weights, so a branch's vote is the one declared however many of its lists matched. The scalar distance threshold 0.65 remains a floor rather than a discriminator, and C25 answers that with a relative per-query rule instead of moving it. Substitutes are real when `STUB_MODE=false` (C26), over the embedding the index already holds. **Sale assistance is real when `STUB_MODE=false` (C30a) and writes its argument since C30b** — structure, rule warnings and citations, plus prose in the two piece-anchored modes, guarded by three deterministic checks. With no `JPV_RAG_LLM_API_KEY` it serves exactly C30a's response, which is both the ablation and the rollback. No `query_log`, `indexing/embeddings.py` unchanged, and `openapi.json` regenerated by **one description**
 - No `POST /v1/retrieval/complementary` — later OpenAPI negotiation. `POST /v1/families/suggest` **exists since C18a**, which is the change that first called it; `POST /v1/families/audit` since C18b, for the same reason
 - `ai.product_document` is written by C13 from the catalog feed; `ai.pos_projection` is **written by C22** from the POS availability feed; `ai.knowledge_document` and `ai.knowledge_chunk` are **written by C23**, by `python -m jbg_ai.indexing sync-knowledge`, from the corpus in `data/knowledge/`
 - No `ai.query_log` (unassigned; the pipeline logs `stage=expand|embed|search|lexical|filters|fuse` with `trace_id` instead). The `ai.eval_*` tables **exist since C24** and are written only with `--persist`
@@ -886,18 +1017,27 @@ ai-service/
     assist/         # C30a structured sale assistance: modes.py (three modes, structural intent),
                     # grounding.py (M2 addressing, general scope only), knowledge_scope.py (the
                     # asymmetric exclusion set), orchestrator.py, constants.py (closed warning
-                    # vocabulary, allow-list, caps). No provider client, no prose: that is C30b
+                    # vocabulary, allow-list, caps, violation causes, currency/stock markers)
+                    # + C30b generation: prompt.py (versioned prompt AND the payload object the
+                    # gate reads), schema.py (AssistPitch/UsedCitation, never on the wire),
+                    # llm.py (own seam, returns usage), verification.py (the three checks),
+                    # pitch.py (one repair, two policies). The client is injected, never built
     evals/          # C24 harness: golden.py (load + the composition validation that fails the
                     # load), pooling.py (adaptive depth), metrics.py (graded and binary),
                     # configs.py + baselines.py (the two v0 replicas), cag.py (context-only),
                     # sweep.py (the directional sweep and its written rule), runner.py,
                     # report.py, repository.py (opt-in sink, imported by nobody upstream),
-                    # cli.py (`uv run evals`)
+                    # cli.py (`uv run evals`), assist_sweep.py (C30b context-width sweep:
+                    # dated, calls a provider, and the declared persistence exception)
   prompts/          # versioned prompts: catalog-synth/v3 (C06b generate) + enrichment/v1 and v2 (extract; v2 in force since FIX1)
                     # + knowledge/v1: eight block prompts, one per generation block of the corpus
+                    # + assist/v1 (C30b sale argument; system rules + one task block per mode,
+                    #   and deliberately written without a single digit)
   evals/            # the yardstick, versioned: golden/ (queries, judgements, frozen query vectors,
-                    # criterion.md, pricing.yaml), configs/ (the five baseline configurations) and
-                    # results/ (C20 reach report, C21 arm comparison, C24 baselines + runs/<run_id>.jsonl)
+                    # criterion.md, pricing.yaml), configs/ (the five baseline configurations —
+                    # globbed by load_all(), so nothing else may live there), assist/ (C30b's
+                    # declared sweep sample) and results/ (C20 reach report, C21 arm comparison,
+                    # C24 baselines + runs/<run_id>.jsonl, C30b sweep artefacts)
   migrations/
     bootstrap.sql   # one-off: extension, schema, dedicated role, grants
     env.py          # version table in `ai`; provisions before revisions run
@@ -909,6 +1049,8 @@ ai-service/
     families/       # C18a grouping and C18b audit (fakes; no provider sockets)
     indexing/       # C11 embeddings, C13 catalog drain, C22 POS drain (marked `db` where SQL)
     assist/         # C30a three modes, grouping, rule warnings, addressing (fakes; offline)
+                    # + C30b prompt, the three checks, the repair policies and the wiring
+                    # (the real client over a scripted `complete`; no socket)
     knowledge/      # C23 corpus rules, chunking, sizing, indexer, search, measurement
                     # + C30a exclusion filter and addressing by identity
     migrations/     # schema, indexes, reversibility (marked `db`)

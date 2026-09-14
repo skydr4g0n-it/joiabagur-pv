@@ -133,12 +133,19 @@ def test_a_call_without_a_token_is_rejected(issue_token: Callable[..., str]) -> 
     assert response.status_code == 401
 
 
-# --- 7.3 · no prose, no prompt version, no usage --------------------------------------------
+# --- 7.3 · with no provider credential: no prose, no prompt version, no usage ----------------
 
 
-def test_the_real_path_emits_an_empty_pitch_a_null_prompt_and_zero_usage(
+def test_without_a_provider_credential_the_route_emits_no_pitch_and_a_null_prompt_version(
     issue_token: Callable[..., str],
 ) -> None:
+    """`build_settings` pins the optional credentials to None, so this is the deployment that
+    has no generation layer — and it answers **200 with the structured response**, not 503.
+
+    The paths that cannot work without their credential do answer 503; this one has most of
+    the response already computed and correct, so refusing to serve it would turn a partial
+    loss into a total one. It is also the rollback of C30b, without a schema being touched.
+    """
     client = _client(issue_token)
 
     for payload in (

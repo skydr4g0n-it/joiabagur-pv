@@ -1,0 +1,125 @@
+# La muestra del barrido de contexto de C30b — declarada ANTES de medir nada.
+#
+# Vive fuera de `evals/configs/` a propósito: ese directorio lo recorre `load_all()` y un test
+# afirma que su contenido es EXACTAMENTE la tabla de ablación de la recuperación. Este fichero
+# no es una fila de esa tabla, así que meterlo allí rompería una afirmación cierta.
+#
+# ── Por qué hay muestra propia ─────────────────────────────────────────────────────────────
+#
+# El golden set de C24/C26 **no puede evaluar el argumentario**: son 72 consultas y NINGUNA
+# ancla una pieza, o sea 100 % modo de consulta libre, que es justo el modo que C30b no
+# genera. `source_product_id` sólo aparece en las 5 consultas de categoría `sustituto` de C26,
+# y ancla una búsqueda de sustitutos, no una asistencia. El barrido es inherentemente del modo
+# «pieza sin pregunta» —`pitch_sections` y `material_cap` sólo gobiernan `ground_piece`—, así
+# que necesita población propia. **C38 hereda el mismo hueco** y queda anotado en su ficha.
+#
+# ── La medición que decide la estratificación ──────────────────────────────────────────────
+#
+# Tomada sobre el índice local el 2026-09-14, antes de elegir nada, sobre las piezas activas
+# con embedding (`ai.product_document`, 1.168 filas):
+#
+#     materiales declarados │ piezas │  %
+#     ──────────────────────┼────────┼───────
+#                         0 │    122 │ 10,4 %
+#                         1 │    955 │ 81,8 %
+#                         2 │     90 │  7,7 %
+#                         3 │      1 │  0,1 %
+#
+# Las piezas de **≥2 materiales son el 7,8 %**, y son exactamente las que arrastran la sección
+# de piezas mixtas y por tanto donde vive el riesgo de atribución cruzada que `grounding.py`
+# declara sin resolver. Una muestra proporcional traería una o dos y no mediría nada sobre
+# ellas: de ahí que la muestra sea **estratificada a partes iguales** y no aleatoria.
+#
+# Las piezas de **0 materiales quedan fuera, y no por descuido**: `ground_piece` no les
+# direcciona ningún fragmento, así que el número de secciones —que es el parámetro barrido— no
+# puede cambiar nada en ellas. Serían filas que no pueden variar con lo que se está midiendo.
+#
+# ── Criterio de selección ──────────────────────────────────────────────────────────────────
+#
+# Determinista y reproducible: `ORDER BY md5(product_id::text) LIMIT 20` dentro de cada
+# estrato. El orden por hash no está correlacionado con el orden de carga del catálogo, así
+# que no agrupa por lote de importación, y da la misma muestra en cada ejecución sin necesidad
+# de fijar una semilla. Los identificadores se **escriben aquí** en vez de re-derivarse al
+# ejecutar: una muestra que se recalcula es una muestra que puede moverse entre dos arms.
+#
+# Tamaño: 20 + 20 = 40 piezas × 3 arms (1, 2 y 3 secciones) = **120 generaciones**. A ~1.500
+# tokens de entrada y ~300 de salida con `gpt-4o-mini`, son ~0,05 USD el barrido entero. El
+# coste no decide nada aquí y conviene decirlo por escrito.
+
+id: c30b-assist-sweep
+label: "Barrido de ancho de contexto del argumentario — 1, 2 y 3 secciones"
+prompt_version: assist/v1
+model: openai/gpt-4o-mini
+measured_on: 2026-09-14
+index:
+  source: ai.product_document
+  filter: is_active AND embedding IS NOT NULL
+  active_with_embedding: 1168
+  by_declared_materials: {0: 122, 1: 955, 2: 90, 3: 1}
+
+selection:
+  criterion: "ORDER BY md5(product_id::text) LIMIT 20 por estrato"
+  per_stratum: 20
+  excluded: "piezas de 0 materiales: ground_piece no les direcciona nada, el arm no puede moverlas"
+
+# Los tres anchos de contexto. Los arms de 1 y 2 son prefijos de DEFAULT_PITCH_SECTIONS, así
+# que el arm de 2 es literalmente la configuración que se sirve hoy. La tercera sección es
+# `que-lo-estropea`: comprobado sobre el corpus, está presente y con `claim_scope: general` en
+# las NUEVE fichas canónicas de material —las dos que no la tienen, `material-piezas-mixtas` y
+# `material-marcajes-y-punzones`, no son fichas de material canónico—, que es la misma
+# condición que C30a exigió a las dos primeras.
+arms:
+  - sections: 1
+    section_slugs: [cuidados-y-limpieza-en-casa]
+  - sections: 2
+    section_slugs: [cuidados-y-limpieza-en-casa, piel-sensible-y-alergias]
+  - sections: 3
+    section_slugs: [cuidados-y-limpieza-en-casa, piel-sensible-y-alergias, que-lo-estropea]
+
+strata:
+  un-material:
+    declared_materials: 1
+    products:
+      - {product_id: 5d19f84e-050c-4642-b623-fdbe7cda84a8, sku: SKU963}
+      - {product_id: 24a89a6e-8e1f-4087-83e9-c7696da454bc, sku: SKU566}
+      - {product_id: 797b1d95-baff-4ceb-9e3d-3606db683a38, sku: SKU1067}
+      - {product_id: 17632595-69d9-48d3-8313-1a5f0b1643df, sku: SKU61}
+      - {product_id: 037aa7f0-c974-42b1-8e4b-6532568e97db, sku: SKU138}
+      - {product_id: 798efd2d-083b-4534-96a9-260d5cfcc8a6, sku: SKU67}
+      - {product_id: b80bbe14-c83a-423a-a4d3-ea32215a4870, sku: SKU769}
+      - {product_id: f1d1541d-2f0e-482c-aa56-fd219ee2f069, sku: SKU1058}
+      - {product_id: 37a58699-70eb-451a-bffe-4998317c0d62, sku: SKU329}
+      - {product_id: 7568e39a-1ce2-4f4a-834f-934ad4e822c9, sku: SKU70}
+      - {product_id: 6ecbf855-3d2b-4602-a82b-3606ebcfee89, sku: SKU955}
+      - {product_id: b71660ac-b08c-47fd-acad-8ac143befe7c, sku: SKU617}
+      - {product_id: 2429af75-7aed-47eb-a6e9-4345b1b7d61d, sku: SKU760}
+      - {product_id: be8107cd-1269-4eb4-a631-25a5d36eff26, sku: SKU616}
+      - {product_id: 5eb3c862-ea39-481f-9edf-3647ac0408a4, sku: SKU1098}
+      - {product_id: 5be241c4-ae8c-4e62-ba6e-d6b8def7988f, sku: SKU429}
+      - {product_id: 8ca50933-356b-4957-bbcf-31f8269862a7, sku: SKU919}
+      - {product_id: 650e3b88-52f4-49e3-843d-503728cacf5c, sku: SKU697}
+      - {product_id: bd8a961d-0502-47a3-b40f-c203259ab092, sku: SKU433}
+      - {product_id: 1c3b123f-cf11-4947-a126-47dcf2356410, sku: SKU05}
+  dos-o-mas-materiales:
+    declared_materials: ">=2"
+    products:
+      - {product_id: 65037d2d-842f-41de-a921-90bde7a38ee5, sku: SKU1123}
+      - {product_id: 9c560bb0-13b3-41ba-b75f-00b1de9579a7, sku: SKU474}
+      - {product_id: d99c831b-ba53-4ccb-b0f1-eb1d39d0b392, sku: SKU64}
+      - {product_id: c631ada6-e21e-4a74-8d3a-6e32c37a5b7d, sku: SKU1120}
+      - {product_id: a0cee2c4-e622-4877-8f68-93375e539bb0, sku: SKU827}
+      - {product_id: 8ac95ce0-8eaf-44bc-b00c-58d2dc5f3df8, sku: SKU22}
+      - {product_id: c67b1b73-841a-4fbf-a98b-b90fc8cccbc1, sku: SKU799}
+      - {product_id: 2626f64c-912c-4bbd-805a-38b9fd14410e, sku: SKU487}
+      - {product_id: b0e1f225-4849-45b7-964c-ed9688aaf671, sku: SKU315}
+      - {product_id: 46fd4fcf-4fda-4708-9be6-230966faffeb, sku: SKU149}
+      - {product_id: 1a481bc3-7dd5-4678-9aa0-b152a143877a, sku: SKU311}
+      - {product_id: 5a473851-bc30-4eda-be9f-8fce9fd723c1, sku: SKU309}
+      - {product_id: 60d59165-8be9-4096-9664-8081a33f32e1, sku: SKU393}
+      - {product_id: 7a999e30-dd48-491f-8b7f-9a73726b78c8, sku: SKU377}
+      - {product_id: 9b120706-cd2c-4aef-bcce-3a7d6d576949, sku: SKU420}
+      - {product_id: 3b909d9b-d960-4fb1-9aca-94a58b76afc4, sku: SKU419}
+      - {product_id: 75383021-8dc9-4729-abd8-64b66dee79d8, sku: SKU367}
+      - {product_id: 9d9014d2-bbef-412e-b7d0-7851196a6ce6, sku: SKU156}
+      - {product_id: 29970d33-66a6-4d89-a59e-e74eab1ef154, sku: SKU260}
+      - {product_id: 9dffdd38-a128-4964-8439-8b25ad205039, sku: SKU361}

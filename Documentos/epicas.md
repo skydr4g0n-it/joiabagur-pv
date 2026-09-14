@@ -520,6 +520,61 @@ Capa de generación y agéntica. Convierte un conjunto de candidatos en una resp
 >
 > **Y un hueco que ningún artefacto tenía anotado:** el golden set de C24/C26 son **72 consultas y ninguna ancla una pieza** —`source_product_id` sólo aparece en las **5** de categoría `sustituto`, y ancla una búsqueda de sustitutos—, o sea **100 % del modo de consulta libre**, que es justo el que C30b difiere a C31. **El golden set no puede evaluar el argumentario.** El barrido de C30b necesita muestra propia, estratificada por número de materiales, y **C38 hereda el mismo hueco** para sus escenarios de generación y su RAGAS. Las otras siete decisiones —una sola reparación con las violaciones acumuladas, las citas que no se vacían al degradar, `prompt_version` pasando a significar *«la capa de generación corrió»*, el cliente propio porque la costura de C09 **descarta `response.usage`**, la degradación en vez del 5xx y el corte antes de llamar cuando hay abstención, y la consulta como dato delimitado— están en el informe con sus alternativas descartadas.
 >
+> **Ampliado el 2026-09-14, al implementar C30b — y la medición refuta el riesgo que el propio
+> change declaraba como el mayor.** `POST /v1/assist/sale` **escribe el argumentario** en los dos
+> modos anclados a pieza: prosa corrida de 3 a 5 frases, `prompt_version` y `usage` reales, y
+> tres comprobaciones deterministas sobre lo generado. El modo de consulta libre y la abstención
+> **cortan antes de llamar**, y un proveedor caído o un *timeout* devuelven la respuesta de C30a
+> con **200**. La suite de `ai-service` pasa de **1195 a 1320 tests, 0 en rojo antes y después**;
+> `openapi.json` se regenera por **una sola descripción** —verificada aplanando los dos
+> documentos a hojas: **1102 antes y 1102 después, una hoja cambiada**, ningún campo añadido,
+> retirado ni con el tipo cambiado— y **no hay migración**, porque el argumentario no se
+> persiste.
+>
+> **El barrido, 120 generaciones reales sobre muestra propia declarada de antemano** —40 piezas
+> estratificadas a partes iguales entre 1 material y ≥2, en 3 anchos de contexto—, dice tres
+> cosas que sus artefactos no decían. **Uno · la puerta numérica no rechazó nada: 0 de 120.** El
+> diseño declaraba como riesgo mayor que *«la puerta se coma los argumentarios buenos»*, y no
+> ocurrió ni una vez; las 121 violaciones del barrido son **todas** de correspondencia, y ninguna
+> costó un argumentario porque su política es proporcionada —se retira esa cita y la prosa se
+> publica—. La lectura no es que la puerta sobre, sino que **la prevención funcionó y la
+> detección no tuvo que actuar**: prosa corrida impuesta en el prompt, placeholders obligatorios
+> y un fichero de prompt **sin un solo dígito**. **Dos · la decoración que D-D y D9 existían para
+> prohibir, por fin con cifra**: en el ancho que se sirve se ofrecen **140 citas y sólo 60
+> sobreviven a la verificación** —42,9 %—, así que emitir todo lo recuperado habría publicado más
+> del doble de citas que el argumentario puede sostener. **Tres · el coste real es 1,9 × el
+> estimado** —0,00077 USD por petición contra los ~0,0004 de la ficha—, porque el contexto es
+> mayor y el 55 % de las peticiones gasta la reparación.
+>
+> **Y dos umbrales decididos con la cifra delante, que es como se decide aquí.** El **plegado de
+> signos NO se añade**: sólo el **2,5 %** de los fallos de correspondencia son de puntuación,
+> contra el umbral del 10 % declarado antes de medir — el fallo es de paráfrasis, no de signos.
+> El ***timeout* de 3 s sí cortaba**: medido **por llamada**, que es como se aplica, el p95 es
+> **2.863 ms**, así que 3 s estaba a **1,05 × p95** y cortaba *jitter* en 8 de 175 llamadas. Sube
+> a **4 s** y pasa a ser ajustable (`JPV_ASSIST_PITCH_TIMEOUT_SECONDS`), que es literalmente lo
+> que el diseño decía hacer *«sólo si el barrido mide que corta generaciones buenas»*. Subir un
+> *timeout* no ralentiza ninguna llamada rápida: la espera típica sigue en ~2,2 s y lo único que
+> cambia es la cola, que antes se servía sin argumentario.
+>
+> **Una cuarta refutación, del propio arnés y propia.** La primera pasada medía el *timeout*
+> contra el **tiempo total de la petición**, que incluye dos llamadas cuando hay reparación:
+> leía **70 % de cortes donde había 4,6 %**, y esa lectura habría justificado mover el umbral
+> tres veces más de lo que la medición sostiene. Se corrigió instrumentando la latencia por
+> llamada, se repitió el barrido entero y el error quedó fijado con un test
+> (`test_the_timeout_is_measured_per_call_and_never_per_request`). **Y un defecto real que la comparación por nombres
+> destapó, corregido:** dos tests de `tests/evals/test_reproducibility.py` fallaban con una
+> selección parcial de directorios y pasaban en la suite completa. No era *flakiness*, era
+> reproducible en un comando: `jbg_ai/db/engine.py` cachea un motor **global de proceso** y
+> `get_engine` **ignoraba el `Settings` que recibe** si ya había uno, así que el test que
+> configura a propósito un host inalcanzable —`@db:5432`, para demostrar el 503— construía el
+> motor global y envenenaba a todo consumidor posterior del proceso; en la suite completa no se
+> veía porque un test intermedio llamaba a `dispose_engine()` por casualidad. El motor pasa a
+> recordar **la URL con la que se construyó** y a reconstruirse cuando cambia, `get_sessionmaker`
+> pregunta por él **primero** para no cortocircuitar la decisión, y **cuatro tests de regresión**
+> lo fijan. Es exactamente por qué la regla es comparar **nombres** y no recuentos: un recuento
+> habría dicho «igual de verde» y el fallo seguiría ahí.
+> Cifras y artefacto en [c30b-implementation-measurements.md](Proyecto%20Final%20AIEng/informes/c30b-implementation-measurements.md).
+
 > **Ampliado el 2026-09-13, al implementar C30a.** **`POST /v1/assist/sale` deja de responder 501** y sirve la capa estructurada real. Con ello **`/v1/inventory/propose` queda como la única ruta del contrato que responde 501**, y no por trabajo pendiente sino porque su rama se canceló el 31 de agosto. La suite de `ai-service` pasa de **1038 a 1195 tests, 0 en rojo antes y después**, `openapi.json` se regenera moviendo **sólo los cinco esquemas de assist** —ninguna ruta, ningún esquema añadido o retirado, las otras nueve rutas idénticas— y **no hay migración**. **Archivado el 2026-09-13**, sincronizando **20 requisitos nuevos y 2 modificados** y haciendo nacer la capability viva **`assist-generation`** con 13 requisitos.
 >
 > **Los tres spikes se corrieron antes de escribir código, y sus cifras decidieron.** *(1)* Las 72 consultas del golden set por `search_knowledge` **contra el índice vivo y al umbral de producción `0,51`**, en dos brazos: el filtro asimétrico retira una media de **36,4 citas de ficha ajena** por material anclado y sólo sube las abstenciones de **41 a 44,3 de 72** — no produce falsa abstención en masa, que era el riesgo que el diseño temía. Y **el modo de consulta libre no necesita umbral propio**: de 101 citas **una sola** es inequívocamente espuria. *(2)* El vector de consulta **sí es reutilizable** entre recuperación y conocimiento — misma `model_version_key` carácter por carácter — y la costura ya existía: es la caché acotada del cliente, con la condición medida de pasar el **mismo texto recortado** a los dos. *(3)* El roster: **156 familias, 491 miembros, máximo 8**; tope fijado en **24**.
@@ -615,7 +670,7 @@ Se miden por *changes* de OpenSpec, no por número de historias: la serie `HU-AI
 | **EP12** | Corpus y Enriquecimiento del Catálogo | C06a (hecho), C06b (hecho), C08 (hecho), C09 (hecho), C10 (hecho), C11 (hecho), **C23 (hecho)**, **FIX1 (hecho)** | 🔴 parcial |
 | **EP13** | Familias de Producto y Desambiguación | C07 (hecho), C18a (hecho), C18b (hecho), **C28 (hecho)** | 🟢 completa |
 | **EP14** | Búsqueda Semántica Híbrida | C12, C13, C14, C15, C16, C20, C21, **C22**, **C25** (hechos) | 🟠 parcial |
-| **EP15** | Venta Asistida, Sustitutos y Agentes | **C26 (archivado)**, ~~C27~~ *(cortado 12 sep)*, **C30a (archivado 13 sep)**, **C30b (en curso 14 sep)** *(partidos el 13 sep)*, C31, C32, C34, C36 | 🟠 parcial |
+| **EP15** | Venta Asistida, Sustitutos y Agentes | **C26 (archivado)**, ~~C27~~ *(cortado 12 sep)*, **C30a (archivado 13 sep)**, **C30b (implementado 14 sep)** *(partidos el 13 sep)*, C31, C32, C34, C36 | 🟠 parcial |
 | **EP16** | ~~Inventario Asistido y Señales de Demanda~~ | ~~C19, C29, C33, C35, C37~~ | ⛔ **anulada 31 ago** |
 | **EP17** | Evaluación y Observabilidad de IA | C04 (hecho), **C24 (hecho)**, C38, C39 · *(C25 amplía el arnés y el golden set desde EP14)* | 🔴 parcial |
 | **TOTAL PF** | | **44 fichas · 38 vivas** (5 anuladas, 1 cortada) — **31 archivadas, 7 pendientes** | |

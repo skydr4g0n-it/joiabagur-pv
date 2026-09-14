@@ -602,6 +602,108 @@ one sheet* · `ai-service/tests/knowledge/test_corpus_rules.py:257`
 
 ---
 
+## C30b — la demo no genera argumentario, y lo que hace falta para que genere
+
+**Estado:** pendiente · **Abierto el:** 2026-09-14 · **Zona:** `deploy/demo/`, `compose.demo.yaml`
+**No es un fallo:** es el comportamiento declarado, verificado y con test.
+
+### Qué pasa hoy
+
+`compose.demo.yaml` **no pasa ninguna credencial de proveedor generativo** al servicio
+`jbg-demo-ai` — comprobado, no hay `JPV_RAG_LLM_*` ni `JPV_ASSIST_LLM_*` en el fichero. Así que
+la demo sirve `POST /v1/assist/sale` con `pitch: ""`, `prompt_version: null` y `usage` a cero:
+exactamente la respuesta de C30a, con **200** y no 503.
+
+Eso es correcto por diseño y no hay que "arreglarlo" con prisa: un despliegue sin credencial
+sirve la mitad estructurada, que es la que tiene grupos, avisos y citas resolubles. Es también
+el *rollback* de C30b. Lo que falta es **decidir** que la demo enseñe la capa de generación, que
+es media hora de trabajo y una clave.
+
+### Lo que hay que cambiar, y lo que NO
+
+**Corrección de una nota anterior de este mismo change:** el informe de implementación llegó a
+decir que esto vivía en `terraform/`. **No es así**, y la diferencia importa:
+
+| | ¿hace falta? | por qué |
+|---|---|---|
+| `terraform/demo/iam.tf` | **NO** | el rol de instancia ya lee **todo el prefijo** `/jbg-demo/`, no parámetro a parámetro |
+| `terraform/demo/ssm.tf` | **NO** | los secretos **no se declaran en Terraform a propósito**: un valor pasado a Terraform se escribe **en claro en el fichero de estado**. Se crean a mano, como los otros seis |
+| `/jbg-demo/ASSIST_LLM_API_KEY` | **sí**, a mano | `aws ssm put-parameter --type SecureString` |
+| `deploy/demo/deploy.sh` | **sí**, una línea | leer el parámetro **sin `:?`** |
+| `compose.demo.yaml` | **sí**, dos líneas | pasar la clave y fijar el modelo |
+| `deploy/demo/README.md` | **sí** | el runbook enumera los secretos que se crean a mano |
+
+**Terraform no se toca.** Ésa era la parte de la nota anterior que estaba mal.
+
+### Los cuatro pasos
+
+**1 · Crear el parámetro, a mano y una vez** (como los otros seis secretos de esta demo):
+
+```bash
+aws ssm put-parameter --region eu-west-1 \
+  --name /jbg-demo/ASSIST_LLM_API_KEY \
+  --type SecureString \
+  --value "sk-..." \
+  --description "C30b credential for the sale argument. Separate from EMBEDDING_API_KEY"
+```
+
+**2 · `deploy/demo/deploy.sh`**, junto a las otras lecturas de Clase A:
+
+```bash
+# C30b. A DIFERENCIA de los demás, este parámetro puede NO existir: sin él la capa
+# de generación no corre y la ruta sirve la respuesta estructurada con 200. Por eso
+# `|| true` — `set -e` más el error del store abortarían el despliegue entero por una
+# credencial cuya ausencia es un estado válido y declarado.
+export ASSIST_LLM_API_KEY="$(read_parameter ASSIST_LLM_API_KEY || true)"
+```
+
+Y **no** añadir una línea `: "${ASSIST_LLM_API_KEY:?...}"` en el bloque de validación: ese bloque
+existe para que un valor **vacío** falle ruidosamente, y aquí vacío significa «no generamos»,
+que es legítimo.
+
+**3 · `compose.demo.yaml`**, en `jbg-demo-ai`:
+
+```yaml
+      # Clase C — ajuste versionado, no parámetro. Misma regla que
+      # JPV_EMBEDDING_MODEL y JPV_RETRIEVAL_DISTANCE_THRESHOLD (C17 D8): el store
+      # es un sitio donde un valor cambia sin revisión de código, y el modelo
+      # cambia lo que cuesta y lo que se midió.
+      JPV_ASSIST_LLM_MODEL: openai/gpt-4o-mini
+      # Clase A — secreto. Fuente: /jbg-demo/ASSIST_LLM_API_KEY. Ausente = la capa
+      # de generación no corre y la ruta sirve la respuesta de C30a con 200.
+      JPV_ASSIST_LLM_API_KEY: ${ASSIST_LLM_API_KEY}
+```
+
+`JPV_ASSIST_PITCH_TIMEOUT_SECONDS` se deja **fuera** hasta tener una medición del propio
+despliegue: el defecto de 4 s está medido desde una máquina de desarrollo en España a través de
+un interceptor TLS, que es una **cota superior** de la latencia del proveedor. Si la demo mide
+una distribución distinta, entonces se añade — con la cifra delante, como se hizo con el 3 s.
+
+**4 · `deploy/demo/README.md`**: añadir el parámetro a la lista de secretos que se crean a mano,
+marcándolo como **el único opcional** de esa lista.
+
+### Cómo comprobar que funcionó
+
+Sin abrir la consola de AWS y sin leer ninguna clave, en el log del contenedor:
+
+```
+stage=assist_client model=openai/gpt-4o-mini timeout_s=4.0 credential=assist
+```
+
+`credential=rag_fallback` diría que está replegando a la clave de C09, y `stage=assist_client`
+ausente, que no se construyó cliente: la capa no corre y la ruta sirve C30a. Y en la respuesta,
+`prompt_version` pasa de `null` a `assist/v1` — que es exactamente la distinción que C30b metió
+en el contrato para poder ver esto desde fuera.
+
+### Por qué no se hizo aquí
+
+C30b declara `terraform/`, `.github/workflows/` y `backend/` fuera de alcance, y el despliegue
+de la demo es trabajo de despliegue, no de la capa. La mitad de Python está entregada, probada
+con **13 tests** y **no es andamio**: en local se separa hoy poniendo `JPV_ASSIST_LLM_API_KEY`
+en `backend/.env`, que es de donde el barrido de C30b lee sus credenciales.
+
+---
+
 ## Implementation Guidance
 
 When implementing deferred tasks:

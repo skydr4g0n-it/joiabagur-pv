@@ -3,6 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
+from jbg_ai.assist.constants import DEFAULT_ASSIST_MODEL, PITCH_TIMEOUT_SECONDS
 from jbg_ai.config.settings import Settings, canonical_openapi_settings, get_settings
 
 
@@ -508,3 +509,164 @@ def test_settings_reject_a_non_positive_smoothing_constant_or_depth(
 
 def test_canonical_openapi_settings_pin_the_fusion_settings() -> None:
     _assert_fusion_defaults(canonical_openapi_settings())
+
+
+# --- C30b · the generation timeout, which the sweep promoted from a constant ----------------
+
+
+def test_settings_do_not_require_the_pitch_timeout_to_boot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """It supplies a DEFAULT and nothing more: absence must not block a boot, like every other
+    optional value here."""
+    _minimal_env(monkeypatch)
+    monkeypatch.delenv("JPV_ASSIST_PITCH_TIMEOUT_SECONDS", raising=False)
+    get_settings.cache_clear()
+
+    assert get_settings().jpv_assist_pitch_timeout_seconds == PITCH_TIMEOUT_SECONDS
+
+
+def test_the_pitch_timeout_default_is_the_one_the_library_carries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """One source of truth. The field imports the constant instead of restating it, because the
+    figure that set it — p95 of 2.863 ms over 175 real calls — is written beside the constant,
+    and a default duplicated in two files drifts the first time one of them is edited."""
+    _minimal_env(monkeypatch)
+    get_settings.cache_clear()
+
+    assert PITCH_TIMEOUT_SECONDS == 4.0
+    assert get_settings().jpv_assist_pitch_timeout_seconds == PITCH_TIMEOUT_SECONDS
+
+
+def test_blank_pitch_timeout_is_treated_as_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.setenv("JPV_ASSIST_PITCH_TIMEOUT_SECONDS", "   ")
+    get_settings.cache_clear()
+
+    assert get_settings().jpv_assist_pitch_timeout_seconds == PITCH_TIMEOUT_SECONDS
+
+
+def test_the_pitch_timeout_can_be_moved_by_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The whole point of promoting it: the latency behind the default was measured on a
+    developer machine through a TLS interceptor, so a deployment must be able to set it against
+    its own distribution without a code change."""
+    _minimal_env(monkeypatch)
+    monkeypatch.setenv("JPV_ASSIST_PITCH_TIMEOUT_SECONDS", "6.5")
+    get_settings.cache_clear()
+
+    assert get_settings().jpv_assist_pitch_timeout_seconds == 6.5
+
+
+def test_settings_reject_a_non_positive_pitch_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Zero would make every call time out and serve no argument at all, silently."""
+    _minimal_env(monkeypatch)
+    monkeypatch.setenv("JPV_ASSIST_PITCH_TIMEOUT_SECONDS", "0")
+    get_settings.cache_clear()
+
+    with pytest.raises(ValidationError):
+        get_settings()
+
+
+def test_canonical_openapi_settings_pin_the_pitch_timeout() -> None:
+    """Pinned like the rest: a value exported in the environment must not be able to reach the
+    committed snapshot, even through a field no route publishes today."""
+    assert (
+        canonical_openapi_settings().jpv_assist_pitch_timeout_seconds
+        == PITCH_TIMEOUT_SECONDS
+    )
+
+
+# --- C30b · its own credential and its own model -------------------------------------------
+
+
+def test_the_assist_credential_is_optional_and_absent_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Optional on purpose: requiring it would stop an existing deployment generating the day
+    the field appeared, and would do it invisibly — the layer degrades to 200 without prose."""
+    _minimal_env(monkeypatch)
+    monkeypatch.delenv("JPV_ASSIST_LLM_API_KEY", raising=False)
+    get_settings.cache_clear()
+
+    assert get_settings().jpv_assist_llm_api_key is None
+
+
+def test_a_blank_assist_credential_is_unset_and_not_an_empty_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A blank export must fall back, never configure an empty key that fails at the provider."""
+    _minimal_env(monkeypatch)
+    monkeypatch.setenv("JPV_ASSIST_LLM_API_KEY", "   ")
+    get_settings.cache_clear()
+
+    assert get_settings().jpv_assist_llm_api_key is None
+
+
+def test_the_assist_credential_is_read_when_it_is_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.setenv("JPV_ASSIST_LLM_API_KEY", "sk-assist")
+    monkeypatch.setenv("JPV_RAG_LLM_API_KEY", "sk-enrichment")
+    get_settings.cache_clear()
+
+    settings = get_settings()
+
+    assert settings.jpv_assist_llm_api_key == "sk-assist"
+    assert settings.jpv_rag_llm_api_key == "sk-enrichment"
+    assert settings.jpv_assist_llm_api_key != settings.jpv_rag_llm_api_key
+
+
+def test_the_assist_model_defaults_to_the_one_every_figure_was_measured_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.delenv("JPV_ASSIST_LLM_MODEL", raising=False)
+    get_settings.cache_clear()
+
+    assert DEFAULT_ASSIST_MODEL == "openai/gpt-4o-mini"
+    assert get_settings().jpv_assist_llm_model == DEFAULT_ASSIST_MODEL
+
+
+def test_the_assist_model_is_its_own_variable_and_never_the_enrichment_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The whole reason it is a separate field: a change to C09's enrichment model must not be
+    able to move the model of a counter-side call whose figures were measured on another."""
+    _minimal_env(monkeypatch)
+    monkeypatch.setenv("JPV_RAG_LLM_MODEL", "openai/gpt-4o")
+    monkeypatch.delenv("JPV_ASSIST_LLM_MODEL", raising=False)
+    get_settings.cache_clear()
+
+    settings = get_settings()
+
+    assert settings.jpv_rag_llm_model == "openai/gpt-4o"
+    assert settings.jpv_assist_llm_model == DEFAULT_ASSIST_MODEL
+
+
+def test_the_assist_model_can_be_moved_by_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.setenv("JPV_ASSIST_LLM_MODEL", "openai/gpt-4.1-mini")
+    get_settings.cache_clear()
+
+    assert get_settings().jpv_assist_llm_model == "openai/gpt-4.1-mini"
+
+
+def test_a_blank_assist_model_is_treated_as_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    _minimal_env(monkeypatch)
+    monkeypatch.setenv("JPV_ASSIST_LLM_MODEL", "   ")
+    get_settings.cache_clear()
+
+    assert get_settings().jpv_assist_llm_model == DEFAULT_ASSIST_MODEL
+
+
+def test_canonical_openapi_settings_pin_the_assist_provider_fields() -> None:
+    """Pinned like the rest: an exported credential or model must not be able to reach the
+    committed snapshot, even through fields no route publishes today."""
+    settings = canonical_openapi_settings()
+
+    assert settings.jpv_assist_llm_api_key is None
+    assert settings.jpv_assist_llm_model == DEFAULT_ASSIST_MODEL

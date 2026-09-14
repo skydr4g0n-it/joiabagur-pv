@@ -551,12 +551,19 @@ def test_the_three_unusable_cases_give_three_different_sentences(
     assert len(messages) == 3
 
 
-# --- 7.3 · no prose, no prompt, no usage ---------------------------------------------------
+# --- 7.3 · with no generation client: no prose, no prompt version, no usage -----------------
 
 
-def test_the_argument_is_empty_its_provenance_absent_and_the_usage_zero(
+def test_without_a_generation_client_the_argument_is_empty_and_its_provenance_absent(
     search, knowledge: InMemoryKnowledgeIndex, principal
 ) -> None:
+    """C30a's shape, which C30b turned from a requirement into a **deployment state**.
+
+    `assist_sale` takes the generation client as a parameter and builds none, so a call that
+    passes nothing — like every call in this module — serves exactly the structured response.
+    That is the rollback of C30b and the reason the two halves stay comparable as an ablation:
+    same route, same candidates, same citations, with prose and without it.
+    """
     for payload in (
         {"product_id": str(PIECE)},
         {"query": "anillo de plata"},
@@ -596,9 +603,10 @@ def test_the_scope_applied_is_the_token_claim_and_never_the_body(
 def test_the_assist_package_imports_no_provider_client() -> None:
     """Introspection over the module graph, not a promise in a docstring.
 
-    `jbg_ai.indexing.embeddings` is reachable — it supplies the `EmbeddingClient` **type**
-    the layer is handed — and that is the point: the layer receives a client, it never
-    constructs one, and it never reaches for `litellm` or `openai` itself.
+    Still true after C30b, and it is the same property rather than a weakened one: the layer
+    is **handed** its clients and the adapter in `assist/llm.py` reaches for `litellm` inside
+    the call it makes, exactly as `enrichment/llm.py` does. So the package imports offline, the
+    suite opens no socket, and importing `jbg_ai.assist` costs no provider library.
     """
     import importlib
     import pkgutil
@@ -653,15 +661,20 @@ def test_no_similarity_search_runs_for_the_piece_anchored_mode(
     assert refusing.fetch_calls == 1, "one addressed read, and no branch of the search"
 
 
-def test_no_language_model_provider_is_called_in_any_mode(
+def test_no_language_model_provider_is_called_when_no_client_is_configured(
     search, knowledge: InMemoryKnowledgeIndex, principal, monkeypatch
 ) -> None:
     """The generation gate, asserted at the provider's own door rather than by introspection.
 
-    `enrichment/llm.py` reaches a model through `litellm.acompletion`; patching it to raise
-    means any completion from any mode fails this test loudly. The embedding path is a
-    different function and is deliberately left alone: the modes with a question are allowed
-    the retrieval's own embedding, and forbidding that would test the wrong invariant.
+    After C30b this is the **deployment without a generation client**, which is the state a
+    service with no provider credential serves in: no call is made, in any of the three modes.
+    That two of those modes do call when a client is handed in is `tests/assist/
+    test_generation.py`; the two modes that never call whatever is configured are there too.
+
+    Patching `litellm.acompletion` to raise means any completion from any mode fails this test
+    loudly. The embedding path is a different function and is deliberately left alone: the
+    modes with a question are allowed the retrieval's own embedding, and forbidding that would
+    test the wrong invariant.
     """
     import litellm
 

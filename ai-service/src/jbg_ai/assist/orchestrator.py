@@ -1,13 +1,17 @@
-"""One sale-assistance request, in whichever of the three modes it is. Delivered by C30a.
+"""One sale-assistance request, in whichever of the three modes it is. C30a, generating since C30b.
 
-**Nothing here calls a language model.** `pitch` comes back empty, `prompt_version` null and
-`usage` zero, and that is a requirement with a test rather than a state of affairs that
-happens to hold: the prose, its versioned prompt and the numeric gate that guards it are
-C30b, and the split exists so C30b's value can be measured *against* this layer.
+**Two of the three modes now call a language model, and one never does.** The piece with no
+question and the piece with a question hand what this module has already assembled to the
+generation layer; the free query does not, because classifying a query is C31's work and an
+argument written over a candidate set whose intent nobody determined is prose about a guess.
+An abstained request does not call either: writing confidently about an empty candidate set is
+the failure the abstention rule exists to prevent.
 
-The only provider call this module can cause is the **embedding of the question**, and only
-in the two modes that have one — and that call is the retrieval's own, not a new one. The
-piece-anchored mode with no question touches no vector at all.
+`pitch_client` is **injected and never built here**, like every other port this module takes.
+A deployment without it serves exactly the response C30a served — empty argument, absent prompt
+version, zero usage — which is what makes the generation layer measurable as an ablation
+against the structured one, and what makes a deployment with no provider credential a
+degradation rather than an outage.
 """
 
 from __future__ import annotations
@@ -36,7 +40,10 @@ from jbg_ai.assist.constants import (
 from jbg_ai.assist.errors import UnusableAnchorProductError
 from jbg_ai.assist.grounding import ground_piece
 from jbg_ai.assist.knowledge_scope import piece_scoped_exclusions
+from jbg_ai.assist.llm import AssistLlm
 from jbg_ai.assist.modes import AssistMode, resolve_mode
+from jbg_ai.assist.pitch import EMPTY_PITCH, PitchOutcome, generate_pitch
+from jbg_ai.assist.prompt import PitchCitation, payload_from
 from jbg_ai.config.settings import Settings
 from jbg_ai.indexing.embeddings import EmbeddingClient
 from jbg_ai.knowledge.search import KnowledgeCitation, KnowledgeSearchIndex, search_knowledge
@@ -46,10 +53,6 @@ from jbg_ai.retrieval.ports import FamilyMember, ProductSearchPort, SourceDocume
 logger = logging.getLogger(__name__)
 
 STAGE = "assist"
-
-#: What the pitch is until C30b writes one. An empty string and not a placeholder sentence:
-#: a placeholder is something a client can ship by accident.
-EMPTY_PITCH = ""
 
 
 def _require_usable(source: SourceDocument | None, product_id: str) -> SourceDocument:
@@ -205,6 +208,7 @@ async def assist_sale(
     embed: EmbeddingClient,
     search: ProductSearchPort,
     knowledge: KnowledgeSearchIndex,
+    pitch_client: AssistLlm | None = None,
     abstain: bool | None = None,
     knowledge_distance_threshold: float | None = None,
     pitch_sections: Sequence[str] = DEFAULT_PITCH_SECTIONS,
@@ -310,9 +314,34 @@ async def assist_sale(
     )
     anchored_id = str(payload.product_id) if mode.is_anchored else None
 
+    # The two cuts, **before** any provider call: the free-query mode and an abstained
+    # request. They overlap today — abstention is only reachable on the query path, which is
+    # the mode that does not generate — and both are stated anyway, because they are two
+    # different reasons and the day an anchored mode can abstain only one of them holds.
+    outcome: PitchOutcome | None = None
+    if pitch_client is not None and mode.is_anchored and not abstained:
+        outcome = await generate_pitch(
+            _pitch_payload(
+                focus_source, roster, citations, warnings=warnings, question=question
+            ),
+            mode,
+            client=pitch_client,
+        )
+        if not outcome.withheld:
+            # The citations of a response carrying an argument are the ones the argument
+            # **used and that verified**. When it was withheld they stay the ones that
+            # grounded the response: a degraded response must never be poorer than the one
+            # the structured layer produces on its own, which is what keeps the ablation
+            # comparable — same route, same candidates, same citations, with prose and
+            # without it.
+            citations = _cited(citations, outcome.used_citation_ids)
+
     logger.info(
         "stage=%s trace_id=%s mode=%s intent=%s groups=%s members=%s warnings=%s "
-        "citations=%s abstained=%s roster=%s threshold=%s",
+        "citations=%s abstained=%s roster=%s threshold=%s prompt_version=%s model=%s "
+        "prompt_tokens=%s completion_tokens=%s total_tokens=%s provider_calls=%s "
+        "pitch_ms=%.1f pitch_chars=%s pitch_sha256=%s violations=%s withdrawn=%s "
+        "provider_error=%s",
         STAGE,
         principal.trace_id,
         mode.value,
@@ -324,22 +353,118 @@ async def assist_sale(
         abstained,
         len(roster),
         threshold,
+        # Everything of the generation **except the argument itself**: the version, the model,
+        # what it cost, how long it took, which citations it used, why anything was refused,
+        # how long the text is and a hash of it. A log line is durable storage outside the
+        # database and carries no point-of-sale scope, while the response does; the text is
+        # re-derivable from a versioned prompt at temperature zero, which is what makes not
+        # storing it viable rather than merely cautious.
+        outcome.prompt_version if outcome is not None else None,
+        outcome.usage.model if outcome is not None else None,
+        outcome.usage.prompt_tokens if outcome is not None else 0,
+        outcome.usage.completion_tokens if outcome is not None else 0,
+        outcome.usage.total_tokens if outcome is not None else 0,
+        outcome.usage.calls if outcome is not None else 0,
+        outcome.elapsed_ms if outcome is not None else 0.0,
+        len(outcome.pitch) if outcome is not None else 0,
+        outcome.digest if outcome is not None else "none",
+        ",".join(outcome.causes()) if outcome is not None and outcome.violations else "none",
+        ",".join(outcome.withdrawn_citation_ids)
+        if outcome is not None and outcome.withdrawn_citation_ids
+        else "none",
+        outcome.provider_error if outcome is not None else None,
         extra={"trace_id": principal.trace_id},
     )
 
     return AssistResponse(
         intent=mode.intent,
         groups=groups,
-        # C30b's half of the split, declared as absence rather than faked.
-        pitch=EMPTY_PITCH,
+        pitch=outcome.pitch if outcome is not None else EMPTY_PITCH,
         citations=[_to_citation(item, product_id=anchored_id) for item in citations],
         warnings=warnings,
+        # Declared **of C31**, not deferred by accident: emitting a clarification question is a
+        # routing decision over a free query, which is the capability that classifies one.
         clarification_question=None,
-        usage=Usage(),
+        usage=_usage(outcome),
         abstained=abstained,
-        prompt_version=None,
+        # "The generation layer ran", and no longer "there is a pitch". An empty argument alone
+        # cannot tell a deployment that does not generate from a generation that was rejected,
+        # and that distinction is the only evidence a consumer has that the guard acted.
+        prompt_version=outcome.prompt_version if outcome is not None else None,
         trace_id=principal.trace_id,
         effective_pos_id=principal.pos_id or "",
+    )
+
+
+def _pitch_payload(
+    source: SourceDocument | None,
+    roster: Sequence[FamilyMember],
+    citations: Sequence[KnowledgeCitation],
+    *,
+    warnings: Sequence[str],
+    question: str,
+):
+    """What the model is handed — and therefore, exactly, which figures it may write.
+
+    Built from the objects this module already holds, never from a rendered string: the numeric
+    gate reads this object, and a gate that read the prompt text would admit the numerals of
+    its own instructions.
+    """
+    return payload_from(
+        sku=source.sku if source is not None else "",
+        piece_type=source.piece_type if source is not None else None,
+        materials=list(source.materials) if source is not None else [],
+        size_label=source.size_label if source is not None else None,
+        variant_label=next(
+            (
+                member.variant_label
+                for member in roster
+                if source is not None and member.product_id == source.product_id
+            ),
+            None,
+        ),
+        family_label=next(
+            (member.family_name for member in roster if member.family_name is not None),
+            None,
+        ),
+        variants=[(member.sku, member.variant_label) for member in roster],
+        warnings=list(warnings),
+        citations=[
+            PitchCitation(
+                citation_id=item.citation_id,
+                document_title=item.document_title,
+                section_title=item.section_title,
+                claim_scope=item.claim_scope,
+                content=item.content,
+            )
+            for item in citations
+        ],
+        query=question or None,
+    )
+
+
+def _cited(
+    citations: Sequence[KnowledgeCitation], used: Sequence[str]
+) -> tuple[KnowledgeCitation, ...]:
+    """The grounding fragments the argument declared, in the order it declared them."""
+    by_id = {item.citation_id: item for item in citations}
+    return tuple(by_id[item] for item in used if item in by_id)
+
+
+def _usage(outcome: PitchOutcome | None) -> Usage:
+    """The contract's usage, summed across every call the request made.
+
+    The model is reported **only when a call actually returned one**. Naming a model beside
+    zero tokens is precisely the shape C09's seam produces and the reason it could not be
+    reused: it reads as a measured cost and is not one.
+    """
+    if outcome is None:
+        return Usage()
+    return Usage(
+        prompt_tokens=outcome.usage.prompt_tokens,
+        completion_tokens=outcome.usage.completion_tokens,
+        total_tokens=outcome.usage.total_tokens,
+        model=outcome.usage.model if outcome.usage.calls else None,
     )
 
 
