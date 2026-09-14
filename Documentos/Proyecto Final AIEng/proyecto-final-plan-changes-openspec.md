@@ -1561,6 +1561,38 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 > eso se deja, pero conviene saberlo antes de medir aquí. Está en el §7 de
 > [`c26-implementation-measurements.md`](informes/c26-implementation-measurements.md).
 
+> **La consulta libre gana ruta, y la ruta es de aquí** *(anotado el 2026-09-14, al explorar
+> C31)*. C31 pone argumentario en el modo **M1** —consulta sin pieza—, con lo que ese modo deja
+> de ser un hueco del servicio y pasa a tener respuesta redactada, **rechazo cortés** y
+> **repregunta**. El §15.12 del diseño declara que **no tiene pantalla**: sus consumidores son el
+> bucle de C32 y el arnés de C38, no una caja de texto. La consecuencia de no cerrarlo está
+> escrita en ese mismo párrafo — el *«no lo sé»* del sistema **se demuestra con escenarios y no en
+> pantalla**, y las diez fichas de mostrador del corpus siguen alcanzándose sólo si el cliente
+> tiene ya una pieza en la mano.
+>
+> **El coste es el que el diseño ya acotó, y no crece con C31:** una ruta nueva en .NET y un
+> bloque de respuesta en el panel de búsqueda. **No hay contrato nuevo.** La ruta reenvía `query`
+> a `POST /v1/assist/sale` **sin `product_id`** y devuelve lo que ya devuelve el modo M3 —grupos,
+> citas, avisos— más los tres campos que C31 llena: `intent` con el veredicto del enrutador,
+> `clarification_question` cuando la consulta no basta para buscar, y `pitch` cuando sí. El bloque
+> de pantalla es de **C36**, que ya pinta citas distinguiendo `claim_scope` y ya tiene tabla de
+> copy para códigos de vocabulario cerrado: el rechazo y la repregunta son **dos filas más de esa
+> tabla**, no un componente nuevo.
+>
+> **Ninguna hidratación nueva.** M1 no ancla pieza, así que no hay más `{{price}}` ni `{{stock}}`
+> que los de los candidatos, que es el mismo camino que `/sales-assist` ya recorre; y el rechazo
+> del enrutador llega **sin grupos**, con lo que no hay nada que hidratar en el caso que esta
+> anotación añade.
+>
+> **Lo único que esta ficha hereda de C31 es mapear el veredicto a pantalla, y ahí hay una
+> distinción que no se puede perder.** `abstained: true` y el rechazo del enrutador son **dos
+> negativas distintas** —*«el catálogo no puede contestar esta consulta»* frente a *«eso no lo
+> vendemos»*— producidas por **dos mecanismos distintos**: la primera lee la forma del perfil de
+> distancias después de recuperar (C25), la segunda clasifica antes de recuperar (C31). Pintarlas
+> con la misma pantalla borra justamente la distinción que las **dos cifras publicadas por
+> separado** existen para sostener. La tercera, `clarification_question`, no es una negativa: es
+> una petición de dato, y su pantalla tiene que invitar a escribir, no cerrar la consulta.
+
 ---
 
 #### ~~C35 · `add-inventory-agent-proposals`~~ ⛔
