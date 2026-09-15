@@ -102,6 +102,14 @@ A single silenced `descripcion-sin-anclaje` query vetoes a configuration, even i
 - **Circular measurement, because the golden set's `note` fields contain the classification rule** → D11, written as a task and a declaration rather than a convention.
 - **Precision over the twenty is an upper bound**, since they were *chosen* to be unsatisfiable → declared alongside the figure, never presented as counter traffic.
 - **The free-query numeric whitelist widens with every candidate**, against a gate that measured **0 violations in 120 generations** with a single-piece payload → internal identifiers and retrieval scores excluded explicitly, and the free-query rejection rate published **separately** from the anchored one, because they are not the same gate.
+  **Measured, 2026-09-15, and the risk did not materialise while a different one did.** The
+  whitelist is of **~13 numerals and not of five** — `top_k=5` counts families after hydration
+  and the retrieval returns **15 candidates** — so the exposure was three times what this line
+  assumed. The numeric gate nevertheless rejected **zero** figures. What rejected the argument
+  was `dangling_citation`: the `catalog` route hands the model candidates and an **empty**
+  corpus list, and the model declared citations anyway, because the task section said nothing
+  about them and the invariant rule «puedes no citar nada» permits without obliging. The fix is
+  one paragraph in `prompts/assist/v3.md`; `v2.md` is kept with its measured rate.
 - **C34's 5 s budget** → not worsened here by D2, but inherited unresolved; recorded in C34's card together with the measured numbers.
 - **The eight-thousandth margin of the knowledge threshold is narrow**, as its own report warned → the router is a second opinion, not a replacement; disagreements are published as a finding.
 - **The free-query pitch could consume the session** → it is the **declared cut line**: the router and the refusal are non-negotiable per the plan's *«never cut»* list, the pitch is not. If cut, the mode keeps returning an empty pitch — today's behaviour, with a test — and the cut is declared.
@@ -125,6 +133,15 @@ All five of the ticket's open questions are resolved here by taking their declar
 2. **The `both` class** → measured with the ten constructed cases, **declaring that they are constructed**.
 3. **Free-query pitch** → in scope, and the declared cut line if the session overruns.
 4. **Classifier model** → same `gpt-4o-mini` as a starting point, with its **own** setting (D9).
+   **Amended by the implementation, 2026-09-15:** the starting point was measured and did not
+   survive. Over the 119 cases, same prompt and temperature zero, `gpt-4o-mini` silences **3**
+   answerable queries (false positive 6,25 %, `catalog` 81,3 %) and **fails the veto of D12**,
+   while `gpt-4o` silences **0** (false positive 0,00 %, `catalog` 48/48) and passes. Three
+   prompt revisions took the figure from fifteen silenced to three and could not reach zero; the
+   model reached it with no prompt change. `DEFAULT_ROUTER_MODEL` is therefore `openai/gpt-4o`.
+   **This is D9 vindicated rather than contradicted:** the separate variable is the only reason
+   the classifier's model could move without touching the argument's, whose cost and rejection
+   rate were measured on another — which is exactly the coupling D9 refused.
 5. **Persisting the routing verdict** → no, log only; the evaluation harness remains the declared exception.
 
 Nothing is left open. What is deliberately *not* decided here is semantic fidelity, which stays declared as a limitation of the capability and measured in C38.

@@ -1,0 +1,1077 @@
+{
+  "run_id": "e36e4b0196df",
+  "git_sha": "e3f0403",
+  "prompt_version": "router/v3",
+  "model": "openai/gpt-4o-mini",
+  "taken_at": "2026-09-14T23:02:18+00:00",
+  "credential": "rag_fallback",
+  "timeout_seconds": 20.0,
+  "n": 119,
+  "confusion_matrix": {
+    "rows": {
+      "ambiguous": {
+        "ambiguous": 4
+      },
+      "both": {
+        "ambiguous": 2,
+        "both": 7,
+        "catalog": 1
+      },
+      "catalog": {
+        "ambiguous": 6,
+        "catalog": 39,
+        "out_of_domain": 3
+      },
+      "knowledge": {
+        "ambiguous": 3,
+        "both": 4,
+        "knowledge": 16,
+        "out_of_domain": 9
+      },
+      "not_in_catalogue": {
+        "ambiguous": 1,
+        "not_in_catalogue": 19
+      },
+      "out_of_domain": {
+        "out_of_domain": 5
+      }
+    },
+    "degraded": {}
+  },
+  "accuracy_by_class": {
+    "catalog": 0.8125,
+    "knowledge": 0.5,
+    "both": 0.7,
+    "ambiguous": 1.0,
+    "not_in_catalogue": 0.95,
+    "out_of_domain": 1.0
+  },
+  "rates": {
+    "router_refusal_rate": 0.3025,
+    "retriever_abstention_rate": 0.1,
+    "retriever_abstention_source": "C25, `evals/results/c25-sweep-fase-a.md`; measured over the 43 answerable queries the golden set held before C26 added the five `sustituto` ones",
+    "summable": false,
+    "note": "The two rates are NOT summable and must never be presented as one figure. The retriever's abstention reads the shape of the distance profile AFTER retrieving; the router's refusal classifies BEFORE retrieving. They are measured over different sets by different mechanisms, and the whole reason this change exists is being able to publish them as two numbers."
+  },
+  "false_positive_on_answerable": {
+    "class": "catalog",
+    "rate": 0.0625,
+    "note": "The rate at which a query the shop CAN answer is refused. Reported as a figure of its own because it is the one that decides whether the router is served at all, and because it is not the complement of any accuracy here."
+  },
+  "veto": {
+    "criterion": "zero «descripcion-sin-anclaje» queries silenced; a single one rejects the configuration however many impossible ones it catches",
+    "declared_before_measuring": true,
+    "violations": [
+      {
+        "id": "q03",
+        "text": "el calzado tipico que se lleva en las fiestas de la isla",
+        "category": "descripcion-sin-anclaje"
+      },
+      {
+        "id": "q05",
+        "text": "una brujula para no perder el rumbo",
+        "category": "descripcion-sin-anclaje"
+      },
+      {
+        "id": "q10",
+        "text": "una bicicleta antigua",
+        "category": "descripcion-sin-anclaje"
+      }
+    ],
+    "passed": false
+  },
+  "per_category": {
+    "ambigua": {
+      "ambiguous": 4
+    },
+    "descripcion-sin-anclaje": {
+      "catalog": 9,
+      "out_of_domain": 3
+    },
+    "fuera-de-dominio": {
+      "ambiguous": 1,
+      "not_in_catalogue": 19
+    },
+    "lexico-exacto": {
+      "catalog": 4
+    },
+    "materiales": {
+      "catalog": 5
+    },
+    "piedra": {
+      "catalog": 4
+    },
+    "sinonimos": {
+      "ambiguous": 1,
+      "catalog": 5
+    },
+    "subjetiva": {
+      "ambiguous": 5
+    },
+    "sustituto": {
+      "catalog": 5
+    },
+    "variante-talla": {
+      "catalog": 7
+    }
+  },
+  "limitations": [
+    "The ten `both` cases are CONSTRUCTED and derived from the corpus's own `eval_question` markers: they measure whether the router recognises a compound query, not how often an operator writes one.",
+    "The twenty `not_in_catalogue` queries were CHOSEN to be unsatisfiable, so the precision measured over them is an UPPER BOUND on what a real counter would see.",
+    "The classifier's prompt was written from `enrichment/vocabularies.yaml` and the corpus README, and NOT from the `note` fields of the golden set nor the `why` fields of this manifest, both of which state the classification rule in words."
+  ],
+  "cases": [
+    {
+      "id": "q01",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "descripcion-sin-anclaje",
+      "text": "joya con forma de concha marina"
+    },
+    {
+      "id": "q02",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "descripcion-sin-anclaje",
+      "text": "la lagartija que toma el sol en las paredes"
+    },
+    {
+      "id": "q03",
+      "expected": "catalog",
+      "predicted": "out_of_domain",
+      "degraded_cause": null,
+      "category": "descripcion-sin-anclaje",
+      "text": "el calzado tipico que se lleva en las fiestas de la isla"
+    },
+    {
+      "id": "q04",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "descripcion-sin-anclaje",
+      "text": "un amuleto de buena suerte con forma de zapatilla de caballo"
+    },
+    {
+      "id": "q05",
+      "expected": "catalog",
+      "predicted": "out_of_domain",
+      "degraded_cause": null,
+      "category": "descripcion-sin-anclaje",
+      "text": "una brujula para no perder el rumbo"
+    },
+    {
+      "id": "q06",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "descripcion-sin-anclaje",
+      "text": "la campanita que se cuelga a los bebes para protegerlos"
+    },
+    {
+      "id": "q07",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "descripcion-sin-anclaje",
+      "text": "la raiz retorcida de un arbol viejo"
+    },
+    {
+      "id": "q08",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "descripcion-sin-anclaje",
+      "text": "follaje seco que cae en septiembre"
+    },
+    {
+      "id": "q09",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "descripcion-sin-anclaje",
+      "text": "el fruto de la encina"
+    },
+    {
+      "id": "q10",
+      "expected": "catalog",
+      "predicted": "out_of_domain",
+      "degraded_cause": null,
+      "category": "descripcion-sin-anclaje",
+      "text": "una bicicleta antigua"
+    },
+    {
+      "id": "q11",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "descripcion-sin-anclaje",
+      "text": "el bicho con puas que se pisa en las rocas"
+    },
+    {
+      "id": "q12",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "descripcion-sin-anclaje",
+      "text": "un molusco que se agarra a las piedras"
+    },
+    {
+      "id": "q13",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "variante-talla",
+      "text": "anillo de erizo de mar talla L"
+    },
+    {
+      "id": "q14",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "variante-talla",
+      "text": "colgante de estrella de mar en talla XS"
+    },
+    {
+      "id": "q15",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "variante-talla",
+      "text": "pendientes de oreja de mar largos M"
+    },
+    {
+      "id": "q16",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "variante-talla",
+      "text": "anillo de lapislazuli pequeno"
+    },
+    {
+      "id": "q17",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "variante-talla",
+      "text": "colgante de hoja de roble grande"
+    },
+    {
+      "id": "q18",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "variante-talla",
+      "text": "colgante de Menorca talla M en oro"
+    },
+    {
+      "id": "q19",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "variante-talla",
+      "text": "anillo de plata talla XL"
+    },
+    {
+      "id": "q20",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "materiales",
+      "text": "sortija de plata"
+    },
+    {
+      "id": "q21",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "materiales",
+      "text": "aros de plata"
+    },
+    {
+      "id": "q22",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "materiales",
+      "text": "pendiente de oro"
+    },
+    {
+      "id": "q23",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "materiales",
+      "text": "anillo de plata y oro"
+    },
+    {
+      "id": "q24",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "materiales",
+      "text": "pulsera de hilo y plata"
+    },
+    {
+      "id": "q25",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "piedra",
+      "text": "anillo con onix"
+    },
+    {
+      "id": "q26",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "piedra",
+      "text": "colgante de lapislazuli"
+    },
+    {
+      "id": "q27",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "piedra",
+      "text": "pendientes de perla"
+    },
+    {
+      "id": "q28",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "piedra",
+      "text": "pulsera de coral"
+    },
+    {
+      "id": "q29",
+      "expected": "catalog",
+      "predicted": "ambiguous",
+      "degraded_cause": null,
+      "category": "subjetiva",
+      "text": "algo para una boda"
+    },
+    {
+      "id": "q30",
+      "expected": "catalog",
+      "predicted": "ambiguous",
+      "degraded_cause": null,
+      "category": "subjetiva",
+      "text": "un regalo para el dia de la madre"
+    },
+    {
+      "id": "q31",
+      "expected": "catalog",
+      "predicted": "ambiguous",
+      "degraded_cause": null,
+      "category": "subjetiva",
+      "text": "algo de estilo marino"
+    },
+    {
+      "id": "q32",
+      "expected": "catalog",
+      "predicted": "ambiguous",
+      "degraded_cause": null,
+      "category": "subjetiva",
+      "text": "para llevar a diario"
+    },
+    {
+      "id": "q33",
+      "expected": "catalog",
+      "predicted": "ambiguous",
+      "degraded_cause": null,
+      "category": "subjetiva",
+      "text": "algo con aire vintage"
+    },
+    {
+      "id": "q34",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "sinonimos",
+      "text": "bano de oro"
+    },
+    {
+      "id": "q35",
+      "expected": "catalog",
+      "predicted": "ambiguous",
+      "degraded_cause": null,
+      "category": "sinonimos",
+      "text": "anillo pequeno"
+    },
+    {
+      "id": "q36",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "sinonimos",
+      "text": "dije de plata"
+    },
+    {
+      "id": "q37",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "sinonimos",
+      "text": "un choker de plata"
+    },
+    {
+      "id": "q38",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "sinonimos",
+      "text": "gargantilla dorada"
+    },
+    {
+      "id": "q39",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "sinonimos",
+      "text": "pulsera dorada"
+    },
+    {
+      "id": "q40",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "lexico-exacto",
+      "text": "SKU355"
+    },
+    {
+      "id": "q41",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "lexico-exacto",
+      "text": "SKU98"
+    },
+    {
+      "id": "q42",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "lexico-exacto",
+      "text": "Anillo Bruma simple"
+    },
+    {
+      "id": "q43",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "lexico-exacto",
+      "text": "Colgante rosa de los vientos"
+    },
+    {
+      "id": "q49",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "sustituto",
+      "text": "el anillo de erizo de mar talla M pero no queda ninguno"
+    },
+    {
+      "id": "q50",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "sustituto",
+      "text": "algo parecido al colgante de estrella de mar S"
+    },
+    {
+      "id": "q51",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "sustituto",
+      "text": "que le puedo ofrecer si no tengo la pulsera de hilo de caracola"
+    },
+    {
+      "id": "q52",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "sustituto",
+      "text": "un sustituto del anillo de lapislazuli mediano"
+    },
+    {
+      "id": "q72",
+      "expected": "catalog",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": "sustituto",
+      "text": "se ha acabado el anillo de caracola, que le ofrezco"
+    },
+    {
+      "id": "q44",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "un reloj de plata sumergible"
+    },
+    {
+      "id": "q45",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "piercing de ombligo de acero quirurgico"
+    },
+    {
+      "id": "q46",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "un rosario de plata"
+    },
+    {
+      "id": "q47",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "un dedal de plata de coleccion"
+    },
+    {
+      "id": "q48",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "una hucha de plata para bautizo"
+    },
+    {
+      "id": "q57",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "una correa de reloj marron"
+    },
+    {
+      "id": "q58",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "un reloj de bolsillo para regalo"
+    },
+    {
+      "id": "q59",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "una pila para el reloj de pulsera"
+    },
+    {
+      "id": "q60",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "una bandeja de plata para servir"
+    },
+    {
+      "id": "q61",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "cuberteria de plata para doce"
+    },
+    {
+      "id": "q62",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "un salero de plata"
+    },
+    {
+      "id": "q63",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "un abrecartas para un regalo de empresa"
+    },
+    {
+      "id": "q64",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "una pluma estilografica para un regalo"
+    },
+    {
+      "id": "q65",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "un joyero de viaje para los anillos"
+    },
+    {
+      "id": "q66",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "una petaca de plata"
+    },
+    {
+      "id": "q67",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "una moneda de plata antigua"
+    },
+    {
+      "id": "q68",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "un lingote de oro"
+    },
+    {
+      "id": "q69",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "un sonajero de plata para un bebe"
+    },
+    {
+      "id": "q70",
+      "expected": "not_in_catalogue",
+      "predicted": "ambiguous",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "una placa para un aniversario de boda"
+    },
+    {
+      "id": "q71",
+      "expected": "not_in_catalogue",
+      "predicted": "not_in_catalogue",
+      "degraded_cause": null,
+      "category": "fuera-de-dominio",
+      "text": "un candelabro para un regalo de boda"
+    },
+    {
+      "id": "ood-01",
+      "expected": "out_of_domain",
+      "predicted": "out_of_domain",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿A qué hora abre la tienda los domingos?"
+    },
+    {
+      "id": "ood-02",
+      "expected": "out_of_domain",
+      "predicted": "out_of_domain",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Cuál es la capital de Australia?"
+    },
+    {
+      "id": "ood-03",
+      "expected": "out_of_domain",
+      "predicted": "out_of_domain",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Puedo pagar con criptomonedas o con transferencia a plazos?"
+    },
+    {
+      "id": "ood-04",
+      "expected": "out_of_domain",
+      "predicted": "out_of_domain",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Qué talla de zapato equivale a un 39 europeo?"
+    },
+    {
+      "id": "ood-05",
+      "expected": "out_of_domain",
+      "predicted": "out_of_domain",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Cómo se restaura un reloj de cuerda antiguo?"
+    },
+    {
+      "id": "kq-cuidados-generales",
+      "expected": "knowledge",
+      "predicted": "out_of_domain",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Es verdad que el dentífrico sirve para limpiar una cadena de plata?"
+    },
+    {
+      "id": "kq-glosario-de-joyeria",
+      "expected": "knowledge",
+      "predicted": "out_of_domain",
+      "degraded_cause": null,
+      "category": null,
+      "text": "Un cliente pide un collar pero enseña la foto de una pieza que cuelga de una cadena, ¿qué está pidiendo en realidad?"
+    },
+    {
+      "id": "kq-guardar-y-viajar-con-joyas",
+      "expected": "knowledge",
+      "predicted": "out_of_domain",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Cómo se deshace el nudo de una cadena fina sin romperla?"
+    },
+    {
+      "id": "kq-joyas-playa-piscina-y-deporte",
+      "expected": "knowledge",
+      "predicted": "both",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Un colgante con baño de oro aguanta un día de piscina?"
+    },
+    {
+      "id": "kq-joyas-y-ninos",
+      "expected": "knowledge",
+      "predicted": "out_of_domain",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Por qué en los pendientes de bebé se usa cierre de rosca y no de presión?"
+    },
+    {
+      "id": "kq-material-acero",
+      "expected": "knowledge",
+      "predicted": "both",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Se puede agrandar de talla un anillo de acero?"
+    },
+    {
+      "id": "kq-material-bano-de-oro",
+      "expected": "knowledge",
+      "predicted": "knowledge",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Cuánto dura el baño de oro y qué se puede hacer cuando empieza a verse el metal de debajo?"
+    },
+    {
+      "id": "kq-material-cuero",
+      "expected": "knowledge",
+      "predicted": "knowledge",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Qué le pasa a una pulsera de cuero si se moja y por qué destiñe sobre la muñeca?"
+    },
+    {
+      "id": "kq-material-hilo",
+      "expected": "knowledge",
+      "predicted": "both",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Se puede mojar una pulsera de hilo que lleva piezas de plata?"
+    },
+    {
+      "id": "kq-material-laton",
+      "expected": "knowledge",
+      "predicted": "knowledge",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Por qué una pulsera dorada deja la muñeca verde y eso significa que hay alergia?"
+    },
+    {
+      "id": "kq-material-marcajes-y-punzones",
+      "expected": "knowledge",
+      "predicted": "knowledge",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Qué quiere decir el 750 grabado dentro de un anillo y dónde se busca esa marca?"
+    },
+    {
+      "id": "kq-material-oro",
+      "expected": "knowledge",
+      "predicted": "knowledge",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Se puede agrandar un anillo de oro y hasta cuántas tallas?"
+    },
+    {
+      "id": "kq-material-perla",
+      "expected": "knowledge",
+      "predicted": "knowledge",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Se puede limpiar una perla con el mismo líquido que la plata?"
+    },
+    {
+      "id": "kq-material-piezas-mixtas",
+      "expected": "knowledge",
+      "predicted": "knowledge",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Cómo se limpia una pulsera que lleva cordón y plata sin estropear ninguna de las dos partes?"
+    },
+    {
+      "id": "kq-material-plata",
+      "expected": "knowledge",
+      "predicted": "knowledge",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Por qué se pone negra la plata y cómo se limpia en casa?"
+    },
+    {
+      "id": "kq-material-resina",
+      "expected": "knowledge",
+      "predicted": "knowledge",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Cómo se distingue una pieza de resina de una piedra, y qué le hace el calor del coche?"
+    },
+    {
+      "id": "kq-menorca-y-el-origen-de-las-colecciones",
+      "expected": "knowledge",
+      "predicted": "out_of_domain",
+      "degraded_cause": null,
+      "category": null,
+      "text": "Un cliente pregunta si Cala Pregonda existe de verdad y cómo es aquel sitio, ¿qué se le puede contar?"
+    },
+    {
+      "id": "kq-niquel-y-piel-sensible",
+      "expected": "knowledge",
+      "predicted": "knowledge",
+      "degraded_cause": null,
+      "category": null,
+      "text": "A una clienta se le irrita el lóbulo con unos pendientes de plata, ¿qué parte de la pieza puede estar causándolo?"
+    },
+    {
+      "id": "kq-ocasiones-y-tradicion",
+      "expected": "knowledge",
+      "predicted": "knowledge",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿A qué aniversario de boda corresponde la plata y a cuál el oro?"
+    },
+    {
+      "id": "kq-perfume-cremas-y-cosmetica",
+      "expected": "knowledge",
+      "predicted": "knowledge",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿El perfume estropea una cadena de plata o solo la ensucia?"
+    },
+    {
+      "id": "kq-piedras-cuarzos-y-gemas-facetadas",
+      "expected": "knowledge",
+      "predicted": "out_of_domain",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Por qué una amatista pierde color cuando la pieza pasa meses en un escaparate soleado?"
+    },
+    {
+      "id": "kq-piedras-materia-organica",
+      "expected": "knowledge",
+      "predicted": "knowledge",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Se puede limpiar una pieza de coral o de ámbar en el ultrasonidos, igual que una de plata?"
+    },
+    {
+      "id": "kq-piedras-opacas-porosas-y-tratadas",
+      "expected": "knowledge",
+      "predicted": "out_of_domain",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Por qué una esmeralda queda blanquecina y con líneas visibles después de una limpieza?"
+    },
+    {
+      "id": "kq-politica-devoluciones-y-cambios",
+      "expected": "knowledge",
+      "predicted": "out_of_domain",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Cómo se resuelve la devolución de una pieza comprada en el mostrador de un hotel cuando el cliente ya ha salido de la isla?"
+    },
+    {
+      "id": "kq-politica-garantia",
+      "expected": "knowledge",
+      "predicted": "knowledge",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Entra en garantía un colgante bañado en oro al que se le ha ido el color con el uso?"
+    },
+    {
+      "id": "kq-politica-grabado-y-encargos",
+      "expected": "knowledge",
+      "predicted": "both",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Se puede grabar una fecha en el interior de un aro bañado en oro?"
+    },
+    {
+      "id": "kq-politica-reparaciones-y-ajustes",
+      "expected": "knowledge",
+      "predicted": "ambiguous",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Se le puede subir la talla a una alianza que lleva piedras en todo el contorno?"
+    },
+    {
+      "id": "kq-regalar-sin-saber-la-talla",
+      "expected": "knowledge",
+      "predicted": "ambiguous",
+      "degraded_cause": null,
+      "category": null,
+      "text": "Un cliente quiere regalar una joya y no conoce ninguna medida de la persona, ¿qué parte del surtido le sirve?"
+    },
+    {
+      "id": "kq-tallas-anillos",
+      "expected": "knowledge",
+      "predicted": "knowledge",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Qué talla de anillo le corresponde a un dedo de 54 mm de circunferencia?"
+    },
+    {
+      "id": "kq-tallas-collares-y-cadenas",
+      "expected": "knowledge",
+      "predicted": "knowledge",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Qué longitud de cadena hace falta para que un colgante caiga sobre el escote?"
+    },
+    {
+      "id": "kq-tallas-como-se-miden-en-nuestro-catalogo",
+      "expected": "knowledge",
+      "predicted": "out_of_domain",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿La M de un colgante significa lo mismo que la M de un anillo?"
+    },
+    {
+      "id": "kq-tallas-pulseras-y-tobilleras",
+      "expected": "knowledge",
+      "predicted": "ambiguous",
+      "degraded_cause": null,
+      "category": null,
+      "text": "¿Cuánto más larga que el contorno del tobillo tiene que ser una tobillera?"
+    },
+    {
+      "id": "q53",
+      "expected": "ambiguous",
+      "predicted": "ambiguous",
+      "degraded_cause": null,
+      "category": "ambigua",
+      "text": "algo bonito"
+    },
+    {
+      "id": "q54",
+      "expected": "ambiguous",
+      "predicted": "ambiguous",
+      "degraded_cause": null,
+      "category": "ambigua",
+      "text": "un regalo"
+    },
+    {
+      "id": "q55",
+      "expected": "ambiguous",
+      "predicted": "ambiguous",
+      "degraded_cause": null,
+      "category": "ambigua",
+      "text": "lo de siempre"
+    },
+    {
+      "id": "q56",
+      "expected": "ambiguous",
+      "predicted": "ambiguous",
+      "degraded_cause": null,
+      "category": "ambigua",
+      "text": "quiero una joya"
+    },
+    {
+      "id": "b01",
+      "expected": "both",
+      "predicted": "both",
+      "degraded_cause": null,
+      "category": null,
+      "text": "una pulsera de hilo que se pueda mojar en la playa"
+    },
+    {
+      "id": "b02",
+      "expected": "both",
+      "predicted": "catalog",
+      "degraded_cause": null,
+      "category": null,
+      "text": "que colgante con bano de oro le puedo ofrecer para llevar a la piscina"
+    },
+    {
+      "id": "b03",
+      "expected": "both",
+      "predicted": "ambiguous",
+      "degraded_cause": null,
+      "category": null,
+      "text": "pendientes para una nina con la oreja recien hecha"
+    },
+    {
+      "id": "b04",
+      "expected": "both",
+      "predicted": "both",
+      "degraded_cause": null,
+      "category": null,
+      "text": "un anillo de plata talla L que se pueda subir de talla mas adelante"
+    },
+    {
+      "id": "b05",
+      "expected": "both",
+      "predicted": "ambiguous",
+      "degraded_cause": null,
+      "category": null,
+      "text": "una pulsera dorada para alguien a quien le sale verde la muneca"
+    },
+    {
+      "id": "b06",
+      "expected": "both",
+      "predicted": "both",
+      "degraded_cause": null,
+      "category": null,
+      "text": "un colgante de Menorca en oro para unas bodas de plata"
+    },
+    {
+      "id": "b07",
+      "expected": "both",
+      "predicted": "both",
+      "degraded_cause": null,
+      "category": null,
+      "text": "pendientes de perla que se puedan limpiar en casa"
+    },
+    {
+      "id": "b08",
+      "expected": "both",
+      "predicted": "both",
+      "degraded_cause": null,
+      "category": null,
+      "text": "que cadena le doy para que el colgante de estrella de mar caiga sobre el escote"
+    },
+    {
+      "id": "b09",
+      "expected": "both",
+      "predicted": "both",
+      "degraded_cause": null,
+      "category": null,
+      "text": "un regalo de plata para quien no se quita nunca la joya ni en la ducha"
+    },
+    {
+      "id": "b10",
+      "expected": "both",
+      "predicted": "both",
+      "degraded_cause": null,
+      "category": null,
+      "text": "un anillo de lapislazuli mediano, se puede meter en el ultrasonidos"
+    }
+  ]
+}

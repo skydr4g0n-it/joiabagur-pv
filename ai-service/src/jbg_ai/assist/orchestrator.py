@@ -1,17 +1,26 @@
-"""One sale-assistance request, in whichever of the three modes it is. C30a, generating since C30b.
+"""One sale-assistance request, in whichever of the three modes it is. C30a, C30b, C31.
 
-**Two of the three modes now call a language model, and one never does.** The piece with no
-question and the piece with a question hand what this module has already assembled to the
-generation layer; the free query does not, because classifying a query is C31's work and an
-argument written over a candidate set whose intent nobody determined is prose about a guess.
-An abstained request does not call either: writing confidently about an empty candidate set is
-the failure the abstention rule exists to prevent.
+**All three modes can now write, and one of them is classified before it retrieves anything.**
+The two anchored modes hand what this module has already assembled to the generation layer. The
+free query is put to a classifier *first* — one call, before `retrieve_products` — and what
+comes back decides whether the request is served at all, which index answers it, and which task
+section writes it. An abstained request still calls no provider: writing confidently about an
+empty candidate set is the failure the abstention rule exists to prevent, and that rule remains
+in place as the net it has always been, **behind** the new gate rather than instead of it.
 
-`pitch_client` is **injected and never built here**, like every other port this module takes.
-A deployment without it serves exactly the response C30a served — empty argument, absent prompt
-version, zero usage — which is what makes the generation layer measurable as an ablation
-against the structured one, and what makes a deployment with no provider credential a
-degradation rather than an outage.
+    M1  consulta sola      → CLASIFICAR, y entonces: rechazar · repreguntar · recuperar y redactar
+    M2  pieza sola         → sin clasificador: no hay consulta que clasificar
+    M3  pieza con pregunta → sin clasificador: `both` por construcción, y su guardarraíl es
+                             el umbral de conocimiento que ya corre — cero citas, coste cero
+
+Both clients are **injected and never built here**, like every other port this module takes.
+
+* With no `pitch_client` the response is exactly C30a's — empty argument, absent prompt
+  version — which is what makes the generation layer measurable as an ablation.
+* With no `router_client` the free query is served exactly as C30b served it: the intent
+  reports unclassified, both indexes are consulted, the abstention rule applies, and nothing
+  is generated. That is the **fail-open**, and it is also the ablation and the rollback. It is
+  a branch in `_task_of` and in the route check above it, never a swallowed exception.
 """
 
 from __future__ import annotations
@@ -34,16 +43,28 @@ from jbg_ai.assist.constants import (
     DEFAULT_MATERIAL_CAP,
     DEFAULT_PITCH_SECTIONS,
     FAMILY_ROSTER_CAP,
+    MAX_PROVIDER_CALLS,
     WARNING_FAMILY_HAS_VARIANTS,
+    WARNING_KNOWLEDGE_NOT_COVERED,
     WARNING_SIZE_LABEL_MISSING,
 )
 from jbg_ai.assist.errors import UnusableAnchorProductError
 from jbg_ai.assist.grounding import ground_piece
 from jbg_ai.assist.knowledge_scope import piece_scoped_exclusions
-from jbg_ai.assist.llm import AssistLlm
+from jbg_ai.assist.llm import AssistLlm, TokenUsage
 from jbg_ai.assist.modes import AssistMode, resolve_mode
 from jbg_ai.assist.pitch import EMPTY_PITCH, PitchOutcome, generate_pitch
-from jbg_ai.assist.prompt import PitchCitation, payload_from
+from jbg_ai.assist.prompt import (
+    FreeQueryCandidate,
+    FreeQueryGroup,
+    PitchCitation,
+    PitchTask,
+    free_query_payload_from,
+    payload_from,
+    resolve_task,
+)
+from jbg_ai.assist.router_llm import RouterLlm
+from jbg_ai.assist.routing import RoutingOutcome, classify_query
 from jbg_ai.config.settings import Settings
 from jbg_ai.indexing.embeddings import EmbeddingClient
 from jbg_ai.knowledge.search import KnowledgeCitation, KnowledgeSearchIndex, search_knowledge
@@ -209,6 +230,7 @@ async def assist_sale(
     search: ProductSearchPort,
     knowledge: KnowledgeSearchIndex,
     pitch_client: AssistLlm | None = None,
+    router_client: RouterLlm | None = None,
     abstain: bool | None = None,
     knowledge_distance_threshold: float | None = None,
     pitch_sections: Sequence[str] = DEFAULT_PITCH_SECTIONS,
@@ -241,6 +263,21 @@ async def assist_sale(
     abstained = False
     focus_source: SourceDocument | None = None
     roster: list[FamilyMember] = []
+    uncovered = False
+
+    # --- C31 · the entry guardrail -----------------------------------------------------
+    #
+    # **The classifier runs in M1 and only in M1, and it cuts before `retrieve_products`.**
+    # M2 has no query to classify. M3 is `both` by construction — the piece is the catalogue
+    # side and the question the corpus side — and refusing there would refuse a piece the
+    # caller named explicitly, which is a statement about the request this service has not
+    # established. Neither reaches this line, so "M2 and M3 make no classifier call" is a
+    # property of the control flow rather than of a condition somewhere inside one.
+    routing = RoutingOutcome()
+    if mode is AssistMode.QUERY_ONLY:
+        routing = await classify_query(
+            question, client=router_client, trace_id=principal.trace_id
+        )
 
     if mode.is_anchored:
         product_id = str(payload.product_id)
@@ -271,20 +308,40 @@ async def assist_sale(
                 distance_threshold=threshold,
                 trace_id=principal.trace_id,
             )
+            # **The deterministic guardrail of M3, and it costs nothing.** Zero citations
+            # after the distance threshold already *means* the corpus does not cover the
+            # question: C23 calibrated `0,51` on a clean gap of eight thousandths, with the
+            # 32 questions the corpus answers below it and the 5 outsiders above. This reads
+            # the result that was already computed — no second search, no provider call —
+            # and turns it into something a consumer can act on. Until now M3 generated
+            # identically with no citations and nobody could tell the two cases apart.
+            uncovered = not citations
+    elif routing.short_circuits:
+        # **The refusal and the clarification cut here: before any retrieval runs.** Not
+        # after, and not concurrently with it — 129 ms of retrieval does not buy breaking a
+        # property whose whole value is that the guardrail is visibly prior. Nothing is
+        # retrieved, nothing is searched, and no provider writes anything.
+        pass
     else:
-        decisions: list[bool] = []
-        retrieved = await retrieve_products(
-            RetrievalRequest(query=question, top_k=payload.top_k),
-            principal,
-            settings=settings,
-            embed=embed,
-            search=search,
-            abstain=abstain,
-            on_abstention=decisions.append,
-        )
-        abstained = bool(decisions and decisions[-1])
-        if not abstained:
-            groups = _group_results(retrieved.results)
+        # `route` is None exactly when the classifier could not be used, and then both
+        # indexes are consulted — which is what this mode did before it routed anything.
+        # The fail-open is this line and the `None` branches below it, not an `except`.
+        route = routing.route
+        if route in (None, "catalog", "both"):
+            decisions: list[bool] = []
+            retrieved = await retrieve_products(
+                RetrievalRequest(query=question, top_k=payload.top_k),
+                principal,
+                settings=settings,
+                embed=embed,
+                search=search,
+                abstain=abstain,
+                on_abstention=decisions.append,
+            )
+            abstained = bool(decisions and decisions[-1])
+            if not abstained:
+                groups = _group_results(retrieved.results)
+        if not abstained and route in (None, "knowledge", "both"):
             citations = await search_knowledge(
                 question,
                 embed=embed,
@@ -293,6 +350,7 @@ async def assist_sale(
                 distance_threshold=threshold,
                 trace_id=principal.trace_id,
             )
+        if groups:
             # The warnings describe the piece the response leads with. Reading the focus
             # piece costs one primary-key lookup and is the same read the anchored modes
             # make, which is why `size_label` never has to be smuggled out of the retrieval
@@ -312,19 +370,33 @@ async def assist_sale(
         if focus_source is not None
         else []
     )
+    # The codes the router and the coverage guardrail add, after the rule-derived ones and
+    # in a stable order. Two distinct refusal codes and never one, because what an operator
+    # says to a customer differs between a trade the shop does not practise and a piece the
+    # shop does not carry.
+    warnings += list(routing.refusal_codes)
+    if uncovered:
+        warnings.append(WARNING_KNOWLEDGE_NOT_COVERED)
     anchored_id = str(payload.product_id) if mode.is_anchored else None
 
-    # The two cuts, **before** any provider call: the free-query mode and an abstained
-    # request. They overlap today — abstention is only reachable on the query path, which is
-    # the mode that does not generate — and both are stated anyway, because they are two
-    # different reasons and the day an anchored mode can abstain only one of them holds.
+    # The cuts, **before** any generation call. An abstained request: writing confidently
+    # about an empty candidate set is the failure the abstention rule exists to prevent. A
+    # refused one or one answered with a question: there is nothing to write about, and the
+    # Spanish a human reads for either belongs to the presentation layer. And a free query
+    # with **no decided route**, which is the fail-open: with no usable classification this
+    # mode serves exactly the response it served before this capability routed anything.
     outcome: PitchOutcome | None = None
-    if pitch_client is not None and mode.is_anchored and not abstained:
+    task = _task_of(mode, routing, uncovered=uncovered)
+    if pitch_client is not None and task is not None and not abstained:
         outcome = await generate_pitch(
             _pitch_payload(
                 focus_source, roster, citations, warnings=warnings, question=question
+            )
+            if mode.is_anchored
+            else _free_query_payload(
+                groups, citations, warnings=warnings, question=question
             ),
-            mode,
+            task,
             client=pitch_client,
         )
         if not outcome.withheld:
@@ -336,8 +408,17 @@ async def assist_sale(
             # without it.
             citations = _cited(citations, outcome.used_citation_ids)
 
+    usage = _usage(routing, outcome)
+    if usage.calls > MAX_PROVIDER_CALLS:  # pragma: no cover — structurally impossible
+        raise AssertionError(
+            f"the provider was called {usage.calls} times for one request; "
+            f"the ceiling is {MAX_PROVIDER_CALLS}"
+        )
+    intent = routing.intent if mode is AssistMode.QUERY_ONLY else mode.intent
+
     logger.info(
-        "stage=%s trace_id=%s mode=%s intent=%s groups=%s members=%s warnings=%s "
+        "stage=%s trace_id=%s mode=%s intent=%s route=%s router_degraded=%s "
+        "router_cause=%s router_ms=%.1f task=%s groups=%s members=%s warnings=%s "
         "citations=%s abstained=%s roster=%s threshold=%s prompt_version=%s model=%s "
         "prompt_tokens=%s completion_tokens=%s total_tokens=%s provider_calls=%s "
         "pitch_ms=%.1f pitch_chars=%s pitch_sha256=%s violations=%s withdrawn=%s "
@@ -345,7 +426,16 @@ async def assist_sale(
         STAGE,
         principal.trace_id,
         mode.value,
-        mode.intent,
+        intent,
+        # The route, the degradation and its cause — never the query. A log line is durable
+        # storage outside the database, and the operator's text is the one thing here that a
+        # customer said out loud. Nothing of the routing decision is persisted either: the
+        # evaluation harness is the declared exception and it writes its own files.
+        routing.route or "none",
+        routing.degraded,
+        routing.degraded_cause or "none",
+        routing.elapsed_ms,
+        task.value if task is not None else "none",
         len(groups),
         sum(len(group.members) for group in groups),
         ",".join(warnings) or "none",
@@ -361,10 +451,13 @@ async def assist_sale(
         # storing it viable rather than merely cautious.
         outcome.prompt_version if outcome is not None else None,
         outcome.usage.model if outcome is not None else None,
-        outcome.usage.prompt_tokens if outcome is not None else 0,
-        outcome.usage.completion_tokens if outcome is not None else 0,
-        outcome.usage.total_tokens if outcome is not None else 0,
-        outcome.usage.calls if outcome is not None else 0,
+        # The totals of the WHOLE request, classifier included: `provider_calls` is the
+        # observable side of the ceiling of three, and a count that left the router out
+        # would say two on a request that made three.
+        usage.prompt_tokens,
+        usage.completion_tokens,
+        usage.total_tokens,
+        usage.calls,
         outcome.elapsed_ms if outcome is not None else 0.0,
         len(outcome.pitch) if outcome is not None else 0,
         outcome.digest if outcome is not None else "none",
@@ -377,15 +470,28 @@ async def assist_sale(
     )
 
     return AssistResponse(
-        intent=mode.intent,
+        intent=intent,
         groups=groups,
         pitch=outcome.pitch if outcome is not None else EMPTY_PITCH,
         citations=[_to_citation(item, product_id=anchored_id) for item in citations],
         warnings=warnings,
-        # Declared **of C31**, not deferred by accident: emitting a clarification question is a
-        # routing decision over a free query, which is the capability that classifies one.
-        clarification_question=None,
-        usage=_usage(outcome),
+        # Prose, and the **only** prose in this response no model wrote: the contract types
+        # this field as a sentence rather than as a code, so the presentation layer cannot
+        # resolve it the way it resolves warnings. Chosen in code from a closed catalogue
+        # keyed on the axis the classifier reported missing, which keeps it deterministic
+        # without moving the type — and keeps a figure nobody checked out of the one field
+        # no numeric gate inspects.
+        clarification_question=routing.clarification_question,
+        usage=Usage(
+            prompt_tokens=usage.prompt_tokens,
+            completion_tokens=usage.completion_tokens,
+            total_tokens=usage.total_tokens,
+            model=usage.model if usage.calls else None,
+        ),
+        # **False on a refusal, always.** The router's refusal is never dressed as an
+        # abstention: one reads the shape of the distance profile after retrieving, the
+        # other classifies before, and collapsing them onto this field would make the two
+        # rates this change exists to publish separately indistinguishable from each other.
         abstained=abstained,
         # "The generation layer ran", and no longer "there is a pitch". An empty argument alone
         # cannot tell a deployment that does not generate from a generation that was rejected,
@@ -443,6 +549,78 @@ def _pitch_payload(
     )
 
 
+def _free_query_payload(
+    groups: Sequence[AssistGroup],
+    citations: Sequence[KnowledgeCitation],
+    *,
+    warnings: Sequence[str],
+    question: str,
+):
+    """What the model is handed for a free query — **and therefore which figures it may write**.
+
+    `product_id` and `score` are on the response objects this reads and are deliberately not
+    copied across: their digits are arbitrary, a counter argument never mentions either, and
+    every numeral handed over widens the whitelist. That exclusion is the containment for the
+    declared risk of this mode — the gate measured zero violations in 120 generations against a
+    payload carrying one SKU, and five candidates bring five.
+
+    `family_id` is excluded for the same reason and is not even a near miss: it is a UUID.
+    """
+    return free_query_payload_from(
+        groups=[
+            FreeQueryGroup(
+                family_label=group.family_label,
+                members=tuple(
+                    FreeQueryCandidate(
+                        sku=member.sku,
+                        piece_type=None,
+                        materials=tuple(member.materials),
+                        size_label=None,
+                        variant_label=member.variant_label,
+                    )
+                    for member in group.members
+                ),
+            )
+            for group in groups
+        ],
+        warnings=list(warnings),
+        citations=[
+            PitchCitation(
+                citation_id=item.citation_id,
+                document_title=item.document_title,
+                section_title=item.section_title,
+                claim_scope=item.claim_scope,
+                content=item.content,
+            )
+            for item in citations
+        ],
+        query=question or None,
+    )
+
+
+def _task_of(
+    mode: AssistMode, routing: RoutingOutcome, *, uncovered: bool
+) -> PitchTask | None:
+    """Which task section this request generates with, or `None` when it must not generate.
+
+    One place, and it is the whole generation policy of the layer stated once:
+
+    * the two anchored modes always generate, with the degraded task when the corpus does not
+      cover an anchored question;
+    * a free query generates **only over a route the classifier decided**, which is exactly
+      what makes the fail-open return this mode to the behaviour it had before C31 — no route,
+      no task, no call, empty argument and absent prompt version, with a test on each;
+    * a refused query and one answered with a clarification never generate, because there is
+      nothing to write about.
+    """
+    if mode.is_anchored:
+        return resolve_task(mode, uncovered=uncovered)
+    route = routing.route
+    if route is None:
+        return None
+    return resolve_task(mode, route=route)
+
+
 def _cited(
     citations: Sequence[KnowledgeCitation], used: Sequence[str]
 ) -> tuple[KnowledgeCitation, ...]:
@@ -451,21 +629,24 @@ def _cited(
     return tuple(by_id[item] for item in used if item in by_id)
 
 
-def _usage(outcome: PitchOutcome | None) -> Usage:
-    """The contract's usage, summed across every call the request made.
+def _usage(routing: RoutingOutcome, outcome: PitchOutcome | None) -> TokenUsage:
+    """Everything the request cost, **the classifier included**. C31.
 
-    The model is reported **only when a call actually returned one**. Naming a model beside
-    zero tokens is precisely the shape C09's seam produces and the reason it could not be
-    reused: it reads as a measured cost and is not one.
+    `TokenUsage.__add__` is what makes this a sum rather than a choice, and the same property
+    that made it a type in C30b applies twice over now: a request that classified, generated and
+    repaired made three calls, and a usage that reported only the generation would understate
+    the cost exactly on the requests that cost the most. `calls` travels with it, so the ceiling
+    of three is observable from the same object a consumer reads.
+
+    The model is the last one a call actually reported. Two different models for one request is
+    now possible — the classifier has its own setting — and the contract has one field; the
+    honest reading is that the figure to compare is the **total**, which is why the two are
+    published as separate rows in the report and never as one aggregate the field could carry.
     """
-    if outcome is None:
-        return Usage()
-    return Usage(
-        prompt_tokens=outcome.usage.prompt_tokens,
-        completion_tokens=outcome.usage.completion_tokens,
-        total_tokens=outcome.usage.total_tokens,
-        model=outcome.usage.model if outcome.usage.calls else None,
-    )
+    total = routing.usage
+    if outcome is not None:
+        total = total + outcome.usage
+    return total
 
 
 async def _focus_of(

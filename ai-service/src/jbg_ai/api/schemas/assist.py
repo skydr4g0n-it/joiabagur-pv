@@ -19,7 +19,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field, model_validator
 
 from jbg_ai.api.schemas.common import ScopedResponse, Usage
-from jbg_ai.assist.constants import ASSIST_WARNING_CODES
+from jbg_ai.assist.constants import ASSIST_INTENTS, ASSIST_WARNING_CODES
 
 
 class AssistContext(BaseModel):
@@ -141,8 +141,15 @@ class AssistResponse(ScopedResponse):
     intent: str = Field(
         ...,
         description=(
-            "Derived from the request shape and never from the wording: `product_pitch` for a "
-            "piece with no question, `unclassified` otherwise. Classifying a query is C31"
+            "Closed vocabulary of the assistance capability: "
+            + ", ".join(ASSIST_INTENTS)
+            + ". `product_pitch` for a piece with no question, derived from the request shape "
+            "and unchanged since C30a. For a free query it is the verdict C31's classifier "
+            "reached before retrieving anything: `in_domain` admitted, `out_of_domain` not "
+            "this business, `not_in_catalogue` jewellery this catalogue does not stock. "
+            "`unclassified` means no classification was made — no classifier ran, or one ran "
+            "and could not be used — and the request was served exactly as it was before this "
+            "capability routed anything"
         ),
     )
     groups: list[AssistGroup]
@@ -156,10 +163,25 @@ class AssistResponse(ScopedResponse):
         description=(
             "Rule-derived codes, from the closed vocabulary of the assistance capability: "
             + ", ".join(ASSIST_WARNING_CODES)
-            + ". Never a sentence: the Spanish a human reads belongs to the frontend"
+            + ". Never a sentence: the Spanish a human reads belongs to the frontend. The two "
+            "refusal codes are distinct on purpose — a trade this shop does not practise and a "
+            "piece it does not carry are two different things to say to a customer — and "
+            "`knowledge_not_covered` states that an anchored question produced no citation "
+            "after the corpus distance threshold, so the argument describes the piece without "
+            "claiming to have answered"
         ),
     )
-    clarification_question: str | None = None
+    clarification_question: str | None = Field(
+        default=None,
+        description=(
+            "A question back to the operator when the classifier found the query carries too "
+            "little to search with, naming the axis it left out. Null in every other case, "
+            "including a refusal. Selected in code from a closed catalogue of es-ES templates "
+            "and never written by the model: the field is typed as prose rather than as a "
+            "code, so the presentation layer cannot resolve it, and two requests carrying the "
+            "same query produce exactly the same text"
+        ),
+    )
     usage: Usage
     abstained: bool = Field(
         ...,

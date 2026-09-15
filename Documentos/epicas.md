@@ -504,7 +504,7 @@ Capa de generación y agéntica. Convierte un conjunto de candidatos en una resp
 - Sustitutos por falta de stock. ~~Complementarios por reglas y co-ocurrencia~~ — **cortado el 2026-09-12 con medición** (ver abajo)
 - Tarjeta de asistencia y desambiguación por familia en el frontend, **con caja de pregunta sobre la pieza elegida** *(13 sep)* — es la superficie por la que el corpus de EP12 llega por fin al joyero
 
-**Changes asociados:** **C26** (`add-substitutes-retrieval` — **archivado el 2026-09-12**, 62/62), ~~C27~~ (**cortado**), **C30a**, **C30b**, **C31** *(en curso desde el 14 sep)*, C32, C34, C36
+**Changes asociados:** **C26** (`add-substitutes-retrieval` — **archivado el 2026-09-12**, 62/62), ~~C27~~ (**cortado**), **C30a**, **C30b**, **C31** *(implementado el 15 sep)*, C32, C34, C36
 
 > **Ampliado el 2026-09-14 — C31 pasa a en curso, y su exploración refuta la justificación de su propia ficha.** **C31** (`add-guardrails-and-intent-router`) abre con historia ([HU-AIENG-031](Historias/AI-Eng/HU-AIENG-031.md)), ticket ([T-AIENG-031](../openspec/changes/add-guardrails-and-intent-router/ticket.md)) y conjunto de enrutado ([`evals/routing/cases.yaml`](../ai-service/evals/routing/cases.yaml)), sobre la rama `c31-add-guardrails-and-intent-router`. Los recuentos de la tabla **no se mueven** —siguen **32 archivadas y 6 pendientes**— porque abrir no es archivar. Es el **duodécimo change consecutivo cuya exploración refuta lo escrito antes** — tras C21, C22, FIX1, C23, C24, C25, C25bis, C26, C28, C30a y C30b — y lo que refuta es **el argumento con el que la ficha se justifica**.
 >
@@ -515,6 +515,30 @@ Capa de generación y agéntica. Convierte un conjunto de candidatos en una resp
 > **Dos decisiones más que salen de medir, no de opinar.** **Una · el enrutador cuesta una llamada y sólo en M1.** Medido: `AssistTimeoutMs` son **5.000 ms**, una llamada de generación va a **2.216 ms de p50** y el **55 %** de las peticiones gasta la reparación, así que una petición reparada ya está del orden de **4.400 ms** — el margen para meter algo en serie delante es de centenares de milisegundos. M2 no tiene consulta que clasificar; **M3 es `both` por construcción** y su guardarraíl sale **gratis** del umbral `0,51` que C23 fijó sobre un **hueco limpio de 8 milésimas** (32 preguntas del corpus por debajo, 5 de fuera por encima): *cero citas tras el umbral* ya significa «el corpus no cubre esto», y hoy **nadie lo lee como tal**. **Dos · el conjunto de evaluación ya existía repartido y nadie lo había conectado**: 48 `catalog`, 20 `not_in_catalogue` y 4 `ambiguous` del golden set, 32 `knowledge` de las marcas del corpus y 5 `out_of_domain` del fixture de C23 — **109 casos con coste de etiquetado cero**, más **10 casos `both`** nuevos, que es la única clase que no existía. Y el detalle que cierra el círculo: las cuatro `ambigua` se declararon **sin juicios** el 2026-09-11 con la nota *«la respuesta correcta es una repregunta, y eso es una decisión del agente»* — su conjunto de evaluación llevaba tres días esperando a que alguien reclamase `clarification_question`, que es lo que C30b propuso el día antes.
 >
 > **Y lo que la exploración deja anotado fuera de C31:** la **consulta libre gana ruta**, porque C31 pone argumentario en M1 y ese modo **no tiene pantalla** (§15.12). La ruta .NET queda anotada en la ficha de **C34** y el bloque de pantalla es de **C36** —dos filas más en la tabla de copy que esa ficha ya va a escribir—, con la distinción que no se puede perder: `abstained` y el rechazo del enrutador son **dos negativas de mecanismos distintos** y pintarlas igual borra justamente lo que las dos cifras existen para sostener.
+
+> **Actualizado el 2026-09-15 — C31 implementado, y la medición refuta siete cosas, empezando
+> por su propia primera configuración.** El **veto de D12 —declarado antes de medir— tumbó la
+> primera pasada**: `router/v1` silenciaba **15 de las 48** consultas contestables, diez de ellas
+> `descripcion-sin-anclaje`, con un falso positivo del **31,25 %**. Y lo que fallaba **no era
+> clasificar intención**, sino no saber **cómo se nombra este catálogo**: las piezas se llaman
+> `<tipo> <motivo>` —«Colgante erizo de mar», «Anillo caracola»—, así que *«el bicho con púas que
+> se pisa en las rocas»* **es** una consulta de catálogo, y el clasificador la leía como una
+> pregunta ajena a la joyería. La distinción fina que la ficha no veía no es *intención contra
+> cobertura* sino **artículo de otro oficio contra motivo de éste**, y la regla que la corta es
+> negativa: nadie entra en una joyería a comprar una bicicleta. **Tres revisiones de prompt
+> bajaron el falso positivo a 6,25 % y no lo cerraron; el que lo cerró fue el modelo.** Con el
+> mismo prompt, `gpt-4o` acierta **48 de 48** en `catalog`, silencia **0** y **pasa el veto**,
+> mientras `gpt-4o-mini` seguía silenciando tres consultas **nombradas literalmente en el prompt**
+> como ejemplos de lo que no hay que rechazar. Eso **refuta la opción por defecto nº 4 del
+> ticket** —«mismo `gpt-4o-mini` de partida»— y **vindica D10/D9 con una medición**: la variable
+> separada del modelo es lo único que permitió mover el del clasificador sin invalidar las 120
+> generaciones de C30b. **Y el riesgo mayor declarado no se materializó:** la lista blanca
+> numérica de la consulta libre resultó ser de **~13 numerales y no de cinco** —la recuperación
+> devuelve 15 candidatos, no 5— y aun así la puerta numérica rechazó **cero**; lo que sí tumbaba
+> el argumentario de M1 era `dangling_citation`, porque la sección de tarea de `catalog` no decía
+> que no hubiera citas que usar. **El contraste con el umbral `0,51` de C23 da 0 discrepancias en
+> 37**, que es la evidencia más fuerte disponible de que aquel hueco de 8 milésimas separa algo
+> real. Informe: [c31-implementation-measurements.md](Proyecto%20Final%20AIEng/informes/c31-implementation-measurements.md).
 
 > **Actualizado el 2026-09-13 — C30 se parte en C30a y C30b, y con él se cierra un hueco que no era suyo.** El corte lo decide **la dependencia de sus consumidores**, no el tamaño: C34 y C36 necesitan **la forma** de la respuesta y no la prosa. **C30a** (`add-assist-structure-and-rule-warnings`) entrega el movimiento del contrato congelado, los tres modos, la agrupación por familia, el listado de miembros, los avisos por reglas, el filtro de ficha de material y la puerta de abstención — **sin una sola llamada a un proveedor**, y aun así con **citas verificables**, porque el corpus está indexado y el direccionamiento por ficha de material es determinista. **C30b** (`add-assist-pitch-generation`) añade el argumentario, la integridad referencial de las citas y la puerta numérica. El corte deja de regalo la **ablación de la capa de generación**: misma ruta, mismos candidatos, mismas citas, con prosa y sin ella.
 >

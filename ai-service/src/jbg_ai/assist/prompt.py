@@ -22,7 +22,9 @@ import json
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
+from typing import Protocol
 
 from jbg_ai.assist.constants import PROMPT_VERSION
 from jbg_ai.assist.modes import AssistMode
@@ -32,17 +34,94 @@ from jbg_ai.assist.modes import AssistMode
 # look true afterwards. `test_prompt_version_matches_the_loaded_prompt_file` pins the pair.
 _PROMPT_RELATIVE = Path("prompts") / f"{PROMPT_VERSION}.md"
 
-#: The heading whose body is the system message. Invariant across both anchored modes, which is
-#: what makes one version cover the pair: if M3 ever needs its own rules, that is `assist/v2.md`
-#: and a row in the prompt table of the design, not a branch here.
+#: The heading whose body is the system message. Invariant across **every** task of a version:
+#: the rules a model must not break do not depend on what it is being asked to write, and one
+#: system block per version is what makes "the system message is identical for any query" a
+#: property a test can read off the built messages instead of a promise.
 SYSTEM_SECTION = "Sistema"
 
-#: The heading whose body is the task, one per mode. The **only** thing that differs between the
-#: two calls besides the data.
-TASK_SECTIONS: dict[AssistMode, str] = {
-    AssistMode.PIECE_ONLY: "Tarea · pieza sin pregunta",
-    AssistMode.PIECE_AND_QUERY: "Tarea · pieza con pregunta",
+
+class PitchTask(Enum):
+    """Which task section of the prompt one generation call uses. C31.
+
+    **The mode no longer determines the task on its own**, which is why this exists. Two of the
+    six are still one-to-one with an anchored mode, but the anchored question has a *degraded*
+    task for the case where the corpus does not cover it, and the free query has one task per
+    route the classifier can decide. Keying the sections on the mode would have forced a branch
+    at every call site to pick between sections of the same mode, which is the shape that lets a
+    response report a prompt version whose task it did not run.
+    """
+
+    #: M2. A piece and no question.
+    PIECE_ONLY = "piece_only"
+    #: M3, with citations. A piece and a question the corpus answers.
+    PIECE_AND_QUERY = "piece_and_query"
+    #: M3, with **zero citations after the distance threshold**. The argument describes the
+    #: piece and does not claim to have answered — the guardrail of D3, expressed as a task.
+    PIECE_AND_QUERY_UNCOVERED = "piece_and_query_uncovered"
+    #: M1, route `catalog`. Several candidate pieces and no corpus fragment.
+    FREE_QUERY_CATALOG = "free_query_catalog"
+    #: M1, route `knowledge`. Corpus fragments and no piece: a question, not a shop window.
+    FREE_QUERY_KNOWLEDGE = "free_query_knowledge"
+    #: M1, route `both`. Pieces and fragments at once.
+    FREE_QUERY_BOTH = "free_query_both"
+
+
+#: The heading whose body is the task, one per task. The **only** thing that differs between two
+#: calls besides the data.
+TASK_SECTIONS: dict[PitchTask, str] = {
+    PitchTask.PIECE_ONLY: "Tarea · pieza sin pregunta",
+    PitchTask.PIECE_AND_QUERY: "Tarea · pieza con pregunta",
+    PitchTask.PIECE_AND_QUERY_UNCOVERED: "Tarea · pieza con pregunta sin cobertura",
+    PitchTask.FREE_QUERY_CATALOG: "Tarea · consulta libre · catálogo",
+    PitchTask.FREE_QUERY_KNOWLEDGE: "Tarea · consulta libre · conocimiento",
+    PitchTask.FREE_QUERY_BOTH: "Tarea · consulta libre · catálogo y conocimiento",
 }
+
+#: The task an **anchored** mode runs by default. The free query is deliberately absent: its
+#: task depends on the route the classifier decided, which a mode cannot know, so asking for it
+#: with a mode alone is a programming error and raises rather than guessing one of three.
+_DEFAULT_TASKS: dict[AssistMode, PitchTask] = {
+    AssistMode.PIECE_ONLY: PitchTask.PIECE_ONLY,
+    AssistMode.PIECE_AND_QUERY: PitchTask.PIECE_AND_QUERY,
+}
+
+#: The task for a free query, by the route the classifier decided. Code, never the model: the
+#: classification may be a model's, the action taken for each label may not.
+FREE_QUERY_TASKS: dict[str, PitchTask] = {
+    "catalog": PitchTask.FREE_QUERY_CATALOG,
+    "knowledge": PitchTask.FREE_QUERY_KNOWLEDGE,
+    "both": PitchTask.FREE_QUERY_BOTH,
+}
+
+
+def resolve_task(
+    mode: AssistMode,
+    *,
+    route: str | None = None,
+    uncovered: bool = False,
+) -> PitchTask:
+    """Which task section this call runs, from the mode plus what the request turned out to be.
+
+    `uncovered` only means anything for the anchored question, and `route` only for the free
+    query; passing either where it does not apply is ignored rather than raising, because the
+    orchestrator computes both before it knows which mode it is serving and a branch there
+    would just move this table to a worse place.
+    """
+    if mode is AssistMode.QUERY_ONLY:
+        task = FREE_QUERY_TASKS.get(route or "")
+        if task is None:
+            raise ValueError(
+                f"the free-query mode needs a decided route to pick a task; got {route!r}"
+            )
+        return task
+    if mode is AssistMode.PIECE_AND_QUERY and uncovered:
+        return PitchTask.PIECE_AND_QUERY_UNCOVERED
+    task = _DEFAULT_TASKS.get(mode)
+    if task is None:  # pragma: no cover — the three modes are exhaustive above
+        raise ValueError(f"{mode.value} does not generate an argument")
+    return task
+
 
 #: The operator's query travels **inside these marks, in the user message**, never concatenated
 #: into the system one. It is the only new injection surface this change opens: the corpus is
@@ -64,22 +143,33 @@ NUMERAL = re.compile(r"\d+(?:[.,]\d+)*")
 ENUMERATION = re.compile(r"(?:\A|\n)[ \t]*(\d+)(?=[.)])")
 
 
-def load_prompt() -> str:
-    """The whole prompt file `PROMPT_VERSION` names. Same search order as `enrichment/`."""
+def load_prompt_file(version: str) -> str:
+    """The whole prompt file a version names. Same search order as `enrichment/`.
+
+    Generalised over the version by C31 so the classifier's prompt is loaded by the same three
+    candidates and the same error message: a second copy of this search would be a second place
+    for a container layout to diverge from a developer checkout.
+    """
+    relative = Path("prompts") / f"{version}.md"
     here = Path(__file__).resolve()
     candidates = (
-        here.parents[3] / _PROMPT_RELATIVE,  # …/ai-service/src/jbg_ai/assist/
-        Path.cwd() / _PROMPT_RELATIVE,
-        Path("/app") / _PROMPT_RELATIVE,
+        here.parents[3] / relative,  # …/ai-service/src/jbg_ai/assist/
+        Path.cwd() / relative,
+        Path("/app") / relative,
     )
     for path in candidates:
         if path.is_file():
             return path.read_text(encoding="utf-8")
     searched = ", ".join(str(item) for item in candidates)
     raise FileNotFoundError(
-        f"{PROMPT_VERSION}.md not found; expected "
-        f"ai-service/{_PROMPT_RELATIVE.as_posix()} (searched: {searched})"
+        f"{version}.md not found; expected "
+        f"ai-service/{relative.as_posix()} (searched: {searched})"
     )
+
+
+def load_prompt() -> str:
+    """The whole prompt file `PROMPT_VERSION` names."""
+    return load_prompt_file(PROMPT_VERSION)
 
 
 def prompt_sections(text: str | None = None) -> dict[str, str]:
@@ -100,12 +190,20 @@ def system_message(text: str | None = None) -> str:
     return prompt_sections(text)[SYSTEM_SECTION]
 
 
-def task_message(mode: AssistMode, text: str | None = None) -> str:
-    """The one line that differs between the two anchored modes."""
-    section = TASK_SECTIONS.get(mode)
-    if section is None:
-        raise ValueError(f"{mode.value} does not generate an argument")
-    return prompt_sections(text)[section]
+def task_message(task: PitchTask | AssistMode, text: str | None = None) -> str:
+    """The one block that differs between two calls.
+
+    Accepts a mode for the two anchored defaults, which is what every call site that predates
+    C31 passes, and a task for everything the route or the coverage decides.
+    """
+    resolved = task if isinstance(task, PitchTask) else resolve_task(task)
+    section = TASK_SECTIONS[resolved]
+    sections = prompt_sections(text)
+    if section not in sections:
+        raise KeyError(
+            f"the prompt does not declare the section «{section}» that {resolved.value} needs"
+        )
+    return sections[section]
 
 
 @dataclass(frozen=True)
@@ -119,8 +217,56 @@ class PitchCitation:
     content: str
 
 
+class PitchContext(Protocol):
+    """What the three checks need of a payload, whatever shape it has. C31.
+
+    C30b had one shape and the gate could name it. This change adds a second — the free query
+    returns up to five groups and no anchored piece, so `PitchPayload`'s single `pieza` cannot
+    carry it — and the protocol is what keeps `verify()` from learning about either. The gate
+    reads **an object with these four answers**, and every payload builds them the same way:
+    `as_data()` is the source of truth and the numerals are derived from it, so a new shape
+    cannot widen the whitelist by forgetting to declare a field.
+    """
+
+    query: str | None
+
+    def as_data(self) -> dict[str, object]: ...
+
+    def citation_ids(self) -> frozenset[str]: ...
+
+    def numerals(self) -> frozenset[str]: ...
+
+    def loose_numerals(self) -> frozenset[str]: ...
+
+
+class _NumeralsFromData:
+    """`numerals()` and `loose_numerals()` derived from `as_data()`, for every payload shape.
+
+    Inherited rather than repeated, because repeating it is exactly how a second shape acquires
+    a different whitelist from the one its data implies.
+    """
+
+    def as_data(self) -> dict[str, object]:  # pragma: no cover — overridden by every subclass
+        raise NotImplementedError
+
+    def _raw_numerals(self) -> list[str]:
+        # `as_data()` and nothing else: not the rendered prompt, whose instructions would widen
+        # the set, and not the query, which is the request rather than the evidence.
+        return NUMERAL.findall(json.dumps(self.as_data(), ensure_ascii=False))
+
+    def numerals(self) -> frozenset[str]:
+        """Every numeral of the object, normalised. The whitelist, and nothing else."""
+        return frozenset(normalise_numeral(raw) for raw in self._raw_numerals())
+
+    def loose_numerals(self) -> frozenset[str]:
+        """The same numerals with every separator stripped. **Admits nothing**: it exists so a
+        rejection can be classified as a separator disagreement rather than an invention, which
+        is the difference between a gate that needs a rule and one that is working."""
+        return frozenset(loose_numeral(raw) for raw in self._raw_numerals())
+
+
 @dataclass(frozen=True)
-class PitchPayload:
+class PitchPayload(_NumeralsFromData):
     """Everything handed to the model, and therefore everything the gate admits.
 
     `query` travels with it and is deliberately **not part of the admitted set**. It is what to
@@ -181,20 +327,90 @@ class PitchPayload:
         """The set a declared identifier must belong to. Nothing else resolves."""
         return frozenset(item.citation_id for item in self.citations)
 
-    def _raw_numerals(self) -> list[str]:
-        # `as_data()` and nothing else: not the rendered prompt, whose instructions would widen
-        # the set, and not the query, which is the request rather than the evidence.
-        return NUMERAL.findall(json.dumps(self.as_data(), ensure_ascii=False))
 
-    def numerals(self) -> frozenset[str]:
-        """Every numeral of the object, normalised. The whitelist, and nothing else."""
-        return frozenset(normalise_numeral(raw) for raw in self._raw_numerals())
+@dataclass(frozen=True)
+class FreeQueryCandidate:
+    """One retrieved piece as the model sees it in the free-query mode. C31.
 
-    def loose_numerals(self) -> frozenset[str]:
-        """The same numerals with every separator stripped. **Admits nothing**: it exists so a
-        rejection can be classified as a separator disagreement rather than an invention, which
-        is the difference between a gate that needs a rule and one that is working."""
-        return frozenset(loose_numeral(raw) for raw in self._raw_numerals())
+    **What is absent is the design.** No `product_id` and no retrieval `score`: their digits are
+    arbitrary, a counter argument never mentions either, and every numeral handed over widens
+    the whitelist — which is the reason C30b left `product_id` out of the single-piece payload
+    and the reason it stays out here, where the cost is multiplied by the number of candidates.
+    """
+
+    sku: str
+    piece_type: str | None = None
+    materials: tuple[str, ...] = ()
+    size_label: str | None = None
+    variant_label: str | None = None
+
+
+@dataclass(frozen=True)
+class FreeQueryGroup:
+    """One family of candidates. `family_label` and never `family_id`, for the same reason."""
+
+    family_label: str | None = None
+    members: tuple[FreeQueryCandidate, ...] = ()
+
+
+@dataclass(frozen=True)
+class FreeQueryPayload(_NumeralsFromData):
+    """What the model is handed for a **free query**: several groups and no anchored piece.
+
+    A second shape rather than a nullable field on the first, because the two say different
+    things: `PitchPayload` describes *this piece*, and everything in it is an assertion about
+    one object the caller named. This one describes *what a search found*, where no candidate is
+    privileged and the argument's job is to compare them.
+
+    **Every candidate widens the numeric whitelist**, and that is the declared risk of this
+    change: the gate measured zero violations in 120 generations against a payload with one SKU,
+    one size and one variant label, and five candidates bring five of each. The containment is
+    the exclusion above — identifiers and scores never enter — and publishing this mode's
+    rejection rate **apart** from the anchored one, because they are not the same gate.
+
+    `query` is not part of the admitted set here either, for the reason C30b gave: it is what to
+    answer, not what is true, and it is the one surface a person outside this code controls.
+    """
+
+    groups: tuple[FreeQueryGroup, ...] = ()
+    warnings: tuple[str, ...] = ()
+    citations: tuple[PitchCitation, ...] = ()
+    query: str | None = None
+
+    def as_data(self) -> dict[str, object]:
+        """The JSON object the user message renders. The query travels in its own block."""
+        return {
+            "candidatas": [
+                {
+                    "familia": group.family_label,
+                    "piezas": [
+                        {
+                            "sku": member.sku,
+                            "tipo": member.piece_type,
+                            "materiales": list(member.materials),
+                            "talla": member.size_label,
+                            "variante": member.variant_label,
+                        }
+                        for member in group.members
+                    ],
+                }
+                for group in self.groups
+            ],
+            "avisos": list(self.warnings),
+            "corpus": [
+                {
+                    "cita": item.citation_id,
+                    "documento": item.document_title,
+                    "seccion": item.section_title,
+                    "ambito": item.claim_scope,
+                    "texto": item.content,
+                }
+                for item in self.citations
+            ],
+        }
+
+    def citation_ids(self) -> frozenset[str]:
+        return frozenset(item.citation_id for item in self.citations)
 
 
 def normalise_numeral(raw: str) -> str:
@@ -219,8 +435,8 @@ def loose_numeral(raw: str) -> str:
 
 
 def build_messages(
-    payload: PitchPayload,
-    mode: AssistMode,
+    payload: PitchContext,
+    task: PitchTask | AssistMode,
     *,
     prompt_text: str | None = None,
     repair: str | None = None,
@@ -233,7 +449,7 @@ def build_messages(
     fix. The reported prompt version therefore still names the text that produced the result.
     """
     body = [
-        task_message(mode, prompt_text),
+        task_message(task, prompt_text),
         "",
         "DATOS",
         json.dumps(payload.as_data(), ensure_ascii=False, indent=2, sort_keys=True),
@@ -280,6 +496,22 @@ def payload_from(
         variant_label=variant_label,
         family_label=family_label,
         variants=tuple(variants),
+        warnings=tuple(warnings),
+        citations=tuple(citations),
+        query=query,
+    )
+
+
+def free_query_payload_from(
+    *,
+    groups: Sequence[FreeQueryGroup] = (),
+    warnings: Sequence[str] = (),
+    citations: Sequence[PitchCitation] = (),
+    query: str | None = None,
+) -> FreeQueryPayload:
+    """Build the free-query payload from what the orchestrator already holds. No I/O."""
+    return FreeQueryPayload(
+        groups=tuple(groups),
         warnings=tuple(warnings),
         citations=tuple(citations),
         query=query,

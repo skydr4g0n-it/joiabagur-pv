@@ -12,7 +12,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # drift: `assist/constants.py` carries the value together with the measurement that set it.
 from jbg_ai.assist.constants import (
     DEFAULT_ASSIST_MODEL,
+    DEFAULT_ROUTER_MODEL,
     PITCH_TIMEOUT_SECONDS as DEFAULT_ASSIST_PITCH_TIMEOUT_SECONDS,
+    ROUTER_TIMEOUT_SECONDS as DEFAULT_ROUTER_TIMEOUT_SECONDS,
 )
 
 PRODUCTION_ENV_NAMES = frozenset({"prod", "production"})
@@ -307,6 +309,45 @@ class Settings(BaseSettings):
             "parameter of the client, so an evaluation can sweep it in one process. "
             "Exceeding it degrades to the structured response with 200, never an error. "
             "Not required to boot /health."
+        ),
+    )
+    jpv_router_llm_api_key: str | None = Field(
+        default=None,
+        description=(
+            "C31 credential for the intent classifier (JPV_ROUTER_LLM_API_KEY). **Optional, and "
+            "it falls back in a chain: router, then JPV_ASSIST_LLM_API_KEY, then "
+            "JPV_RAG_LLM_API_KEY.** C30b opened the last two links; this prepends one. With "
+            "none of the three the classifier is not constructed at all, which is a declared "
+            "deployment state and not a failure: the route behaves exactly as it did before it "
+            "routed anything, and that is also the ablation and the rollback. The resolved "
+            "choice is logged when the client is built, so which credential is in force is "
+            "something a deployment can check instead of assume. Not required to boot /health."
+        ),
+    )
+    jpv_router_llm_model: str = Field(
+        default=DEFAULT_ROUTER_MODEL,
+        min_length=1,
+        description=(
+            "C31 model that classifies the query (JPV_ROUTER_LLM_MODEL). Deliberately its OWN "
+            "variable and never JPV_ASSIST_LLM_MODEL nor JPV_RAG_LLM_MODEL: these are calls of "
+            "very different shape — around thirty output tokens against a paragraph — so "
+            "sharing a variable would make any cost comparison between them false. It must "
+            "support structured output; one that does not degrades to an unclassified intent "
+            "and records the cause."
+        ),
+    )
+    jpv_router_timeout_seconds: float = Field(
+        default=DEFAULT_ROUTER_TIMEOUT_SECONDS,
+        gt=0,
+        le=60,
+        description=(
+            "C31 seconds the single classifier call of POST /v1/assist/sale may take "
+            "(JPV_ROUTER_TIMEOUT_SECONDS). **The default is declared NOT calibrated**: it is a "
+            "product judgement taken on a developer machine through a TLS interceptor, and it "
+            "is an upper bound rather than a budget. Supplies only the DEFAULT — the effective "
+            "value travels as a parameter of the client, so an evaluation can sweep it in one "
+            "process. Exceeding it is a fail-open: the request proceeds unclassified and is "
+            "served exactly as it was before routing existed. Not required to boot /health."
         ),
     )
 
@@ -687,6 +728,28 @@ class Settings(BaseSettings):
             return DEFAULT_ASSIST_PITCH_TIMEOUT_SECONDS
         return value
 
+    @field_validator("jpv_router_llm_api_key", mode="before")
+    @classmethod
+    def blank_router_llm_key_is_unset(cls, value: object) -> object:
+        """A blank export means "unset", so it falls back rather than configuring an empty key."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("jpv_router_llm_model", mode="before")
+    @classmethod
+    def blank_router_llm_model_is_default(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return DEFAULT_ROUTER_MODEL
+        return value
+
+    @field_validator("jpv_router_timeout_seconds", mode="before")
+    @classmethod
+    def blank_router_timeout_is_default(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return DEFAULT_ROUTER_TIMEOUT_SECONDS
+        return value
+
     @field_validator("jpv_retrieval_distance_threshold", mode="before")
     @classmethod
     def blank_retrieval_threshold_is_default(cls, value: object) -> object:
@@ -823,6 +886,11 @@ def canonical_openapi_settings() -> Settings:
         jpv_assist_pitch_timeout_seconds=DEFAULT_ASSIST_PITCH_TIMEOUT_SECONDS,
         jpv_assist_llm_api_key=None,
         jpv_assist_llm_model=DEFAULT_ASSIST_MODEL,
+        # C31, pinned for the same reason as every line above: an exported
+        # JPV_ROUTER_LLM_MODEL must not reach the committed contract.
+        jpv_router_llm_api_key=None,
+        jpv_router_llm_model=DEFAULT_ROUTER_MODEL,
+        jpv_router_timeout_seconds=DEFAULT_ROUTER_TIMEOUT_SECONDS,
         jpv_query_expansion_enabled=True,
         jpv_pos_prefilter_enabled=True,
         jpv_pos_projection_max_age_seconds=3600,

@@ -704,6 +704,90 @@ en `backend/.env`, que es de donde el barrido de C30b lee sus credenciales.
 
 ---
 
+## Active Change: `add-guardrails-and-intent-router` (C31)
+
+### Desplegar el clasificador de intención en la demo
+
+**Estado: pendiente, y la configuración que se despliega está decidida por medición.**
+
+Mismo patrón que la entrada de C30b de arriba, con **tres** variables en lugar de una y con un
+requisito que manda sobre todo lo demás: **sólo se despliega la configuración que pasó el veto.**
+
+Medido sobre los 119 casos de `evals/routing/cases.yaml`, mismo prompt `router/v3`, temperatura
+cero, cobertura completa en los dos arms:
+
+| modelo | acierto `catalog` | falso positivo | silenciadas | veto |
+|---|---|---|---|---|
+| `openai/gpt-4o-mini` | 81,3 % | 6,25 % | **3** | **NO PASA** |
+| `openai/gpt-4o` | 100 % | 0,00 % | **0** | **PASA** |
+
+`DEFAULT_ROUTER_MODEL` quedó fijado en **`openai/gpt-4o`** por esa medición, y ése es el valor
+que el despliegue tiene que poner. **Un despliegue que apunte `JPV_ROUTER_LLM_MODEL` a
+`gpt-4o-mini` estaría sirviendo una configuración vetada**, que silencia tres consultas que la
+tienda sí puede contestar.
+
+Mientras la credencial no esté puesta, el clasificador no se construye, `intent` vuelve a
+`unclassified` y la ruta se comporta exactamente como la dejó C30b. Eso es a la vez el
+*fail-open*, la ablación y el rollback, y está entregado con test.
+
+### Los cuatro pasos
+
+**1 · Crear el parámetro, a mano y una vez** (como los otros siete secretos de esta demo):
+
+```
+aws ssm put-parameter --name /jbg-demo/ROUTER_LLM_API_KEY --type SecureString --value '…'
+```
+
+**Terraform no se toca**, por la misma razón que en C30b: el rol de instancia ya lee todo el
+prefijo `/jbg-demo/`, y un valor pasado a Terraform se escribe en claro en el fichero de estado.
+
+**2 · `deploy/demo/deploy.sh`**: leer el parámetro **sin `:?`**, para que un despliegue sin él
+siga funcionando — que es precisamente el estado en el que hay que dejarlo hasta que el veto
+pase.
+
+**3 · `compose.demo.yaml`**: pasar `JPV_ROUTER_LLM_API_KEY` y fijar `JPV_ROUTER_LLM_MODEL`.
+
+`JPV_ROUTER_TIMEOUT_SECONDS` se deja **fuera**, igual que C30b dejó fuera el suyo y por la misma
+razón, sólo que más fuerte: el defecto de 2 s está **declarado no calibrado** en el docstring de
+la constante, se tomó desde una máquina de desarrollo en España a través de un interceptor TLS, y
+este corte va **delante de todo**, así que su efecto es más duro que el del argumentario. Se
+añade cuando el despliegue mida su propia distribución, con la cifra delante.
+
+**4 · `deploy/demo/README.md`**: añadir el parámetro a la lista de secretos que se crean a mano,
+marcándolo como **opcional**, y anotando junto a él que `JPV_ROUTER_LLM_MODEL` **no puede
+apuntar a `gpt-4o-mini`**, que es la configuración que el veto rechazó.
+
+### Cómo comprobar que funcionó
+
+Sin abrir la consola de AWS y sin leer ninguna clave, en el log del contenedor:
+
+```
+stage=router_client model=openai/gpt-4o timeout_s=2.0 credential=router
+```
+
+**Si ese `model=` dice `gpt-4o-mini`, el despliegue está sirviendo la configuración vetada** y
+hay que corregirlo antes de mirar nada más.
+
+`credential=assist_fallback` o `rag_fallback` dirían que repliega por la cadena, y
+`stage=router_client` ausente, que no se construyó cliente y la ruta se comporta como C30b. Y en
+la respuesta, `intent` pasa de `unclassified` a un veredicto de enrutado.
+
+### Dos cosas más que este change dejó medidas y que el despliegue hereda
+
+1. **El límite de tasa del proveedor decide cuánto se puede medir de golpe.** El barrido de 119
+   casos a concurrencia 6 produjo **22 degradaciones por `RateLimitError`**, y sobre `gpt-4o`,
+   **89 de 119**. El arnés reintenta sólo eso —nunca un fallo de parseo, que es la degradación
+   que se está midiendo— y aun así hace falta concurrencia 1 y pausa. No afecta al camino de
+   servicio, que hace una llamada por petición.
+2. **La primera llamada de un proceso paga el `import litellm` dentro de su propio *timeout*.**
+   Medido: los dos primeros casos de una pasada agotaron **20 s** por eso y por nada más. En el
+   camino de servicio, con un corte de 2 s, eso significa que **la primera consulta libre tras un
+   arranque en frío degrada** — cae en el *fail-open*, que es el comportamiento correcto, pero es
+   una degradación evitable calentando el import en el arranque de la aplicación. No se hizo aquí
+   porque tocar el arranque está fuera del alcance de este change; queda anotado.
+
+---
+
 ## Implementation Guidance
 
 When implementing deferred tasks:
@@ -716,5 +800,5 @@ When implementing deferred tasks:
 
 ---
 
-**Last Updated:** 2026-09-05
+**Last Updated:** 2026-09-15
 **Maintained By:** Development Team

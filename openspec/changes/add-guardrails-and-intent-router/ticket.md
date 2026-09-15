@@ -290,24 +290,27 @@ con requisito que los declara:
 
 ## Definición de Hecho (DoD)
 
-- [ ] Enrutador cableado **sólo en M1**, con corte **antes** de `retrieve_products`
-- [ ] M2 y M3 **no** invocan al clasificador, comprobado por test y no por lectura
-- [ ] Guardarraíl determinista de M3 sobre cero citas, **sin llamada adicional**
-- [ ] `clarification_question` resuelta desde catálogo cerrado, con test de determinismo
-- [ ] Argumentario de M1 con su *payload* propio y su política de lista blanca
-- [ ] `prompts/assist/v2.md` con test fichero↔constante; **`v1.md` intacto**
-- [ ] *Fail-open* como rama con test, nunca un `except` mudo
-- [ ] Techo de **3** llamadas al proveedor comprobado por introspección
-- [ ] `ai-service`: `uv run pytest` en verde **sin llamadas reales** a LLM, embeddings ni RDS
-- [ ] Línea base de la suite comparada **por nombres de test** y no por recuento
-- [ ] `openapi.json` regenerado y verificado **hoja a hoja**: ningún campo añadido, retirado ni con el tipo cambiado
-- [ ] Matriz de confusión publicada con las **dos cifras separadas** y el falso positivo sobre `catalog` como cifra propia
-- [ ] **Cero** consultas `descripcion-sin-anclaje` silenciadas — criterio de veto
-- [ ] Deltas de `assist-generation` con `openspec validate --all --strict` en **0 failed**
-- [ ] Entrada en `DEFERRED_TASKS.md` con los cuatro pasos de despliegue
-- [ ] Documentación actualizada: épicas, plan de changes, `ai-service/README.md`, `openspec/config.yaml`
-- [ ] Sin migración de EF Core — este change **no toca datos**
-- [ ] Sin TODO/FIXME sin tarea de seguimiento
+- [x] Enrutador cableado **sólo en M1**, con corte **antes** de `retrieve_products`
+- [x] M2 y M3 **no** invocan al clasificador, comprobado por test y no por lectura
+- [x] Guardarraíl determinista de M3 sobre cero citas, **sin llamada adicional**
+- [x] `clarification_question` resuelta desde catálogo cerrado, con test de determinismo
+- [x] Argumentario de M1 con su *payload* propio y su política de lista blanca
+- [x] `prompts/assist/v2.md` con test fichero↔constante; **`v1.md` intacto** — *y `v3.md`,
+      porque la medición de M1 refutó una sección de tarea de v2; las tres se conservan*
+- [x] *Fail-open* como rama con test, nunca un `except` mudo
+- [x] Techo de **3** llamadas al proveedor comprobado por introspección
+- [x] `ai-service`: `uv run pytest` en verde **sin llamadas reales** a LLM, embeddings ni RDS
+- [x] Línea base de la suite comparada **por nombres de test** y no por recuento
+- [x] `openapi.json` regenerado y verificado **hoja a hoja**: ningún campo añadido, retirado ni con el tipo cambiado
+- [x] Matriz de confusión publicada con las **dos cifras separadas** y el falso positivo sobre `catalog` como cifra propia
+- [x] **Cero** consultas `descripcion-sin-anclaje` silenciadas — criterio de veto · *lo cumple
+      `gpt-4o` con `router/v3` (48/48 en `catalog`, falso positivo 0,00 %); **`gpt-4o-mini` NO lo
+      cumple** y por eso `DEFAULT_ROUTER_MODEL` se movió*
+- [x] Deltas de `assist-generation` con `openspec validate --all --strict` en **0 failed**
+- [x] Entrada en `DEFERRED_TASKS.md` con los cuatro pasos de despliegue
+- [x] Documentación actualizada: épicas, plan de changes, `ai-service/README.md`, `openspec/config.yaml`
+- [x] Sin migración de EF Core — este change **no toca datos**
+- [x] Sin TODO/FIXME sin tarea de seguimiento
 
 ---
 
@@ -381,4 +384,5 @@ Cinco, todas con **opción por defecto declarada** que se aplicará si no hay re
 
 | Fecha | Cambio |
 |---|---|
+| 2026-09-15 | **Implementado.** La medición **enmienda la opción por defecto nº 4 de este ticket**: «mismo `gpt-4o-mini` de partida» no sobrevive al veto. Sobre los 119 casos, mismo prompt y temperatura 0, `gpt-4o-mini` silencia **3** consultas contestables —falso positivo 6,25 %— y **falla el veto de D12**, mientras `gpt-4o` silencia **0**, acierta **48/48** en `catalog` y pasa. Tres revisiones de prompt llevaron la cifra de quince silenciadas a tres y **no lograron cerrarla**; el modelo la cerró sin tocar una palabra del prompt. Es **D9 vindicado**: la variable separada es lo único que permitió mover el modelo del clasificador sin invalidar las 120 generaciones de C30b. Y **el riesgo mayor de este ticket no se materializó**: la lista blanca numérica de M1 resultó de **~13 numerales y no de cinco** —la recuperación devuelve 15 candidatos, no 5— y la puerta numérica rechazó **cero**; lo que tumbaba el argumentario de M1 era `dangling_citation`, porque la sección de tarea de `catalog` no decía que no hubiera citas. Cifras completas en [c31-implementation-measurements.md](../../../Documentos/Proyecto%20Final%20AIEng/informes/c31-implementation-measurements.md) |
 | 2026-09-14 | Creación del ticket a partir de HU-AIENG-031 y de la exploración de C31. Recoge el hallazgo que reencuadra el change —**«fuera de dominio» son dos conjuntos y la ficha del plan los mezcla**: las 20 consultas de la categoría son oficios vecinos y no preguntas ajenas a la joyería, así que un clasificador de intención puro no movería el 18 de 20 con el que la ficha se justifica—, y las tres decisiones que salen de medir: **el enrutador cuesta una llamada y sólo en M1**, porque una petición reparada ya está en ~4.400 ms de los 5.000 de `AssistTimeoutMs`; **el guardarraíl de M3 es gratis**, porque el umbral `0,51` de C23 ya separa con un hueco de 8 milésimas; y **el conjunto de evaluación ya existía repartido**, con las cuatro consultas `ambigua` declaradas sin juicios desde el 2026-09-11 porque *«la respuesta correcta es una repregunta»* |
