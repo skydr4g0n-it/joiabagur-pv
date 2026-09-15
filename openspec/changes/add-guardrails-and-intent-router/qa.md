@@ -36,7 +36,8 @@ La línea base se midió **antes de tocar una línea de código**, sobre el árb
 | **Línea base** `ai-service` (`e3f0403`, árbol limpio) | **1320 passed**, 0 failed, 0 skipped, 127,2 s |
 | `ai-service` tras cablear enrutador y guardarraíles | **1315 passed, 5 failed** — los cinco, consecuencia esperada del change (§1.2) |
 | `ai-service` tras reconciliar los cinco | **1390 passed**, 0 failed, 218,5 s |
-| **`ai-service` al cierre** | **1415 passed**, 0 failed, 291,3 s |
+| `ai-service` al cierre de la implementación | **1415 passed**, 0 failed, 291,3 s |
+| **`ai-service` tras la pasada de verificación** (§13) | **1418 passed**, 0 failed, 116,4 s |
 | `openspec validate --all --strict` antes y después | **58 passed, 0 failed** en las dos puntas |
 | `openspec validate add-guardrails-and-intent-router --strict` | `Change 'add-guardrails-and-intent-router' is valid` |
 | `dotnet test` · `npm run test` al cierre | **no ejecutados**: fuera del diff. Ver §7 |
@@ -493,7 +494,53 @@ puede hacer porque sólo sabe decir «ninguna cita».
 
 ---
 
-## 12. Lo que esta pasada **no** verifica, dicho aquí
+## 12. La pasada de verificación, y los tres defectos que encontró
+
+Ejecutada **después** de commitear la implementación (`a74f7ad`), releyendo las deltas requisito a
+requisito contra el código en vez de contra la memoria. Encontró tres cosas, y las tres son mías.
+
+### 12.1. Dos dobles de test que no podían fallar — **CRÍTICO**
+
+`test_guardrails.py` afirmaba «no se ejecuta ninguna recuperación» con dobles que sobreescribían
+métodos que **la producción nunca llama**:
+
+| doble | sobreescribía | lo que de verdad se invoca | efecto |
+|---|---|---|---|
+| `_refusing_knowledge` | `search` | `vector_search`, `lexical_search`, `fetch_chunks` | **totalmente vacío** — y el índice iba vacío, así que el test pasaba por la razón equivocada |
+| `_refusing_search` | `search` ✅ y `lexical_search` ❌ | `search` y **`search_lexical`** | la mitad del guardián era un *no-op* |
+
+**Un doble que no puede fallar es peor que no tener doble**: hace que cada test que lo usa pase
+por el motivo equivocado, y nada lo reporta. Corregidos los dos por el nombre real, y añadido
+**`test_the_refusing_doubles_actually_refuse`**, que conduce cada doble por la llamada exacta que
+hace la producción y **exige que levante**. Si alguien renombra un método del puerto, falla ahí en
+vez de desarmar en silencio cuatro tests de guardarraíl.
+
+**Los 30 tests de `test_guardrails.py` siguen verdes con los dobles ya armados**, así que la
+propiedad —el corte ocurre *antes* de las dos recuperaciones— queda **probada** y no supuesta.
+
+### 12.2. Dos escenarios de la delta sin cobertura literal — **WARNING**
+
+| Escenario | Qué faltaba | Test añadido |
+|---|---|---|
+| «A label outside the vocabulary never reaches the response» | la mitad «degrada a `unclassified`» estaba; la mitad **«la etiqueta desconocida no aparece en la respuesta»** no | `test_an_unknown_label_never_appears_anywhere_in_the_response` — comprueba sobre el **volcado entero**, no sobre `intent` |
+| «The reported value MUST belong to a closed vocabulary» | nadie recorría los siete caminos | `test_the_reported_intent_always_belongs_to_the_closed_vocabulary` — tres veredictos, repregunta, *fail-open* y los dos modos anclados, y además comprueba que **los cinco valores son alcanzables**: ninguno es decorativo |
+
+### 12.3. `proposal.md` decía `assist/v2` — **SUGGESTION, enmendado**
+
+Era el único artefacto que aún nombraba v2 como la versión servida. Enmendado con la misma nota
+que `design.md` y `ticket.md` ya llevaban.
+
+### Lo que la verificación comprobó y estaba bien
+
+- Los **17 requisitos `ADDED`** no chocan con ninguno de la spec viva; el `MODIFIED` y el
+  `REMOVED` **existen** en ella, así que el archivado posterior encajará.
+- Las **doce decisiones D1-D12** se siguen en el código, incluida D9 —cliente cacheado en
+  `app.state`, así que el log de credencial sale **una vez por proceso** y no por petición—.
+- `alembic heads` sin mover, congelados sin tocar, `openapi.json` sólo en descripciones.
+
+---
+
+## 13. Lo que esta pasada **no** verifica, dicho aquí
 
 - **Fidelidad semántica (`faithfulness` / RAGAS).** Fuera de alcance por ficha: es **C38**. Las
   tres comprobaciones confirman que la fuente existía, que la cita se usó para algo escrito y que

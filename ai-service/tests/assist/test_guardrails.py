@@ -69,13 +69,18 @@ def _refusing_search() -> FakeProductSearch:
 
     The *point* of the guardrail is that it cuts **before** `retrieve_products`, so asserting it
     with a search that raises is asserting the property itself rather than a count read later.
+
+    **Every method the retrieval orchestrator actually calls is covered, by name.** The first
+    version of this double overrode `lexical_search`, which does not exist — the port calls
+    `search_lexical` — so half the guard was a no-op nothing would have reported. A double that
+    fails to fail is worse than no double at all.
     """
 
     class RefusingSearch(FakeProductSearch):
         async def search(self, *args, **kwargs):  # type: ignore[override]
             raise AssertionError("no product retrieval may run on this path")
 
-        async def lexical_search(self, *args, **kwargs):  # type: ignore[override]
+        async def search_lexical(self, *args, **kwargs):  # type: ignore[override]
             raise AssertionError("no product retrieval may run on this path")
 
     return RefusingSearch([indexed_row()])
@@ -100,11 +105,53 @@ def _flat_family(count: int) -> FakeProductSearch:
 
 
 def _refusing_knowledge() -> InMemoryKnowledgeIndex:
+    """A corpus index that fails the test if it is searched.
+
+    **`search_knowledge` never calls a method named `search`.** It calls `vector_search`,
+    `lexical_search` and `fetch_chunks`, and the first version of this double overrode only
+    `search` — so the assertion «no knowledge search is executed» was **vacuous**: the double
+    could not fire, and the index was empty anyway, so the test passed for the wrong reason.
+    Found by the verification pass, which is exactly what it is for.
+    """
+
     class RefusingKnowledge(InMemoryKnowledgeIndex):
-        async def search(self, *args, **kwargs):  # type: ignore[override]
+        async def vector_search(self, *args, **kwargs):  # type: ignore[override]
+            raise AssertionError("no knowledge search may run on this path")
+
+        async def lexical_search(self, *args, **kwargs):  # type: ignore[override]
+            raise AssertionError("no knowledge search may run on this path")
+
+        async def fetch_chunks(self, *args, **kwargs):  # type: ignore[override]
             raise AssertionError("no knowledge search may run on this path")
 
     return RefusingKnowledge(chunks=())
+
+
+def test_the_refusing_doubles_actually_refuse() -> None:
+    """**The guard on the guards.** A double that cannot fire makes every test that uses it pass
+    for the wrong reason, which is how the first version of `_refusing_knowledge` went unnoticed:
+    it overrode a method `search_knowledge` never calls.
+
+    This drives each double through the very call the production code makes and requires it to
+    raise. If a port method is ever renamed, this fails here instead of silently disarming four
+    guardrail tests somewhere else.
+    """
+    from uuid import uuid4
+
+    search = _refusing_search()
+    knowledge = _refusing_knowledge()
+
+    for call in (
+        lambda: search.search(
+            embedding=[0.0] * 8, pos_id=uuid4(), top_k=5, distance_threshold=0.65
+        ),
+        lambda: search.search_lexical(groups=[], pos_id=uuid4(), top_k=5),
+        lambda: knowledge.vector_search(embedding=[0.0] * 8, top_k=5),
+        lambda: knowledge.lexical_search(groups=[], top_k=5),
+        lambda: knowledge.fetch_chunks([]),
+    ):
+        with pytest.raises(AssertionError, match="may run on this path"):
+            run(call())
 
 
 # --- HU escenarios 1 and 2 · the two refusals, before any retrieval -------------------------
@@ -750,3 +797,84 @@ def test_the_usage_of_a_routed_request_accumulates_the_classifier_too(
     # The routed request paid the classifier on top of the generation; the anchored one did not.
     assert routed.usage.total_tokens > anchored.usage.total_tokens
     assert routed.usage.prompt_tokens >= 1500 + 700
+
+
+# --- los dos escenarios que la pasada de verificación encontró sin cobertura literal --------
+
+
+def test_an_unknown_label_never_appears_anywhere_in_the_response(
+    search, knowledge: InMemoryKnowledgeIndex, principal
+) -> None:
+    """Spec: «A label outside the vocabulary never reaches the response».
+
+    La mitad «degrada a `unclassified`» ya estaba cubierta; **la mitad «la etiqueta desconocida
+    no aparece en la respuesta» no lo estaba**, y es la que importa: un valor que no parsea pero
+    se filtra a un campo cualquiera sería exactamente el fallo que el `Literal` existe para
+    impedir. Se comprueba sobre el **volcado entero** de la respuesta, no sobre `intent`.
+    """
+    router, _ = scripted_router(
+        '{"served": "inventada", "index": "inventado", "missing_axis": "inventado"}'
+    )
+
+    response = serve(
+        search,
+        knowledge,
+        principal,
+        payload={"query": "un anillo de plata"},
+        router=router,
+        knowledge_distance_threshold=0.99,
+    )
+
+    assert response.intent == INTENT_UNCLASSIFIED
+    assert "inventad" not in response.model_dump_json()
+
+
+def test_the_reported_intent_always_belongs_to_the_closed_vocabulary(
+    search, knowledge: InMemoryKnowledgeIndex, principal
+) -> None:
+    """Spec: «The reported value MUST belong to a closed vocabulary declared by this capability».
+
+    Recorrido sobre **los tres veredictos, la repregunta, el fail-open y los dos modos
+    anclados**: siete caminos, y ninguno puede emitir un valor de fuera del vocabulario.
+    """
+    from jbg_ai.assist.constants import ASSIST_INTENTS
+
+    casos = [
+        (decision(index="catalog"), {"query": "un anillo de plata"}),
+        (decision(index="knowledge"), {"query": "¿cómo se limpia la plata?"}),
+        (decision(index="both"), {"query": "un anillo de plata que no se ponga negro"}),
+        (decision(index="catalog", missing_axis="piece_type"), {"query": "algo bonito"}),
+        (decision(served="out_of_domain", index=None), {"query": "la capital de Australia"}),
+        (decision(served="not_in_catalogue", index=None), {"query": "un salero de plata"}),
+        ("no soy json", {"query": "un anillo de plata"}),
+    ]
+    vistos = set()
+    for guion, payload in casos:
+        router, _ = scripted_router(guion)
+        response = serve(
+            search,
+            knowledge,
+            principal,
+            payload=payload,
+            router=router,
+            knowledge_distance_threshold=0.99,
+        )
+        assert response.intent in ASSIST_INTENTS, (payload, response.intent)
+        vistos.add(response.intent)
+
+    for payload in ({"product_id": str(PIECE)}, {"product_id": str(PIECE), "query": "¿se moja?"}):
+        router, router_provider = refusing_router()
+        response = serve(
+            search,
+            knowledge,
+            principal,
+            payload=payload,
+            router=router,
+            knowledge_distance_threshold=0.99,
+        )
+        assert router_provider.calls == 0
+        assert response.intent in ASSIST_INTENTS
+        vistos.add(response.intent)
+
+    # Los cinco valores del vocabulario son alcanzables: ninguno es decorativo.
+    assert vistos == set(ASSIST_INTENTS)
