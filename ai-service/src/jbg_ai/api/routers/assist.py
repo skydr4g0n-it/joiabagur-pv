@@ -27,6 +27,7 @@ from jbg_ai.api.deps import (
 from jbg_ai.api.schemas.assist import AssistRequest, AssistResponse
 from jbg_ai.assist.errors import NoAnchorError, UnusableAnchorProductError
 from jbg_ai.assist.llm import AssistLlm, LiteLlmAssistClient
+from jbg_ai.assist.router_llm import LiteLlmRouterClient, RouterLlm
 from jbg_ai.assist.orchestrator import assist_sale as run_assist_sale
 from jbg_ai.config import Settings
 from jbg_ai.db.engine import DatabaseNotConfiguredError
@@ -149,6 +150,59 @@ def _resolve_pitch_client(request: Request, settings: Settings) -> AssistLlm | N
     return client
 
 
+def _resolve_router_client(request: Request, settings: Settings) -> RouterLlm | None:
+    """The classifier, or **None**, which is a deployment state and not a failure. C31.
+
+    With no credential at all the classifier is not constructed and the free-query mode serves
+    exactly what C30b served: an unclassified intent, both indexes consulted, the abstention
+    rule as the net, and no argument. That is the fail-open, the ablation and the rollback in
+    one — removing the credential is how a deployment goes back.
+
+    **Its own credential, with a chain that is logged rather than silent.** C30b opened
+    `JPV_ASSIST_LLM_API_KEY` falling back to `JPV_RAG_LLM_API_KEY`; this prepends
+    `JPV_ROUTER_LLM_API_KEY` to the same chain, so a deployment that sets none of them keeps
+    working and one that sets the new one bills the classifier apart. The line below says which
+    of the three is in force — the whole point of having three — and carries no secret.
+
+    **Its own model too**, and never `JPV_ASSIST_LLM_MODEL`: around thirty output tokens against
+    a paragraph is not the same call, and sharing the variable would make any cost comparison
+    between them false.
+    """
+    injected = getattr(request.app.state, "assist_router_client", None)
+    if injected is not None:
+        return injected  # type: ignore[no-any-return]
+
+    if settings.jpv_router_llm_api_key:
+        api_key, credential = settings.jpv_router_llm_api_key, "router"
+    elif settings.jpv_assist_llm_api_key:
+        api_key, credential = settings.jpv_assist_llm_api_key, "assist_fallback"
+    elif settings.jpv_rag_llm_api_key:
+        api_key, credential = settings.jpv_rag_llm_api_key, "rag_fallback"
+    else:
+        return None
+
+    client = LiteLlmRouterClient(
+        api_key=api_key,
+        # The base URL stays C09's, for the reason the generation client gives: it names the
+        # PROVIDER endpoint and not the account.
+        base_url=settings.jpv_rag_llm_base_url,
+        model=settings.jpv_router_llm_model,
+        timeout=settings.jpv_router_timeout_seconds,
+    )
+    # Once per process, never per request, and it carries no secret and no query — only WHICH
+    # credential was resolved. `stage=router_client` absent in the container log says no client
+    # was built and the route behaves as C30b's, which is the verification the deployment needs
+    # without opening a console or reading a key.
+    logger.info(
+        "stage=router_client model=%s timeout_s=%s credential=%s",
+        client.model_id,
+        settings.jpv_router_timeout_seconds,
+        credential,
+    )
+    request.app.state.assist_router_client = client
+    return client
+
+
 @router.post(
     "/sale",
     response_model=AssistResponse,
@@ -174,6 +228,7 @@ async def assist_sale(
             search=_resolve_search(request, settings),
             knowledge=_resolve_knowledge(request, settings),
             pitch_client=_resolve_pitch_client(request, settings),
+            router_client=_resolve_router_client(request, settings),
         )
     except UnusableAnchorProductError as exc:
         # 422 and not 404, like the substitutes route: the body named something this service

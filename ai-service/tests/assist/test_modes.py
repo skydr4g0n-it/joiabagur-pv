@@ -6,6 +6,9 @@ import pytest
 
 from jbg_ai.assist.constants import (
     ASSIST_INTENTS,
+    INTENT_IN_DOMAIN,
+    INTENT_NOT_IN_CATALOGUE,
+    INTENT_OUT_OF_DOMAIN,
     INTENT_PRODUCT_PITCH,
     INTENT_UNCLASSIFIED,
 )
@@ -76,10 +79,27 @@ def test_two_queries_worded_differently_with_the_same_anchors_report_one_intent(
     assert anchored == {INTENT_UNCLASSIFIED}
 
 
-def test_the_intent_vocabulary_has_exactly_two_members() -> None:
-    """C31 will replace `unclassified`; it will never have to replace `product_pitch`."""
-    assert ASSIST_INTENTS == (INTENT_PRODUCT_PITCH, INTENT_UNCLASSIFIED)
-    assert {mode.intent for mode in AssistMode} == set(ASSIST_INTENTS)
+def test_the_intent_vocabulary_gained_the_routing_verdicts_and_kept_the_piece_anchored_one() -> None:
+    """C31 replaced `unclassified` in the free-query mode and never touched `product_pitch`,
+    which is exactly what `modes.py` promised before the router existed.
+
+    **This module still derives only the two structural values.** The three verdicts are
+    reachable only through the classifier, which runs in the free-query mode alone, so the
+    intents a *mode* can produce stay a strict subset of the vocabulary a *response* can carry.
+    """
+    assert ASSIST_INTENTS == (
+        INTENT_PRODUCT_PITCH,
+        INTENT_IN_DOMAIN,
+        INTENT_OUT_OF_DOMAIN,
+        INTENT_NOT_IN_CATALOGUE,
+        INTENT_UNCLASSIFIED,
+    )
+    assert INTENT_PRODUCT_PITCH in ASSIST_INTENTS
+    assert {mode.intent for mode in AssistMode} == {
+        INTENT_PRODUCT_PITCH,
+        INTENT_UNCLASSIFIED,
+    }
+    assert {mode.intent for mode in AssistMode} < set(ASSIST_INTENTS)
 
 
 def test_only_the_query_only_mode_is_not_anchored() -> None:

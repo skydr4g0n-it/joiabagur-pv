@@ -19,8 +19,13 @@ from jbg_ai.api.schemas.assist import (
 )
 from jbg_ai.api.schemas.common import Usage
 from jbg_ai.assist.constants import (
+    ASSIST_INTENTS,
+    ASSIST_REFUSAL_CODES,
     ASSIST_WARNING_CODES,
     WARNING_FAMILY_HAS_VARIANTS,
+    WARNING_KNOWLEDGE_NOT_COVERED,
+    WARNING_QUERY_NOT_IN_CATALOGUE,
+    WARNING_QUERY_OUT_OF_DOMAIN,
     WARNING_SIZE_LABEL_MISSING,
 )
 
@@ -178,9 +183,31 @@ def test_assist_response_does_not_reuse_low_confidence_for_abstention() -> None:
 # --- 3.6 · the warning vocabulary is closed ----------------------------------------------
 
 
-def test_warning_vocabulary_holds_exactly_two_codes() -> None:
-    assert ASSIST_WARNING_CODES == (WARNING_FAMILY_HAS_VARIANTS, WARNING_SIZE_LABEL_MISSING)
-    assert len(ASSIST_WARNING_CODES) == 2
+def test_warning_vocabulary_holds_the_two_rule_codes_and_the_three_of_the_router() -> None:
+    """C30a's two are first and unchanged; C31 stacked three on top and moved neither.
+
+    The two refusal codes are **distinct from each other**, which is D1 stated as an assertion:
+    what an operator says to a customer differs between a trade the shop does not practise and
+    a piece the shop does not carry, and one shared `refused` code would erase the distinction
+    exactly where a consumer reads it.
+    """
+    assert ASSIST_WARNING_CODES[:2] == (
+        WARNING_FAMILY_HAS_VARIANTS,
+        WARNING_SIZE_LABEL_MISSING,
+    )
+    assert ASSIST_WARNING_CODES == (
+        WARNING_FAMILY_HAS_VARIANTS,
+        WARNING_SIZE_LABEL_MISSING,
+        WARNING_QUERY_OUT_OF_DOMAIN,
+        WARNING_QUERY_NOT_IN_CATALOGUE,
+        WARNING_KNOWLEDGE_NOT_COVERED,
+    )
+    assert WARNING_QUERY_OUT_OF_DOMAIN != WARNING_QUERY_NOT_IN_CATALOGUE
+    assert ASSIST_REFUSAL_CODES == (
+        WARNING_QUERY_OUT_OF_DOMAIN,
+        WARNING_QUERY_NOT_IN_CATALOGUE,
+    )
+    assert set(ASSIST_REFUSAL_CODES) <= set(ASSIST_WARNING_CODES)
 
 
 def test_no_warning_code_is_a_sentence_in_natural_language() -> None:
@@ -200,3 +227,50 @@ def test_the_warnings_field_documents_the_closed_vocabulary() -> None:
 
     for code in ASSIST_WARNING_CODES:
         assert code in description
+
+
+# --- C31 · the contract moved in DESCRIPTIONS and in nothing else ---------------------------
+
+
+def test_the_router_added_no_field_and_changed_no_type() -> None:
+    """D4 and the sixth non-negotiable, pinned so a later change cannot move the shape quietly.
+
+    The verification that produced `openapi.json` flattened both documents to leaves and
+    compared them: **one leaf added — a `description` key on a field that had none — zero
+    removed, zero types changed, `required` identical.** This is the half of it a suite can keep
+    checking: `intent` is still a plain string, `clarification_question` still an optional one,
+    and `warnings` still a list of strings, which is why the refusal code and the question
+    needed no new field at all.
+    """
+    schema = AssistResponse.model_json_schema()
+    properties = schema["properties"]
+
+    assert properties["intent"]["type"] == "string"
+    assert set(properties["warnings"]["items"]) == {"type"}
+    assert properties["warnings"]["items"]["type"] == "string"
+    assert properties["warnings"]["type"] == "array"
+    # Optional prose, exactly as C30a declared it.
+    assert {entry.get("type") for entry in properties["clarification_question"]["anyOf"]} == {
+        "string",
+        "null",
+    }
+    assert "clarification_question" not in schema["required"]
+    assert "refusal_reason" not in properties
+    assert "route" not in properties
+    assert "missing_axis" not in properties
+
+
+def test_the_intent_field_documents_its_closed_vocabulary() -> None:
+    description = AssistResponse.model_fields["intent"].description or ""
+
+    for value in ASSIST_INTENTS:
+        assert value in description, value
+
+
+def test_the_clarification_question_declares_that_no_model_writes_it() -> None:
+    """The field is typed as prose, so the presentation layer cannot resolve it — which is why
+    the contract has to say that the prose is nonetheless deterministic and code-chosen."""
+    description = AssistResponse.model_fields["clarification_question"].description or ""
+
+    assert "never written by the model" in description
+    assert "same text" in description

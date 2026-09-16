@@ -22,6 +22,26 @@ class PitchProviderError(AssistError, RuntimeError):
         super().__init__(message)
 
 
+class RouterProviderError(AssistError, RuntimeError):
+    """The classifier failed, timed out, or returned something that is not a valid label. C31.
+
+    **It never reaches the router either, and for a stronger reason than its sibling above.**
+    A classifier fault is a *fail-open*: the request proceeds unclassified and is served exactly
+    as it was before this capability routed anything, with the cause recorded. Failing closed
+    would turn a provider blip into a universal polite refusal — a total outage of the useful
+    path dressed up as a safety measure.
+
+    The class exists so that the fail-open is **a branch with one thing to catch and one
+    `cause` to log**, rather than a bare `except Exception` whose reason nobody can read
+    afterwards. A label outside the closed vocabulary raises it with `cause="parse"`: an
+    unknown value is treated as an unparseable reply and never propagated.
+    """
+
+    def __init__(self, message: str, *, cause: str) -> None:
+        self.cause = cause
+        super().__init__(message)
+
+
 class NoAnchorError(AssistError, ValueError):
     """The request carried neither a piece nor a question.
 

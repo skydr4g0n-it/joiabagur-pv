@@ -14,12 +14,15 @@ from jbg_ai.assist.prompt import (
     NUMERAL,
     QUERY_CLOSE,
     QUERY_OPEN,
+    TASK_SECTIONS,
     PitchCitation,
+    PitchTask,
     build_messages,
     load_prompt,
     normalise_numeral,
     payload_from,
     prompt_sections,
+    resolve_task,
     system_message,
     task_message,
 )
@@ -66,35 +69,144 @@ def test_prompt_version_matches_the_loaded_prompt_file() -> None:
     public = AI_SERVICE_ROOT / "prompts" / f"{PROMPT_VERSION}.md"
     prompt = load_prompt()
 
-    assert PROMPT_VERSION == "assist/v1"
+    assert PROMPT_VERSION == "assist/v3"
     assert public.is_file()
     assert prompt == public.read_text(encoding="utf-8")
     assert prompt.splitlines()[0].strip() == f"# {PROMPT_VERSION}"
 
 
-def test_the_prompt_file_carries_one_system_block_and_one_task_per_anchored_mode() -> None:
+def test_the_previous_prompt_version_is_present_and_was_not_edited() -> None:
+    """HU escenario 16, second half. D10, as a file on disk rather than as an intention.
+
+    C30b measured 120 generations against `assist/v1`, and those figures are only interpretable
+    while the text they were measured against is unchanged. Adding the free-query task sections
+    to that file would have moved what «v1» means for a measurement already published, silently
+    and with nothing to notice it — so the new sections went into a new file, and this pins that
+    v1 keeps the exact three sections C30b served with the free-query ones absent from it.
+    """
+    previous = AI_SERVICE_ROOT / "prompts" / "assist" / "v1.md"
+
+    assert previous.is_file()
+    text = previous.read_text(encoding="utf-8")
+    assert text.splitlines()[0].strip() == "# assist/v1"
+
+    sections = prompt_sections(text)
+    assert set(sections) == {
+        "Sistema",
+        "Tarea · pieza sin pregunta",
+        "Tarea · pieza con pregunta",
+    }
+    # The sections C31 introduced live in v2 onwards and in no earlier version.
+    assert not any(name.startswith("Tarea · consulta libre") for name in sections)
+    assert "Tarea · pieza con pregunta sin cobertura" not in sections
+
+
+def test_every_assist_prompt_version_is_preserved_with_its_measurement() -> None:
+    """Three versions, none deleted, each with a figure of its own in the C31 report.
+
+    v2 is kept for the same reason v1 is, even though it never shipped: it is the version that
+    **measured a 75 % rejection rate in the free-query mode, all of it `dangling_citation` and
+    none of it figures**, and v3 is the one-paragraph fix that measurement produced. A version
+    that fails and is then deleted is a measurement nobody can repeat.
+    """
+    directory = AI_SERVICE_ROOT / "prompts" / "assist"
+    versions = sorted(path.name for path in directory.glob("*.md"))
+
+    assert versions == ["v1.md", "v2.md", "v3.md"]
+    assert PROMPT_VERSION == "assist/v3", "the version the service actually runs"
+    for name in versions:
+        text = (directory / name).read_text(encoding="utf-8")
+        assert text.splitlines()[0].strip() == f"# assist/{name[:-3]}"
+
+    # The fix v3 exists for, stated in the task section that measured the failure.
+    catalog_task = task_message(PitchTask.FREE_QUERY_CATALOG).casefold()
+    assert "vacía" in catalog_task and "no declares ningún identificador" in catalog_task
+
+
+def test_the_new_version_keeps_the_invariant_rules_of_the_previous_one() -> None:
+    """The ticket's promise, checked rather than asserted: what v2 adds are TASK sections.
+
+    The rules — no figure outside the data, price and stock as placeholders, only the citation
+    identifiers handed over, the span copied literally, the query block as data, continuous
+    prose, nothing added that the data does not declare — are the same bullets, byte for byte.
+    Only the framing sentence differs, because v2 also writes over several candidates and not
+    only over one named piece.
+    """
+    previous = (AI_SERVICE_ROOT / "prompts" / "assist" / "v1.md").read_text(encoding="utf-8")
+    old_rules = system_message(previous)
+    new_rules = system_message()
+
+    bullets = [line for line in old_rules.splitlines() if line.startswith("- ")]
+    assert len(bullets) == 8
+    for bullet in bullets:
+        assert bullet in new_rules, bullet
+    assert old_rules.splitlines()[-1] == new_rules.splitlines()[-1]
+
+
+def test_the_prompt_file_carries_one_system_block_and_one_task_per_task_value() -> None:
+    """Six tasks now, and the system block is still exactly one.
+
+    One system block per version is what makes "the rules a model must not break do not depend
+    on what it is being asked to write" a property this test reads instead of a promise, and it
+    is the same property the injection test below leans on.
+    """
     sections = prompt_sections()
 
     assert "Sistema" in sections
-    assert {mode: task_message(mode) for mode in (
-        AssistMode.PIECE_ONLY, AssistMode.PIECE_AND_QUERY
-    )}
-    assert task_message(AssistMode.PIECE_ONLY) != task_message(AssistMode.PIECE_AND_QUERY)
+    bodies = {task: task_message(task) for task in PitchTask}
+    assert len(set(bodies.values())) == len(PitchTask)
+    for task, heading in TASK_SECTIONS.items():
+        assert heading in sections, task
 
 
-def test_the_free_query_mode_has_no_task_block_at_all() -> None:
-    """Not an oversight: the mode that does not generate has nothing to be told to write."""
+def test_a_free_query_mode_cannot_pick_a_task_without_a_decided_route() -> None:
+    """Not an oversight: the free query has one task per route, so a mode alone cannot choose.
+
+    Before C31 this raised because the mode did not generate at all. It still raises, and now
+    for the opposite reason — there are three candidate sections and nothing in the mode says
+    which — which is exactly what makes the fail-open a branch: no route, no task, no call.
+    """
     with pytest.raises(ValueError):
         task_message(AssistMode.QUERY_ONLY)
+    with pytest.raises(ValueError):
+        resolve_task(AssistMode.QUERY_ONLY, route=None)
+    with pytest.raises(ValueError):
+        resolve_task(AssistMode.QUERY_ONLY, route="something-else")
+
+
+def test_each_route_and_the_uncovered_case_resolve_to_their_own_task() -> None:
+    assert resolve_task(AssistMode.PIECE_ONLY) is PitchTask.PIECE_ONLY
+    assert resolve_task(AssistMode.PIECE_AND_QUERY) is PitchTask.PIECE_AND_QUERY
+    assert (
+        resolve_task(AssistMode.PIECE_AND_QUERY, uncovered=True)
+        is PitchTask.PIECE_AND_QUERY_UNCOVERED
+    )
+    assert (
+        resolve_task(AssistMode.QUERY_ONLY, route="catalog")
+        is PitchTask.FREE_QUERY_CATALOG
+    )
+    assert (
+        resolve_task(AssistMode.QUERY_ONLY, route="knowledge")
+        is PitchTask.FREE_QUERY_KNOWLEDGE
+    )
+    assert resolve_task(AssistMode.QUERY_ONLY, route="both") is PitchTask.FREE_QUERY_BOTH
+    # `uncovered` is meaningless for a piece with no question and is ignored rather than
+    # raising: the orchestrator computes it before it knows which mode it serves.
+    assert resolve_task(AssistMode.PIECE_ONLY, uncovered=True) is PitchTask.PIECE_ONLY
 
 
 def test_the_instructions_carry_no_figure_of_their_own() -> None:
     """The gate reads the payload object, so a digit in the instructions would never be
     whitelisted — and would therefore be a figure the model is invited to write and the gate
-    is obliged to refuse. The source is removed rather than the rule bent."""
+    is obliged to refuse. The source is removed rather than the rule bent.
+
+    **Checked over all six tasks**, not only the two anchored ones: the free-query sections are
+    where a stray digit would be cheapest to write and most expensive to find, because that mode
+    is the one whose whitelist every candidate widens.
+    """
     assert NUMERAL.findall(system_message()) == []
-    assert NUMERAL.findall(task_message(AssistMode.PIECE_ONLY)) == []
-    assert NUMERAL.findall(task_message(AssistMode.PIECE_AND_QUERY)) == []
+    for task in PitchTask:
+        assert NUMERAL.findall(task_message(task)) == [], task
 
 
 def test_the_system_message_forbids_lists_and_pins_the_placeholders() -> None:

@@ -20,7 +20,59 @@ RAGAS in C38; no model judge runs in the serving path.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+
+class RouteDecision(BaseModel):
+    """What the classifier returns for one free-text query. C31. **Internal, never on the wire.**
+
+    Three axes and no prose. `served` is the verdict, `index` is which of the two indexes gets
+    consulted, and `missing_axis` says the query does not carry enough to search with.
+
+    **The closed vocabularies are `Literal`s, and that is the enforcement.** A label outside the
+    set fails Pydantic's parse, which the client turns into a `RouterProviderError` with cause
+    `parse`, which the orchestrator turns into a fail-open. So an invented label can never
+    reach the response and can never be acted on — the classification may be made by a model,
+    the enforcement may not. That distinction is what makes this a guardrail rather than an
+    instruction the model is free to disregard.
+
+    All three fields are **required**, `index` and `missing_axis` nullable. Requiring them
+    obliges the model to commit to each axis instead of omitting the ones it is unsure about,
+    and a null is a decision the code can read.
+    """
+
+    served: Literal["in_domain", "out_of_domain", "not_in_catalogue"] = Field(
+        ...,
+        description=(
+            "`in_domain` si la consulta es de esta joyería; `not_in_catalogue` si es joyería u "
+            "oficio vecino pero el objeto pedido no es ninguno de los doce tipos de pieza; "
+            "`out_of_domain` si no es del negocio en absoluto. Ante la duda, `in_domain`"
+        ),
+    )
+    index: Literal["catalog", "knowledge", "both"] | None = Field(
+        ...,
+        description=(
+            "A qué índice se pregunta: `catalog` si se piden piezas, `knowledge` si se pregunta "
+            "algo del oficio, `both` si se hacen las dos cosas. Null cuando no se atiende"
+        ),
+    )
+    missing_axis: Literal["piece_type", "material", "occasion", "price"] | None = Field(
+        ...,
+        description=(
+            "El eje que la consulta deja sin determinar, cuando no determina nada que buscar. "
+            "Null cuando la consulta basta, y null siempre que no se atienda"
+        ),
+    )
+
+    @property
+    def is_served(self) -> bool:
+        return self.served == "in_domain"
+
+    @property
+    def is_sufficient(self) -> bool:
+        return self.missing_axis is None
 
 
 class UsedCitation(BaseModel):

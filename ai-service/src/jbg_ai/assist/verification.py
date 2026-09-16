@@ -40,7 +40,7 @@ from jbg_ai.assist.constants import (
 from jbg_ai.assist.prompt import (
     ENUMERATION,
     NUMERAL,
-    PitchPayload,
+    PitchContext,
     loose_numeral,
     normalise_numeral,
 )
@@ -108,7 +108,7 @@ def normalise_text(value: str) -> str:
 
 
 def check_resolution(
-    used: Sequence[UsedCitation], payload: PitchPayload
+    used: Sequence[UsedCitation], payload: PitchContext
 ) -> tuple[Violation, ...]:
     """Every declared identifier belongs to the set handed over. A dangling one is never
     ignored: it is repaired once and, if it survives, it takes the argument with it."""
@@ -173,7 +173,7 @@ def _adjacency_cause(pitch: str, start: int, end: int) -> str | None:
     return None
 
 
-def check_numeric_gate(pitch: str, payload: PitchPayload) -> tuple[Violation, ...]:
+def check_numeric_gate(pitch: str, payload: PitchContext) -> tuple[Violation, ...]:
     """Whitelist by membership in the payload object, **plus** adjacency to money or stock.
 
     The adjacency rule is the whole reason a pure whitelist does not close this: measured on
@@ -231,7 +231,7 @@ def check_numeric_gate(pitch: str, payload: PitchPayload) -> tuple[Violation, ..
     return tuple(violations)
 
 
-def verify(generated: AssistPitch, payload: PitchPayload) -> tuple[Violation, ...]:
+def verify(generated: AssistPitch, payload: PitchContext) -> tuple[Violation, ...]:
     """The three checks, cheapest first, with every violation collected rather than the first.
 
     All of them are returned because all of them travel in **one** repair: the two gates fail

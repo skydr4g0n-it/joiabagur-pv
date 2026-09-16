@@ -464,3 +464,135 @@ def test_the_enrichment_model_cannot_move_the_assistance_model(
 
     assert built is not None
     assert built.model_id == DEFAULT_ASSIST_MODEL == "openai/gpt-4o-mini"
+
+
+# --- C31 · the classifier's own credential, its own model, and the chain --------------------
+
+
+def _built_router(issue_token: Callable[..., str], **overrides):
+    """Drive one FREE-QUERY request through the real resolution and hand back the client built.
+
+    A free query and not an anchored piece: the classifier is resolved for every request the
+    route serves, but only the free-query mode ever calls it, so exercising it here is what
+    makes the resolution chain observable through the route rather than only through settings.
+    """
+    from jbg_ai.api.main import create_app
+
+    app = create_app(build_settings(stub_mode=False, **overrides))
+    app.state.retrieval_embed = LocalEmbeddingClient()
+    app.state.retrieval_search = FakeProductSearch(_rows())
+    app.state.knowledge_index = InMemoryKnowledgeIndex(chunks=chunk_corpus(load_corpus()))
+
+    client = TestClient(app)
+    client.headers.update({"Authorization": f"Bearer {issue_token()}"})
+    response = client.post("/v1/assist/sale", json={"query": "un anillo de plata"})
+
+    return getattr(app.state, "assist_router_client", None), response
+
+
+def test_the_classifier_credential_falls_back_through_the_three_links(
+    issue_token: Callable[..., str],
+) -> None:
+    """HU escenario 17. Router, then assist, then enrichment — C30b opened the last two links
+    and this prepends one, so a deployment that sets none of them keeps working."""
+    dedicated, _ = _built_router(
+        issue_token,
+        jpv_rag_llm_api_key="sk-enrichment",
+        jpv_assist_llm_api_key="sk-assist",
+        jpv_router_llm_api_key="sk-router",
+    )
+    assert dedicated is not None and dedicated._api_key == "sk-router"
+
+    middle, _ = _built_router(
+        issue_token,
+        jpv_rag_llm_api_key="sk-enrichment",
+        jpv_assist_llm_api_key="sk-assist",
+    )
+    assert middle is not None and middle._api_key == "sk-assist"
+
+    last, response = _built_router(issue_token, jpv_rag_llm_api_key="sk-enrichment")
+    assert response.status_code == 200
+    assert last is not None and last._api_key == "sk-enrichment"
+
+
+def test_with_no_credential_at_all_no_classifier_is_constructed(
+    issue_token: Callable[..., str],
+) -> None:
+    """HU escenario 17, last clause, and the rollback. Not a 503 and not a refusal: the answer
+    this capability served before it routed anything, with the intent saying so."""
+    built, response = _built_router(issue_token)
+
+    assert built is None
+    assert response.status_code == 200
+    body = response.json()
+    assert body["intent"] == "unclassified"
+    assert body["clarification_question"] is None
+
+
+def test_which_classifier_credential_is_in_force_is_recorded_without_the_key(
+    issue_token: Callable[..., str], caplog: pytest.LogCaptureFixture
+) -> None:
+    """HU escenario 17. `stage=router_client … credential=…` is the verification the deployment
+    makes without opening a console or reading a key; its absence says no client was built."""
+    import logging
+
+    from jbg_ai.api.main import create_app
+
+    app = create_app(build_settings(stub_mode=False, jpv_rag_llm_api_key="sk-enrichment"))
+    app.state.retrieval_embed = LocalEmbeddingClient()
+    app.state.retrieval_search = FakeProductSearch(_rows())
+    app.state.knowledge_index = InMemoryKnowledgeIndex(chunks=chunk_corpus(load_corpus()))
+    logging.getLogger().addHandler(caplog.handler)
+    with caplog.at_level(logging.INFO):
+        with TestClient(app) as client:
+            client.post(
+                "/v1/assist/sale",
+                json={"query": "un anillo de plata"},
+                headers={"Authorization": f"Bearer {issue_token()}"},
+            )
+
+    emitted = "\n".join(record.getMessage() for record in caplog.records)
+    assert "stage=router_client" in emitted
+    assert "credential=rag_fallback" in emitted
+    assert "sk-enrichment" not in emitted, "a credential never reaches a log line"
+
+
+def test_the_configured_classifier_model_and_timeout_reach_the_client(
+    issue_token: Callable[..., str],
+) -> None:
+    """Both knobs have to arrive where the call is made, or they are settings that change
+    nothing — the failure mode of every knob added one layer away from where it is read."""
+    from jbg_ai.assist.constants import DEFAULT_ROUTER_MODEL, ROUTER_TIMEOUT_SECONDS
+
+    built, _ = _built_router(
+        issue_token,
+        jpv_rag_llm_api_key="sk-enrichment",
+        jpv_router_llm_model="openai/gpt-4.1-nano",
+        jpv_router_timeout_seconds=1.25,
+    )
+
+    assert built is not None
+    assert built.model_id == "openai/gpt-4.1-nano"
+    assert built._timeout == 1.25
+    assert ROUTER_TIMEOUT_SECONDS == 2.0, "declared NOT calibrated, and pinned to that claim"
+    # Moved from `gpt-4o-mini` BY the measurement: same prompt, the mini arm silenced three
+    # answerable queries and the veto rejected it. Pinned to the arm that passed.
+    assert DEFAULT_ROUTER_MODEL == "openai/gpt-4o"
+
+
+def test_the_argument_model_cannot_move_the_classifier_model(
+    issue_token: Callable[..., str],
+) -> None:
+    """D9, as the reason the field exists. ~30 output tokens against a paragraph is not the
+    same call, and sharing a variable would make any cost comparison between them false."""
+    from jbg_ai.assist.constants import DEFAULT_ROUTER_MODEL
+
+    built, _ = _built_router(
+        issue_token,
+        jpv_rag_llm_api_key="sk-enrichment",
+        jpv_assist_llm_model="openai/gpt-4.1-mini",
+        jpv_rag_llm_model="openai/gpt-4o",
+    )
+
+    assert built is not None
+    assert built.model_id == DEFAULT_ROUTER_MODEL

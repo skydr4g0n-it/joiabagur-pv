@@ -25,6 +25,7 @@ from jbg_ai.evals.assist_sweep import (
     summarise,
 )
 from jbg_ai.knowledge.corpus import load_corpus
+from support.paths import AI_SERVICE_ROOT
 
 
 def _sample() -> dict:
@@ -43,7 +44,15 @@ def test_the_sweep_sample_is_declared_and_not_derived_at_run_time() -> None:
     assert len({item["product_id"] for item in products}) == 40
     for item in products:
         UUID(item["product_id"])  # every identifier is a real one, not a placeholder
-    assert sample["prompt_version"] == PROMPT_VERSION
+    # **The version this sample was MEASURED against, and not the one the code runs today.**
+    # C31 moved `PROMPT_VERSION` to `assist/v2`, and rewriting this line to follow it would
+    # have falsified the provenance of 120 generations already published — which is the exact
+    # failure D10 exists to prevent, arriving from the direction nobody had written down. A
+    # re-run stamps its own `prompt_version` into the provenance block it prints; this field
+    # says which text the figures in the C30b report came from, and it is frozen.
+    assert sample["prompt_version"] == "assist/v1"
+    assert (AI_SERVICE_ROOT / "prompts" / f"{sample['prompt_version']}.md").is_file()
+    assert PROMPT_VERSION != sample["prompt_version"]
 
 
 def test_the_sample_is_stratified_by_declared_materials_and_says_why() -> None:

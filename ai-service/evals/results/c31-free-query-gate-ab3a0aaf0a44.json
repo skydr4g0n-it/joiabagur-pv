@@ -1,0 +1,78 @@
+{
+  "run_id": "ab3a0aaf0a44",
+  "git_sha": "e3f0403",
+  "prompt_version": "router/v3",
+  "model": "openai/gpt-4o-mini",
+  "taken_at": "2026-09-14T23:36:02+00:00",
+  "router_model": "openai/gpt-4o",
+  "pitch_prompt_version": "assist/v2",
+  "n_queries": 4,
+  "n_generated": 4,
+  "n_withheld_by_the_gate": 4,
+  "free_query_rejection_rate": 1.0,
+  "note": "The rejection rate of the FREE-QUERY mode. Published apart from the anchored one — C30b's 0 violations in 120 generations — because they are not the same gate: every candidate a free query returns widens the numeric whitelist, and a single averaged figure would be arithmetic over two different populations.",
+  "causes": {},
+  "violation_vocabulary": [
+    "dangling_citation",
+    "claim_not_in_pitch",
+    "figure_not_in_context",
+    "currency_adjacent_figure",
+    "stock_adjacent_figure",
+    "enumeration_format",
+    "decimal_form"
+  ],
+  "rows": [
+    {
+      "id": "q01",
+      "expected": "catalog",
+      "intent": "in_domain",
+      "groups": 15,
+      "members": 15,
+      "citations": 0,
+      "abstained": false,
+      "clarified": false,
+      "generated": false,
+      "prompt_version": "assist/v2",
+      "total_tokens": 9232
+    },
+    {
+      "id": "q02",
+      "expected": "catalog",
+      "intent": "in_domain",
+      "groups": 7,
+      "members": 15,
+      "citations": 0,
+      "abstained": false,
+      "clarified": false,
+      "generated": false,
+      "prompt_version": "assist/v2",
+      "total_tokens": 8111
+    },
+    {
+      "id": "q03",
+      "expected": "catalog",
+      "intent": "in_domain",
+      "groups": 15,
+      "members": 15,
+      "citations": 0,
+      "abstained": false,
+      "clarified": false,
+      "generated": false,
+      "prompt_version": "assist/v2",
+      "total_tokens": 8560
+    },
+    {
+      "id": "q04",
+      "expected": "catalog",
+      "intent": "in_domain",
+      "groups": 15,
+      "members": 15,
+      "citations": 0,
+      "abstained": false,
+      "clarified": false,
+      "generated": false,
+      "prompt_version": "assist/v2",
+      "total_tokens": 8504
+    }
+  ]
+}

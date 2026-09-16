@@ -17,6 +17,27 @@ WARNING_FAMILY_HAS_VARIANTS = "family_has_variants"
 #: The piece declares no size label. Read off the indexed document, not inferred.
 WARNING_SIZE_LABEL_MISSING = "size_label_missing"
 
+#: The router refused the query because it is not about this business at all. C31.
+#:
+#: **A different code from the one below, and the distinction is the point of D1.** What an
+#: operator says to a customer differs between a trade the shop does not practise and a piece
+#: the shop does not carry, and a single `refused` code would make the two rates this change
+#: exists to publish separately indistinguishable on the wire.
+WARNING_QUERY_OUT_OF_DOMAIN = "query_out_of_domain"
+
+#: The router refused the query because it asks for an object this catalogue does not stock —
+#: jewellery-adjacent and plausible, but none of the twelve closed `piece_type` terms. C31.
+WARNING_QUERY_NOT_IN_CATALOGUE = "query_not_in_catalogue"
+
+#: An anchored question the corpus does not cover: **zero citations after the distance
+#: threshold**. C31, and it costs no provider call at all — the result is already computed.
+#:
+#: C23 fixed `jpv_knowledge_distance_threshold = 0,51` on a clean gap of eight thousandths, so
+#: an empty citation list after it already *means* the corpus cannot answer. What was missing
+#: was a consumer able to tell that apart from there being nothing worth citing, and that is
+#: the whole of this code: the information existed and nobody could read it.
+WARNING_KNOWLEDGE_NOT_COVERED = "knowledge_not_covered"
+
 #: **Closed, and closed is the point.** The model never sees this tuple and cannot add to it,
 #: which is what makes "warnings are rule-derived" a property a test can witness instead of a
 #: promise a reader has to take on trust. The Spanish a human reads is the frontend's: codes
@@ -30,17 +51,49 @@ WARNING_SIZE_LABEL_MISSING = "size_label_missing"
 ASSIST_WARNING_CODES: tuple[str, ...] = (
     WARNING_FAMILY_HAS_VARIANTS,
     WARNING_SIZE_LABEL_MISSING,
+    WARNING_QUERY_OUT_OF_DOMAIN,
+    WARNING_QUERY_NOT_IN_CATALOGUE,
+    WARNING_KNOWLEDGE_NOT_COVERED,
+)
+
+#: The two codes that state a **refusal by the router**, as opposed to a fact about a piece.
+#: Kept as a subset of the vocabulary above rather than as a second vocabulary: a consumer
+#: reads one list of codes, and this tuple is what lets a test say "exactly one of these is
+#: present on a refused response" without restating the pair.
+ASSIST_REFUSAL_CODES: tuple[str, ...] = (
+    WARNING_QUERY_OUT_OF_DOMAIN,
+    WARNING_QUERY_NOT_IN_CATALOGUE,
 )
 
 #: A piece is anchored and no question is asked: the request itself says what it wants.
 INTENT_PRODUCT_PITCH = "product_pitch"
 
-#: Anything with a question in it. **The only honest value this capability can emit**: routing
-#: a query between catalogue, knowledge, both and out-of-domain is C31, and reporting anything
-#: else here would claim a classification that was never made.
+#: The router admitted the query: it is about this business and there is something to search.
+#: C31. It says nothing about **which** index was consulted — that decision does not travel on
+#: the wire, because it governs what runs rather than what the caller has to know.
+INTENT_IN_DOMAIN = "in_domain"
+
+#: The router refused: the query is not about this business at all. C31.
+INTENT_OUT_OF_DOMAIN = "out_of_domain"
+
+#: The router refused: jewellery-adjacent, and this catalogue does not stock the object. C31.
+INTENT_NOT_IN_CATALOGUE = "not_in_catalogue"
+
+#: No classification was made. **The value gained a second meaning in C31 and both are true.**
+#: Before the router it said "queries are not classified at all"; now it says "this particular
+#: request was not classified" — because no classifier ran (a piece with a question is routed
+#: structurally) or because one ran and could not be used (no credential, a fault, a timeout,
+#: an unparseable reply). A consumer needs no new field to tell them apart: the log records
+#: which, and the response is identical in both cases by design — that is the fail-open.
 INTENT_UNCLASSIFIED = "unclassified"
 
-ASSIST_INTENTS: tuple[str, ...] = (INTENT_PRODUCT_PITCH, INTENT_UNCLASSIFIED)
+ASSIST_INTENTS: tuple[str, ...] = (
+    INTENT_PRODUCT_PITCH,
+    INTENT_IN_DOMAIN,
+    INTENT_OUT_OF_DOMAIN,
+    INTENT_NOT_IN_CATALOGUE,
+    INTENT_UNCLASSIFIED,
+)
 
 #: Sections addressed by primary key in M2. An **allow-list**, never "every section of the
 #: sheet": measured, these two are present and `claim_scope: general` in **all nine** canonical
@@ -86,7 +139,20 @@ FAMILY_ROSTER_CAP = 24
 #: while the file did not cannot stamp a response with a prompt that never reached the model —
 #: the failure `enrichment/` already paid for once. `test_prompt_version_matches_the_loaded_
 #: prompt_file` pins the other half.
-PROMPT_VERSION = "assist/v1"
+#:
+#: **Moved to v2 by C31, and `prompts/assist/v1.md` stays on disk untouched.** Adding the
+#: free-query task sections to v1 would have silently changed what «v1» means for the 120
+#: generations C30b measured against it, and those figures have to stay interpretable. The
+#: invariant system rules are byte-identical between the two files; what v2 adds are task
+#: sections — one per route the router can decide, plus the degraded one for an anchored
+#: question the corpus does not cover. `test_the_previous_prompt_version_is_present_and_intact`
+#: is what keeps v1 from being edited by accident later.
+PROMPT_VERSION = "assist/v3"
+
+#: The prompt of the **classifier**, versioned separately because it is a different call with a
+#: different output and a different model setting. A router prompt that shared the argument's
+#: version would make either figure unreadable the first time one of the two moved.
+ROUTER_PROMPT_VERSION = "router/v3"
 
 #: The model that writes the argument. A **module constant and not a setting**, for the reason
 #: the timeout below is one: `JPV_RAG_LLM_MODEL` is C09's enrichment model — `gpt-4o` on this
@@ -122,6 +188,62 @@ PITCH_TIMEOUT_SECONDS = 4.0
 #: SECONDS` is two seconds, so a single backoff sleep would consume two thirds of the budget
 #: above before the retried call even started. Degrading is the cheaper answer at a counter.
 MAX_PITCH_PROVIDER_CALLS = 2
+
+# --- C31 · the intent router ---------------------------------------------------------------
+
+#: The model that classifies the query. A **setting with its own variable**, and it never
+#: inherits `JPV_ASSIST_LLM_MODEL` nor `JPV_RAG_LLM_MODEL` — the same measured argument C30b
+#: used against inheriting C09's. These are calls of very different shape: ~30 output tokens
+#: against a paragraph, so sharing a variable would make any cost comparison between them false.
+#:
+#: **Opened at `gpt-4o-mini` and moved to `gpt-4o` by the measurement, which is the whole reason
+#: the variable is separate.** Over the 119 cases of `evals/routing/cases.yaml`, same prompt
+#: (`router/v3`), temperature zero, full coverage on both arms:
+#:
+#:     modelo            catalog   falso positivo   silenciadas   veto
+#:     gpt-4o-mini        81,3 %        6,25 %           3        NO PASA
+#:     gpt-4o            100,0 %        0,00 %           0        PASA
+#:
+#: The veto of D12 is not a preference: a single silenced answerable query rejects the
+#: configuration, and `gpt-4o-mini` silenced three — `el calzado tipico que se lleva en las
+#: fiestas de la isla`, `una brujula para no perder el rumbo`, `una bicicleta antigua` — all
+#: three of them queries that describe **the motif a piece depicts** rather than an article.
+#: Three prompt revisions took that from fifteen to three and could not take it to zero; the
+#: model took it to zero with no prompt change at all. **What decides this gate is the model.**
+#:
+#: The argument's model stays `gpt-4o-mini` and is untouched: that is what D9's separate
+#: variable bought, and moving one without the other is the thing a shared variable would have
+#: made impossible. Cost: ~700 input and ~30 output tokens per classification, so this arm is
+#: of the order of 0,002 USD per request against the 0,00077 the argument measures — published
+#: as its own figure in the C31 report and never folded into the argument's.
+DEFAULT_ROUTER_MODEL = "openai/gpt-4o"
+
+#: Seconds the **single** classifier call may take.
+#:
+#: **Declared NOT calibrated.** Two seconds is a product judgement with no latency measurement
+#: behind it, in exactly the position C30b's three seconds occupied before its sweep moved the
+#: value to four. The difference is that this cut is harder, because the classifier runs *in
+#: front of everything*: a request that spends it has spent it before the retrieval starts.
+#: It is also the reason `JPV_ROUTER_TIMEOUT_SECONDS` is deliberately left out of the deployment
+#: steps until the deployment measures its own distribution — the default was taken on a
+#: developer machine in Spain through a TLS interceptor and is an upper bound, not a budget.
+#:
+#: Exceeding it is a **fail-open**: the request proceeds unclassified, which is today's
+#: behaviour, so the worst case of a badly chosen value is the behaviour this change replaces.
+ROUTER_TIMEOUT_SECONDS = 2.0
+
+#: Provider calls the classifier may make for one request. **One, and the one is literal**:
+#: there is no retry and no repair underneath it. An unparseable label is a degradation and not
+#: a violation to fix — there is nothing in a label to repair — and spending a second call on
+#: it would buy a second opinion from the same model at temperature zero, which is the same
+#: opinion. It also keeps C30b's measured decision not to retry on a parse failure intact.
+MAX_ROUTER_PROVIDER_CALLS = 1
+
+#: **The ceiling of the whole system, and it is literal: three.** One classifier call plus the
+#: two of the argument. Derived from the two constants rather than written as a digit, so a
+#: change to either cannot leave a stale three behind, and observable by introspection over the
+#: accumulated `usage.calls` — the same property C30b delivered for two.
+MAX_PROVIDER_CALLS = MAX_ROUTER_PROVIDER_CALLS + MAX_PITCH_PROVIDER_CALLS
 
 #: Markers of money. **es-ES, closed and short**, which is exactly what licenses a blacklist
 #: here: there is no legitimate use of `€` in an argument whose price travels as a placeholder.

@@ -1,0 +1,247 @@
+# Conjunto de enrutado de C31 — el manifiesto del clasificador de intención.
+#
+# **Escrito el 2026-09-14, antes de redactar el prompt del clasificador.** Ése es su valor, y es
+# la misma disciplina que `evals/golden/criterion.md` se impuso a sí mismo: un conjunto escrito
+# después de ver los aciertos describe lo que el clasificador hace, no lo que se le pedía.
+#
+# ---------------------------------------------------------------------------------------------
+# 1 · Cinco de las seis clases YA EXISTEN, y aquí se REFERENCIAN en vez de copiarse
+# ---------------------------------------------------------------------------------------------
+#
+# Copiar las consultas a este fichero sería garantizar la deriva: el día que alguien añada una
+# consulta al golden set o una `eval_question` a un documento, este fichero quedaría atrasado en
+# silencio. Es exactamente el argumento por el que C23 puso la pregunta de evaluación DENTRO de
+# cada documento del corpus — «tenerlas en el propio documento es lo que impide que el fixture y
+# el corpus se separen».
+#
+# Y una advertencia de lectura sobre `catalog`: son **48** hoy. Las mediciones de abstención de
+# C25 —0 de 43 contestables silenciadas— se tomaron sobre **43**, antes de que C26 añadiera las
+# cinco consultas de sustitutos. Las dos cifras son correctas; describen composiciones distintas.
+#
+# ---------------------------------------------------------------------------------------------
+# 2 · La clase `both` no existía, y es la única que se escribe entera aquí
+# ---------------------------------------------------------------------------------------------
+#
+# **Ocho de los diez casos son una consulta del golden set ya juzgada más una condición que sólo
+# el corpus puede resolver.** Eso los convierte en PARES CONTROLADOS, y es la propiedad que hace
+# útil a este conjunto: si el clasificador etiqueta `pulsera dorada` como `catalog` y `pulsera
+# dorada para alguien a quien le sale verde la muñeca` como `both`, la diferencia es atribuible a
+# la condición añadida y a nada más. Diez casos sueltos medirían mucho menos.
+#
+# El noveno par cruza el otro eje: `un regalo` (q54) es `ambigua`, y con material y condición deja
+# de serlo. Mide que el clasificador no confunde *poco específica* con *compuesta*, que son dos
+# cosas distintas y sólo una de ellas se contesta repreguntando.
+#
+# ---------------------------------------------------------------------------------------------
+# 3 · DOS LIMITACIONES, declaradas antes de medir y no después
+# ---------------------------------------------------------------------------------------------
+#
+# **(a) Estos diez casos son CONSTRUIDOS, y derivados de las `eval_question` del propio corpus.**
+# Miden si el enrutador reconoce una consulta compuesta; NO miden con qué frecuencia un operario
+# real escribe una. Las veinte de `fuera-de-dominio` sí se escribieron para otro propósito y por
+# otra razón, y por eso arbitran; éstas no gozan de esa independencia y no deben presentarse como
+# si la tuvieran.
+#
+# **(b) El prompt del clasificador NO se escribe leyendo este fichero.** Se escribe desde
+# `src/jbg_ai/enrichment/vocabularies.yaml` —los doce tipos de pieza y los nueve materiales— y el
+# README del corpus. Los campos `why` y `corpus` de abajo existen para que un lector entienda por
+# qué cada caso es `both`; usarlos como material de redacción del prompt haría la medición
+# circular, que es precisamente el riesgo estructural que el golden set declaró del suyo. El mismo
+# aviso vale, y con más fuerza, para los campos `note` de `evals/golden/queries.jsonl`: varios de
+# ellos llevan literalmente escrita la regla de clasificación («lo que guarda las joyas, no una
+# joya»).
+
+version: 1
+
+# ---------------------------------------------------------------------------------------------
+# Las cinco clases preexistentes, por referencia
+# ---------------------------------------------------------------------------------------------
+sources:
+
+  # La consulta se contesta con el índice de catálogo. Ocho categorías del golden set, todas
+  # juzgadas a profundidad 20-60.
+  #
+  # EL FALSO POSITIVO SOBRE ESTA CLASE ES EL QUE DECIDE si el enrutador se sirve o no. La
+  # asimetría está medida y argumentada en `src/jbg_ai/retrieval/abstention.py`: silenciar una
+  # consulta que la tienda SÍ puede contestar es un fallo visible en el mostrador; no rechazar una
+  # imposible enseña cinco piezas que no encajan y el operario lo ve. Una sola de las doce
+  # `descripcion-sin-anclaje` silenciada debería vetar la configuración, aunque capture las 20.
+  catalog:
+    from: golden
+    categories:
+      - descripcion-sin-anclaje   # 12 — sin anclaje léxico; la razón de ser de la rama vectorial
+      - variante-talla            #  7
+      - materiales                #  5
+      - piedra                    #  4
+      - subjetiva                 #  5
+      - sinonimos                 #  6
+      - lexico-exacto             #  4
+      - sustituto                 #  5 — añadidas por C26, posteriores a la medición de C25
+    expected_count: 48
+
+  # Joyería legítima que ESTE catálogo no puede satisfacer. Relojería, platería de mesa,
+  # papelería, numismática. NO son «no es una pregunta de joyería»: son el oficio vecino.
+  #
+  # Elegidas para ser insatisfacibles, así que la precisión medida sobre ellas es una COTA
+  # SUPERIOR de lo que verá un mostrador real. Dos llevan dentro un tipo de pieza del catálogo
+  # —`pulsera` en la pila de reloj, `anillos` en el joyero de viaje— puestas ahí a propósito para
+  # matar cualquier regla léxica.
+  not_in_catalogue:
+    from: golden
+    categories: [fuera-de-dominio]
+    expected_count: 20
+
+  # No es una pregunta de joyería en absoluto. Es la clase que un clasificador de intención
+  # detecta por sí solo, y la única con ese significado en todo el repositorio.
+  out_of_domain:
+    from: corpus_eval
+    file: ../../../data/knowledge/_eval/out-of-domain.yaml
+    expected_count: 5
+
+  # La contesta el corpus de conocimiento. Una por documento, escrita por su autor dentro del
+  # propio documento.
+  #
+  # C23 midió un hueco limpio de 8 milésimas en el umbral 0,51: estas 32 caen por debajo y las 5
+  # de `out_of_domain` por encima, 100 % y 0 %. El enrutador da una SEGUNDA OPINIÓN independiente
+  # sobre la misma pregunta, y donde discrepen hay hallazgo — el propio informe de C23 avisó de
+  # que ese margen es estrecho «y por construcción».
+  knowledge:
+    from: corpus
+    marker: eval_question
+    expected_count: 32
+
+  # La respuesta correcta es una repregunta. Declaradas SIN JUICIOS en C24, el 2026-09-11, con
+  # esta nota: «la respuesta correcta es una repregunta, y eso es una decisión del agente».
+  #
+  # No necesitan juicios de relevancia y por eso no los tienen: su etiqueta es la RUTA, no un
+  # grado. Se juzgan preguntando «¿eligió el eje que falta?» —tipo de pieza, material, ocasión o
+  # precio— y no «¿es buena la frase?».
+  ambiguous:
+    from: golden
+    categories: [ambigua]
+    expected_count: 4
+
+# ---------------------------------------------------------------------------------------------
+# La clase que no tenía conjunto. Diez casos, ocho de ellos con par de control.
+# ---------------------------------------------------------------------------------------------
+both:
+
+  - id: b01
+    text: una pulsera de hilo que se pueda mojar en la playa
+    pairs_with: q24            # pulsera de hilo y plata
+    catalogue: pulsera + hilo
+    corpus: [material-hilo, joyas-playa-piscina-y-deporte]
+    why: >-
+      «Que se pueda mojar» NO es atributo de ninguna ficha de producto: no existe ese campo. El
+      catálogo da las pulseras de hilo, el corpus dice si aguantan — y si dice que no, la respuesta
+      correcta es ofrecer y advertir, que es exactamente lo que ninguna ruta sola hace.
+
+  - id: b02
+    text: que colgante con bano de oro le puedo ofrecer para llevar a la piscina
+    pairs_with: q34            # bano de oro
+    catalogue: colgante + baño de oro
+    corpus: [joyas-playa-piscina-y-deporte, material-bano-de-oro, politica-garantia]
+    why: >-
+      Variante deliberada de la `eval_question` de `joyas-playa-piscina-y-deporte`, que es
+      `knowledge` pura. Con «qué colgante le ofrezco» delante exige recuperar, y la garantía entra
+      porque el desgaste del baño por uso es una pregunta de política, no de material.
+
+  - id: b03
+    text: pendientes para una nina con la oreja recien hecha
+    catalogue: pendientes
+    corpus: [joyas-y-ninos, niquel-y-piel-sensible]
+    why: >-
+      Sin par de control, a propósito: es el único caso del conjunto cuya condición no se añade a
+      una consulta ya juzgada, sino que viene de fábrica. El catálogo tiene pendientes; el cierre
+      de rosca y el material tolerable sólo los sabe el corpus.
+
+  - id: b04
+    text: un anillo de plata talla L que se pueda subir de talla mas adelante
+    pairs_with: q19            # anillo de plata talla XL
+    catalogue: anillo + plata + talla
+    corpus: [politica-reparaciones-y-ajustes]
+    why: >-
+      EL CASO MÁS FUERTE DEL CONJUNTO. La respuesta depende de la pieza CONCRETA que se recupere:
+      si lleva piedras en todo el contorno, no se puede subir. Ni el índice solo ni el corpus solo
+      la contestan, y no por falta de contexto sino por la forma de la pregunta.
+
+  - id: b05
+    text: una pulsera dorada para alguien a quien le sale verde la muneca
+    pairs_with: q39            # pulsera dorada — prefijo LITERAL
+    catalogue: pulsera + dorada
+    corpus: [material-laton, niquel-y-piel-sensible]
+    why: >-
+      Par controlado exacto: q39 es `catalog` puro y está juzgada. La condición añadida es
+      literalmente la `eval_question` de `material-laton` — «¿por qué una pulsera dorada deja la
+      muñeca verde y eso significa que hay alergia?».
+
+  - id: b06
+    text: un colgante de Menorca en oro para unas bodas de plata
+    pairs_with: q18            # colgante de Menorca talla M en oro
+    catalogue: colgante + Menorca + oro
+    corpus: [ocasiones-y-tradicion]
+    why: >-
+      Tensión útil y poco frecuente: el corpus dice que las bodas de plata corresponden a la plata
+      y el cliente pide oro. El sistema tiene que recuperar Y matizar, que es la forma de respuesta
+      que ninguna de las dos rutas produce por separado.
+
+  - id: b07
+    text: pendientes de perla que se puedan limpiar en casa
+    pairs_with: q27            # pendientes de perla — prefijo LITERAL
+    catalogue: pendientes + perla
+    corpus: [material-perla, cuidados-generales]
+    why: >-
+      Par controlado exacto. La perla es el material cuyo cuidado se aparta más del resto, y el
+      corpus lo dice en su propia `eval_question`.
+
+  - id: b08
+    text: que cadena le doy para que el colgante de estrella de mar caiga sobre el escote
+    pairs_with: q14            # colgante de estrella de mar en talla XS
+    catalogue: cadena + colgante de estrella de mar
+    corpus: [tallas-collares-y-cadenas]
+    why: >-
+      DOS recuperaciones y una tabla: la pieza que cuelga, la cadena que la sostiene y la longitud
+      que el corpus tabula. Es el caso que más lejos queda de una ruta única.
+
+  - id: b09
+    text: un regalo de plata para quien no se quita nunca la joya ni en la ducha
+    pairs_with: q54            # un regalo — categoría `ambigua`
+    catalogue: plata + regalo (occasion_tags)
+    corpus: [material-plata, perfume-cremas-y-cosmetica, cuidados-generales]
+    why: >-
+      PAR CONTROLADO SOBRE EL OTRO EJE. q54 «un regalo» es `ambigua` y se contesta repreguntando;
+      con material y condición deja de serlo. Mide que el enrutador no confunde poco específica con
+      compuesta, que es el error que convertiría la repregunta en una muletilla.
+
+  - id: b10
+    text: un anillo de lapislazuli mediano, se puede meter en el ultrasonidos
+    pairs_with: q16            # anillo de lapislazuli pequeno
+    catalogue: anillo + lapislázuli + talla
+    corpus: [piedras-opacas-porosas-y-tratadas]
+    why: >-
+      Par controlado. El lapislázuli es opaca y porosa, que es el caso para el que ese documento
+      existe, y el ultrasonidos es la operación que lo estropea. Verificado: las dos palabras viven
+      en ese documento y en ninguna otra ficha de piedras.
+
+# ---------------------------------------------------------------------------------------------
+# Reserva. NO entran en la medición salvo decisión explícita, y se anotan aquí para que no haya
+# que volver a derivarlos: cubren dos zonas que los diez de arriba dejan sin tocar.
+# ---------------------------------------------------------------------------------------------
+both_reserve:
+
+  - id: r01
+    text: un anillo de acero para grabarle una fecha dentro
+    catalogue: anillo + acero
+    corpus: [politica-grabado-y-encargos, material-acero]
+    why: >-
+      Cubre la única combinación del corpus donde política y material parecen contradecirse: el
+      acero se graba, pero no como la plata. Dos documentos de `doc_type` distinto sobre la misma
+      pieza.
+
+  - id: r02
+    text: una tobillera de plata para una nina, que medida le pongo
+    catalogue: tobillera + plata
+    corpus: [tallas-pulseras-y-tobilleras, joyas-y-ninos]
+    why: >-
+      Cubre `tobillera`, el tipo de pieza con menos presencia en el golden set: ninguna de las 72
+      consultas la nombra.

@@ -38,7 +38,7 @@ from jbg_ai.assist.constants import MAX_PITCH_PROVIDER_CALLS, PROMPT_VERSION
 from jbg_ai.assist.llm import AssistLlm, TokenUsage
 from jbg_ai.assist.modes import AssistMode
 from jbg_ai.assist.errors import PitchProviderError
-from jbg_ai.assist.prompt import PitchPayload, build_messages
+from jbg_ai.assist.prompt import PitchContext, PitchTask, build_messages
 from jbg_ai.assist.schema import AssistPitch
 from jbg_ai.assist.verification import Violation, repair_message, verify
 
@@ -107,8 +107,8 @@ def _published_ids(
 
 
 async def generate_pitch(
-    payload: PitchPayload,
-    mode: AssistMode,
+    payload: PitchContext,
+    task: PitchTask | AssistMode,
     *,
     client: AssistLlm,
     prompt_text: str | None = None,
@@ -134,7 +134,7 @@ async def generate_pitch(
         finally:
             latencies.append((time.perf_counter() - call_started) * 1000.0)
 
-    messages = build_messages(payload, mode, prompt_text=prompt_text)
+    messages = build_messages(payload, task, prompt_text=prompt_text)
     try:
         completion = await timed(messages)
     except PitchProviderError as exc:
@@ -157,7 +157,7 @@ async def generate_pitch(
     if violations:
         repair = build_messages(
             payload,
-            mode,
+            task,
             prompt_text=prompt_text,
             repair=repair_message(violations),
             previous=completion.raw,
