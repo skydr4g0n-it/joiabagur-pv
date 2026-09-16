@@ -204,6 +204,40 @@ The service SHALL introduce the free-query task sections in a new prompt version
 
 ## MODIFIED Requirements
 
+### Requirement: Warnings are computed from rules and travel as a closed vocabulary of codes
+Warnings SHALL be computed from data by deterministic rules and MUST NOT be produced by a model. Every warning emitted MUST belong to a closed vocabulary declared by this capability, and the service MUST NOT emit a warning in natural language: the wording for a human reader belongs to the presentation layer.
+
+This capability SHALL emit **five** codes: the two that describe the piece — the product's family holds other members, and the product declares no size label — and the three this capability adds once it routes, which are the two distinct refusal reasons and the one stating that the corpus does not cover an anchored question.
+
+The two refusal codes MUST remain distinct from each other. A trade this shop does not practise and a piece this shop does not carry are two different things for an operator to say to a customer, and one shared code would make the two rates this capability publishes separately indistinguishable where a consumer reads them.
+
+The service MUST NOT emit any warning that depends on real stock. Stock is the .NET API's authority and is known only after hydration, and the availability bucket this service holds is carried for ranking, is never emitted, and may be stale.
+
+#### Scenario: A family with other members raises the variants warning
+- **GIVEN** a product whose family holds more than one member
+- **WHEN** the route is called anchored to that product
+- **THEN** the warnings contain the code stating that the family holds other members
+
+#### Scenario: A missing size label raises its warning
+- **GIVEN** a product that declares no size label
+- **WHEN** the route is called anchored to that product
+- **THEN** the warnings contain the code stating that the size label is absent
+
+#### Scenario: Every warning belongs to the closed vocabulary
+- **WHEN** any response is produced
+- **THEN** every warning it carries is a member of the declared closed vocabulary
+- **AND** none of them is a sentence in natural language
+
+#### Scenario: The two refusal codes are two and never one
+- **WHEN** the closed vocabulary is inspected
+- **THEN** the code for a query outside the domain differs from the code for a query this catalogue cannot stock
+- **AND** both belong to the same declared vocabulary the rule-derived codes belong to
+
+#### Scenario: No stock warning is emitted by this service
+- **GIVEN** a product whose availability bucket at the requesting point of sale is zero
+- **WHEN** the route is called anchored to that product
+- **THEN** the warnings contain no code about critical stock and none about members out of stock
+
 ### Requirement: The provider is not called when there is nothing to write about
 The service SHALL NOT call the language model provider when the abstention rule has decided that the catalogue cannot answer the query, when the router has refused the request, or when a clarification question has been emitted. Writing prose about an empty candidate set states something with confidence about nothing, which is the failure the abstention rule exists to prevent.
 

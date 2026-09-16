@@ -1,7 +1,7 @@
 # C31 — informe de implementación: el enrutador, y las siete cosas que la implementación refuta
 
 **Change:** `add-guardrails-and-intent-router` (C31) · **Rama:** `c31-add-guardrails-and-intent-router`
-**Fecha:** 2026-09-15 · **Historia:** [HU-AIENG-031](../../Historias/AI-Eng/HU-AIENG-031.md) · **Ticket:** [T-AIENG-031](../../../openspec/changes/add-guardrails-and-intent-router/ticket.md)
+**Fecha:** 2026-09-15 · **Historia:** [HU-AIENG-031](../../Historias/AI-Eng/HU-AIENG-031.md) · **Ticket:** [T-AIENG-031](../../../openspec/changes/archive/2026-09-16-add-guardrails-and-intent-router/ticket.md)
 **Conjunto de enrutado:** [`evals/routing/cases.yaml`](../../../ai-service/evals/routing/cases.yaml) — 119 casos, seis clases
 
 C31 entrega el enrutador de intención y los guardarraíles de entrada: clasificación de la
@@ -341,6 +341,20 @@ Aplanados los dos `openapi.json` a hojas y comparados uno a uno:
 La única hoja «añadida» es una clave `description` sobre un campo que ya existía. **Ningún campo
 se añade, se retira ni cambia de tipo**, que es la verificación que D4 exige y la misma que C30b
 ejecutó. Leerlo a ojo no habría bastado: el diff de git son **3 líneas**.
+
+---
+
+## 6.bis · Lo que la sincronización del archivado destapó
+
+La evaluación previa al sync encontró una **contradicción que la delta habría escrito en la spec
+viva**: el requisito vivo de los avisos declara *«SHALL emit exactly two codes»* y C31 lleva el
+vocabulario a **cinco**, sin que la delta lo modificara. `openspec validate --all --strict` no lo
+habría visto —comprueba estructura, no coherencia semántica— y los tests tampoco, porque afirman
+sobre la constante y no sobre lo que la spec dice de ella.
+
+Corregido **en la delta**, que es de donde se deriva la spec viva: un segundo `MODIFIED` que lleva
+el requisito a cinco códigos y que además exige que **los dos de rechazo sigan siendo dos**. La
+delta pasa de 19 a **20 requisitos** y de 26 a **31 escenarios**.
 
 ---
 

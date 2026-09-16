@@ -188,8 +188,17 @@ Degradaciones en toda la pasada: 0 de 119
 
 ## 4. Escenarios de la delta, uno a uno
 
-**19 requisitos · 26 escenarios** (15 `ADDED`… en realidad 17 añadidos, 1 `MODIFIED`, 1 `REMOVED`).
-`openspec show --json` confirma `deltaCount: 19`.
+**20 requisitos · 31 escenarios**: 17 `ADDED`, **2** `MODIFIED` y 1 `REMOVED`.
+
+> **El segundo `MODIFIED` lo añadió el archivado, no la implementación.** La delta llegó al
+> archivado con 19 requisitos y la evaluación de sincronización destapó una **contradicción que
+> se habría escrito en la spec viva**: el requisito vivo *«Warnings are computed from rules and
+> travel as a closed vocabulary of codes»* dice **«SHALL emit exactly two codes»**, y C31 lleva
+> el vocabulario a **cinco**. Nadie lo habría visto: `openspec validate --all --strict` no lee
+> coherencia semántica, y los tests afirman sobre la constante y no sobre la spec. Corregido
+> **en la delta y no en la spec viva** —que es donde corresponde, porque la spec viva se deriva
+> del change y no al revés—, con un párrafo que además exige que **los dos códigos de rechazo
+> sigan siendo dos** y un quinto escenario que lo comprueba. Detalle en el §12.4.
 
 ### `assist-generation` — `ADDED`
 
@@ -529,6 +538,30 @@ propiedad —el corte ocurre *antes* de las dos recuperaciones— queda **probad
 
 Era el único artefacto que aún nombraba v2 como la versión servida. Enmendado con la misma nota
 que `design.md` y `ticket.md` ya llevaban.
+
+### 12.4. Una contradicción que la delta habría escrito en la spec viva — **CRÍTICO, corregido**
+
+Encontrada en la **evaluación de sincronización del archivado**, no antes. El requisito vivo
+*«Warnings are computed from rules and travel as a closed vocabulary of codes»* declara:
+
+> This capability SHALL emit **exactly two codes**: one stating that the product's family holds
+> other members, and one stating that the product declares no size label.
+
+C31 lleva `ASSIST_WARNING_CODES` a **cinco** y la delta **no modificaba ese requisito**. Sin
+corregirlo, el sync habría dejado la spec viva afirmando «exactamente dos» en un requisito y
+enumerando cinco en otro y en el `## Purpose`.
+
+**Nada lo habría detectado.** `openspec validate --all --strict` comprueba la estructura, no la
+coherencia semántica; y los tests afirman sobre `ASSIST_WARNING_CODES`, que es la constante, no
+sobre lo que la spec dice de ella. Es exactamente la forma de deriva que `CLAUDE.md` describe
+—una spec viva que se contradice y valida igual— y por eso el archivado **sí** evalúa el sync
+antes de aplicarlo en vez de copiar ficheros.
+
+**Corregido en la delta y no en la spec viva**, que es donde corresponde: la spec viva se deriva
+del change, no al revés. La delta gana un segundo `MODIFIED` que lleva el requisito a cinco
+códigos, añade un párrafo exigiendo que **los dos de rechazo sigan siendo dos** —lo que la spec
+sólo decía en el requisito de la puerta de cobertura— y un quinto escenario que lo comprueba. La
+delta pasa de 19 a **20 requisitos** y de 26 a **31 escenarios**.
 
 ### Lo que la verificación comprobó y estaba bien
 
