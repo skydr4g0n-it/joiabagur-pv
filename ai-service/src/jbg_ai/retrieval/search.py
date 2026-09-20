@@ -306,6 +306,40 @@ FROM ai.product_document d
 WHERE d.product_id = :source_id
 """
 
+# The same projection as `SOURCE_DOCUMENT_SQL` above, addressed by the other key. Written out
+# rather than parameterised over the column, because a statement whose WHERE clause is built
+# from a string is one refactor away from being built from a caller's string.
+#
+# `sku` is UNIQUE on `ai.product_document`, so there is no ORDER BY and no LIMIT: a second row
+# would be a broken index and silently taking the first would hide it.
+DOCUMENT_BY_SKU_SQL = """
+SELECT
+  d.product_id,
+  d.sku,
+  d.piece_type,
+  d.size_label,
+  d.materials,
+  d.style_tags,
+  d.family_id,
+  d.price_band,
+  d.is_active,
+  (d.embedding IS NOT NULL) AS has_embedding
+FROM ai.product_document d
+WHERE d.sku = :sku
+"""
+
+# One piece, one point of sale, one row at most. `is_assigned_hint` is the same soft-delete
+# predicate `SCOPE_BUCKETS_SQL` applies, and applying it here is what makes an unassigned row
+# indistinguishable from an absent one — which is correct: both mean this point of sale does
+# not carry the piece, and neither is a bucket of zero.
+AVAILABILITY_BUCKET_SQL = """
+SELECT qty_bucket
+FROM ai.pos_projection
+WHERE pos_id = :pos_id
+  AND product_id = :product_id
+  AND is_assigned_hint IS TRUE
+"""
+
 # An UNCORRELATED scalar subquery on the primary key, written once and substituted into both
 # the projection and the ordering. The planner lifts it to an InitPlan and evaluates it once,
 # so the distance operator sees a constant on the right — the shape an index scan needs —
@@ -616,6 +650,47 @@ class SqlAlchemyProductSearch:
             )
             for row in rows
         ]
+
+    async def document_by_sku(self, sku: str) -> SourceDocument | None:
+        """Read one document by SKU. Absence comes back as `None`, never as an exception."""
+        try:
+            async with session_scope(self._settings) as session:
+                row = (
+                    await session.execute(text(DOCUMENT_BY_SKU_SQL), {"sku": sku})
+                ).mappings().first()
+        except SQLAlchemyError as exc:
+            raise RetrievalDependencyError(f"database query failed: {exc}") from exc
+        if row is None:
+            return None
+        return SourceDocument(
+            product_id=UUID(str(row["product_id"])),
+            sku=str(row["sku"]),
+            piece_type=_optional_str(row["piece_type"]),
+            size_label=_optional_str(row["size_label"]),
+            materials=_materials_list(row["materials"]),
+            style_tags=_materials_list(row["style_tags"]),
+            family_id=_optional_uuid(row["family_id"]),
+            price_band=_optional_str(row["price_band"]),
+            is_active=bool(row["is_active"]),
+            has_embedding=bool(row["has_embedding"]),
+        )
+
+    async def availability_bucket(self, product_id: UUID, *, pos_id: UUID) -> str | None:
+        """One bucket, or `None` when this point of sale does not carry the piece.
+
+        `None` is the absent row and never a bucket of zero, which the caller needs kept apart.
+        """
+        try:
+            async with session_scope(self._settings) as session:
+                value = (
+                    await session.execute(
+                        text(AVAILABILITY_BUCKET_SQL),
+                        {"pos_id": pos_id, "product_id": product_id},
+                    )
+                ).scalar()
+        except SQLAlchemyError as exc:
+            raise RetrievalDependencyError(f"database query failed: {exc}") from exc
+        return None if value is None else str(value)
 
     async def neighbours_of(
         self,

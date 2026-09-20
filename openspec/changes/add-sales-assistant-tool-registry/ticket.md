@@ -186,16 +186,16 @@ y el §15.8 es una de las tres declaraciones que el README entrega.
 
 ## Definición de Hecho (DoD)
 
-- [ ] Código implementado según las capas de `Documentos/modelo-c4.md` y las convenciones de `openspec/project.md`
-- [ ] `ai-service`: `uv run pytest` en verde **sin llamadas reales a LLM, embeddings ni RDS**; comparado **por nombres de test** contra la línea base, nunca por recuento
-- [ ] `ai-service/openapi.json` **sin cambios**, verificado y no supuesto
-- [ ] Nomenclatura `test_<unidad>_<escenario>_<esperado>`; fakes inyectados, ningún socket abierto
-- [ ] Los nueve escenarios de [HU-AIENG-032a](../../../Documentos/Historias/AI-Eng/HU-AIENG-032a.md) trazados a test nombrado
-- [ ] Spec de la capability actualizada en `openspec/changes/add-sales-assistant-tool-registry/specs/` y **`openspec validate --all --strict` en verde**, no la forma de un solo change
-- [ ] Documentación actualizada según la tabla *Post-Implementation Documentation Update* de `openspec/project.md`
-- [ ] Informe de implementación con lo que la implementación refute de este ticket
-- [ ] Sin TODO/FIXME sin tarea de seguimiento asociada
-- [ ] Sin migración de EF Core (no aplica), sin cambios en `backend/`, `frontend/` ni `terraform/`
+- [x] Código implementado según las capas de `Documentos/modelo-c4.md` y las convenciones de `openspec/project.md`
+- [x] `ai-service`: `uv run pytest` en verde **sin llamadas reales a LLM, embeddings ni RDS**; comparado **por nombres de test** contra la línea base, nunca por recuento
+- [x] `ai-service/openapi.json` **sin cambios**, verificado y no supuesto
+- [x] Nomenclatura `test_<unidad>_<escenario>_<esperado>`; fakes inyectados, ningún socket abierto
+- [x] Los nueve escenarios de [HU-AIENG-032a](../../../Documentos/Historias/AI-Eng/HU-AIENG-032a.md) trazados a test nombrado
+- [x] Spec de la capability actualizada en `openspec/changes/add-sales-assistant-tool-registry/specs/` y **`openspec validate --all --strict` en verde**, no la forma de un solo change
+- [x] Documentación actualizada según la tabla *Post-Implementation Documentation Update* de `openspec/project.md`
+- [x] Informe de implementación con lo que la implementación refute de este ticket
+- [x] Sin TODO/FIXME sin tarea de seguimiento asociada
+- [x] Sin migración de EF Core (no aplica), sin cambios en `backend/`, `frontend/` ni `terraform/`
 
 ---
 

@@ -114,6 +114,8 @@ class FakeProductSearch:
         self.source_document_calls: list[UUID] = []
         self.neighbour_calls: list[dict[str, object]] = []
         self.family_roster_calls: list[tuple[UUID, int]] = []
+        self.document_by_sku_calls: list[str] = []
+        self.availability_calls: list[tuple[UUID, UUID]] = []
 
     def _scope(self, pos_id: UUID) -> dict[UUID, FakeAssignment]:
         """What this point of sale actually carries, by product identifier."""
@@ -351,6 +353,48 @@ class FakeProductSearch:
                 has_embedding=row.has_embedding,
             )
         return None
+
+    # --- C32a the two reads the tool registry addresses a piece with ---------------------
+
+    async def document_by_sku(self, sku: str) -> SourceDocument | None:
+        """Mirrors `DOCUMENT_BY_SKU_SQL`: the row comes back whether or not it is usable.
+
+        Same rule as `source_document` above and for the same reason — inactive and
+        embedding-less rows travel as VALUES, because the three unusable cases are three
+        different sentences and a fake that collapsed them would let a test pass without
+        telling them apart.
+        """
+        self.document_by_sku_calls.append(sku)
+        for row in self.rows:
+            if row.sku != sku:
+                continue
+            return SourceDocument(
+                product_id=row.product_id,
+                sku=row.sku,
+                piece_type=row.piece_type,
+                size_label=row.size_label,
+                materials=list(row.materials),
+                style_tags=list(row.style_tags),
+                family_id=row.family_id,
+                price_band=row.price_band,
+                is_active=row.is_active,
+                has_embedding=row.has_embedding,
+            )
+        return None
+
+    async def availability_bucket(self, product_id: UUID, *, pos_id: UUID) -> str | None:
+        """Mirrors `AVAILABILITY_BUCKET_SQL`, soft delete included.
+
+        Goes through `_scope`, so the `assignments=None` default keeps meaning what it means
+        everywhere else here — this point of sale carries the whole indexed set — and a test
+        about a piece the shop does not carry states its assortment explicitly.
+
+        Returns `None` for the absent row and never `"0"`: the fake must not be the place
+        where the distinction the port exists to keep is quietly lost.
+        """
+        self.availability_calls.append((product_id, pos_id))
+        row = self._scope(pos_id).get(product_id)
+        return None if row is None else row.qty_bucket
 
     # --- C30a family roster -------------------------------------------------------------
 

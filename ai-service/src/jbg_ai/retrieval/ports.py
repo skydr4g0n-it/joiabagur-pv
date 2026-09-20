@@ -254,6 +254,47 @@ class ProductSearchPort(Protocol):
         """
         ...
 
+    async def document_by_sku(self, sku: str) -> SourceDocument | None:
+        """The indexed document of one SKU, or `None` when the index holds no such row. C32a.
+
+        **Addressed by SKU and not by product identifier, and that is the whole reason it
+        exists** beside `source_document()`, which answers the same question about the same
+        table from the other side. The tools of the sale assistant address a piece the way a
+        counter does: a SKU is stable, real and semantic, while an internal identifier is an
+        arbitrary string of digits nobody says out loud — which is exactly why the generation
+        layer already excludes it from everything a model is shown.
+
+        It returns a `SourceDocument` rather than a type of its own because the question is
+        the same question: *is there a row, and is it usable?* `is_active` and `has_embedding`
+        travel as VALUES and the absent row travels as `None`, by the rule that method already
+        fixed — which sentence a caller writes about an unusable piece is not a decision the
+        SQL layer gets to make, and here the two callers write different ones.
+
+        Reads `ai.product_document` alone: no projection, no `public`, no provider.
+        """
+        ...
+
+    async def availability_bucket(self, product_id: UUID, *, pos_id: UUID) -> str | None:
+        """The stored availability bucket of ONE piece at ONE point of sale. C32a.
+
+        `None` means **no row was read** — this point of sale does not carry the piece — and
+        it is NOT a bucket of zero. The distinction is the same one `SearchHit.qty_bucket`
+        already carries, and collapsing it here would report a piece the shop can sell as one
+        it cannot.
+
+        **Why not `scope_buckets()`**, which is right there and already reads this table: that
+        one returns the point of sale's ENTIRE assortment — of the order of a thousand rows —
+        to answer a question about one piece. It exists for an evaluation that needs the
+        bucket of every judged document at once; paying its volume per piece would spend a
+        connection of a pool capped at five on a dump whose remainder nobody reads.
+
+        The value it returns is a **bucket, and buckets are numerals**. It is deliberately the
+        raw stored value and not a label: this is the SQL layer, and translating to the
+        qualitative vocabulary here would put a presentation decision inside a port. The
+        assistance layer maps it, and nothing between here and there emits it.
+        """
+        ...
+
     async def neighbours_of(
         self,
         product_id: UUID,

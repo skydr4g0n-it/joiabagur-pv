@@ -788,6 +788,53 @@ la respuesta, `intent` pasa de `unclassified` a un veredicto de enrutado.
 
 ---
 
+## C32a · La consulta puntual de disponibilidad en .NET
+
+**Estado:** identificada, acotada y **no hecha**. Aplazada **con motivo**, no por falta de tiempo.
+
+El §6.1 del diseño RAG dibuja la arista `R2 -->|tool: consultar_disponibilidad| API` y deja el
+esquema de la llamada de vuelta Python → .NET como *«decisión abierta del change del agente de
+venta»*. C32a es ese change, y la resuelve **difiriéndola**: la tool se sirve desde
+`ai.pos_projection`, que es un dato que Python ya tiene proyectado.
+
+### Por qué no se hizo aquí
+
+La única arista Python → .NET que existe hoy es
+[`AiIndexFeedController`](../backend/src/JoiabagurPV.API/Controllers/AiIndexFeedController.cs), y
+no sirve para esto por tres razones independientes:
+
+1. Está autenticada con `X-Index-Feed-Key` y **sin `[Authorize]` a propósito** — *«a user JWT
+   must not open these routes»* — así que no transporta identidad de usuario.
+2. **No transporta `pos_id`**, que es justo el ámbito que una consulta puntual necesita.
+3. Su ruta `pos-availability` es un **feed paginado de 200 filas con keyset**, pensado para un
+   drenaje batch y no para preguntar por una pieza.
+
+Construirlo habría significado ruta .NET nueva, filtro de autenticación con ámbito de punto de
+venta y tests de integración: **zona .NET dentro de un change de zona Python**.
+
+### Qué hace falta cuando se haga
+
+- Ruta .NET puntual por `(pos_id, product_id)` o por `(pos_id, sku)`.
+- Un esquema de autenticación de vuelta que **sí** transporte el ámbito del punto de venta, y
+  que no sea la clave de feed: la clave de feed abre rutas sin usuario por diseño.
+- Decidir si la respuesta sigue siendo una **banda cualitativa** o pasa a ser la cifra. La
+  frontera del §6.2 dice que .NET es la autoridad sobre el stock, así que la cifra es suya; lo
+  que C32a fija es que **al modelo no le llega un número**, venga de donde venga.
+
+### Por qué el reemplazo es directo
+
+La tool no tiene lógica de disponibilidad dentro: llama a
+`ProductSearchPort.availability_bucket(product_id, pos_id=...)` y traduce con
+`AVAILABILITY_LABEL_BY_BUCKET`. Sustituir el puerto por un cliente del endpoint .NET no cambia
+la forma de la observación, ni el vocabulario cerrado, ni ninguno de sus tests — salvo el del
+invariante de solo-lectura, que **volverá a ser el que decide**: un cliente HTTP de propósito
+general expone `post`, `put`, `patch` y `delete`, y el tercer eje de la comprobación lo rechaza.
+Quien construya ese cliente tendrá que envolverlo en una superficie que exponga sólo la lectura,
+que es exactamente la restricción que se quería dejar puesta.
+
+
+---
+
 ## Implementation Guidance
 
 When implementing deferred tasks:
@@ -800,5 +847,5 @@ When implementing deferred tasks:
 
 ---
 
-**Last Updated:** 2026-09-15
+**Last Updated:** 2026-09-20
 **Maintained By:** Development Team
