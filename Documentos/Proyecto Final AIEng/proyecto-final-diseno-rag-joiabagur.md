@@ -183,7 +183,7 @@ flowchart TB
     CB -->|JWT interno| R1
     CB -->|JWT interno| R2
     R4 -->|feed paginado since-cursor| API
-    R2 -->|tool: consultar_disponibilidad| API
+    R2 -.->|tool: consultar_disponibilidad<br/>NO HECHA — C32a lee ai.pos_projection| API
     API --> BIZ
     BIZ --> DB
     API --> HYD
@@ -197,6 +197,8 @@ flowchart TB
 > **Corregido el 2026-08-31.** El diagrama de la v3 dibujaba un tercer servicio Python, `/v1/inventory/propose`, y una arista de vuelta `Python → .NET` etiquetada *«tools: señales de demanda»*. Ambos desaparecen con la anulación del agente de inventario.
 >
 > La llamada de vuelta **no desaparece**: `consultar_disponibilidad` es tool del agente de venta y también va de Python a .NET. Lo que cambia es su superficie, y para bien. **El §6.4 solo especifica el sentido .NET → Python** (JWT interno de servicio HS256 con `pos_id` y `trace_id`); el de vuelta seguía sin esquema definido, y ahora tiene que resolverse **una sola vez, para un dato que el hidratador ya es autoridad de expresar**, en lugar de dos veces y transportando además cifras de demanda por producto. Queda como decisión abierta del change del agente de venta.
+>
+> **Cerrada el 2026-09-20 por C32a, y cerrada difiriéndola con motivo.** C32a es ese change, y su decisión D-1 es que `consultar_disponibilidad` **no llama a .NET**: se sirve desde `ai.pos_projection`, que es un dato que Python ya tiene proyectado. La arista de vuelta del diagrama de arriba, por tanto, **no existe todavía**. El motivo no es de plazo: la única arista Python → .NET que hay hoy es `AiIndexFeedController`, autenticada con `X-Index-Feed-Key`, **sin `[Authorize]` a propósito** y **sin transportar `pos_id`**, y su ruta `pos-availability` es un feed paginado de 200 filas con keyset, pensado para un drenaje batch y no para preguntar por una pieza. Construirlo habría significado ruta .NET nueva, filtro de autenticación con ámbito de punto de venta y tests de integración: zona .NET dentro de un change de zona Python. **El endpoint queda identificado, acotado y no hecho**, con su ficha y lo que hará falta en [`openspec/DEFERRED_TASKS.md`](../../openspec/DEFERRED_TASKS.md) — incluida la advertencia de que un cliente HTTP de propósito general **no pasará** el invariante de solo-lectura del registro, porque expone `post`, `put`, `patch` y `delete`, y habrá que envolverlo en una superficie que exponga sólo la lectura. Lo que C32a sí fija de forma definitiva, venga el dato de donde venga, es que **al modelo no le llega un número**: la observación es una etiqueta cualitativa sin dígitos.
 
 ### 6.2. Qué vive dónde (respuesta a la decisión 9)
 
@@ -507,7 +509,7 @@ Eran dos hasta el 2026-08-31; el de inventario se anuló con toda su rama de imp
 
 | Agente | Qué decide | Tools (todas de lectura) | Salida |
 |---|---|---|---|
-| **Asistente de venta** (síncrono) | Si buscar, si pedir aclaración, si pivotar a sustitutos o variantes, si consultar conocimiento | `buscar_catalogo`, `consultar_disponibilidad` (.NET), `listar_familia`, `buscar_sustitutos`, ~~`buscar_complementarios`~~, `consultar_conocimiento`, `pedir_aclaracion` — **seis** *(corregido el 2026-09-13)* | Resultados estructurados + borrador de venta que confirma el operador |
+| **Asistente de venta** (síncrono) | Si buscar, si pedir aclaración, si pivotar a sustitutos o variantes, si consultar conocimiento | `buscar_catalogo`, `consultar_disponibilidad` (~~.NET~~ → **`ai.pos_projection`**, *corregido el 2026-09-20*), `listar_familia`, `buscar_sustitutos`, ~~`buscar_complementarios`~~, `consultar_conocimiento`, `pedir_aclaracion` — **seis** *(corregido el 2026-09-13)* | Resultados estructurados + borrador de venta que confirma el operador |
 | ~~**Agente de inventario** (batch)~~ | ~~Qué priorizar, qué sustituto proponer, cómo redactar el motivo~~ | ~~`senales_demanda`, `stock_por_pos`, `buscar_sustitutos`, `perfil_punto_venta`~~ | **Fuera desde el 31 ago** |
 
 ~~**Siete tools, no ocho.**~~ → **Seis** *(corregido el 2026-09-13; el documento hermano ya lo había bajado a seis el 12 de septiembre y esta sección no se sincronizó).* `perfil_punto_venta` sale del registro con el perfil por POS: registrar una tool cuyo servicio no existe le da al modelo una herramienta que falla siempre, y una tool que devuelve error es peor que una tool ausente — el bucle la reintenta y quema presupuesto. Si el perfil por POS se rescata, vuelve. Y `buscar_complementarios` **salió el 12 de septiembre**, al dispararse el corte nº 1 del §13.4 sobre complementarios: la condición era exactamente ésta y se cumplió. **El recuento no es lo que el PF evalúa del agente**: lo son el bucle, el presupuesto duro, el invariante de solo-lectura y el `partial: true`.

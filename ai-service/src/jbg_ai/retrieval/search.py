@@ -306,6 +306,48 @@ FROM ai.product_document d
 WHERE d.product_id = :source_id
 """
 
+# The same projection as `SOURCE_DOCUMENT_SQL` above, addressed by the other key. Written out
+# rather than parameterised over the column, because a statement whose WHERE clause is built
+# from a string is one refactor away from being built from a caller's string.
+#
+# **Uniqueness of `sku` is .NET's and not this schema's, and that is a decision on record.**
+# `Products.SKU` carries a unique index over there (`ProductConfiguration`), while here
+# `ai.product_document.sku` is a plain NOT NULL text column: the primary key is `product_id`,
+# and no migration declares a unique constraint — or any index at all — on `sku`. The schema
+# change that created this table asked the question and answered it: *«¿Índice único sobre sku?
+# No se crea. La unicidad es del corpus, y C13 hace upsert por product_id.»*
+#
+# So a second row is possible in principle — it would mean the feed carried two active products
+# under one reference — and this statement must not paper over it: there is no ORDER BY and no
+# LIMIT precisely so that the reader below can refuse to pick one. See `document_by_sku`.
+DOCUMENT_BY_SKU_SQL = """
+SELECT
+  d.product_id,
+  d.sku,
+  d.piece_type,
+  d.size_label,
+  d.materials,
+  d.style_tags,
+  d.family_id,
+  d.price_band,
+  d.is_active,
+  (d.embedding IS NOT NULL) AS has_embedding
+FROM ai.product_document d
+WHERE d.sku = :sku
+"""
+
+# One piece, one point of sale, one row at most. `is_assigned_hint` is the same soft-delete
+# predicate `SCOPE_BUCKETS_SQL` applies, and applying it here is what makes an unassigned row
+# indistinguishable from an absent one — which is correct: both mean this point of sale does
+# not carry the piece, and neither is a bucket of zero.
+AVAILABILITY_BUCKET_SQL = """
+SELECT qty_bucket
+FROM ai.pos_projection
+WHERE pos_id = :pos_id
+  AND product_id = :product_id
+  AND is_assigned_hint IS TRUE
+"""
+
 # An UNCORRELATED scalar subquery on the primary key, written once and substituted into both
 # the projection and the ordering. The planner lifts it to an InitPlan and evaluates it once,
 # so the distance operator sees a constant on the right — the shape an index scan needs —
@@ -616,6 +658,57 @@ class SqlAlchemyProductSearch:
             )
             for row in rows
         ]
+
+    async def document_by_sku(self, sku: str) -> SourceDocument | None:
+        """Read one document by SKU. Absence comes back as `None`, never as an exception.
+
+        **`one_or_none()` and not `first()`, because `sku` is not unique in this schema.**
+        Uniqueness is enforced upstream, by .NET, over its own `Products` table; nothing in
+        `ai.product_document` constrains it. `first()` would answer a duplicate reference by
+        taking an arbitrary row of an unordered result — silently returning a different piece
+        on different calls, through the door four of the six sale-assistant tools resolve by.
+        `one_or_none()` raises `MultipleResultsFound`, which is a `SQLAlchemyError` and so
+        arrives at the caller as a dependency failure carrying the real message: a broken feed
+        reads as broken, which is the honest report, rather than as a piece nobody chose.
+        """
+        try:
+            async with session_scope(self._settings) as session:
+                row = (
+                    await session.execute(text(DOCUMENT_BY_SKU_SQL), {"sku": sku})
+                ).mappings().one_or_none()
+        except SQLAlchemyError as exc:
+            raise RetrievalDependencyError(f"database query failed: {exc}") from exc
+        if row is None:
+            return None
+        return SourceDocument(
+            product_id=UUID(str(row["product_id"])),
+            sku=str(row["sku"]),
+            piece_type=_optional_str(row["piece_type"]),
+            size_label=_optional_str(row["size_label"]),
+            materials=_materials_list(row["materials"]),
+            style_tags=_materials_list(row["style_tags"]),
+            family_id=_optional_uuid(row["family_id"]),
+            price_band=_optional_str(row["price_band"]),
+            is_active=bool(row["is_active"]),
+            has_embedding=bool(row["has_embedding"]),
+        )
+
+    async def availability_bucket(self, product_id: UUID, *, pos_id: UUID) -> str | None:
+        """One bucket, or `None` when this point of sale does not carry the piece.
+
+        `None` is the absent row and never a bucket of zero, which the caller needs kept apart.
+        """
+        try:
+            async with session_scope(self._settings) as session:
+                value = (
+                    await session.execute(
+                        text(AVAILABILITY_BUCKET_SQL),
+                        {"pos_id": pos_id, "product_id": product_id},
+                    )
+                ).scalar()
+        except SQLAlchemyError as exc:
+            raise RetrievalDependencyError(f"database query failed: {exc}") from exc
+        return None if value is None else str(value)
 
     async def neighbours_of(
         self,

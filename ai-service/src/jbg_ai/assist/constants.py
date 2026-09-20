@@ -303,3 +303,153 @@ HARD_VIOLATION_CAUSES: tuple[str, ...] = (
     CAUSE_ENUMERATION_FORMAT,
     CAUSE_DECIMAL_FORM,
 )
+
+
+# --- C32a · the sale assistant's tool registry ----------------------------------------------
+
+#: The six tools of the sale assistant, **frozen**. A seventh is a deliberate act with a test
+#: behind it and never whatever `build_registry` happened to assemble, which is the whole
+#: reason this is a declared constant and not a derivation of the construction.
+#:
+#: `perfil_punto_venta` and `buscar_complementarios` are **absent and must stay absent**: the
+#: first was served by a change that was cancelled, the second was cut when its signals
+#: measured empty over the real catalogue. Naming them nowhere would make their return a
+#: silent diff; `test_the_registry_holds_exactly_the_six_frozen_tools` names them so that it
+#: cannot be.
+TOOL_NAMES: tuple[str, ...] = (
+    "buscar_catalogo",
+    "buscar_sustitutos",
+    "listar_familia",
+    "consultar_conocimiento",
+    "consultar_disponibilidad",
+    "pedir_aclaracion",
+)
+
+#: Tools withdrawn before this registry existed. Held as a constant so the frozen-set test can
+#: assert their absence by name rather than by a count that would also pass if one came back
+#: and another left.
+WITHDRAWN_TOOL_NAMES: tuple[str, ...] = (
+    "perfil_punto_venta",
+    "buscar_complementarios",
+)
+
+#: The availability vocabulary, **qualitative and with no digit in it**. The projection stores
+#: availability as `QTY_BUCKETS = {"0", "1-2", "3+"}`, whose members are literally numerals, so
+#: emitting a bucket verbatim would put a stock figure into the model's context — the thing the
+#: service boundary forbids and the thing `SearchHit.qty_bucket` already declares when it says
+#: that «a bucket on the wire would be the beginning of one».
+#:
+#: The authority over stock remains .NET's. This is a **band**, of the same kind the ranking
+#: already consumes, and `test_no_availability_label_contains_a_digit` is what keeps it one.
+AVAILABILITY_OUT_OF_STOCK = "sin_existencias"
+AVAILABILITY_LAST_UNITS = "ultimas_unidades"
+AVAILABILITY_IN_STOCK = "disponible"
+
+#: **A fourth value, and the fourth is the point.** It states that nothing was read — the
+#: principal carries no point of sale, or this point of sale has no projection row for the
+#: piece — and it is NOT an absence of stock. The precedent is literal and it is the port's:
+#: `qty_bucket = None` means «ran unscoped, which is not the same as a bucket of zero».
+#:
+#: Collapsing the two would fire the pivot to substitutes over a piece the shop can actually
+#: sell, which is the failure the degrade-never-remove rule exists to prevent.
+AVAILABILITY_NO_SCOPE = "sin_ambito"
+
+AVAILABILITY_LABELS: tuple[str, ...] = (
+    AVAILABILITY_OUT_OF_STOCK,
+    AVAILABILITY_LAST_UNITS,
+    AVAILABILITY_IN_STOCK,
+    AVAILABILITY_NO_SCOPE,
+)
+
+#: Every bucket the index feed can store, mapped to its label.
+#:
+#: **The keys are written out here rather than imported from `indexing/feed.py`**, because this
+#: module imports nothing at all and that property is what lets everything else read from it
+#: without a cycle. The coupling is not lost, it is moved to where it can fail loudly:
+#: `test_every_bucket_the_feed_can_store_has_a_label` compares these keys against `QTY_BUCKETS`
+#: itself, so a tenth bucket added to the feed breaks a test rather than silently falling
+#: through to «no scope».
+#:
+#: `AVAILABILITY_NO_SCOPE` is deliberately **not** a value of this map: it is never derived
+#: from a bucket, only from the absence of one.
+AVAILABILITY_LABEL_BY_BUCKET: dict[str, str] = {
+    "0": AVAILABILITY_OUT_OF_STOCK,
+    "1-2": AVAILABILITY_LAST_UNITS,
+    "3+": AVAILABILITY_IN_STOCK,
+}
+
+#: Why a tool observation came back failed. **Codes, never prose**, the same rule the
+#: rule-derived warnings above already follow — the Spanish belongs to whoever presents it, and
+#: here the consumer is a loop that has to branch on the cause rather than read it.
+#:
+#: They are in Spanish because their siblings in this file are: the tool names, their
+#: descriptions and the availability labels all are, and a consumer reading `sin_ambito` beside
+#: `unknown_reference` would be reading two vocabularies that were never meant to be two.
+#:
+#: An exception is **not** one of the options. One escaping would kill the consuming loop
+#: instead of costing it one turn, and a generic `error` would leave the model blind exactly
+#: where an informative code lets it reformulate.
+
+#: The arguments did not satisfy the tool's own schema. Raised **before any port is touched**.
+TOOL_CAUSE_INVALID_ARGUMENT = "argumento_invalido"
+
+#: The SKU does not exist in the index. A statement about the reference, not about the
+#: catalogue: reformulating with another piece is the useful next step.
+TOOL_CAUSE_UNKNOWN_REFERENCE = "referencia_desconocida"
+
+#: The piece exists and cannot anchor this tool — discontinued, or indexed without an
+#: embedding. Separate from the code above because the two are different sentences for whoever
+#: has to act on them, exactly as the substitutes path already keeps them apart.
+TOOL_CAUSE_UNUSABLE_REFERENCE = "referencia_no_utilizable"
+
+#: A dependency the tool consults is unavailable. The loop's useful move is to stop asking this
+#: tool, which is a different decision from reformulating, so it is a different code.
+TOOL_CAUSE_DEPENDENCY_UNAVAILABLE = "dependencia_no_disponible"
+
+TOOL_FAILURE_CAUSES: tuple[str, ...] = (
+    TOOL_CAUSE_INVALID_ARGUMENT,
+    TOOL_CAUSE_UNKNOWN_REFERENCE,
+    TOOL_CAUSE_UNUSABLE_REFERENCE,
+    TOOL_CAUSE_DEPENDENCY_UNAVAILABLE,
+)
+
+#: Candidates one catalogue search may return, as the tool's schema declares them. **A declared
+#: minimum and maximum and not an open integer**: everything a tool returns is re-sent on every
+#: subsequent turn of the consuming loop, so an uncapped `top_k` is the cheapest way for one
+#: turn to drag fifty candidates through all the following ones.
+TOOL_TOP_K_MIN = 1
+TOOL_TOP_K_MAX = 10
+TOOL_TOP_K_DEFAULT = 5
+
+#: Fragments one knowledge question may return. Same argument as the bound above, and the same
+#: reason it is small: a fragment is a paragraph, not a row.
+TOOL_CITATION_TOP_K = 3
+
+#: The method-name vocabulary that marks a write. Matched **token by token** against the
+#: snake_case name of every method a tool's collaborators expose.
+#:
+#: **Token equality and not substring containment, and the difference is not cosmetic.** Read
+#: literally as a substring, `sync` flags `ProductSearchPort.projection_synced_at()` and
+#: `ProjectionFreshness.synced_at()`, which are reads of a checkpoint, and the invariant would
+#: be unsatisfiable with the very ports this registry is required to inject. Token equality
+#: catches every spelling built from one of these verbs — `save_profile`, `bulk_insert`,
+#: `upsert_projection`, `delete_row`, `sync_now`, `apply_page` — and
+#: `test_a_tool_capturing_a_writing_port_is_refused_however_it_describes_itself` is what holds
+#: that claim up.
+#:
+#: **What it does not catch is a verb this list never had, and that is the real limit.** It is
+#: not inflection: `SqlAlchemyPosProjection.put_checkpoint()` is an `INSERT … ON CONFLICT DO
+#: UPDATE` that lives in this repository today and matches nothing here — and would match
+#: nothing under substring reading either, so the comparison rule is not what loses it. The
+#: same goes for the family it belongs to: `put_`, `store_`, `record_`, `commit`, `flush`. The
+#: vocabulary is fixed by the change's design decision and widening it is a decision, not a
+#: patch; what must not happen is reading this set as though it were exhaustive. The check is
+#: a floor under the object graph, not a proof that no method writes.
+WRITE_METHOD_VERBS: frozenset[str] = frozenset(
+    {"insert", "update", "delete", "write", "save", "upsert", "persist", "sync", "apply"}
+)
+
+#: HTTP verbs that are not a read. A collaborator exposing one of these as a callable is a
+#: client that **can** issue it, which is what the third axis of the read-only check refuses —
+#: the question is what the object is able to do, never what it happens to do today.
+WRITE_HTTP_VERBS: frozenset[str] = frozenset({"post", "put", "patch", "delete"})

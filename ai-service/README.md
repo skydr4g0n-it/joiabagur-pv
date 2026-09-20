@@ -946,6 +946,95 @@ carrying every violation of every check together. It is literal — there is no 
 backoff underneath it, and that is a deliberate departure from C09's seam, whose two-second base
 backoff would consume two thirds of the per-call budget before the retried call started.
 
+## The sale assistant's tool registry (C32a)
+
+C30a gave the assistance layer its structure, C30b its prose and C31 its entry guardrail. What
+was missing to close the agentic branch was the layer of decision, and C32 was split on
+2026-09-20 into the two halves that compose it. **This is the lower one: the tools and their
+registry, and it calls no chat provider at all.** The loop, its three budgets, `partial: true`
+and `POST /v1/assist/agent` are C32b.
+
+`jbg_ai/assist/tools.py` holds six read-only tools — `buscar_catalogo`, `buscar_sustitutos`,
+`listar_familia`, `consultar_conocimiento`, `consultar_disponibilidad` and `pedir_aclaracion` —
+each with a Spanish description written for a reader who sees no code, a typed parameter schema
+and **argument validation that runs before any port is touched**. It is a library wired to **no
+route**: `openapi.json` is byte for byte the file C31 left, and `POST /v1/assist/sale` behaves
+exactly as it did.
+
+Four properties are what the half is for, and each is a test rather than a sentence.
+
+**The set of six is frozen.** `TOOL_NAMES` is a declared constant and construction refuses
+anything outside it, so the two tools withdrawn before this registry existed —
+`perfil_punto_venta`, whose change was cancelled, and `buscar_complementarios`, cut when its
+signals measured empty — cannot come back by accident.
+
+**Nothing writes, and the check looks at the object graph.** Not at a `writes: bool` on the
+descriptor, which is set by whoever registers the tool — precisely who could be wrong. Three
+axes over the constructed registry: the set of names, the methods every collaborator a tool
+captured exposes, and the HTTP verbs any registered client could issue. A tool that describes
+itself as read-only and captures a port with a write method **fails the build**. The published
+limitation that no agent writes is one of the three this README hands over, so it is
+demonstrated or it is not declared.
+
+The write vocabulary is matched **token by token** and not as a substring, and that is a
+correction the implementation forced: read literally, `sync` occurs inside
+`ProductSearchPort.projection_synced_at()` and `ProjectionFreshness.synced_at()`, which read a
+checkpoint, and the invariant would have been unsatisfiable with the very ports the registry
+must inject. What token equality loses is not an inflection of a verb the vocabulary holds but
+a verb it never had — `put_checkpoint()` writes and matches nothing, under either reading — so
+the set is a floor under the object graph and not a proof that no method writes.
+
+Two objects are excluded from the scan, **by name and not by category**: `Settings` and
+`ServicePrincipal`, which are configuration and identity, perform no I/O, and trip the
+vocabulary only on pydantic's deprecated v1 shim `update_forward_refs`. Excluding the *kinds*
+they belong to was the first attempt and it was a bug: dropping every pydantic model and every
+dataclass silently removed `InMemoryKnowledgeIndex` — a real port, captured by
+`consultar_conocimiento` — from all three axes while every assertion stayed green. A port is
+inspected whatever it is built from, and the exclusion list lives in the module whose only
+reason to exist is to check, so no tool can opt its own dependencies out.
+
+**A failure is data.** No exception leaves an invocation: one escaping would kill C32b's loop
+instead of costing it a single turn. Every failure carries a code from a closed vocabulary —
+`argumento_invalido`, `referencia_desconocida`, `referencia_no_utilizable`,
+`dependencia_no_disponible` — never prose, by the rule the rule-derived warnings already follow.
+
+**Availability is a band and never a figure.** `consultar_disponibilidad` is the one tool that
+had no service behind it, and it is served from `ai.pos_projection` rather than from .NET —
+which resolves the open question of the design's §6.1 by **deferring it with a reason**: the
+only Python → .NET edge that exists carries `X-Index-Feed-Key`, has no `[Authorize]` on purpose
+and no `pos_id`, and its `pos-availability` route is a paginated feed of 200 rows rather than a
+point lookup. The endpoint is identified, bounded and **not built**, recorded in
+`openspec/DEFERRED_TASKS.md`, with the tool shaped so that it is a drop-in replacement.
+
+The projection stores availability as `QTY_BUCKETS = {"0", "1-2", "3+"}`, and **those are
+numerals**: emitting one would put a stock figure into a model's context, which is what the
+service boundary forbids. The tool maps them to `sin_existencias`, `ultimas_unidades` and
+`disponible`, with a **fourth** value, `sin_ambito`, for a principal carrying no point of sale
+or a piece with no projection row. The fourth is the point: absence of a row is not a count of
+zero, and collapsing them would fire the pivot to substitutes over a piece the shop can
+actually sell. The observation also declares the **age** of the projection reading, and a stale
+projection degrades it rather than failing it — degrade, never remove. The authority over stock
+stays .NET's.
+
+Two reads are added to `ProductSearchPort` and none is modified: one document by **SKU**, and
+the availability bucket of **one** piece at one point of sale. Tools address a piece by SKU and
+never by internal identifier — a SKU is stable, real and semantic, while an internal identifier
+is an arbitrary string of digits nobody says at a counter, which is why the generation layer
+already excludes it from everything a model is shown. The per-piece read exists instead of
+`scope_buckets()` because that one returns the point of sale's entire assortment, of the order
+of a thousand rows, to answer a question about one piece.
+
+The embedding calls two of the tools legitimately make are counted in **a counter of their
+own**, because the `usage.calls` figure the assistance layer publishes means *chat calls of one
+request* and has tests asserting its ceiling; widening its meaning here would make a number
+that is already reported mean two different things in two places.
+
+**What this half cannot measure, and says so.** The tool descriptions have not been iterated
+against a real model, because this half calls none. They are prompts, and a prompt is iterated
+with measurement — that happens in C32b. The granularity of six may equally turn out to be
+wrong, and the registry is left with its ports injected precisely so that regrouping a tool
+costs neither the ports nor their suite.
+
 ## Tests
 
 ```bash
@@ -986,6 +1075,7 @@ These four tests exist to catch failures that produce **no error at all**: an HN
 - No `ai.query_log` (unassigned; the pipeline logs `stage=expand|embed|search|lexical|filters|fuse` with `trace_id` instead). The `ai.eval_*` tables **exist since C24** and are written only with `--persist`
 - No reranking. C24 measured the number that would make it decidable and C25 re-measured it under the two-stage fusion — **two queries of forty-three** have a maximum-grade document inside the window a reranker would reorder but outside the five that are shown — and a cross-encoder at ~250 ms would spend 10-15 % of C16's budget for a ceiling of 2 % of the queries. Adding one is a `configs/v2-rerank.yaml` plus a run, which is the protocol being executable rather than rhetorical
 - No recalibration of `JPV_RETRIEVAL_DISTANCE_THRESHOLD`, and **C25 settled that it was never the right lever**. Over 3.926 judgements the relevant documents reach a distance of 0,8008 and the irrelevant ones start at 0,3268, so the two populations overlap; per QUERY — the quantity that actually decides — the answerable best hits reach 0,7118 while the out-of-domain ones start at 0,4469, which is **containment and not partial overlap**: the impossible range sits *inside* the answerable one. No scalar can separate them, so C25 ships a **relative per-query rule** (`retrieval/abstention.py`) that reads the SHAPE of the distance profile, runs after the fusion and does not alter the candidate set. The scalar stays where it is **by decision rather than by deferral**
+- **No agent loop, and C32a is deliberately only its lower half.** The six read-only tools, their frozen registry and the read-only invariant exist and are tested; the loop, its iteration/tool/provider budgets, `partial: true`, `POST /v1/assist/agent` and the multi-turn transcript are **C32b**. Nothing in `assist/tools.py` is reachable from outside the process, because it is wired to no route — which is also why `openapi.json` did not move. The point availability endpoint on the .NET side is **identified, bounded and not built**, recorded in `openspec/DEFERRED_TASKS.md` with its reason
 - No SQL access to schema `public`, ever
 - No production deploy, SSM or `CREATE EXTENSION` on RDS. C17 delivered the **enriched health** — `GET /health` reports database reachability, indexed document count, whether the embedding provider credential is configured, and a contrast between the configured embedding model and the one recorded on the index rows, all without ever calling the provider — and deployed it to an **isolated demo account**, not to the shop's production account. The return annotation stays an open mapping, so `openapi.json` is unchanged
 - No production tuning: `halfvec`, `hnsw.iterative_scan`, `CREATE INDEX CONCURRENTLY` and the `VACUUM`/`REINDEX` cycle are deliberate omissions at ~1,500 vectors, not oversights
@@ -1032,6 +1122,15 @@ ai-service/
                     # prompt.py gains PitchTask (six task sections) and FreeQueryPayload, the
                     # second payload shape — several candidates, and internal identifiers and
                     # retrieval scores excluded, because every numeral widens the whitelist
+                    # + C32a the tool registry: tools.py (six read-only tools, the FROZEN
+                    # name set, argument validation before any port is touched, failures as
+                    # observations with a closed cause, and the read-only invariant checked by
+                    # INTROSPECTION of the object graph rather than by a `writes` flag). A
+                    # library wired to NO route: openapi.json does not move, and its consumer
+                    # is C32b's loop. constants.py gains the qualitative availability
+                    # vocabulary — the projection's buckets are numerals, so a bucket never
+                    # reaches a model — with «sin ambito» as a fourth value that is not
+                    # «agotado», plus the tool failure causes and the write-method vocabulary
     evals/          # C24 harness: golden.py (load + the composition validation that fails the
                     # load), pooling.py (adaptive depth), metrics.py (graded and binary),
                     # + C31 routing.py / routing_run.py (the 119-case manifest, five of its six
