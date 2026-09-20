@@ -163,6 +163,13 @@
       "policy": "editable",
       "reference": "references/documentos-funcionales.md"
     },
+    "doc-pf-diseno-rag": {
+      "path": "Documentos/Proyecto Final AIEng/proyecto-final-diseno-rag-joiabagur.md",
+      "title": "Diseno RAG del Proyecto Final de IA",
+      "language": "es",
+      "policy": "editable",
+      "reference": "references/documentos-funcionales.md"
+    },
 
     "openspec-project": {
       "path": "openspec/project.md",
@@ -300,7 +307,7 @@
     {
       "name": "ai-service",
       "globs": ["ai-service/**"],
-      "docs": ["readme-ai-service", "doc-pf-especificaciones", "readme-ai-service-tests"],
+      "docs": ["readme-ai-service", "doc-pf-especificaciones", "readme-ai-service-tests", "doc-pf-diseno-rag"],
       "reason": "Resto de jbg-ai: revisa el README del servicio y las especificaciones del Proyecto Final. Un modulo nuevo en src/jbg_ai/ implica carpeta nueva en tests/."
     },
     {
@@ -342,7 +349,7 @@
     {
       "name": "openspec-specs",
       "globs": ["openspec/specs/**"],
-      "docs": ["doc-epicas", "openspec-project", "doc-historias"],
+      "docs": ["doc-epicas", "openspec-project", "doc-historias", "doc-pf-diseno-rag"],
       "reason": "Specs vivas sincronizadas: la capability cambio de comportamiento y la documentacion funcional debe reflejarlo."
     },
     {
