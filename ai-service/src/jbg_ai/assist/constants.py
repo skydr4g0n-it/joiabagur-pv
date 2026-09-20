@@ -432,9 +432,19 @@ TOOL_CITATION_TOP_K = 3
 #: literally as a substring, `sync` flags `ProductSearchPort.projection_synced_at()` and
 #: `ProjectionFreshness.synced_at()`, which are reads of a checkpoint, and the invariant would
 #: be unsatisfiable with the very ports this registry is required to inject. Token equality
-#: still catches every natural spelling of a write — `save_profile`, `bulk_insert`,
-#: `upsert_projection`, `delete_row`, `sync_now` — and `test_a_tool_capturing_a_writing_port_
-#: fails_the_read_only_check` is what holds that claim up.
+#: catches every spelling built from one of these verbs — `save_profile`, `bulk_insert`,
+#: `upsert_projection`, `delete_row`, `sync_now`, `apply_page` — and
+#: `test_a_tool_capturing_a_writing_port_is_refused_however_it_describes_itself` is what holds
+#: that claim up.
+#:
+#: **What it does not catch is a verb this list never had, and that is the real limit.** It is
+#: not inflection: `SqlAlchemyPosProjection.put_checkpoint()` is an `INSERT … ON CONFLICT DO
+#: UPDATE` that lives in this repository today and matches nothing here — and would match
+#: nothing under substring reading either, so the comparison rule is not what loses it. The
+#: same goes for the family it belongs to: `put_`, `store_`, `record_`, `commit`, `flush`. The
+#: vocabulary is fixed by the change's design decision and widening it is a decision, not a
+#: patch; what must not happen is reading this set as though it were exhaustive. The check is
+#: a floor under the object graph, not a proof that no method writes.
 WRITE_METHOD_VERBS: frozenset[str] = frozenset(
     {"insert", "update", "delete", "write", "save", "upsert", "persist", "sync", "apply"}
 )

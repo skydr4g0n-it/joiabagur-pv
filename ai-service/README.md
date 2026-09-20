@@ -980,10 +980,18 @@ The write vocabulary is matched **token by token** and not as a substring, and t
 correction the implementation forced: read literally, `sync` occurs inside
 `ProductSearchPort.projection_synced_at()` and `ProjectionFreshness.synced_at()`, which read a
 checkpoint, and the invariant would have been unsatisfiable with the very ports the registry
-must inject. Configuration is excluded from the scan for the same kind of reason — `Settings`
-is a pydantic model whose deprecated v1 shim `update_forward_refs` a literal reading flags —
-and both exclusions are structural rather than declared per tool, so no tool can opt its own
-dependencies out.
+must inject. What token equality loses is not an inflection of a verb the vocabulary holds but
+a verb it never had — `put_checkpoint()` writes and matches nothing, under either reading — so
+the set is a floor under the object graph and not a proof that no method writes.
+
+Two objects are excluded from the scan, **by name and not by category**: `Settings` and
+`ServicePrincipal`, which are configuration and identity, perform no I/O, and trip the
+vocabulary only on pydantic's deprecated v1 shim `update_forward_refs`. Excluding the *kinds*
+they belong to was the first attempt and it was a bug: dropping every pydantic model and every
+dataclass silently removed `InMemoryKnowledgeIndex` — a real port, captured by
+`consultar_conocimiento` — from all three axes while every assertion stayed green. A port is
+inspected whatever it is built from, and the exclusion list lives in the module whose only
+reason to exist is to check, so no tool can opt its own dependencies out.
 
 **A failure is data.** No exception leaves an invocation: one escaping would kill C32b's loop
 instead of costing it a single turn. Every failure carries a code from a closed vocabulary —

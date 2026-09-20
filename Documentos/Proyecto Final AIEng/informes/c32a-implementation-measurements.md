@@ -32,12 +32,18 @@ costó no estaba escrita en ningún artefacto.
 | `document_by_sku()` y `availability_bucket()` en el `Protocol` | `retrieval/ports.py` | ampliado, **nada modificado** |
 | Sus dos sentencias SQL y sus dos métodos | `retrieval/search.py` | ampliado, **nada modificado** |
 | Los dos métodos en el doble compartido | `tests/support/fake_product_search.py` | ampliado |
-| La suite de la capability | `tests/assist/test_tools.py` | **nuevo**, 50 tests |
+| La suite de la capability | `tests/assist/test_tools.py` | **nuevo**, 51 tests |
 
 **Suite:** línea base **1.418 passed / 0 failed**; al cierre **1.468 passed / 0 failed**,
 comparada **por nombres** y no por recuento. **50 tests nuevos, todos en `test_tools.py`, y
 ningún test retirado ni renombrado**: los 1.418 nombres de la línea base están los 1.418 al
 cierre, y en verde.
+
+**Tras la verificación independiente: 1.469 passed / 0 failed.** Una prueba más —la de abstención
+del §2.4— y **cero nombres desaparecidos**, comparado otra vez con `comm` sobre los *node id*. Los
+cuatro hallazgos de esa pasada, con su medición y su control, están en el §11 del
+[QA](../../../openspec/changes/add-sales-assistant-tool-registry/qa.md); dos de ellos —la exclusión
+por categoría del §2.2 y la unicidad de `sku` del §3— eran defectos de código y no de redacción.
 
 **La suite de `ai-service` está verde de fábrica** — 1.418 de 1.418 — y conviene decirlo porque
 [CLAUDE.md](../../../CLAUDE.md) documenta líneas base **rojas** para el backend (decenas de
@@ -100,14 +106,26 @@ Freshness  -> []
 seis tools porque `retrieve_products()` y `retrieve_substitutes()` lo exigen.
 
 **Qué se hizo.** La comprobación distingue **colaborador** de **dato inerte**, y lo hace
-**estructuralmente**: se excluyen primitivos, contenedores, módulos, clases, funciones, modelos
-de pydantic y *dataclasses*. `Settings` es un modelo de pydantic, no hace E/S y es configuración.
-Lo que queda dentro es exactamente lo que puede alcanzar un sistema de registro.
+**estructuralmente**: se excluyen primitivos, contenedores, módulos, clases, funciones, y **dos
+tipos nombrados uno a uno** — `Settings` y `ServicePrincipal`. Los dos son configuración e
+identidad, ninguno hace E/S, y los dos tropiezan con el vocabulario sólo por el *shim* de
+pydantic v1.
+
+**Por qué nombrados y no por categoría, que es lo que se escribió primero y era un fallo.** La
+primera versión excluía todo modelo de pydantic y toda *dataclass*, y una verificación
+independiente lo midió: `InMemoryKnowledgeIndex` es una dataclass, es el puerto que
+`consultar_conocimiento` captura, y **quedaba fuera de los tres ejes** sin que ninguna aserción se
+pusiera roja. Peor: un puerto que escribiera, escrito como dataclass o como modelo de pydantic,
+**construía el registro**. La frase que ocupaba este sitio —*«lo que queda dentro es exactamente lo
+que puede alcanzar un sistema de registro»*— era falsa, y la corrección es la que la hace cierta:
+**un puerto se inspecciona sea cual sea la construcción con la que esté escrito.** El registro de
+la medición, con su control al lado, está en el §11.1 del [QA](../../../openspec/changes/add-sales-assistant-tool-registry/qa.md).
 
 **Por qué esto no es la bandera `writes: bool` con otro nombre.** La exclusión vive en el módulo
-del invariante y depende del **tipo** del objeto, no de nada que la tool declare sobre sí misma.
-Una tool no puede sacar sus dependencias de la comprobación; para hacerlo habría que editar el
-fichero cuya única razón de existir es comprobar.
+del invariante y nombra **objetos concretos**, no una propiedad que la tool declare sobre sí misma
+ni una categoría a la que un puerto pueda pertenecer por casualidad. Una tool no puede sacar sus
+dependencias de la comprobación; para hacerlo habría que editar el fichero cuya única razón de
+existir es comprobar, y añadir un nombre a esa lista se lee en el diff.
 
 ### 2.3 · Faltaba una cuarta causa de fallo, y el árbol la impone
 
@@ -144,6 +162,16 @@ la costura `on_abstention`.
 es la señal que un bucle puede usar para decidir si reformula o concluye que no hay nada.
 `low_confidence` **no se reexporta bajo ningún nombre**, y
 `test_the_catalogue_search_reports_abstention_and_not_the_consensus_flag` lo pincha.
+
+**Y la prueba que faltaba, que es la que hace que esto no sea circular.** Ese test conducía sólo
+el caso respondible: afirmaba que `abstenido` estaba y era un booleano, y que el otro campo no
+estaba. **Todas esas aserciones habrían pasado sobre un `"abstenido": False` cableado a mano** —
+que es, literalmente, el modo de fallo que dejó colarse `low_confidence` la primera vez. Una
+verificación independiente lo señaló y se cerró con
+`test_the_catalogue_search_reports_an_abstention_when_the_retriever_abstains`, que construye un
+mundo de perfil de distancias plano —la forma sobre la que abstiene la regla relativa de C25— y
+afirma `content["abstenido"] is True` con la lista de candidatos vacía. Las dos direcciones, ahora
+sí, son `True` y `False` y no «está» y «no está».
 
 ### 2.5 · La ampliación del `Protocol` **no** rompió los dobles, y la razón importa
 
@@ -196,6 +224,7 @@ Ninguna de éstas contradice nada escrito; son huecos que hubo que rellenar.
 | 4 | Dónde se ata el principal | **En `build_registry`**, no en `invoke` | El ámbito de lectura es del token, como en todo `/v1`; pasarlo por llamada lo convertiría en un argumento que el llamante elige. Construir un registro por petición no cuesta E/S |
 | 5 | Validación de argumentos | **Modelos de pydantic** con `extra="forbid"` | Dependencia ya usada; el esquema se **deriva** del modelo, así que una cota declarada y una cota publicada no pueden discrepar. `extra="forbid"` hace que un parámetro inventado sea una llamada rechazada y no una ignorada en silencio |
 | 6 | Profundidad de la introspección | **Lo que la tool recibe**, sin recorrer atributos | Recorrer atributos convierte la comprobación en un barrido del proceso entero: `Settings` sola arrastra toda la configuración. Está declarado en el docstring qué caza y qué no |
+| 7 | Un SKU que devolviera dos filas | **`one_or_none()`**, que lanza | *Corregido tras la verificación independiente.* `sku` **no es único en el esquema `ai`**: no hay restricción única ni índice alguno sobre esa columna en ninguna migración, y la unicidad la impone .NET sobre su propia tabla (`ProductConfiguration`: `HasIndex(p => p.SKU).IsUnique()`). No es un olvido de aquella migración sino una decisión archivada: el ticket de `add-pgvector-schema-foundation` pregunta por ese índice y responde *«no se crea; la unicidad es del corpus»*. El comentario, por tanto, **contradecía una decisión tomada** para justificar el `first()`. El `first()` original devolvía ante un duplicado **una fila arbitraria de un resultado sin `ORDER BY`** —una pieza distinta en llamadas distintas, por la puerta que resuelven cuatro de las seis tools— que es justo lo que el comentario decía querer evitar. `one_or_none()` lanza `MultipleResultsFound`, que llega al llamante como `dependencia_no_disponible` con el mensaje real: un feed roto se lee como roto |
 
 ---
 
@@ -262,6 +291,7 @@ salvo donde se indica.
 | | …ningún cliente HTTP emite otro verbo que `GET` | `test_no_collaborator_captured_by_a_tool_can_issue_a_write_http_verb` |
 | | …la comprobación **falla** aunque el descriptor diga lo contrario | `test_a_tool_capturing_a_writing_port_is_refused_however_it_describes_itself` |
 | | *(anti-vacuidad y regla de comparación)* | `test_the_read_only_check_reaches_every_port_the_registry_was_handed` · `test_the_write_vocabulary_catches_every_natural_spelling_of_a_write` |
+| | *(que el puerto de conocimiento entre en el barrido — §2.2)* | `test_the_read_only_check_reaches_every_port_the_registry_was_handed`, que nombra `InMemoryKnowledgeIndex` |
 | **3** | Un fallo de dependencia vuelve como observación | `test_a_dependency_failure_comes_back_as_a_failed_observation_and_not_an_exception` |
 | | …con causa de vocabulario cerrado | `test_a_failure_cause_is_always_a_code_of_the_closed_vocabulary` · `test_an_unknown_tool_name_is_an_observation_and_not_an_exception` |
 | **4** | Disponibilidad con etiqueta del vocabulario cerrado | `test_availability_answers_with_the_label_of_the_stored_bucket` |
@@ -311,10 +341,22 @@ salvo donde se indica.
    el stock sigue siendo de .NET (§6.2). Por eso la observación declara su frescura, **degrada y
    nunca elimina**.
 2. **Las descripciones de las tools no se han medido contra un modelo.** Ver §7.3.
-3. **El invariante de solo-lectura caza lo que puede cazar.** No recorre atributos de un
-   colaborador, así que un puerto escondido dentro de otro objeto se le escaparía — y quien esté
-   dispuesto a esconder una escritura tiene caminos más fáciles. Y sobre `pedir_aclaracion` pasa
-   **vacuamente**, porque esa tool no captura nada. Ambos límites están en el docstring y en §2.6.
+3. **El invariante de solo-lectura caza lo que puede cazar**, y los cuatro límites están en el
+   docstring del módulo, en §2.6 y en el §9.6 del QA:
+   - **No recorre atributos** de un colaborador, así que un puerto escondido dentro de otro objeto
+     se le escaparía — y quien esté dispuesto a esconder una escritura tiene caminos más fáciles.
+   - **Sólo ve lo que el ejecutor cierra.** Una función de módulo que alcanzara un puerto por
+     búsqueda global no tiene celda de cierre y pasaría los tres ejes sobre una lista vacía. Hoy es
+     inocuo —las seis son *closures* anidadas en `build_registry`, la única costura de
+     construcción— y es la razón de que una tool futura deba construirse igual.
+   - **Sobre `pedir_aclaracion` pasa vacuamente**, porque esa tool no captura nada.
+   - **El vocabulario de escritura no es exhaustivo.** Y el hueco no es una flexión sino un verbo
+     que la lista nunca tuvo: `SqlAlchemyPosProjection.put_checkpoint()` es un `INSERT … ON
+     CONFLICT DO UPDATE` de este repositorio y no casa nada, **ni por token ni por subcadena**, así
+     que no es la regla de comparación del §2.1 la que lo pierde. Con él se pierde su familia:
+     `put_`, `store_`, `record_`, `commit`, `flush`. Ensancharla es una decisión de D-6, no un
+     parche; lo que no se puede es leer el conjunto como si fuera exhaustivo. **Es un suelo bajo el
+     grafo de objetos, no una demostración de que ningún método escribe.**
 4. **`style_similarity` sigue en cero para 403 de 404 productos reales** (C26), así que las
    observaciones de `buscar_sustitutos` heredan esa limitación ya declarada. No es de aquí.
 5. **El recuento de seis no es lo que el PF evalúa.** Lo evaluable son el bucle, el presupuesto

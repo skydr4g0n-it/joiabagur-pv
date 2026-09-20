@@ -170,8 +170,14 @@ def test_the_read_only_check_reaches_every_port_the_registry_was_handed(
 ) -> None:
     """A check that found nothing to inspect would pass vacuously, which is worse than failing.
 
-    Pins the seam rather than the count: the four tools that consult an index must be seen to
-    capture one, or the two assertions above are green over an empty list.
+    Pins the seam rather than the count: every tool that consults an index must be seen to
+    capture it, or the two assertions above are green over an empty list.
+
+    `InMemoryKnowledgeIndex` is named here for a reason that cost a verification pass. It is a
+    dataclass, and an earlier form of `_is_collaborator` excluded dataclasses wholesale, so the
+    knowledge port — the only real collaborator `consultar_conocimiento` has — fell out of all
+    three axes while every assertion stayed green. A port is inspected whatever it is built
+    from; this line is what keeps that true.
     """
     captured = {
         spec.name: sorted(type(item).__name__ for item in captured_collaborators(spec))
@@ -180,6 +186,7 @@ def test_the_read_only_check_reaches_every_port_the_registry_was_handed(
     assert "FakeProductSearch" in captured["buscar_catalogo"]
     assert "FakeProductSearch" in captured["consultar_disponibilidad"]
     assert "CountingEmbeddings" in captured["consultar_conocimiento"]
+    assert "InMemoryKnowledgeIndex" in captured["consultar_conocimiento"]
     # The clarification tool resolves a template from a closed catalogue and consults nothing.
     assert captured["pedir_aclaracion"] == []
 
@@ -360,8 +367,12 @@ def test_the_availability_observation_carries_no_stock_quantity_anywhere(
     label = observation.content["disponibilidad"]
     assert label in AVAILABILITY_LABELS
     assert not any(character.isdigit() for character in str(label))
-    # The buckets are numerals; none of them may appear as a value of the observation.
-    emitted = {str(value) for value in observation.content.values()}
+    # The buckets are numerals; none of them may appear as a value ANYWHERE in the observation.
+    # Walked with `_rows_of` rather than over the top-level values, so the assertion still holds
+    # if this observation ever grows a nested row — the shape is not what the rule is about.
+    emitted = {
+        str(value) for row in _rows_of(observation.content) for value in row.values()
+    }
     assert not emitted & set(QTY_BUCKETS)
 
 
@@ -872,8 +883,41 @@ def test_the_catalogue_search_reports_abstention_and_not_the_consensus_flag(
 
     assert observation.ok is True
     assert "abstenido" in observation.content
-    assert isinstance(observation.content["abstenido"], bool)
+    assert observation.content["abstenido"] is False, "the premise: this query is answerable"
+    assert observation.content["candidatos"], "and it returns candidates"
     # The consensus flag is deliberately not re-exported under another name: a consumer that
     # read it as an abstention would report the opposite of the truth.
     assert "confianza_baja" not in observation.content
     assert "low_confidence" not in observation.content
+
+
+def test_the_catalogue_search_reports_an_abstention_when_the_retriever_abstains(
+    knowledge: InMemoryKnowledgeIndex, principal: ServicePrincipal
+) -> None:
+    """The positive direction of `abstenido`, which is the one the field exists for.
+
+    The test above drives only the answerable case, and every assertion it makes would stay
+    green over a field hardcoded to `False` — which is precisely the failure mode that made
+    re-exporting `low_confidence` survive its first review. So the abstention has to be driven
+    for real: a flat distance profile is the shape of a query the catalogue cannot answer, and
+    the relative rule of C25 abstains on it.
+    """
+    flat = [
+        indexed_row(
+            product_id=UUID(int=index),
+            sku=f"JBG-{index:04d}",
+            distance=0.500 + 0.0005 * index,
+        )
+        for index in range(1, 21)
+    ]
+    registry = make_registry(
+        search=FakeProductSearch(flat), knowledge=knowledge, principal=principal
+    )
+    observation = run(registry.invoke("buscar_catalogo", {"consulta": "anillo de plata"}))
+
+    assert observation.ok is True
+    assert observation.content["abstenido"] is True
+    # An abstention is a decision about the WHOLE query, so it empties the candidate list. The
+    # flag is the only thing that tells the consumer to reformulate rather than conclude that
+    # the catalogue holds nothing — the two empty lists look identical without it.
+    assert observation.content["candidatos"] == []

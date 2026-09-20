@@ -40,9 +40,10 @@ la tarea 1.1 lo proponía.
 | `ai-service` tras reconciliar los tres | **1467 passed**, 0 failed, 101,9 s |
 | `ai-service` tras el hallazgo de `low_confidence` (§9.3) | **1468 passed**, 0 failed, 85,3 s |
 | **`ai-service` definitiva, sobre el árbol final** | **1468 passed**, 0 failed, **0 skipped**, 87,3 s |
+| **`ai-service` tras la segunda pasada (§11)** | **1469 passed**, 0 failed, **0 skipped** — el nuevo es el test de abstención del §11.3 |
 | `openspec validate --all --strict` antes y después | **58 passed, 0 failed** en las dos puntas |
 | `openspec validate add-sales-assistant-tool-registry --strict` | `Change 'add-sales-assistant-tool-registry' is valid` |
-| Comprobador de enlaces antes / después | **1012 → 1026 enlaces, 0 rotos** en las dos puntas — los 14 nuevos los añaden el informe, las notas de documentación y este mismo fichero |
+| Comprobador de enlaces antes / después | **1012 → 1026 enlaces, 0 rotos** en las dos puntas — los 14 nuevos los añaden el informe, las notas de documentación y este mismo fichero. **1029 tras la segunda pasada** (§11), también 0 rotos |
 | `dotnet test` · `npm run test` al cierre | **no ejecutados**: fuera del diff. Ver §8 |
 
 > La segunda fila de arriba lleva una corrección a la vista a propósito: la línea base es **1418**,
@@ -83,6 +84,13 @@ Los 50 *node id* son **48 funciones**, una de ellas parametrizada con **3** caso
 48 funciones − 1 parametrizada + 3 casos = 50 node id  ✓
 1418 + 50 = 1468                                        ✓
 ```
+
+> **La segunda pasada (§11.3) añadió uno**, `test_the_catalogue_search_reports_an_abstention_when_
+> the_retriever_abstains`, en la sección «las tools que envuelven código probado», que pasa de **9
+> a 10**. La tabla de abajo es el desglose **de la primera pasada** y se deja como estaba; con el
+> añadido el total es **49 funciones** y **51 node id**, y `1418 + 51 = 1469`. Ninguna función
+> desapareció ni se renombró: las cuatro correcciones del §11 son enmiendas dentro de tests
+> existentes más este único añadido, comparado otra vez por nombres con `comm`.
 
 Medido sobre las secciones del fichero, no sobre una tabla escrita a mano:
 
@@ -212,10 +220,15 @@ introspección encuentra por tool:
 buscar_catalogo          -> ['CountingEmbeddings', 'FakeProductSearch']
 buscar_sustitutos        -> ['FakeProductSearch']
 listar_familia           -> ['FakeProductSearch']
-consultar_conocimiento   -> ['CountingEmbeddings', 'FakeProductSearch']
+consultar_conocimiento   -> ['CountingEmbeddings', 'FakeProductSearch', 'InMemoryKnowledgeIndex']
 consultar_disponibilidad -> ['FakeProductSearch', 'ProjectionFreshness']
 pedir_aclaracion         -> []
 ```
+
+> **`InMemoryKnowledgeIndex` aparece aquí desde la segunda pasada, y antes no.** La primera versión
+> de la comprobación excluía toda dataclass, y el índice de conocimiento lo es: el único
+> colaborador real de `consultar_conocimiento` quedaba fuera de los tres ejes sin que ninguna
+> aserción se pusiera roja. Ver §11.1.
 
 **Eje 3 — los verbos HTTP.** Ningún colaborador expone `post`/`put`/`patch`/`delete`. Y hay una
 comprobación más fuerte que ésta y es **preexistente**:
@@ -338,12 +351,23 @@ Settings   -> ['blank_index_sync_time_budget_is_default', 'update_forward_refs']
 **Qué se hizo, y qué NO.** El vocabulario **no se tocó** —está en dos artefactos, es una decisión
 tomada, y cambiarlo por mi cuenta era justo lo que el encargo prohibía—. Lo que se fijó es la
 **regla de comparación**, que ningún artefacto especifica: **token a token con igualdad exacta**.
-Y la configuración se excluye **por tipo** (modelos de pydantic), nunca por nada que la tool declare
-sobre sí misma — la diferencia con una bandera `writes: bool` es que la exclusión vive en el módulo
-del invariante, y una tool no puede sacar sus dependencias de la comprobación.
+Y la configuración se excluye **por tipo**, nunca por nada que la tool declare sobre sí misma — la
+diferencia con una bandera `writes: bool` es que la exclusión vive en el módulo del invariante, y
+una tool no puede sacar sus dependencias de la comprobación.
 
-**Queda dicho, porque es lo que se pierde:** una forma flexionada (`saves`, `syncing`) escaparía.
-No existe ninguna en el árbol.
+> **Enmendado en la segunda pasada (§11).** La exclusión se escribió primero por *categoría* —todo
+> modelo de pydantic y toda dataclass— y eso era un fallo, no un matiz: dejaba fuera un puerto vivo.
+> Ahora excluye **dos tipos nombrados**, `Settings` y `ServicePrincipal`. Ver §11.1.
+
+**Queda dicho, porque es lo que se pierde, y decirlo mal ya costó una revisión.** No es una forma
+flexionada: es un **verbo que el vocabulario nunca tuvo**. El ejemplo no hay que inventarlo, está en
+este repositorio — `SqlAlchemyPosProjection.put_checkpoint()` es un `INSERT … ON CONFLICT DO UPDATE`
+y no casa ningún token, **ni casaría por subcadena tampoco**, así que no es la regla de comparación
+la que lo pierde. Con él se pierde su familia entera: `put_`, `store_`, `record_`, `commit`,
+`flush`. El borrador anterior de este párrafo decía *«una forma flexionada (`saves`, `syncing`)
+escaparía; no existe ninguna en el árbol»*, que es cierto y deja al lector con la impresión
+equivocada de que el hueco es marginal. **El conjunto es un suelo bajo el grafo de objetos, no una
+demostración de que ningún método escribe.** Ensancharlo es una decisión de D-6 y no un parche.
 
 **Esto está señalado al usuario** y consta en el §2.1 y §2.2 del informe. Si la lectura correcta de
 D-6 incluye también la regla de comparación, hay que volver sobre ello.
@@ -382,8 +406,15 @@ confusión contra la que C30a creó la costura `on_abstention`.
 **Se encontró leyendo el código del que se depende, no por un test en rojo** — no había test que
 pudiera ponerse rojo, porque el campo existía y tenía el tipo correcto. Corregido: la tool usa
 `on_abstention` y emite **`abstenido`**; `low_confidence` **no se reexporta bajo ningún nombre**, y
-`test_the_catalogue_search_reports_abstention_and_not_the_consensus_flag` lo fija en las dos
-direcciones.
+`test_the_catalogue_search_reports_abstention_and_not_the_consensus_flag` lo fija.
+
+> **Matizado en la segunda pasada (§11.3).** Decía aquí que ese test *«lo fija en las dos
+> direcciones»*. Las dos direcciones que fijaba eran **qué entra y qué sale del diccionario** —
+> `abstenido` presente, `confianza_baja` y `low_confidence` ausentes—, no `True` y `False`: ningún
+> test llevaba `buscar_catalogo` a una abstención real, así que **un `"abstenido": False` cableado a
+> mano habría pasado las cuatro aserciones**. Que es exactamente el modo de fallo que dejó colarse
+> `low_confidence` en primera instancia. Cerrado con
+> `test_the_catalogue_search_reports_an_abstention_when_the_retriever_abstains`.
 
 ### 9.4. Tres defectos de las pruebas nuevas, y los tres eran míos
 
@@ -409,7 +440,7 @@ hasta que pasara.
 Ninguno de los dos cambia una decisión; se dejan escritos porque un recuento equivocado repetido en
 tres sitios acaba pareciendo el correcto.
 
-### 9.6. Dos límites del invariante, declarados y no disimulados
+### 9.6. Los límites del invariante, declarados y no disimulados
 
 1. **`pedir_aclaracion` no captura ningún colaborador**, así que los tres ejes pasan **vacuamente**
    sobre ella. No es un fallo —esa tool no puede escribir porque no tiene con qué— pero un lector
@@ -419,6 +450,17 @@ tres sitios acaba pareciendo el correcto.
    convierte la comprobación en un barrido del proceso entero: `Settings` sola arrastra toda la
    configuración. Un puerto escondido dentro de otro objeto se escaparía, y quien esté dispuesto a
    esconder una escritura tiene caminos más fáciles.
+3. **La introspección ve sólo lo que el ejecutor CIERRA.** *(Añadido en la segunda pasada, §11.4.)*
+   Una función de módulo que alcanzara un puerto de módulo por búsqueda global no tiene celda de
+   cierre: llegaría a `captured_collaborators` con **cero colaboradores** y pasaría los tres ejes
+   sobre una lista vacía. Hoy es inocuo —las seis se construyen como closures anidadas en
+   `build_registry`, que es la única costura de construcción— y por eso mismo conviene que esté
+   escrito: una tool futura tiene que seguir construyéndose igual, y no tirando de un global.
+4. **El vocabulario de escritura no es exhaustivo**, y eso es distinto de la regla de comparación.
+   Ver el párrafo enmendado del §9.1.
+5. **La exclusión de tipos inertes es por nombre y no por categoría.** `Settings` y
+   `ServicePrincipal`, y nada más. Excluir las categorías a las que pertenecen fue el primer
+   intento y fue un fallo medido: ver §11.1.
 
 ### 9.7. Lo que la implementación refuta de los artefactos, y qué se enmendó
 
@@ -455,3 +497,108 @@ tres sitios acaba pareciendo el correcto.
    motivo en [`DEFERRED_TASKS.md`](../../DEFERRED_TASKS.md). Con una advertencia heredada: **un
    cliente HTTP de propósito general no pasará el tercer eje del invariante**, porque expone `post`,
    `put`, `patch` y `delete`.
+
+---
+
+## 11. Segunda pasada: verificación independiente
+
+> Ejecutada sobre el árbol **ya commiteado** en `ac9adef`, reproduciendo contra el repositorio cada
+> cifra y cada «✅» de los §1–§10 en vez de releerlos. Casi todo reprodujo. Lo que no, está aquí.
+>
+> La distinción que importa: los §1–§10 los escribió quien implementó, y esta sección la escribió
+> quien la comprobó. **Cuatro hallazgos, los cuatro corregidos**; ninguno cambia una decisión de
+> `design.md`, y tres de los cuatro son enmiendas a afirmaciones que se leían más fuertes de lo que
+> el código sostenía.
+
+### 11.1. La exclusión por categoría dejaba fuera un puerto vivo — **CRÍTICO, corregido**
+
+`_is_collaborator` excluía **todo modelo de pydantic y toda dataclass**. `InMemoryKnowledgeIndex`
+es una dataclass, y es el puerto que `consultar_conocimiento` captura: **los tres ejes del
+invariante nunca lo miraban**. Medido antes de la corrección, y no deducido:
+
+```
+consultar_conocimiento   -> ['FakeProductSearch', 'CountingEmbeddings']     ← el índice no está
+```
+
+Y no era sólo cobertura perdida: un puerto escrito como dataclass —o como modelo de pydantic— con
+`save_availability`, capturado en el cierre exactamente como lo hace `build_registry`, **construía
+el registro sin que nada lo rechazara**. Verificado con el control al lado:
+
+```
+ANTES   plain class (control)     -> refused          @dataclass -> CONSTRUCTED   pydantic -> CONSTRUCTED
+DESPUES plain class (control)     -> refused          @dataclass -> refused       pydantic -> refused
+```
+
+Tres afirmaciones escritas lo daban por bueno y las tres eran falsas: el §2.2 del informe
+(*«lo que queda dentro es exactamente lo que puede alcanzar un sistema de registro»*), el docstring
+de `_is_collaborator` —que enumeraba las exclusiones **omitiendo las dataclasses**, que es lo que el
+código sí excluía— y el docstring del test de anti-vacuidad.
+
+**Corregido estrechando la exclusión**, que es la opción que sostiene lo que la propuesta promete:
+se excluyen **dos tipos nombrados**, `Settings` y `ServicePrincipal` —configuración e identidad, sin
+E/S, que tropiezan con el vocabulario sólo por el *shim* `update_forward_refs` de pydantic v1— y
+nada más. **Un puerto se inspecciona sea cual sea la construcción con la que esté escrito.** La
+lista vive en el módulo del invariante, así que añadir un tercer nombre es editar el fichero cuya
+única razón de existir es comprobar. `test_the_read_only_check_reaches_every_port_the_registry_was_handed`
+nombra ahora `InMemoryKnowledgeIndex` para que no pueda volver a caerse en silencio.
+
+### 11.2. `ai.product_document.sku` **no** es único, y el comentario se apoyaba en que lo fuera — corregido
+
+`DOCUMENT_BY_SKU_SQL` llevaba escrito: *«`sku` is UNIQUE on `ai.product_document`, so there is no
+ORDER BY and no LIMIT: a second row would be a broken index and silently taking the first would
+hide it»*. En las migraciones de `ai-service` la **única** `UniqueConstraint` es
+`uq_knowledge_chunk_document_chunk_index`; `sku` es `sa.Column("sku", sa.Text(), nullable=False)`,
+sin restricción única y **sin índice de ningún tipo**. La unicidad la impone .NET sobre su propia
+tabla (`ProductConfiguration`: `HasIndex(p => p.SKU).IsUnique()`), no este esquema.
+
+**Y no es un descuido de aquella migración: es una decisión registrada.** El ticket del change que
+creó la tabla plantea la pregunta y la responde —
+[`2026-08-15-add-pgvector-schema-foundation`](../archive/2026-08-15-add-pgvector-schema-foundation/ticket.md),
+pregunta abierta 2: *«¿Índice único sobre `sku` en `product_document`? … **No se crea.** La unicidad
+es del corpus, y C13 hace upsert por `product_id`»*. Así que el comentario no sólo afirmaba algo
+falso del árbol: **contradecía una decisión tomada y archivada**, y lo hacía para justificar el
+`first()`.
+
+Y `document_by_sku` usaba `.mappings().first()`, que hace **exactamente** lo que el comentario decía
+querer evitar: ante dos filas devuelve una arbitraria de un resultado sin `ORDER BY`. Resuelven por
+esa puerta **cuatro de las seis tools**.
+
+**Corregido a `.one_or_none()`**, que lanza `MultipleResultsFound` —un `SQLAlchemyError`, así que
+llega al llamante como `dependencia_no_disponible` con el mensaje real— y el comentario dice ahora
+dónde vive la unicidad. Un feed roto se lee como roto, en vez de como una pieza que nadie eligió.
+
+**Esto es lo que la ausencia de prueba `db` dejó pasar, y una prueba `db` tampoco lo habría cazado:**
+una fixture pone una fila por SKU. Lo cazó leer la migración. El punto 4 del §10 sigue en pie tal
+como está escrito.
+
+### 11.3. La dirección positiva de `abstenido` no la comprobaba nadie — corregido
+
+Ver el recuadro del §9.3. El arreglo del hallazgo que este documento declara como el que más cerca
+estuvo de colarse descansaba en un campo cuyo camino `True` **no ejecutaba ningún test**. Cerrado
+con `test_the_catalogue_search_reports_an_abstention_when_the_retriever_abstains`, que construye un
+mundo de perfil de distancias plano —20 filas, que es la forma sobre la que abstiene la regla
+relativa de C25— y afirma `content["abstenido"] is True` y la lista de candidatos vacía. El test que
+ya existía pasa a afirmar `is False` explícitamente, para que los dos casos queden fijados.
+
+### 11.4. Tres enunciados que se leían más fuertes que el código — corregidos
+
+| Dónde | Decía | Enmienda |
+|---|---|---|
+| §9.1 y el docstring de `WRITE_METHOD_VERBS` | lo que se pierde es *«una forma flexionada»* | Es **un verbo que el vocabulario nunca tuvo**: `put_checkpoint()` escribe y no casa, ni por token ni por subcadena. Ver §9.1 |
+| §9.6 | dos límites del invariante | **Cinco**. Faltaba el de los cierres (una función de módulo pasaría sobre lista vacía) y el de la exclusión por tipo |
+| §3 fila 9 | *«busca los valores de `QTY_BUCKETS` en toda la observación»* | Recorría sólo los valores de primer nivel. Ahora usa `_rows_of`, que es recursivo, y el enunciado es cierto |
+
+### Lo que la segunda pasada **sí** reprodujo
+
+Línea base y cierre por **nombres de test** con `comm` sobre los *node id* (0 desaparecidos);
+`sha256` del contrato idéntico y `git diff` vacío; 116 inserciones y 0 borrados en `retrieval/`;
+`50 deselected` en `pytest -m db`; 48 funciones + 1 parametrize de 3; `openspec validate --all
+--strict` en 58/0; 1026 enlaces con 0 rotos; `alembic heads` en `d7c4e91b25a0`; que nada en `src/`
+importa `assist/tools.py`; y **los nueve escenarios de la HU y los 25 de la delta abriendo cada test
+citado**, uno a uno, para comprobar que afirma lo que la tabla dice que afirma. No apareció ningún
+doble que no pudiera fallar.
+
+Una sola cifra no reprodujo literalmente y no es del change: la línea base medida en un `git
+worktree` limpio da **1416 passed / 2 failed**, porque `tiktoken` descarga ahí su fichero BPE con la
+caché en frío. Los dos ficheros no están en el diff y los dos tests pasan en el checkout principal.
+1416 + 2 = **1418**, la cifra del §1.

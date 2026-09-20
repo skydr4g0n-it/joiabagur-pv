@@ -310,8 +310,16 @@ WHERE d.product_id = :source_id
 # rather than parameterised over the column, because a statement whose WHERE clause is built
 # from a string is one refactor away from being built from a caller's string.
 #
-# `sku` is UNIQUE on `ai.product_document`, so there is no ORDER BY and no LIMIT: a second row
-# would be a broken index and silently taking the first would hide it.
+# **Uniqueness of `sku` is .NET's and not this schema's, and that is a decision on record.**
+# `Products.SKU` carries a unique index over there (`ProductConfiguration`), while here
+# `ai.product_document.sku` is a plain NOT NULL text column: the primary key is `product_id`,
+# and no migration declares a unique constraint — or any index at all — on `sku`. The schema
+# change that created this table asked the question and answered it: *«¿Índice único sobre sku?
+# No se crea. La unicidad es del corpus, y C13 hace upsert por product_id.»*
+#
+# So a second row is possible in principle — it would mean the feed carried two active products
+# under one reference — and this statement must not paper over it: there is no ORDER BY and no
+# LIMIT precisely so that the reader below can refuse to pick one. See `document_by_sku`.
 DOCUMENT_BY_SKU_SQL = """
 SELECT
   d.product_id,
@@ -652,12 +660,22 @@ class SqlAlchemyProductSearch:
         ]
 
     async def document_by_sku(self, sku: str) -> SourceDocument | None:
-        """Read one document by SKU. Absence comes back as `None`, never as an exception."""
+        """Read one document by SKU. Absence comes back as `None`, never as an exception.
+
+        **`one_or_none()` and not `first()`, because `sku` is not unique in this schema.**
+        Uniqueness is enforced upstream, by .NET, over its own `Products` table; nothing in
+        `ai.product_document` constrains it. `first()` would answer a duplicate reference by
+        taking an arbitrary row of an unordered result — silently returning a different piece
+        on different calls, through the door four of the six sale-assistant tools resolve by.
+        `one_or_none()` raises `MultipleResultsFound`, which is a `SQLAlchemyError` and so
+        arrives at the caller as a dependency failure carrying the real message: a broken feed
+        reads as broken, which is the honest report, rather than as a piece nobody chose.
+        """
         try:
             async with session_scope(self._settings) as session:
                 row = (
                     await session.execute(text(DOCUMENT_BY_SKU_SQL), {"sku": sku})
-                ).mappings().first()
+                ).mappings().one_or_none()
         except SQLAlchemyError as exc:
             raise RetrievalDependencyError(f"database query failed: {exc}") from exc
         if row is None:

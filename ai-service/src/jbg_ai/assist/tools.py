@@ -40,7 +40,7 @@ import inspect
 import logging
 import time
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass, is_dataclass
+from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
@@ -324,6 +324,24 @@ def _method_names(obj: object) -> list[str]:
     return sorted(set(names))
 
 
+#: The two objects every tool is handed that are configuration and identity rather than a way
+#: to reach anything. **Named one by one, and that is the point.**
+#:
+#: Both are pydantic models and both trip the write vocabulary on a name of their own that has
+#: nothing to do with writing: `Settings` on pydantic's deprecated v1 shim `update_forward_refs`
+#: and on its own validator `blank_index_sync_time_budget_is_default`, `ServicePrincipal` on the
+#: shim alone. Neither performs I/O and neither holds a session.
+#:
+#: **Excluding the categories they belong to instead would be the bug this list exists to
+#: avoid.** An earlier form of this check excluded every pydantic model and every dataclass,
+#: which silently dropped `InMemoryKnowledgeIndex` — a real port, a dataclass, captured by
+#: `consultar_conocimiento` — out of all three axes, and would have let a future port that
+#: writes through by the same door as long as it were written as either. A port is inspected
+#: whatever it is built from; only these two names are not, and adding a third is an edit to
+#: the module whose only reason to exist is to check.
+_INERT_TYPES: tuple[type, ...] = (Settings, ServicePrincipal)
+
+
 def _is_collaborator(obj: object) -> bool:
     """Is this captured value an injected collaborator, or inert data?
 
@@ -331,11 +349,10 @@ def _is_collaborator(obj: object) -> bool:
     point: a tool cannot opt its dependencies out of the check.
 
     Excluded are the kinds that carry no behaviour of their own — primitives, containers,
-    modules, classes, functions, and pydantic models. That last exclusion is load-bearing and
-    it is the one a reader should question, so: `Settings` is a pydantic model, it performs no
-    I/O, and pydantic's own deprecated v1 shim `update_forward_refs` would be flagged by a
-    literal reading of the write vocabulary. Excluding configuration is correct; excluding
-    anything that could reach a system of record is not, and nothing that can does.
+    modules, classes and functions — plus the two named types of `_INERT_TYPES`. Nothing is
+    excluded for the construction it happens to use: a dataclass and a pydantic model are both
+    ordinary ways to write a port, so both are inspected. Excluding configuration and identity
+    is correct; excluding anything that could reach a system of record is not.
     """
     if obj is None or isinstance(obj, (str, bytes, bool, int, float, complex)):
         return False
@@ -343,9 +360,7 @@ def _is_collaborator(obj: object) -> bool:
         return False
     if inspect.ismodule(obj) or inspect.isclass(obj) or inspect.isroutine(obj):
         return False
-    if isinstance(obj, BaseModel):
-        return False
-    if is_dataclass(obj) and not isinstance(obj, type):
+    if isinstance(obj, _INERT_TYPES):
         return False
     return bool(_method_names(obj))
 
@@ -358,6 +373,13 @@ def captured_collaborators(spec: ToolSpec) -> list[object]:
     a collaborator: the boundary is "what this tool was handed", and following attributes
     turns the check into a scan of the whole process — `Settings` alone would drag in every
     field of the configuration.
+
+    **It also sees only what the executor CLOSES OVER.** A module-level function reaching a
+    module-level port by global lookup holds no closure cell, so it would arrive here with
+    nothing captured and pass all three axes over an empty list. That is inert today — all six
+    executors are closures nested in `build_registry`, which is what `build_registry` being the
+    only construction seam buys — and it is the reason a future tool must keep being built the
+    same way rather than reaching for a module global.
 
     That boundary is honest about what the invariant does and does not catch. It catches the
     real case, which is a future tool injected with a port that writes. It does not catch a
@@ -411,9 +433,13 @@ def write_methods_of(obj: object) -> list[str]:
     Substring containment was the obvious reading and it is wrong: `sync` occurs inside
     `projection_synced_at()` and `synced_at()`, which read a checkpoint, and a check built on
     it would make the invariant unsatisfiable with the very ports this registry must inject.
-    Token equality still catches every natural spelling of a write — `save_profile`,
+    Token equality catches every spelling built from one of the verbs — `save_profile`,
     `bulk_insert`, `upsert_projection`, `delete_row`, `sync_now` — and a test registers a
     writing port to hold that claim up rather than leaving it asserted here.
+
+    What it misses is a verb `WRITE_METHOD_VERBS` never held, not an inflection of one it does:
+    `put_checkpoint()` writes and matches nothing, under this rule or under substring. The
+    vocabulary's own docstring carries that limit; this function only applies it.
     """
     return [
         name
