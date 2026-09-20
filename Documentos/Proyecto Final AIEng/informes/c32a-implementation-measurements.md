@@ -1,7 +1,7 @@
 # C32a — informe de implementación: el registro de tools, y las seis cosas que la implementación refuta
 
 **Change:** `add-sales-assistant-tool-registry` (C32a) · **Rama:** `c32a-add-sales-assistant-tool-registry`
-**Fecha:** 2026-09-20 · **Historia:** [HU-AIENG-032a](../../Historias/AI-Eng/HU-AIENG-032a.md) · **Ticket:** [T-AIENG-032a](../../../openspec/changes/add-sales-assistant-tool-registry/ticket.md)
+**Fecha:** 2026-09-20 · **Historia:** [HU-AIENG-032a](../../Historias/AI-Eng/HU-AIENG-032a.md) · **Ticket:** [T-AIENG-032a](../../../openspec/changes/archive/2026-09-20-add-sales-assistant-tool-registry/ticket.md)
 **Capability nueva:** `sales-assistant-tools` — 13 requisitos, 25 escenarios, todos `ADDED`
 
 C32a entrega la mitad baja de C32: **seis herramientas de solo lectura, su registro con el
@@ -42,7 +42,7 @@ cierre, y en verde.
 **Tras la verificación independiente: 1.469 passed / 0 failed.** Una prueba más —la de abstención
 del §2.4— y **cero nombres desaparecidos**, comparado otra vez con `comm` sobre los *node id*. Los
 cuatro hallazgos de esa pasada, con su medición y su control, están en el §11 del
-[QA](../../../openspec/changes/add-sales-assistant-tool-registry/qa.md); dos de ellos —la exclusión
+[QA](../../../openspec/changes/archive/2026-09-20-add-sales-assistant-tool-registry/qa.md); dos de ellos —la exclusión
 por categoría del §2.2 y la unicidad de `sku` del §3— eran defectos de código y no de redacción.
 
 **La suite de `ai-service` está verde de fábrica** — 1.418 de 1.418 — y conviene decirlo porque
@@ -52,11 +52,11 @@ rojo habría sido mío.
 
 | Puerta | Resultado |
 |---|---|
-| `uv run pytest` | **1.468 passed / 0 failed**, sin proveedor, sin red y sin base de datos |
-| `openspec validate --all --strict` | **58 passed / 0 failed** (misma cifra que en la línea base) |
+| `uv run pytest` | **1.469 passed / 0 failed**, sin proveedor, sin red y sin base de datos (1.468 al cerrar la implementación, más la prueba de abstención del §2.4) |
+| `openspec validate --all --strict` | **58 passed / 0 failed** — tras archivar, los 58 son 58 specs vivas y 0 changes activos; durante la implementación eran 57 specs y 1 change |
 | `ai-service/openapi.json` | **`sha256 43f70fda…68c684`, idéntico byte a byte**, verificado contra el hash guardado antes de empezar y confirmado por `git status` |
 | `test_openapi_snapshot_is_stable` | **verde sin regenerar nada** |
-| Comprobador de enlaces | **1.026 enlaces, 0 rotos** |
+| Comprobador de enlaces | **1.005 enlaces, 0 rotos** tras el archivado, que reparó los 4 que el movimiento del change rompió |
 
 ---
 
@@ -87,9 +87,16 @@ y lo que se fija es la **regla de comparación**: se compara **token a token** c
 **pinchado como comportamiento** en `test_the_write_vocabulary_catches_every_natural_spelling_of_a_write`,
 que incluye los dos falsos positivos como casos negativos para que nadie los reintroduzca.
 
-**Lo que se pierde, dicho en voz alta:** una forma flexionada (`saves`, `updated`, `syncing`) se
-escaparía. No existe ninguna en el árbol, y el coste de cazarlas era volver a la subcadena que
-acabamos de descartar.
+**Lo que se pierde, dicho en voz alta, y decirlo mal ya costó una revisión.** El primer borrador de
+este párrafo decía que lo que se escapa es *«una forma flexionada (`saves`, `updated`, `syncing`)»*
+y que no existe ninguna en el árbol. Es cierto y deja al lector con la impresión equivocada de que
+el hueco es marginal. Lo que de verdad se escapa es **un verbo que el vocabulario nunca tuvo**:
+`SqlAlchemyPosProjection.put_checkpoint()` es un `INSERT … ON CONFLICT DO UPDATE` de este mismo
+repositorio y no casa ningún token — **ni casaría por subcadena tampoco**, así que no es la regla
+de comparación la que lo pierde, sino la lista. Con él se pierde su familia entera: `put_`,
+`store_`, `record_`, `commit`, `flush`. Ensanchar el vocabulario es una decisión de D-6 y no un
+parche; lo que no se puede es leerlo como si fuera exhaustivo. **Es un suelo bajo el grafo de
+objetos, no una demostración de que ningún método escribe** (§8).
 
 ### 2.2 · `Settings` tampoco pasa la comprobación, y es configuración
 
@@ -119,7 +126,7 @@ pusiera roja. Peor: un puerto que escribiera, escrito como dataclass o como mode
 **construía el registro**. La frase que ocupaba este sitio —*«lo que queda dentro es exactamente lo
 que puede alcanzar un sistema de registro»*— era falsa, y la corrección es la que la hace cierta:
 **un puerto se inspecciona sea cual sea la construcción con la que esté escrito.** El registro de
-la medición, con su control al lado, está en el §11.1 del [QA](../../../openspec/changes/add-sales-assistant-tool-registry/qa.md).
+la medición, con su control al lado, está en el §11.1 del [QA](../../../openspec/changes/archive/2026-09-20-add-sales-assistant-tool-registry/qa.md).
 
 **Por qué esto no es la bandera `writes: bool` con otro nombre.** La exclusión vive en el módulo
 del invariante y nombra **objetos concretos**, no una propiedad que la tool declare sobre sí misma
