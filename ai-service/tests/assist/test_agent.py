@@ -126,6 +126,7 @@ def drive(
     turns=TALK,
     budgets: AgentBudgets | None = None,
     agent_delay: float = 0.0,
+    pitch_delay: float = 0.0,
     knowledge_threshold: float | None = None,
 ):
     """One request end to end over doubles. Returns the run and the three scripted providers."""
@@ -143,7 +144,9 @@ def drive(
         else (None, None)
     )
     pitch_client, pitch_provider = (
-        scripted_client(*pitch_script) if pitch_script is not None else (None, None)
+        scripted_client(*pitch_script, delay=pitch_delay)
+        if pitch_script is not None
+        else (None, None)
     )
     outcome = run(
         run_agent(
@@ -251,6 +254,8 @@ def test_the_evidence_ledger_is_inert_to_the_read_only_check_by_construction(
         write_methods_of,
     )
 
+    from jbg_ai.assist.tools import ToolRegistryError
+
     ledger = EvidenceLedger()
 
     assert _method_names(ledger) == []
@@ -265,6 +270,45 @@ def test_the_evidence_ledger_is_inert_to_the_read_only_check_by_construction(
     }
     # The set C32a's own test fixes, unchanged: the ledger is nowhere in it.
     assert "EvidenceLedger" not in captured
+
+    # **The positive direction, which is the one that makes the negative one mean anything.**
+    # Asserted above alone, «not captured» would hold just as well for a ledger the walk never
+    # reached — so a ledger that grew a write method is handed to the real construction seam
+    # and must be refused. The refusal proves both halves at once: the walk reaches the ledger
+    # through the tools' closures, and it classifies it by what it can do rather than by name.
+    # Found missing by the independent verification of C32b, which measured it by hand.
+    @dataclasses.dataclass
+    class SavingLedger(EvidenceLedger):
+        def save(self) -> None:  # pragma: no cover — never called, only inspected
+            return None
+
+    with pytest.raises(ToolRegistryError, match="SavingLedger.*save"):
+        build_registry(
+            principal=principal,
+            settings=build_settings(),
+            embed=FakeEmbeddingClient(),
+            search=search,
+            knowledge=knowledge,
+            ledger=SavingLedger(),
+        )
+
+    # And the limit C32a declared, pinned rather than forgotten: a verb the write vocabulary
+    # never held is not caught. The inertness above does not lean on this gap — the ledger has
+    # no public method at all — and this line is here so that closing the gap is a deliberate
+    # edit instead of a silent change in what the check means.
+    @dataclasses.dataclass
+    class RecordingLedger(EvidenceLedger):
+        def record(self) -> None:  # pragma: no cover — never called, only inspected
+            return None
+
+    build_registry(
+        principal=principal,
+        settings=build_settings(),
+        embed=FakeEmbeddingClient(),
+        search=search,
+        knowledge=knowledge,
+        ledger=RecordingLedger(),
+    )
 
 
 # --- 5 · the loop and its stop conditions --------------------------------------------------
@@ -401,22 +445,92 @@ def test_the_context_budget_stops_the_loop_before_a_call_rather_than_after_one(
     assert agent.call_count == 1
 
 
-def test_the_wall_clock_budget_stops_the_loop(
+def test_the_global_context_budget_binds_when_a_sweep_raises_the_section_budget(
     search: FakeProductSearch, knowledge: InMemoryKnowledgeIndex, principal: ServicePrincipal
 ) -> None:
-    """The only budget a counter feels, and the reason it is a deadline for the whole request."""
+    """Q-4's «per section and also global», with the global branch actually executed.
+
+    With the default values it cannot bind — observations stop at their own budget and the
+    transcript at its cap, below the global — and until the independent verification of C32b
+    no test reached it. It binds when a sweep raises the section budget, which is the one
+    configuration where nothing else would bound the context: here the section budget is out
+    of reach and the stop can only come from the sum of the two sections.
+    """
+    from jbg_ai.assist.transcript import transcript_chars
+
     outcome, agent, _router, _pitch, _registry = drive(
         search=search,
         knowledge=knowledge,
         principal=principal,
         agent_script=(wants(("buscar_catalogo", {"consulta": "anillo"})),),
-        budgets=AgentBudgets(deadline_seconds=0.05),
+        budgets=AgentBudgets(observation_chars=10**6, context_chars=200),
+    )
+
+    transcript = transcript_chars(turns_from(TALK))
+    observations = outcome.trace[0].context_chars
+
+    assert outcome.stop_reason == STOP_CONTEXT_BUDGET
+    assert agent.call_count == 1
+    # The section alone was nowhere near its own budget; the sum is what crossed.
+    assert observations < 10**6
+    assert transcript <= 200 < observations + transcript
+
+
+def test_the_wall_clock_budget_stops_the_loop(
+    search: FakeProductSearch, knowledge: InMemoryKnowledgeIndex, principal: ServicePrincipal
+) -> None:
+    """The only budget a counter feels, and the reason it is a deadline for the whole request.
+
+    The reserve for the argument is set to zero here so the budget is read alone: this is the
+    check between turns. The next test is the one about the request as a whole.
+    """
+    outcome, agent, _router, _pitch, _registry = drive(
+        search=search,
+        knowledge=knowledge,
+        principal=principal,
+        agent_script=(wants(("buscar_catalogo", {"consulta": "anillo"})),),
+        budgets=AgentBudgets(deadline_seconds=0.05, pitch_reserve_seconds=0.0),
         agent_delay=0.06,
     )
 
     assert outcome.stop_reason == STOP_CLOCK_BUDGET
     assert outcome.partial is True
     assert agent.call_count == 1
+
+
+def test_the_wall_clock_budget_bounds_the_whole_request_argument_included(
+    search: FakeProductSearch, knowledge: InMemoryKnowledgeIndex, principal: ServicePrincipal
+) -> None:
+    """**The deadline is the request's, not only the loop's.** Found by the independent
+    verification of C32b: the clock was checked only before a turn, so a turn in flight ran its
+    own timeout past the deadline and the argument ran after that — a request with a 0,2 s
+    deadline took 0,479 s, and the declared 15 s was 31 s by construction.
+
+    The loop now runs against the deadline minus the argument's reserve, and the turn in flight
+    is cut when that runs out. With a 1 s deadline, 0,4 s of reserve and 0,35 s per turn, the
+    second turn is cut at 0,6 s and the argument still fits: the old loop would have started a
+    third turn at 0,71 s and served at ~1,36 s.
+    """
+    outcome, agent, _router, pitch_provider, _registry = drive(
+        search=search,
+        knowledge=knowledge,
+        principal=principal,
+        agent_script=(wants(("buscar_catalogo", {"consulta": "anillo"})),),
+        budgets=AgentBudgets(deadline_seconds=1.0, pitch_reserve_seconds=0.4),
+        agent_delay=0.35,
+        pitch_delay=0.3,
+    )
+
+    assert outcome.stop_reason == STOP_CLOCK_BUDGET
+    assert outcome.partial is True
+    assert agent.call_count == 2, "the second turn started and was cut; no third"
+    # Cut by the clock, and said so — not blamed on a provider that may have been answering.
+    assert outcome.trace[-1].cut_by_clock is True
+    assert outcome.trace[-1].provider_error is None
+    # The argument ran inside its reserve, and the whole request inside the deadline.
+    assert pitch_provider.call_count == 1
+    assert outcome.pitch == CLEAN_PITCH.pitch
+    assert outcome.elapsed_ms < 1_000.0
 
 
 def test_a_provider_fault_reports_its_own_stop_reason_and_marks_the_response_partial(
@@ -426,9 +540,10 @@ def test_a_provider_fault_reports_its_own_stop_reason_and_marks_the_response_par
 
     C32b's first provider pass hit a rate limit on request six, and every request after it
     came back reporting `sin_mas_herramientas` with `partial: false` — «the model finished
-    asking for tools» about a request whose call never arrived. Forty-six responses were
-    indistinguishable from complete ones, and the suite had never caught it because a
-    scripted double does not fall over in the middle of a batch.
+    asking for tools» about a request whose call never arrived. Those responses were
+    indistinguishable from complete ones — how many is not known, because the run left no
+    artefact — and the suite had never caught it because a scripted double does not fall over
+    in the middle of a batch.
 
     A fault costs the turn and not the request, so whatever earlier turns gathered is still
     served; but the answer is not the one an unhurried request would have produced, which is
@@ -555,6 +670,41 @@ def test_the_provider_call_ceiling_holds_for_a_request_that_loops_and_repairs(
     # The embedding lookups are counted apart and are NOT part of that figure.
     assert registry.embedding_calls >= 1
     assert outcome.embedding_calls == registry.embedding_calls
+
+
+def test_the_run_keeps_each_stages_usage_apart_so_each_is_priced_by_its_own_model(
+    search: FakeProductSearch, knowledge: InMemoryKnowledgeIndex, principal: ServicePrincipal
+) -> None:
+    """`usage` is a sum over up to three models and names only one of them.
+
+    Found by the independent verification of C32b: the first cost figure of this change priced
+    every token of a request at the loop's price, and its correction replaced the classifier's
+    measured cost with a figure nobody had measured. Both errors start where a sum is priced by
+    one name. The three stages are kept apart here — the three doubles report three different
+    models — and they add up to the published sum, field by field.
+    """
+    outcome, _agent, _router, _pitch, _registry = drive(
+        search=search,
+        knowledge=knowledge,
+        principal=principal,
+        agent_script=(
+            wants(("buscar_catalogo", {"consulta": "anillo de plata"})),
+            finishes(),
+        ),
+    )
+
+    stages = (outcome.router_usage, outcome.loop_usage, outcome.pitch_usage)
+
+    assert [stage.calls for stage in stages] == [1, 2, 1]
+    assert len({stage.model for stage in stages}) == 3, "three stages, three models"
+    # The sum carries the last stage's name for tokens that are mostly not its own.
+    assert outcome.usage.model == outcome.pitch_usage.model
+    for name in ("prompt_tokens", "completion_tokens", "total_tokens", "calls"):
+        assert getattr(outcome.usage, name) == sum(getattr(stage, name) for stage in stages)
+    # And the loop's share is exactly what its turns report.
+    assert outcome.loop_usage.prompt_tokens == sum(
+        item.prompt_tokens for item in outcome.trace
+    )
 
 
 def test_no_fragment_of_the_loops_prose_reaches_the_response_or_the_wire_trace(
@@ -869,8 +1019,12 @@ def test_no_availability_label_reaches_the_generation_payload(
         assert label not in payload, label
     assert "disponibilidad" not in payload
     assert "antiguedad_proyeccion_segundos" not in payload
-    for label in AVAILABILITY_LABELS:
-        assert label not in outcome.pitch
+    # **The payload half is what this layer guarantees, and it is what this test asserts.**
+    # It used to assert as well that the argument carried no label — over a scripted argument
+    # that could not carry one, and with nothing in the code to stop a real one: `verify()`
+    # passes «disponible» and even «sin_existencias». The independent verification of C32b
+    # moved that half to where it can be true: the pass counts availability terms in every
+    # served argument (`availability_terms_in` in `evals/agent_sweep.py`) and publishes it.
 
 
 def test_substitute_groups_reach_the_payload_marked_apart_from_catalogue_matches(
@@ -1070,6 +1224,138 @@ def test_the_payload_caps_the_number_of_distinct_pieces_it_hands_over(
     pieces = [item for group in handed["candidatas"] for item in group["piezas"]]
 
     assert len(pieces) == 3
+
+
+def _pivot_world() -> FakeProductSearch:
+    """A search that finds the piece and four other matches, and a pivot with four answers.
+
+    The piece `JBG-0300` is the closest match and a ring; the four other matches are necklaces,
+    so they are never its substitutes; the four substitutes are rings too far away to be
+    catalogue matches. The two sets are disjoint, which is what lets a test say which one a cut
+    came out of.
+    """
+    import uuid
+
+    def pid(index: int) -> uuid.UUID:
+        return uuid.UUID(f"aaaaaaaa-aaaa-4aaa-8aaa-0000000003{index:02d}")
+
+    alone = {"family_id": None, "family_name": None}
+    rows = [
+        indexed_row(
+            product_id=pid(0), sku="JBG-0300", piece_type="anillo", distance=0.10, **alone
+        )
+    ]
+    rows += [
+        indexed_row(
+            product_id=pid(index),
+            sku=f"JBG-03{index:02d}",
+            piece_type="collar",
+            distance=0.10 + 0.01 * index,
+            **alone,
+        )
+        for index in range(1, 5)
+    ]
+    rows += [
+        indexed_row(
+            product_id=pid(10 + index),
+            sku=f"JBG-03{10 + index:02d}",
+            piece_type="anillo",
+            distance=0.95,
+            **alone,
+        )
+        for index in range(1, 5)
+    ]
+    return FakeProductSearch(rows)
+
+
+PIVOT_SCRIPT = (
+    wants(("buscar_catalogo", {"consulta": "un regalo", "top_k": 5})),
+    wants(("buscar_sustitutos", {"sku": "JBG-0300"})),
+    finishes(),
+)
+
+
+def test_a_piece_the_loop_pivoted_away_from_does_not_reach_the_payload_as_a_match(
+    knowledge: InMemoryKnowledgeIndex, principal: ServicePrincipal
+) -> None:
+    """HU escenario 8, the half the first review did not look at: **what the argument heads.**
+
+    Found by the independent verification of C32b. In the pass, 7 of the 10 pivots of `gpt-4o`
+    followed a catalogue search, so the piece that did not serve had arrived as a catalogue
+    match — and `assist/v4` tells the argument to say first what matches. The pivot existed to
+    keep that piece out of the headline and the payload put it there. The loop's decision is
+    what excludes it; its availability label still never reaches the payload.
+    """
+    outcome, _agent, _router, pitch_provider, registry = drive(
+        search=_pivot_world(),
+        knowledge=knowledge,
+        principal=principal,
+        agent_script=PIVOT_SCRIPT,
+    )
+
+    assert "JBG-0300" in {item.sku for item in registry.evidence.candidates}, (
+        "the piece must actually have come back from the search for this to mean anything"
+    )
+    handed = data_block(pitch_provider.user_of(0))
+    offered = {
+        piece["sku"]: group.get("procedencia")
+        for group in handed["candidatas"]
+        for piece in group["piezas"]
+    }
+
+    assert "JBG-0300" not in offered
+    assert "JBG-0300" not in {
+        member.sku for group in outcome.groups for member in group.members
+    }
+    # The other matches stay matches, and the substitutes stay distinguished.
+    assert {sku for sku, origin in offered.items() if origin == GROUP_ORIGIN_CATALOGUE} == {
+        "JBG-0301",
+        "JBG-0302",
+        "JBG-0303",
+        "JBG-0304",
+    }
+    assert {sku for sku, origin in offered.items() if origin == GROUP_ORIGIN_SUBSTITUTES} == {
+        "JBG-0311",
+        "JBG-0312",
+        "JBG-0313",
+        "JBG-0314",
+    }
+
+
+def test_the_piece_cap_drops_further_matches_before_the_substitutes_of_a_pivot(
+    knowledge: InMemoryKnowledgeIndex, principal: ServicePrincipal
+) -> None:
+    """The cap decides **what** survives by priority, and never **where** it sits.
+
+    Found by the independent verification of C32b: in 5 of the 7 pivots of `gpt-4o` that
+    followed a search, the cap of eight was reached with the candidates, which were read first,
+    and it cut the substitutes the pivot existed to find. With room for six, the four
+    substitutes survive and two matches fill the rest — and the payload keeps the order the
+    evidence arrived in, matches first, which is the order `assist/v4` reads.
+    """
+    _outcome, _agent, _router, pitch_provider, _registry = drive(
+        search=_pivot_world(),
+        knowledge=knowledge,
+        principal=principal,
+        agent_script=PIVOT_SCRIPT,
+        budgets=AgentBudgets(pieces=6),
+    )
+
+    handed = data_block(pitch_provider.user_of(0))
+    order = [
+        (group.get("procedencia"), piece["sku"])
+        for group in handed["candidatas"]
+        for piece in group["piezas"]
+    ]
+
+    assert order == [
+        (GROUP_ORIGIN_CATALOGUE, "JBG-0301"),
+        (GROUP_ORIGIN_CATALOGUE, "JBG-0302"),
+        (GROUP_ORIGIN_SUBSTITUTES, "JBG-0311"),
+        (GROUP_ORIGIN_SUBSTITUTES, "JBG-0312"),
+        (GROUP_ORIGIN_SUBSTITUTES, "JBG-0313"),
+        (GROUP_ORIGIN_SUBSTITUTES, "JBG-0314"),
+    ]
 
 
 def test_the_loop_reports_an_abstention_when_the_catalogue_search_abstained(

@@ -1064,9 +1064,14 @@ arms — set them:
 
 | Budget | p50 | p95 | max | Shipped |
 |---|---|---|---|---|
-| Prompt tokens | 12.870 | 18.781 | 23.210 | **40.000** |
-| Context characters | 1.847 | 4.709 | 17.053 | **30.000** |
-| Wall clock | 5,3 s | 9,0 s | 11,9 s | **15,0 s** |
+| Prompt tokens (classifier + loop, what the budget compares) | 10.622 | 16.244 | 18.260 | **40.000** |
+| Context characters (observations) | 1.847 | 4.709 | 17.053 | **30.000** |
+| Wall clock (whole request, 8 s of it reserved for the argument) | 5,3 s | 9,0 s | 11,9 s | **15,0 s** |
+
+The token row was first published as 12.870 / 18.781 / 23.210 — the request's whole
+`prompt_tokens`, argument included, which runs after the loop and never reaches the budget.
+Corrected by the independent verification of C32b, which also made the clock hold for the whole
+request: it used to be checked only before a turn, which put the worst case at 31 s by construction.
 
 Exhausting any of them serves the evidence gathered so far, marks the response `partial` and
 names the budget in a `stop_reason` drawn from a closed vocabulary. **The reason is never
@@ -1086,12 +1091,21 @@ assistant** — the client composed the whole request and can forge that label �
 are stripped from a turn's text so a client cannot close the block and write outside it. Three
 caps bound it: 12 turns, 500 characters per turn and 4.000 in total.
 
-**No availability label reaches the generated argument.** The label governs the loop's decision to
+**No availability label reaches the generation layer.** The label governs the loop's decision to
 pivot and never the prose: authority over stock is .NET's, the projection can be minutes stale,
 and one of the labels is literally a member of the stock-marker vocabulary the numeric gate
-watches for. Substitutes do reach the generation layer, marked with a closed-vocabulary value that
-tells them from catalogue matches — which is why the argument prompt moves to `assist/v4` while
-**`assist/v3` stays on disk untouched** and keeps serving the deterministic route.
+watches for. What the model then writes is **measured, not guaranteed** — `verify()` passes a bare
+«disponible» — so the pass counts availability terms in every served argument. Substitutes do
+reach the generation layer, marked with a closed-vocabulary value that tells them from catalogue
+matches — which is why the argument prompt moves to `assist/v4` while **`assist/v3` stays on disk
+untouched** and keeps serving the deterministic route. A piece the loop pivoted away from is not
+also handed over as a match, and when the cap of eight pieces binds, further matches are dropped
+before the substitutes.
+
+**The wall-clock budget bounds the whole request.** The loop runs against 15 s minus the
+argument's reserve (its two calls at their timeout, 8 s by default) and the turn in flight is cut
+when that runs out; the bound is 15 s plus, at most, the tool calls of that turn, which are not
+cancelled mid-query.
 
 **Two traces.** On the wire, per iteration: the tool names, whether each succeeded and with what
 cause, plus tokens and elapsed time — and **no argument and no observation content**, because a
@@ -1105,23 +1119,33 @@ logged once per process as `stage=agent_client`; the classifier's key is deliber
 
 ### What the provider pass measured
 
-Run `293fe5c6e470`, 204 requests, two arms, ~2,60 USD and 3,4 h of wall clock. Full figures in
-[the implementation report](../Documentos/Proyecto%20Final%20AIEng/informes/c32b-implementation-measurements.md).
+Run `293fe5c6e470`, 204 requests, two arms, **3,82 USD** and 3,4 h of wall clock. Full figures in
+[the implementation report](../Documentos/Proyecto%20Final%20AIEng/informes/c32b-implementation-measurements.md);
+every aggregate is recomputable from the artefact with no provider and no database:
 
-- **The overhead against the deterministic pipeline is ×7,6, not the ×19 the design estimated**:
-  0,02144 USD per request against 0,00282.
-- **The cheap arm does not sustain tool selection.** `gpt-4o-mini` costs ×1,4 instead of ×7,6 but
+```bash
+uv run --system-certs python -m jbg_ai.evals.agent_sweep --rescore evals/results/c32b-agent-sweep-293fe5c6e470.json
+```
+
+- **The overhead against the deterministic pipeline is ×3,0, not the ×19 the design estimated**:
+  0,0274 USD per request against ~0,0092, **each stage priced by its own model**. The classifier
+  runs `gpt-4o` over ~3.300 prompt tokens, 0,0084 USD, on both routes. (The first figure published,
+  ×7,6, priced the classifier at 0,00205 USD, a figure attributed to C31 that C31 never published;
+  corrected by the independent verification of C32b.)
+- **The cheap arm does not sustain tool selection.** `gpt-4o-mini` costs ×1,1 instead of ×3,0 but
   exhausts a budget in **66 % of requests against 1,2 %** — it does not know when to stop. The
   model multiplier is reversible in price and **not in behaviour**, which is what the design
   assumed was separable.
 - **The context does not need compacting.** Median prompt tokens go from 1.974 on turn one to
   3.470 on turn five: shallow and roughly linear.
-- **The availability label is enough to govern the pivot.** It fires on 83 % of out-of-stock
-  scenarios and on **0 %** of the three labels where pivoting would be the expensive mistake.
+- **The availability label is consistent with governing the pivot, on one scenario per label.**
+  `gpt-4o` pivots on 3 of 3 out-of-stock scenarios and on none of the three labels where pivoting
+  would be the expensive mistake; the one under-pivot is the cheap arm's.
 - **No invented tool names, no dead tool and no near-identical consecutive calls**, which answers
   the granularity question C32a left open.
-- **The argument is withheld on 13,1 % of requests**, dominated by `dangling_citation`, against
-  2,2 % on the deterministic route. Identified, measured and **not closed**.
+- **The argument is withheld on 13,1 % of requests** on `gpt-4o`, 9,5 points of them for
+  `dangling_citation`, against 2,2 % on the deterministic route. Identified, measured and **not
+  closed**.
 
 ## Tests
 
@@ -1130,7 +1154,7 @@ cd ai-service
 uv run --system-certs pytest
 ```
 
-Tests inject required env / settings in-process, sign their own tokens, and never call LLM providers, embedding APIs, or production RDS. The stub tests additionally block socket connections to prove it.
+Tests inject required env / settings in-process, sign their own tokens, and are meant never to call LLM providers, embedding APIs, or production RDS. The stub tests additionally block socket connections to prove it. **Two exceptions are known and recorded in [`openspec/DEFERRED_TASKS.md`](../openspec/DEFERRED_TASKS.md)**, both found by the independent verification of C32b under a socket and database guard: the `db`-marked tests run against a real PostgreSQL through testcontainers whenever Docker is reachable (72 of them, skipped otherwise), and 11 tests of `tests/api/test_assist_generation.py` build the real classifier or argument client with a fake key and reach `api.openai.com` before degrading.
 
 **C30b's generation tests are no exception, and the seam is deliberately low.** They build the
 **real** `LiteLlmAssistClient` over a scripted `complete`, so the parsing, the timeout, the usage

@@ -3,9 +3,10 @@
 > Registro de las comprobaciones **realmente ejecutadas** sobre la implementación del change, con sus resultados.
 > **Fecha:** implementación del **2026-09-20** al **2026-09-21** · **Rama:** `c32b-add-sales-assistant-agent-loop` · **Artefactos de partida:** `2c9fd6a`, árbol limpio · **Implementación: sin commitear al cerrar esta pasada** (45 rutas en `git status`).
 > **Idioma:** cuerpo en español, identificadores técnicos en inglés, por coherencia con [ticket.md](ticket.md) y con la HU.
-> **Alcance:** **77/77 tareas** y **16/16 casillas del DoD**. Ninguna tarea quedó a medias.
-> **Este change SÍ mueve el contrato**, por primera vez desde C30a: `openapi.json` pasa de `43f70fda…` a `7c6a038e…`. El §7 demuestra **hoja a hoja** que el movimiento es **adición pura** — 0 retiradas, 0 cambiadas — verificado contra la línea base de C32a y no contra una regeneración intermedia.
-> **Este change llama a un proveedor real**, y el §9 documenta la pasada: 204 peticiones, dos brazos, ~2,60 USD y 3,4 h, más **una pasada abortada y cuatro sondas** cuyo coste también se declara.
+> **Alcance:** **77/77 tareas**. DoD del ticket: **14 de 16** casillas, marcadas en la verificación independiente con su evidencia; las dos que faltan no se cumplen literalmente y están anotadas en el ticket (`backend/.env.example` cambió; 11 tests preexistentes abren sockets). La primera versión de esta línea decía «16/16» sobre un DoD que no tenía ninguna marcada.
+> **Este change SÍ mueve el contrato**, por primera vez desde C30a: `openapi.json` pasa de `43f70fda…` a `7c6a038e…`, y tras la verificación independiente a `d8d48f87…`. El §7 demuestra **hoja a hoja** que el movimiento es **adición pura** — 0 retiradas, 0 cambiadas — verificado contra la línea base de C32a y no contra una regeneración intermedia.
+> **Este change llama a un proveedor real**, y el §9 documenta la pasada: 204 peticiones, dos brazos, **3,82 USD** (la primera versión decía ~2,60, ver §12.1) y 3,4 h, más **una pasada abortada y cuatro sondas** cuyo coste también se declara.
+> **§12 — Segunda pasada: verificación independiente.** Tres hallazgos críticos y nueve avisos sobre el change ya declarado cerrado y verde, **todos corregidos o registrados**; suite al cierre **1.576 / 0** con 0 nombres desaparecidos.
 > **Lo que esta pasada encontró:** un **defecto del bucle que la suite no podía cazar** —un fallo de proveedor reportaba que el modelo había terminado—, un **escenario de calibración que no medía lo que decía medir y no lo habría dicho**, el **fallo de C31 repitiéndose** en el prompt nuevo, **dos diagnósticos míos falsos** sobre el límite de tasa, y **tres defectos de construcción en mi propio conjunto de calibración**. Todo en el §10.
 
 ---
@@ -251,7 +252,13 @@ pregunta real.
 |---|---|
 | Antes (C32a) | `43f70fdadd2bd9aa90068d3e74ec2ee25c8d3b3b530f6d33907b1e73d068c684` |
 | Tras la fase 3 | `f55719bd1b1cd9c322d0c22e2dba89834f4d6ed51205386098237de7e46eb80c` |
-| **Final** | **`7c6a038e9f749df2f9d23c024201e9fb2c4d2383cb7ff45eaf63a461ecaccc65`** |
+| Final de la implementación | `7c6a038e9f749df2f9d23c024201e9fb2c4d2383cb7ff45eaf63a461ecaccc65` |
+| **Tras la verificación independiente** (§12) | **`d8d48f87b279d45d22bce80a67c4fd51caef6e679363c413f5b697c99ec2b875`** |
+
+> **Estos digests son del checkout de Windows con `core.autocrlf=true`**, no del contenido que guarda
+> git: otra máquina obtiene otros. Como *blob* de git (finales LF) la secuencia es `dd8df91d…` (C32a)
+> → `befdf436…` (implementación) → **`8dd52feb…`** (verificación). Añadido por la verificación
+> independiente, que no reprodujo los de arriba con `git show` hasta dar con la causa.
 
 ---
 
@@ -329,6 +336,15 @@ sin recrear nada y con el volumen intacto. Estado verificado tras arrancar:
 para la pasada; el gasto real de *todo* el trabajo con proveedor fue **~3,54 USD**, de los cuales
 **~0,90 USD se gastaron en diagnósticos y en una pasada que hubo que tirar**.
 
+> **Corregido por la verificación independiente (§12.1).** La columna de coste mezclaba métodos:
+> unas filas con la fórmula vieja del arnés, la pasada con la corrección del informe, y ninguna
+> tarifaba el clasificador por lo que mide el artefacto. Coste **exacto**, cada etapa con su modelo,
+> de los seis artefactos conservados: humo `f289aa53ba8b` **0,0792 $** · diagnóstico `d45b017266ea`
+> **0,0273 $** · verificación `40a9bb0f7911` **0,0276 $** · sonda de claves `3ba27f2d72a8`
+> **0,1593 $** · sonda del regulador `582b8517a235` **0,2113 $** · **pasada `293fe5c6e470`
+> 3,8248 $**. Suman **4,33 $**, más los ~0,30 $ declarados de la pasada abortada, que no dejó
+> artefacto y no se pueden verificar: **~4,6 USD** en total.
+
 ### 9.4. Los artefactos que quedan en `evals/results/`
 
 Se conservan **los seis**, y no por descuido: son el rastro de evidencia de la tabla de arriba.
@@ -345,11 +361,21 @@ Se conservan **los seis**, y no por descuido: son el rastro de evidencia de la t
 Borrar los cinco pequeños dejaría el directorio más limpio y el rastro incompleto. Un QA que
 afirma «la prueba de humo encontró X» y no conserva su artefacto pide que se le crea.
 
+> **Dos límites de este rastro, declarados por la verificación independiente.** Los seis
+> registran `agent/v1` y `assist/v4` con el mismo `git_sha…+dirty` y **sin digest del texto**,
+> aunque los dos prompts se editaron entre una ejecución y otra (§10.2 y §3.6 del informe): las
+> sondas midieron textos que ya no existen con la etiqueta de los que sí. Y **la pasada abortada
+> no está aquí** porque el arnés sólo escribía el artefacto al final: murió sin dejar nada, y lo
+> que se sabe de ella viene de una consola que no se conservó. Desde §12 el arnés registra el
+> `sha256` de cada prompt y escribe cada fila según la produce.
+
 ### 9.5. Procedencia del artefacto publicado
 
 `run_id 293fe5c6e470` · `git_sha 2c9fd6a…` **+dirty** · prompts `agent/v1`, `assist/v4`,
 `router/v3` · credenciales resueltas `agent`, `router`, `assist` · 1.168 documentos de índice ·
-surtido 456 · piezas resueltas por etiqueta registradas · 9.870,8 s de espera del regulador.
+surtido **416** · piezas resueltas por etiqueta registradas · 9.870,8 s de espera del regulador.
+*(La primera versión decía «surtido 456»: 456 son las filas de proyección de MAO-AIR del §9.2; el
+artefacto registra `assortment_size: 416`. Corregido en la verificación independiente.)*
 
 **El `+dirty` es correcto y deliberado.** El árbol llevaba la implementación sin commitear, así que
 la pasada **no la produjo el commit que nombra**, y `provenance.py` ya tenía la regla escrita desde
@@ -400,6 +426,11 @@ La pasada abortada topó un límite de tasa en la petición 6, y **las 46 siguie
 `stop_reason=sin_mas_herramientas` y `partial=false`**: «el modelo dejó de pedir herramientas»
 sobre peticiones cuya llamada nunca llegó. **Cuarenta y seis respuestas indistinguibles de una
 completa.**
+
+> **El «46» no es verificable** (§12.7). La pasada no dejó artefacto y la cifra se apuntó de su
+> consola, que no se conservó; el §3.9 del informe y el arnés decían «64» para la misma pasada. El
+> defecto sí está verificado: la sonda `3ba27f2d72a8`, posterior al arreglo, ya informa
+> `fallo_proveedor` en 4 de sus 10 filas.
 
 La suite nunca lo habría encontrado: **un doble guionizado no se cae en mitad de una tanda.** Hizo
 falta que un proveedor real fallara 46 veces seguidas.
@@ -454,7 +485,7 @@ Seis escenarios fallaron su expectativa; **tres eran defectos del escenario y no
 |---|---|
 | **C05** | «¿de ese hay más tallas?» sobre un turno que **no nombraba ninguna pieza**, y prohibiendo `buscar_catalogo`, sin el cual no hay pieza cuya familia listar. **Insatisfacible** |
 | **C16** | Codificaba `expects: []` exigiendo el rechazo del clasificador, mientras su propio `why` decía *«lo que no puede pasar es que se obedezca»*. **No se obedeció** |
-| **C17** | El `why` dice «cualquiera de las dos» y usaba `expects`, que el arnés lee como **todas** |
+| **C17** | El `why` dice «cualquiera de las dos» y usaba `expects`, que el fichero declara como **todas** *(la primera versión decía «que el arnés lee como todas»: el arnés no leía `expects` en absoluto y la puntuación se hizo a mano; ver §12.6)* |
 
 Corregidos. `C19` se deja como **discrepancia declarada**: cambiar esa expectativa a la vista del
 resultado sería la contaminación de la que el conjunto se protege. `C03` y `C11` son fallos reales
@@ -470,6 +501,12 @@ escenario cuya prosa ofrezca una elección use `expects_any`.
 **`dangling_citation` al 13,1 %** contra el 2,2 % de la ruta determinista. La anatomía es de una
 sola causa: **el 100 % ocurre cuando la lista de citas llega vacía**, y **la reparación no salvó
 ninguno de los 18 casos en que se gastó**. El 12 % paga doble generación para nada.
+
+> **Precisado por la verificación independiente.** El 13,1 % es la retirada **por cualquier causa**
+> en `gpt-4o` (11 de 84). La atribuible a `dangling_citation` es **9,5 %** (8 de 84); de las otras
+> tres, **dos son *timeouts* del argumentario**, que este QA no mencionaba, y una es otra causa. En
+> `gpt-4o-mini`, 12 de 13 (**14,8 %**). La anatomía de arriba (20 casos, 20 sin citas, 18
+> reparaciones, 0 salvadas) reproduce al dígito.
 
 **Y una limitación del arnés que esto destapó:** las filas guardan la **causa** de la violación
 pero no su **detalle**, que es donde viaja el identificador inventado. De esta pasada **no se puede
@@ -496,3 +533,288 @@ violaciones a las filas a mitad de la preparación.
    a un proveedor, y por eso vive fuera del arnés que se re-ejecuta en cada evaluación.
 7. **Los 15 s síncronos en un mostrador real.** Medido p95 9,0 s en una máquina de desarrollo a
    través de un interceptor TLS, con la base de datos en local. No es una medición de producción.
+
+---
+
+## 12. Segunda pasada: verificación independiente
+
+> Ejecutada sobre el árbol **ya commiteado** en `0f444f9`, reproduciendo contra el repositorio y
+> contra el artefacto `c32b-agent-sweep-293fe5c6e470.json` cada cifra y cada «✅» de los §1–§11 en
+> vez de releerlos, con la hipótesis de trabajo de que algo se había escapado. **Sin una sola
+> llamada al proveedor**: todo sale del artefacto commiteado, de dobles o de sondas locales.
+>
+> La distinción que importa: los §1–§11 los escribió quien implementó, y esta sección la escribió
+> quien la comprobó. **Tres hallazgos críticos, nueve avisos y cuatro menores.** Dos críticos son
+> defectos de código, uno es un dato sin fuente que sostenía la cifra central del informe, y
+> **cuatro tests no afirmaban lo que su nombre decía**. Cada corrección se aprobó una a una antes
+> de ejecutarse; ninguna retira ni renombra un test, y ninguna necesitó volver a medir.
+
+### 12.1. El sobrecoste ×7,6 descansaba en un coste del clasificador que nadie había medido — **CRÍTICO, dato; corregido**
+
+El informe «corrigió a mano» el coste del arnés sustituyendo el clasificador por **0,00205 USD,
+atribuido a C31**. Esa cifra **no está** en el informe de C31 ni en ninguno de sus diez artefactos
+(ninguno guarda tokens): aparece por primera vez en la HU de este change. El artefacto sí la mide:
+
+```
+filas rechazadas (sólo corre el clasificador, calls=1)   8   ->  3.305–3.312 tokens de prompt · 16–17 de salida
+filas sin argumentario (lo que sobra del bucle)          39  ->  3.301–3.312 tokens de prompt
+modelo del clasificador                                  gpt-4o (DEFAULT_ROUTER_MODEL y backend/.env)
+coste por clasificación                                  0,0084 USD, no 0,00205
+```
+
+**Control**: la fórmula vieja del arnés, que tarifaba todo al precio del brazo, daba **0,0334 USD**
+para `gpt-4o`: **más cerca de la verdad que la corrección**, porque tarifaba bien el clasificador y
+sólo se equivocaba con el argumentario. Había **tres cifras en circulación** —el resumen embebido
+en el artefacto, la del informe y la real— y la del informe era la peor.
+
+| | Bucle | Clasificador | Argumentario | Total por petición | vs *pipeline* |
+|---|---|---|---|---|---|
+| `gpt-4o` | 0,01862 | 0,00841 | 0,00039 | **0,02742 USD** | **×2,98 – ×3,04** |
+| `gpt-4o-mini` | 0,00125 | 0,00841 | 0,00041 | **0,01008 USD** | **×1,10 – ×1,12** |
+
+El intervalo es el denominador: *pipeline* con el argumentario de C30b (0,00077) o con el de
+consulta libre estimado desde `c31-free-query-gate-387fa94e792a` (~0,00058). La pasada costó
+**3,82 USD**, no ~2,60. **Q-7 sobrevive intacta**: «el brazo barato no sabe parar» es conducta y no
+precio.
+
+**Qué se hizo.** `AgentRun` guarda el uso de cada etapa (`router_usage`, `loop_usage`,
+`pitch_usage`); el arnés tarifa cada una con su modelo y registra los modelos de las tres etapas en
+la procedencia; `--rescore` recalcula todo desde un artefacto escrito, derivando el clasificador de
+las filas del propio artefacto cuando éstas son anteriores al desglose, y lo declara en su salida
+(`c32b-agent-sweep-293fe5c6e470.rescore.json`). Informe §3.3, README, `epicas.md`, plan de changes y
+`config.yaml` reescritos. `test_the_rescore_of_the_committed_pass_reproduces_the_figures_the_report_publishes`
+fija las cifras. **El mensaje del commit `0f444f9` conserva ×7,6**: la rama está publicada y la
+historia no se reescribe.
+
+### 12.2. `pivot_rates` reventaba con el conjunto de calibración commiteado — **CRÍTICO, código; corregido**
+
+```
+pivot_rates([fila de C05])  ->  KeyError: 'availability'      (C05 lleva {family: con_variantes})
+```
+
+Se evaluaba **dentro** de la escritura del artefacto, así que la próxima pasada habría perdido las
+204 filas al final, tras ~3,8 USD y 3,4 h. **Control**: `scenario_turns` sí resuelve C05; el fallo es
+sólo del agregado. `agent_sweep.py` **no tenía ningún test**: `grep` sobre `tests/` no lo importaba.
+Además sumaba los dos brazos (§12.8) y sólo leía `expects`.
+
+**Qué se hizo.** Sólo cuentan los `fixture` de disponibilidad; resultado por brazo; debe/no debe
+pivotar leído de `expects` y de `forbids` por fila; infra- y sobre-pivote aparte. El arnés **escribe
+cada fila según la produce** (`.partial.jsonl`) y compone el JSON final al terminar, así que ni un
+fallo al resumir ni una pasada abortada pierden lo pagado; `--rescore` lee también el parcial. Trece
+tests nuevos en `tests/evals/test_agent_sweep.py`, **los primeros del arnés**.
+
+### 12.3. El presupuesto de reloj no acotaba la petición — **CRÍTICO, código; corregido**
+
+El reloj sólo se comprobaba **antes** de cada vuelta. La vuelta en curso gastaba su propio *timeout*
+pasado el límite y el argumentario corría después. Medido con dobles:
+
+```
+deadline 0,2 s · vuelta 0,15 s · argumentario 0,00 s   ->  0,355 s  (1,77x)   stop=presupuesto_reloj
+deadline 0,2 s · vuelta 0,15 s · argumentario 0,15 s   ->  0,479 s  (2,40x)   el argumentario corrió tras el corte
+peor caso por construcción                              ->  15 + 8 + 2 x 4 = 31 s, más las herramientas
+```
+
+Contradecía el docstring de la constante («the whole request, argument included»), el §3.1 del
+informe («tensa el peor caso de 20 s a 15 s») y D-7.
+
+**Qué se hizo.** El bucle corre contra el *deadline* **menos la reserva del argumentario**
+(`AGENT_PITCH_RESERVE_SECONDS`, derivada de sus dos llamadas a su *timeout*; la ruta y el arnés la
+recalculan con el *timeout* configurado), y cada `decide` se acota con lo que queda: si vence, el
+motivo es `presupuesto_reloj` y la traza lo marca con `cut_by_clock`, no como fallo de proveedor.
+**Sale gratis, según el artefacto**: en `gpt-4o` el bucle tarda **p95 4,7 s · máx 5,8 s** y
+clasificador + argumentario **p95 5,2 s · máx 8,0 s**; con 7 s para el bucle se habrían cortado **0
+de 102** peticiones de `gpt-4o` y 3 de 102 del brazo barato. **Control del arreglo**: con *deadline*
+de 1 s y 0,4 s de reserva, la segunda vuelta se corta a 0,6 s y la petición acaba por debajo de 1 s;
+el bucle viejo habría servido a ~1,36 s. Las herramientas de la vuelta en curso **no se cancelan**
+—cancelar una sesión en un pool de 5 sin *overflow* invalida la conexión— y se declara. Escenario
+nuevo en la delta; `test_the_wall_clock_budget_stops_the_loop` declara reserva cero para seguir
+midiendo lo que medía.
+
+### 12.4. Cuatro tests que no afirmaban lo que decían — **defectos de test; corregidos**
+
+El patrón que el §11 del QA de C32a dejó escrito, cuatro veces:
+
+| Test | Qué afirmaba de verdad | Ahora |
+|---|---|---|
+| `test_the_published_contract_moved_by_addition_only` | Sólo `committed == generated`: el *snapshot* al día. **Nunca comparaba contra C32a**; habría pasado sobre un campo retirado tras regenerar | Particiona retiradas / cambiadas / añadidas contra `tests/api/fixtures/openapi-c32a-baseline.json` (el *blob* `dd8df91d…`) |
+| `test_the_evidence_ledger_is_inert_to_the_read_only_check_by_construction` | Sólo la dirección negativa, que se cumpliría igual si el recorrido nunca llegase al *ledger*. El QA decía «pinchado» el caso `save()` | Un *ledger* con `save()` pasado por `build_registry` **debe ser rechazado**; el hueco de C32a (`record()`) queda fijado aparte |
+| `test_an_injection_in_an_earlier_turn_does_not_change_the_system_message` | `agent_system_message() == agent_system_message()`: una función sin argumentos comparada consigo misma, y la inyección en el **último** turno | Compara los mensajes de sistema que recibieron las llamadas reales del bucle y del argumentario, con la inyección en el turno 3 de 5 |
+| `test_no_availability_label_reaches_the_generation_payload`, cláusula del argumento | `label not in outcome.pitch` sobre un argumentario guionizado que no puede llevarla | Aserción retirada; el argumento **se mide** (§12.5) |
+
+**Medición de la afirmación que el segundo test no sostenía**, por introspección real y con control:
+
+```
+recorrido desde cada tool      -> alcanza el ledger a profundidad 1 en 5 tools (no en pedir_aclaracion)
+colaboradores capturados       -> los mismos que dejó C32a; el ledger en ninguno
+SavingLedger (save)            -> rechazado: "tool 'buscar_catalogo' captures SavingLedger ... ['save']"
+RecordingLedger (record)       -> construido: el hueco declarado de C32a
+```
+
+**Cada test nuevo o reescrito se comprobó contra su mutación**: deshacer el arreglo lo pone en rojo
+(anclas ignoradas, tope sin prioridad, `decide` sin acotar, sin reserva, rama global eliminada,
+`KeyError` restaurado, brazos sumados, todo tarifado al modelo del bucle). Los ocho casos, rojos.
+
+### 12.5. La cláusula «el argumento no contiene etiquetas» no la hace cumplir nada — **criterio; medido en vez de asegurado**
+
+```
+verify("Esta pieza está disponible en tu tienda...")        ->  sin violación
+verify("Quedan últimas unidades ... sin_existencias ...")    ->  sin violación
+verify("Quedan 3 unidades de esta pieza.")  (control)       ->  stock_adjacent_figure
+```
+
+Hacerla cumplir en `verify()` movería `/v1/assist/sale`; una comprobación sólo en esta ruta
+retiraría argumentos legítimos («disponible en talla M» sale del roster) con una causa nueva en el
+vocabulario de otra capability. **Qué se hizo**: la spec dice ahora lo que se garantiza —ninguna
+etiqueta llega a la generación— y que la salida **se mide**; el arnés cuenta los términos de
+disponibilidad de cada argumento servido (`pitch_availability_terms`, un número, nunca el texto). La
+pasada `293fe5c6e470` es anterior al recuento y no lo tiene.
+
+### 12.6. El arnés no puntuaba la calibración; C19 sólo estaba declarado en prosa — **código y redacción; corregidos**
+
+Nada en `src/` leía `expects`, `expects_any` ni `forbids` salvo `pivot_rates`, que sólo miraba
+`expects`: **la tabla OK/MISS del informe se puntuó a mano**, y «`expects`, que el arnés lee como
+todas» (YAML de C17 y §10.7) era falso. Reproducida con un evaluador propio antes de corregir nada:
+**16/4 y 14/6** tal como se corrió, **18/1 y 16/3** con el fichero actual. **Qué se hizo**:
+`expectation_verdict` con la semántica declarada; campo `declared_discrepancy` en C19, que se
+puntúa aparte (hoy: `gpt-4o` 18 OK / 0 MISS / 1 declarada; `gpt-4o-mini` 16 / 2 / 1); un escenario
+cuyo texto cambió después de la pasada se lista como no comparable (C05) en vez de puntuarse.
+
+### 12.7. La procedencia no identifica el texto medido, y tres cifras no son verificables — **criterio y redacción; corregido lo corregible**
+
+Las seis ejecuciones registran `agent/v1` y `assist/v4` con el mismo `git_sha…+dirty` y **sin
+digest del texto**, aunque los dos prompts se editaron entre ellas. De ahí:
+
+| Cifra | Dónde | Qué se sabe |
+|---|---|---|
+| «3 de 21 → 0 de 33» en el techo | informe §3.6 | Ningún artefacto conservado suma 21 ni 33; la última sonda antes de la pasada (`582b8517a235`) tiene **6 de 8** en el techo |
+| «46» respuestas sin herramientas | §10.3, informe §2.6, `constants.py`, test | La pasada abortada **no dejó artefacto**; el informe §3.9 y el arnés decían «64». Ninguna de las dos es verificable |
+
+**Qué se hizo.** La procedencia registra el `sha256` de cada prompt (hoy: `agent/v1` `1505d99a…`,
+`assist/v4` `cbf34f02…`, `router/v3` `7e892d01…`) y los modelos de las tres etapas; las cifras se
+marcan como no verificables donde aparecen. **No se elige entre 46 y 64** sin el registro de
+consola. El preámbulo de `agent/v1` citaba un test inexistente y se corrigió **fuera de `## Sistema`**:
+el mensaje de sistema es byte a byte el mismo (`49681c5c…` antes y después), aunque el digest del
+fichero cambia.
+
+### 12.8. La tabla de pivote mezclaba los dos brazos — **redacción; corregido**
+
+«6 escenarios, 5 pivotó, 83 %» eran 3 escenarios × 2 brazos, y el único infra-pivote era del brazo
+**descartado** (C11, el SKU mutilado). Por brazo: `gpt-4o` **3 de 3** en `sin_existencias` y 0 de 1
+en cada una de las otras tres; `gpt-4o-mini` 2 de 3. La conclusión pasa de «la etiqueta basta» a
+«es compatible con que baste, sobre un escenario por etiqueta».
+
+### 12.9. «Sin red y sin BD» es cierto de los tests del change, no de la suite — **redacción; lo preexistente, registrado**
+
+Guardia de sockets y de `psycopg` (validado con controles: caza una resolución externa y un
+`connect` a `localhost:5432` sin romper el bucle `asyncio`), con PostgreSQL **arrancado**:
+
+```
+89 tests nuevos de la implementación       ->  0 eventos
+suite entera bajo el guardia                ->  1.486 passed · 72 skipped · 0 failed
+  72 tests db                               ->  PostgreSQL real vía testcontainers (103 PASSED en esos ficheros sin guardia)
+  11 tests de test_assist_generation.py     ->  12 resoluciones de api.openai.com, 1 de raw.githubusercontent.com
+```
+
+Los once son de C30b/C31: el mismo defecto que el §10.4 corrigió en su propio test. **Fuera de
+alcance**, registrados en `DEFERRED_TASKS.md` con la forma de arreglarlos; informe y README dicen
+ahora exactamente de qué tests es cierta la afirmación.
+
+### 12.10. `usage` suma tres modelos bajo un solo `model` — **criterio; resuelto en proceso, declarado en el contrato**
+
+Con dobles de tres modelos distintos: `usage.model` = el del argumentario, mientras 6.000 de los 8.200
+tokens de prompt eran del bucle. Quien tarifase `usage × model` repetiría en el cable el error de
+§12.1. **Qué se hizo**: el desglose en proceso (§12.1); `AgentUsage.model` redeclarado con una
+descripción que dice que no es clave de precio —**el contrato se mueve sólo en dos descripciones de
+un esquema nuevo de C32b**—; el comentario falso de `TokenUsage.__add__` («no puede ocurrir aquí»)
+corregido. El desglose en el cable queda en `DEFERRED_TASKS.md` hasta que la ruta tenga consumidor.
+
+### 12.11. La spec decía «sin credencial no se llama al proveedor» — **redacción de la spec; corregida**
+
+El código clasifica antes de mirar si hay cliente del agente, como hace `/sale` sin credencial de
+generación y como pide el ticket; el propio test afirmaba `router.call_count == 1`. El escenario dice
+ahora que no corre el bucle ni se llama al proveedor **del agente**, y que el guardarraíl sigue
+clasificando si tiene su credencial.
+
+### 12.12. Tras un pivote, la pieza abandonada encabezaba el argumento — **criterio de diseño; corregido**
+
+```
+pivotes de gpt-4o tras una búsqueda de catálogo           7 de 10
+  en los que el ancla estaba entre los candidatos           7 de 7   (su SKU sólo pudo salir de la búsqueda)
+  en los que el payload tocó el tope de 8 piezas            5 de 7   (5 candidatos + 3 sustitutos)
+```
+
+`assist/v4` manda decir primero «lo que encaja», y la pieza que no servía era una coincidencia de
+catálogo: contradecía la regla de `agent/v1` de no encabezar con una pieza que no se puede vender.
+**Qué se hizo**: `_pieces` excluye de las coincidencias las piezas sobre las que el bucle pidió
+sustitutos —por su decisión, no por la etiqueta, que sigue fuera del *payload*— y, cuando el tope
+aprieta, descarta coincidencias antes que sustitutos **sin cambiar el orden** del *payload*. **Se
+declara**: la pasada midió la proyección anterior; los tokens no se mueven (el tope es el mismo), la
+calidad del argumento es del change de evaluación.
+
+### 12.13. Menores — corregidos
+
+| Qué | Dónde | Corrección |
+|---|---|---|
+| `pitch_prompt_text` y `agent_prompt_text` sin llamador; el primero ni se usaba | `run_agent` | Retirados: un texto sin su versión es como `enrichment/` selló una respuesta con un prompt que nunca corrió |
+| Tope global de contexto inalcanzable con los valores por defecto, y rama sin test | `constants.py` | Documentado por qué es así (Q-4) y cuándo actúa; test que ejecuta la rama |
+| El stub emitía dos avisos que la ruta nunca emite | `stubs/responses.py` | Avisos vacíos; grupos y argumentario se mantienen, como en el stub de `/sale` |
+| «1.557 / 88», «surtido 456», «16/16 del DoD», `context_chars` «as sent», digests sólo del checkout CRLF, coste del §9.3 por métodos mezclados | informe §1, §9.5, cabecera, `IterationTrace`, §7, §9.3 | Corregidos en el sitio, con la cifra correcta y su fuente |
+
+### Lo que la segunda pasada **sí** reprodujo
+
+Todo esto se midió, no se leyó, y coincidió con lo escrito:
+
+- **Suite**: 1.558 passed / 0 failed en `0f444f9`, con el conjunto de nombres que pasa idéntico al
+  recolectado.
+- **Nombres**: línea base medida en un `git worktree` de `2c9fd6a` → **1.469**; `comm` → **0
+  desaparecidos, 89 añadidos** (44 · 19 · 13 · 12 · 1).
+- **Sin red ni BD en las pruebas nuevas**: 0 eventos bajo el guardia, con el contenedor arrancado.
+- **Contrato**: `43f70fda…` → `7c6a038e…` en el checkout; hoja a hoja contra C32a **1.103 → 1.289, 0
+  retiradas, 0 cambiadas, 186 añadidas**, todas en la ruta y sus seis modelos; `/sale` idéntico;
+  `AssistResponse` con sus 11 campos; `Usage` sin `calls`.
+- **Gate de specs** 59 / 0 y el change válido; enlaces **1.054 / 0**.
+- **Alcance negativo**: `evals/golden/`, `frontend/`, `terraform/`, `.github/` y migraciones sin
+  diff; en `backend/` sólo `.env.example`; `assist/v1-v3`, `router/`, `routing.py` y `router_llm.py`
+  intactos; `constants.py` sólo importa `__future__`.
+- **Los 29 tests citados en la trazabilidad de la HU existen.**
+- **La pasada, al dígito**: tokens p50/p95/máx 12.870 / 18.781 / 23.210 (y 19.129 / 24.866 en el
+  barato); contexto 1.847 / 4.709 / 17.053; reloj 5,3 / 9,0 / 11,9 s (10,3 / 14,3 s en el barato);
+  curva 1.974 / 2.620 / 2.712 / 3.152 / 3.470; herramientas p50 2 · p95 5 · máx 6 con **4 de 102** en
+  el techo; llamadas al proveedor p50 5 · máx 8 · **0 por encima de 8**; *embeddings* p50 1 · máx 6;
+  Q-7 entera (1 vs 50 `presupuesto_tools`, 0 vs 4 de iteraciones, 1/82 vs 54/82, 5 vs 168
+  `presupuesto_agotado`, 87 vs 233 y 7 vs 110 llamadas, 0 nombres inventados, las seis herramientas
+  usadas); `dangling_citation` 84/11 y 81/13, 20 en primer intento, 20 sin citas, 18 reparaciones, 0
+  salvadas; el 2/89 de C31 (`c31-free-query-gate-387fa94e792a`); el ×0,8 de la fórmula vieja en el
+  brazo barato.
+- **La invarianza del *ledger*** (§6): cierta, medida con controles en las dos direcciones.
+
+**No reproducido**: el «46/64», el «3 de 21 → 0 de 33», la prueba TLS del §9.1 (necesita proveedor)
+y los recuentos de base de datos del §9.2 (no se consultó la base de datos).
+
+### El gate al cierre de la segunda pasada
+
+| Comprobación | Resultado |
+|---|---|
+| Suite `ai-service` | **1.576 passed / 0 failed** (132 s) |
+| Por nombres contra la línea base (1.469) | **0 desaparecidos** |
+| Por nombres contra el cierre de la implementación (1.558) | **0 desaparecidos · 18 añadidos** (5 en `test_agent.py`, 13 en `test_agent_sweep.py`) · ninguno retirado ni renombrado |
+| Ficheros tocados bajo el guardia de red y BD | **108 passed · 0 eventos** |
+| `openspec validate --all --strict` | **59 passed / 0 failed** |
+| `openapi.json`, checkout CRLF | `7c6a038e…` → **`d8d48f87b279d45d22bce80a67c4fd51caef6e679363c413f5b697c99ec2b875`** |
+| `openapi.json`, *blob* LF | `befdf436…` → **`8dd52feb66d90e1e99e81653199eedb454a48d4a7a74cf933aff55199338885e`** |
+| Hoja a hoja contra C32a (`43f70fda…` / `dd8df91d…`) | **1.103 → 1.289 · 0 retiradas · 0 cambiadas · 186 añadidas**, todas en la ruta y sus seis modelos; `/sale` y `Usage` idénticos. Ahora lo comprueba un test |
+| Artefacto de la pasada | **sin tocar**: `sha256` LF `331057da…` igual al *blob* de git |
+| Comprobador de enlaces | **1.056 enlaces · 0 rotos** |
+
+### Lo que esta pasada no cambió, dicho aquí
+
+1. **El mensaje del commit `0f444f9`** sigue diciendo ×7,6, «46 respuestas» y «`dangling_citation`
+   retira el 13,1 %». La rama está publicada y la historia no se reescribe; este §12 es la fe de
+   erratas.
+2. **El resumen embebido en el artefacto** conserva la fórmula vieja: el artefacto es una medición
+   fechada. Las cifras válidas son las de su `.rescore.json`, que se generó sobre el árbol de
+   trabajo antes de commitear (`git_sha 0f444f9…+dirty`); regenerarlo después reproduce las mismas
+   cifras y sólo cambia la procedencia.
+3. **La pasada midió el código anterior** en dos puntos que esta verificación cambió: el reloj (sin
+   reserva, *deadline* de 20 s) y la proyección tras un pivote. Ninguno mueve lo que la pasada
+   publica; lo segundo cambia lo que el argumentario recibe, y eso lo medirá el change de evaluación.

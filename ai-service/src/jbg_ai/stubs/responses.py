@@ -610,14 +610,19 @@ def assist_agent_stub(
     """The agent route's fixture. Still a pure function of its input, and still no loop.
 
     **This route declares stub behaviour because every `/v1` route does**, and being the one
-    exception would be the thing a client discovers in integration. What it must not do is
-    pretend: the stub runs no loop and calls no provider, so it reports the shape with a
-    trace of **zero iterations** and the stop reason that says the loop did not run — the
-    same one a deployment with no agent credential reports, because it is the same fact.
+    exception would be the thing a client discovers in integration. So the body has the
+    shape a client renders — groups, citations and an argument with the two placeholders —
+    as the stub of `POST /v1/assist/sale` does. What it does not pretend is a loop: the stub
+    runs none and calls no provider, so the trace has **zero iterations** and the stop reason
+    is the one that says the loop did not run — the one a deployment with no agent credential
+    reports, because it is the same fact. `partial: true` follows from that, for the reason
+    the credential-less path gives: no loop gathered the evidence this body shows.
 
-    Emitting `partial: true` here is deliberate for the reason the credential-less path emits
-    it: nothing was gathered, and a client reading `partial: false` over an empty response
-    would read it as «the catalogue had nothing», which is the opposite of what happened.
+    **The warnings are the ones this route can emit, which here is none.** The route reports
+    a refusal code on a refusal and nothing else; the two rule-derived warnings of C30a are
+    statements about an anchored piece this route does not read. The first form of this stub
+    emitted both, so a client integrating against it would have handled codes that never
+    arrive — found by the independent verification of C32b.
     """
     answered = next(
         (turn.text for turn in reversed(request.turns) if turn.role == "operario"),
@@ -628,9 +633,7 @@ def assist_agent_stub(
         _assist_citation(index, group.members[0].product_id)
         for index, group in enumerate(groups)
     ]
-    warnings = [WARNING_SIZE_LABEL_MISSING]
-    if any(len(group.members) > 1 for group in groups):
-        warnings.insert(0, WARNING_FAMILY_HAS_VARIANTS)
+    warnings: list[str] = []
     return AgentAssistResponse(
         intent=INTENT_UNCLASSIFIED,
         groups=groups,

@@ -30,8 +30,9 @@ from jbg_ai.api.schemas.assist import (
     AssistRequest,
     AssistResponse,
 )
-from jbg_ai.assist.agent import agent_response, run_agent
+from jbg_ai.assist.agent import AgentBudgets, agent_response, run_agent
 from jbg_ai.assist.agent_llm import AgentLlm, LiteLlmAgentClient
+from jbg_ai.assist.constants import MAX_PITCH_PROVIDER_CALLS
 from jbg_ai.assist.errors import (
     NoAnchorError,
     TranscriptError,
@@ -365,6 +366,12 @@ async def assist_agent(
             agent_client=_resolve_agent_client(request, settings),
             router_client=_resolve_router_client(request, settings),
             pitch_client=_resolve_pitch_client(request, settings),
+            # The argument's reserve from the timeout its client is actually built with, so
+            # the deadline holds for the request as configured and not only for the default.
+            budgets=AgentBudgets(
+                pitch_reserve_seconds=MAX_PITCH_PROVIDER_CALLS
+                * settings.jpv_assist_pitch_timeout_seconds
+            ),
         )
     except TranscriptError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

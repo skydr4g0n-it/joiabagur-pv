@@ -65,6 +65,13 @@ The stop reason SHALL be drawn from a closed vocabulary that distinguishes the m
 - **THEN** the response carries a stop reason
 - **AND** that reason belongs to the declared closed vocabulary
 
+#### Scenario: The wall-clock budget bounds the whole request, argument included
+- **GIVEN** a request whose loop turns are slow enough to reach the deadline
+- **WHEN** the loop's share of the deadline runs out while a turn is in flight
+- **THEN** that turn is cut and the stop reason names the wall-clock budget, not a provider fault
+- **AND** the argument still runs within the share of the deadline reserved for it
+- **AND** the request as a whole completes within the declared deadline, save for the tool calls of the turn in flight
+
 ### Requirement: The multi-turn transcript travels in the request and the service stores nothing between calls
 The service SHALL accept the conversation transcript as part of the request and MUST NOT retain any conversation state between requests, and the transcript MUST be bounded by a declared maximum number of turns, a maximum length per turn and a maximum total length.
 
@@ -162,19 +169,21 @@ Executing none of a turn's calls would waste a provider call already paid for. D
 - **AND** the loop stops after that turn and the response is marked partial
 
 ### Requirement: Availability labels govern the loop's decisions and never reach the generated argument
-The service SHALL NOT include any availability label in what it hands to the generation layer, and no availability label MAY appear in the generated argument.
+The service SHALL NOT include any availability label in what it hands to the generation layer, and the calibration run MUST measure how often a served argument nonetheless mentions availability rather than assert that it cannot.
 
 Authority over stock belongs to the .NET API, the projection this service reads can be minutes stale, and the placeholder the hydrating layer resolves is the only expression of availability the contract admits. The label exists so the loop can decide whether to pivot to substitutes; letting it into the prose would put a stale statement about stock in the one place no numeric gate can undo it — and one of the labels is itself a member of the stock-marker vocabulary that gate watches for.
+
+What this layer guarantees is the input: the generation layer is never given a label. What the model writes is not guaranteed by anything — the verification of the argument passes a bare «disponible», and refusing that word would also refuse a size a family roster legitimately makes available — so the output is measured, not asserted. Refusing it in the shared verification would move the deterministic route, which this capability must not do.
 
 #### Scenario: The generation payload carries no availability label
 - **GIVEN** a request during which the loop observed the availability of one or more pieces
 - **WHEN** the payload handed to the generation layer is inspected
 - **THEN** it contains no availability label
 
-#### Scenario: The argument carries no availability label
-- **WHEN** a request that observed availability produces an argument
-- **THEN** the argument contains none of the availability labels
-- **AND** the only expression of availability in the response remains the placeholder the hydrating layer resolves
+#### Scenario: Availability in the argument is measured, not asserted
+- **WHEN** a calibration run serves an argument
+- **THEN** the run records how many availability terms that argument carries, as a count and never as its text
+- **AND** the only expression of availability the contract admits remains the placeholder the hydrating layer resolves
 
 ### Requirement: Substitutes reach the generation layer as a group distinguished from catalogue matches
 The service SHALL mark the groups it gathered from the substitutes tool as substitutes, using a value from a closed vocabulary, so that the generation layer can tell them from candidates the catalogue search returned.
@@ -186,6 +195,12 @@ A substitute and a match are different things to say to a customer, and a payloa
 - **WHEN** the payload handed to the generation layer is inspected
 - **THEN** the substitute groups carry the closed-vocabulary marker that distinguishes them
 - **AND** the catalogue matches do not
+
+#### Scenario: The piece the loop pivoted away from is not offered as a match
+- **GIVEN** a request whose catalogue search returned a piece for which the loop then requested substitutes
+- **WHEN** the payload handed to the generation layer is inspected
+- **THEN** that piece is not among the catalogue matches
+- **AND** when the cap on distinct pieces binds, further catalogue matches are dropped before the substitutes, while the payload keeps the order in which the evidence arrived
 
 #### Scenario: The previous argument prompt version is preserved intact
 - **WHEN** the prompt directory is inspected after this capability ships
@@ -289,7 +304,8 @@ A deployment that configures no credential is a declared state, and it is also t
 
 #### Scenario: No credential configured
 - **WHEN** a request arrives and no agent credential is configured
-- **THEN** no loop runs and no provider call is made
+- **THEN** no loop runs and the agent's provider is not called
+- **AND** the entry guardrail still classifies the request when its own credential is configured, so a refusal is reported as one
 - **AND** the response is served rather than failed
 
 #### Scenario: The resolved credential is observable

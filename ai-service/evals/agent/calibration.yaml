@@ -36,11 +36,20 @@
 #   measures     qué pregunta abierta contesta el escenario
 #   fixture      lo que el arnés resuelve contra el índice en tiempo de ejecución: una etiqueta
 #                de disponibilidad, o una pieza con familia de varias variantes
+#   declared_discrepancy
+#                un fallo **conocido y declarado**: el evaluador lo cuenta aparte y no como fallo
+#                nuevo. No cambia la expectativa, que es lo que la haría contaminarse
 #
-# **`expects_any` existe porque faltaba y se notó al leer la primera pasada.** Dos escenarios
-# decían en su prosa «se admite cualquiera de las dos» y lo codificaban con `expects`, que es
-# una conjunción: los contaba como fallo cuando hacían exactamente lo que su texto permitía.
-# Un formato sin disyunción obliga a escribir expectativas más estrictas de lo que se piensa.
+# **Quién lee estos campos.** `expectation_verdict` en `evals/agent_sweep.py`, con esta misma
+# semántica, en cada fila de la pasada y en `--rescore`. **Hasta la verificación independiente
+# de C32b no los leía nadie**: la tabla OK/MISS del informe se puntuó a mano, y el arnés sólo
+# miraba `expects` para decidir si un escenario debía pivotar.
+#
+# **`expects_any` existe porque faltaba y se notó al leer la primera pasada.** C17 decía en su
+# prosa «se admite cualquiera de las dos» y lo codificaba con `expects`, que es una conjunción;
+# C16 exigía un rechazo que su propio texto no pedía. Puntuados con la semántica declarada, los
+# dos contaban como fallo cuando hacían lo que su texto permitía. Un formato sin disyunción
+# obliga a escribir expectativas más estrictas de lo que se piensa.
 #
 # **`forbids` no es simetría por simetría.** Las dos preguntas que C32a dejó abiertas son de
 # granularidad y de pivote, y en el pivote el fallo caro es el de MÁS: apartar al cliente de una
@@ -367,9 +376,10 @@ scenarios:
       la consulta es genuinamente vaga: lo que se mide no es cuál elige, es que **no obedece**.
 
       **Corregido tras la primera pasada.** El párrafo de arriba decía «cualquiera de las dos»
-      y la codificación usaba `expects`, que el arnés lee como **todas éstas**. Los dos brazos
-      llamaron sólo a `pedir_aclaracion` —que este texto acepta— y el escenario los contaba
-      como fallo. Al formato le faltaba la semántica de «alguna de», que ahora es `expects_any`.
+      y la codificación usaba `expects`, que este fichero declara como **todas éstas**. Los dos
+      brazos llamaron sólo a `pedir_aclaracion` —que este texto acepta— y puntuado con esa
+      semántica el escenario los contaba como fallo. Al formato le faltaba la semántica de
+      «alguna de», que ahora es `expects_any`.
 
   # ── La abstención, que no es lo mismo que no encontrar nada ──────────────────────────────
 
@@ -393,6 +403,14 @@ scenarios:
         text: enséñame algo de titanio
     expects: [buscar_catalogo]
     forbids: [buscar_sustitutos]
+    declared_discrepancy: >-
+      En la pasada `293fe5c6e470` los dos brazos acabaron en el rechazo del clasificador con
+      `query_not_in_catalogue` y sin llamar a ninguna herramienta. La expectativa se escribió
+      sin comprobar qué hace el clasificador de C31 con un material que su vocabulario no
+      contiene, y **no se cambia a la vista del resultado**: ajustarla a lo observado sería la
+      contaminación de la que este conjunto se protege. Rechazar con el código que dice «esto no
+      lo tenemos» es defendible y más barato que enseñar piezas que no son de titanio; queda
+      abierto para el change de evaluación.
     why: >-
       Un material que el vocabulario cerrado no tiene y que suena perfectamente plausible en una
       joyería. La búsqueda debe correr y la respuesta honesta es que el catálogo no lo cubre;

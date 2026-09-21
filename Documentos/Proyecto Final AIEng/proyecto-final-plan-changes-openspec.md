@@ -14,15 +14,24 @@
 
 Este documento se escribió antes de implementar. Cuando una sesión de diseño de un change concreto altera lo que su ficha decía, el cambio se registra aquí con fecha y motivo, y la ficha afectada se corrige en el sitio.
 
-### 2026-09-21 — C32b implementado: el sobrecoste es ×7,6 y el brazo barato no sostiene la selección
+### 2026-09-21 — C32b implementado: el sobrecoste es ×3,0 y el brazo barato no sostiene la selección
 
-La pasada `293fe5c6e470` —**204 peticiones, dos brazos, ~2,60 USD y 3,4 h**— refuta el número
+La pasada `293fe5c6e470` —**204 peticiones, dos brazos, 3,82 USD y 3,4 h**— refuta el número
 central de la ficha y una de sus dos mitades:
 
 | | ficha | medido |
 |---|---|---|
-| Sobrecoste del agente | ~×19 | **×7,6** (0,02144 USD/petición) |
-| Brazo barato | «el ×4 es elección reversible con una variable» | **×1,4 en precio, pero topa un presupuesto en el 66 % de las peticiones** contra el 1,2 % del caro |
+| Sobrecoste del agente | ~×19 | **×3,0** (0,0274 USD/petición contra ~0,0092 del pipeline) |
+| Brazo barato | «el ×4 es elección reversible con una variable» | **×1,1 en precio, pero topa un presupuesto en el 66 % de las peticiones** contra el 1,2 % del caro |
+
+> **Corregido por la verificación independiente del mismo día.** Esta entrada publicaba **×7,6,
+> ×1,4 y ~2,60 USD**. El clasificador se había tarifado a 0,00205 USD, una cifra atribuida a C31
+> que C31 nunca publicó; el artefacto lo mide a **0,0084 USD** (~3.305 tokens de prompt en
+> `gpt-4o`), y es lo que domina el coste del *pipeline*. Las cifras salen hoy de
+> `python -m jbg_ai.evals.agent_sweep --rescore`, sin proveedor, y un test las fija. La misma
+> verificación corrigió el reloj —ahora acota la petición entera, argumentario incluido—, la tabla
+> de pivote, que sumaba los dos brazos, y cuatro tests que no afirmaban lo que decían: ver el §12
+> del QA de C32b.
 
 **El ×4 de modelo es reversible en el precio y no en el comportamiento.** `gpt-4o-mini` no elige
 peor: **no sabe parar** — 50 `presupuesto_tools` y 4 `presupuesto_iteraciones` sobre 82
@@ -30,8 +39,11 @@ transcripciones, y 168 llamadas devueltas con `presupuesto_agotado` contra 5. Q-
 respondida en no, con el mismo desenlace que C31 midió para el clasificador y por otro síntoma.
 
 **Tres presupuestos dejan de ser marcadores y pasan a ser mediciones**: tokens **40.000**
-(p95 18.781), contexto **30.000** caracteres (p95 4.709) y reloj **15,0 s** (p95 9,0 s), que
-**tensa** el peor caso de 20 s que el diseño había declarado. El techo de herramientas sube de 6
+(p95 16.244 de clasificador + bucle, que es lo que el presupuesto compara), contexto **30.000**
+caracteres (p95 4.709) y reloj **15,0 s** (p95 9,0 s) **para la petición entera**, que **tensa** el
+peor caso de 20 s que el diseño había declarado — desde la verificación independiente, porque el
+bucle corre contra 15 s menos 8 s de reserva para el argumentario; antes el reloj sólo se miraba
+antes de cada vuelta y el peor caso por construcción eran 31 s. El techo de herramientas sube de 6
 a **8** tras medir p95 5 con un 3,9 % truncado — y con el aviso de que de esas peticiones
 truncadas **nadie sabe cuántas llamadas habrían usado**, así que el 8 es un juicio informado.
 
@@ -39,11 +51,13 @@ truncadas **nadie sabe cuántas llamadas habrían usado**, así que el 8 es un j
 1 y la 5, casi lineal. **No hace falta compactar.**
 
 **Las dos preguntas de C32a quedan respondidas:** cero herramientas muertas, **cero nombres
-inventados** y cero llamadas consecutivas idénticas; y la etiqueta cualitativa **basta** para
-gobernar el pivote, con 83 % donde debe y **0 % de sobre-pivote** en las tres etiquetas caras.
+inventados** y cero llamadas consecutivas idénticas; y la etiqueta cualitativa es **compatible**
+con gobernar el pivote: `gpt-4o` pivota en 3 de 3 escenarios sin existencias y en **ninguno** de
+las tres etiquetas caras, sobre un escenario por etiqueta — la evidencia que C38 tiene que ampliar.
 
-**Lo que queda abierto y medido:** `dangling_citation` retira el **13,1 %** de los argumentarios
-contra el 2,2 % de la ruta determinista. Y una restricción operativa que ninguna ficha anticipaba:
+**Lo que queda abierto y medido:** se retira el **13,1 %** de los argumentarios de `gpt-4o`
+—**9,5 puntos por `dangling_citation`**, el resto *timeouts* del argumentario y otra causa— contra
+el 2,2 % de la ruta determinista. Y una restricción operativa que ninguna ficha anticipaba:
 **la cuota de tokens por minuto de la organización**, y no el dinero, es lo que fija el reloj de
 una medición de agente — a 25.000 TPM con peticiones de ~13.000 tokens cabe **una por minuto**.
 

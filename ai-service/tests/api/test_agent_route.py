@@ -343,6 +343,10 @@ def test_under_stub_mode_the_route_answers_the_shape_without_running_a_loop(
     assert body["trace"] == []
     assert body["usage"]["calls"] == 0
     assert body["groups"] and body["pitch"]
+    # Only codes this route can emit. It emits a refusal code on a refusal and nothing else —
+    # never the two rule-derived warnings of C30a, which are statements about an anchored
+    # piece this route does not read. The first stub emitted both.
+    assert body["warnings"] == []
 
 
 # --- HU escenario 14 · the deterministic route did not move --------------------------------
@@ -386,23 +390,59 @@ def test_the_deterministic_route_answers_exactly_what_it_answered_before(
 def test_the_published_contract_moved_by_addition_only(
     issue_token: Callable[..., str],
 ) -> None:
-    """HU escenario 14, verified **leaf by leaf** against the committed snapshot.
+    """HU escenario 14, verified **leaf by leaf against the contract before this change**.
 
     Not a comparison of top-level keys and not a reading of a diff: both documents are
     flattened to `path -> scalar` and the difference is partitioned. Pure addition means the
     removed set and the changed set are both empty, and that every addition belongs to the new
     route or to one of its new models — an addition somewhere else would be a change to an
     existing surface wearing the clothes of an addition.
+
+    **The «before» is a fixture**: `fixtures/openapi-c32a-baseline.json`, the committed snapshot
+    as C32a left it (git blob `dd8df91d…`; `43f70fda…` in a Windows checkout with CRLF). Until
+    the independent verification of C32b this test compared the committed snapshot against the
+    generated one — which is `test_openapi_snapshot_is_stable` again — and would have passed
+    over a removed field once the snapshot was regenerated. Reading the baseline from git
+    instead would tie the suite to the history being present, which a shallow clone or a
+    container does not guarantee. **The next change that moves the contract replaces this
+    fixture and the allowed additions below, deliberately.**
     """
+    baseline = json.loads(
+        (Path(__file__).parent / "fixtures" / "openapi-c32a-baseline.json").read_text(
+            encoding="utf-8"
+        )
+    )
     committed = json.loads(
         (AI_SERVICE_ROOT / "openapi.json").read_text(encoding="utf-8")
     )
     generated = create_app(canonical_openapi_settings()).openapi()
 
-    before = dict(_walk(committed))
-    after = dict(_walk(generated))
+    before = dict(_walk(baseline))
+    after = dict(_walk(committed))
 
-    assert before == after, "the committed snapshot is the one the app generates"
+    assert after == dict(_walk(generated)), "the committed snapshot is the one the app generates"
+
+    removed = sorted(set(before) - set(after))
+    changed = sorted(path for path in set(before) & set(after) if before[path] != after[path])
+    added = sorted(set(after) - set(before))
+    new_models = (
+        "AgentAssistRequest",
+        "AgentAssistResponse",
+        "AgentTraceIteration",
+        "AgentTraceTool",
+        "AgentTurn",
+        "AgentUsage",
+    )
+    allowed = ("$.paths./v1/assist/agent.",) + tuple(
+        f"$.components.schemas.{name}." for name in new_models
+    )
+
+    assert removed == [], removed[:10]
+    assert changed == [], changed[:10]
+    assert added, "the change adds a route; an empty difference would mean the fixture is stale"
+    assert [path for path in added if not path.startswith(allowed)] == []
+    for name in new_models:
+        assert any(path.startswith(f"$.components.schemas.{name}.") for path in added), name
 
     # And the shape of the deterministic response is pinned as a SET, not as a count.
     assert set(committed["components"]["schemas"]["AssistResponse"]["properties"]) == {

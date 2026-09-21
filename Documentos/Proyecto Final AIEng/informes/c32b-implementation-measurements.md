@@ -11,11 +11,19 @@ una capa agéntica —el bucle, el presupuesto duro, el invariante de solo-lectu
 C32a entregó una y aquí van las tres restantes.
 
 **Lo primero que hay que decir es que la pasada refutó el número central del diseño.** El
-sobrecoste de la autonomía **no es ×19: es ×7,6**, y la descomposición «×5 estructural de tokens
-por ×4 reversible de modelo» **no se sostiene** — el brazo barato baja el coste a ×1,4 pero topa un
+sobrecoste de la autonomía **no es ×19: es ×3,0**, y la descomposición «×5 estructural de tokens
+por ×4 reversible de modelo» **no se sostiene** — el brazo barato baja el coste a ×1,1 pero topa un
 presupuesto en el 66 % de las peticiones. Lo segundo es que **tres de los cuatro fallos que costaron
 dinero o tiempo los encontró la propia pasada, no la suite**, y el más caro habría producido una
 medición inservible sin que nada fallara.
+
+> **Corregido por la verificación independiente (§11 de este informe, §12 del QA).** La primera
+> versión de este informe publicaba **×7,6 y ×1,4** y una pasada de **~2,60 USD**. Las tres cifras
+> descansaban en un coste del clasificador de 0,00205 USD atribuido a C31 que C31 nunca publicó:
+> el propio artefacto muestra al clasificador gastando ~3.305 tokens de prompt en `gpt-4o` por
+> petición, **0,0084 USD**. Las cifras de este informe salen ahora de
+> `python -m jbg_ai.evals.agent_sweep --rescore`, que las recalcula desde el artefacto sin
+> proveedor, y un test las fija.
 
 ---
 
@@ -45,12 +53,13 @@ medición inservible sin que nada fallara.
 
 | Puerta | Resultado |
 |---|---|
-| `uv run pytest` | **1.557 passed / 0 failed**, sin proveedor, sin red y sin base de datos |
-| Comparación **por nombres** | línea base 1.469 → 1.557 · **0 nombres desaparecidos** · 88 añadidos |
+| `uv run pytest` | **1.558 passed / 0 failed** al cerrar la implementación; **1.576 / 0** tras la verificación independiente |
+| Sin proveedor, sin red, sin BD | **cierto de los tests de este change**, comprobado con un guardia de sockets y de `psycopg` con PostgreSQL arrancado: 0 eventos. **No de la suite entera**: 72 tests `db` preexistentes corren contra PostgreSQL por testcontainers cuando hay Docker, y 11 preexistentes de C30b/C31 salen a `api.openai.com` (`DEFERRED_TASKS.md`) |
+| Comparación **por nombres** | línea base 1.469 → 1.558 · **0 desaparecidos** · 89 añadidos; → **1.576** · 0 desaparecidos · 18 más |
 | `openspec validate --all --strict` | **59 passed / 0 failed** |
-| `ai-service/openapi.json` | `43f70fda…` → **`7c6a038e…`**, verificado hoja a hoja (§5) |
+| `ai-service/openapi.json` | `43f70fda…` → `7c6a038e…` → **`d8d48f87…`** (checkout CRLF; *blobs* `dd8df91d…` → `8dd52feb…`), verificado hoja a hoja contra C32a (§5) |
 | Pasada con proveedor | **204/204**, artefacto `c32b-agent-sweep-293fe5c6e470.json` |
-| Coste real de la pasada | **~2,60 USD** (estimado 3,4) · **3,4 h de reloj** |
+| Coste real de la pasada | **3,82 USD**, cada etapa a su precio (`--rescore`) · **3,4 h de reloj**. La primera versión decía ~2,60 (§3.3) |
 | Golden set de C24 | **intacto**; `git status` vacío sobre `evals/golden/` |
 
 **La suite de `ai-service` está verde de fábrica** —1.469 de 1.469 al empezar— así que, como en
@@ -122,9 +131,15 @@ byte el que era.
 ### 2.6 · Un fallo de proveedor reportaba que el modelo había terminado
 
 **Encontrado por una medición, no leyendo código.** La primera pasada topó un límite de tasa en la
-petición 6 y **las 46 siguientes volvieron con `stop_reason=sin_mas_herramientas` y
+petición 6 y **las siguientes volvieron con `stop_reason=sin_mas_herramientas` y
 `partial=false`** — es decir, «el modelo dejó de pedir herramientas» sobre peticiones cuya llamada
-nunca llegó. Cuarenta y seis respuestas indistinguibles de una completa.
+nunca llegó: respuestas indistinguibles de una completa.
+
+> **Cuántas, no se puede verificar.** Esta sección decía «46»; el §3.9 decía «64». La pasada
+> abortada **no dejó artefacto** —el arnés sólo escribía al final— y las dos cifras se apuntaron de
+> su salida de consola, que no se conservó. El defecto sí está verificado: la sonda
+> `3ba27f2d72a8`, posterior al arreglo, ya informa `fallo_proveedor` en 4 de sus 10 filas. Desde
+> la verificación independiente el arnés escribe cada fila según la produce (§11).
 
 Se añade `fallo_proveedor` al vocabulario cerrado, con `partial=true`. La suite nunca lo habría
 cazado: un doble programado no se cae en mitad de una tanda.
@@ -157,12 +172,29 @@ cuatro piezas resueltas por etiqueta.
 
 | Presupuesto | p50 | **p95** | máx | Antes | **Ahora** | Razón |
 |---|---|---|---|---|---|---|
-| Tokens | 12.870 | **18.781** | 23.210 | 120.000 | **40.000** | 6,4× el p95 era un marcador, no un presupuesto |
-| Contexto (chars) | 1.847 | **4.709** | 17.053 | 40.000 | **30.000** | ~1,8× el máximo observado, con margen por el techo de tools |
-| Reloj | 5,3 s | **9,0 s** | 11,9 s | 20 s | **15,0 s** | ~1,26× el máximo, y **tensa el peor caso declarado** de 20 s a 15 s |
+| Tokens (clasificador + bucle) | 10.622 | **16.244** | 18.260 | 120.000 | **40.000** | ~2,5× el p95; el marcador de 120.000 no era un presupuesto |
+| Contexto (chars de observaciones) | 1.847 | **4.709** | 17.053 | 40.000 | **30.000** | ~1,8× el máximo observado, con margen por el techo de tools |
+| Reloj (petición entera) | 5,3 s | **9,0 s** | 11,9 s | 20 s | **15,0 s** | ~1,26× el máximo, **con 8 s reservados al argumentario** |
 
-El brazo barato da p95 19.129 / máx 24.866 en tokens y p95 10,3 s / máx 14,3 s en reloj, que es el
+El brazo barato da p95 16.298 / máx 22.019 en tokens y p95 10,3 s / máx 14,3 s en reloj, que es el
 que loopea hasta que un presupuesto lo corta; los valores elegidos lo cubren también.
+
+> **Dos correcciones de la verificación independiente.**
+>
+> **Tokens.** La primera versión de esta tabla publicaba p50 12.870 · p95 18.781 · máx 23.210: el
+> `prompt_tokens` entero de la petición, **argumentario incluido**. El presupuesto no compara eso:
+> compara clasificador más bucle, que es lo acumulado cuando se comprueba, porque el argumentario
+> corre después. El valor de 40.000 no cambia.
+>
+> **Reloj.** «Tensa el peor caso de 20 s a 15 s» **no era cierto**: el reloj sólo se miraba antes
+> de cada vuelta, así que la vuelta en curso gastaba su propio *timeout* pasado el límite y el
+> argumentario corría después (peor caso por construcción: 15 + 8 + 2 × 4 = 31 s, más las
+> herramientas). Ahora el bucle corre contra 15 s **menos la reserva del argumentario** (2 × 4 s) y
+> la vuelta en curso se corta cuando se agota. La reserva sale gratis según el propio artefacto: en
+> `gpt-4o` el bucle tarda **p95 4,7 s · máx 5,8 s** y clasificador + argumentario **p95 5,2 s ·
+> máx 8,0 s**; con 7 s para el bucle se habrían cortado **0 de 102** peticiones de `gpt-4o` y 3 de
+> 102 del brazo barato. El límite es ahora 15 s más, como mucho, las herramientas de la vuelta en
+> curso, que no se cancelan a medias.
 
 ### 3.2 · La curva de crecimiento contesta O-5: **no hace falta compactar**
 
@@ -180,18 +212,47 @@ dato delante en vez de por precaución.
 **Corrección metodológica primero.** El arnés tarifaba **todos** los tokens de una petición al
 precio del brazo, pero una petición mezcla tres modelos —clasificador `gpt-4o`, bucle (el brazo),
 argumentario `gpt-4o-mini`—. Para el brazo barato eso daba un absurdo: **×0,8, el agente más barato
-que el pipeline**. La descomposición correcta usa el coste del bucle exacto —de la traza por
-iteración— más las cifras que C31 y C30b ya publicaron para las otras dos etapas, que este change
-no mueve.
+que el pipeline**. Ahora cada etapa se tarifa **con su propio modelo**: el bucle, exacto desde la
+traza por iteración; el clasificador, medido en el propio artefacto; el argumentario, lo que queda.
 
-| | Bucle | + clasificador | + argumentario | **Total** | **vs pipeline (0,00282 $)** |
-|---|---|---|---|---|---|
-| `gpt-4o` | 0,01862 $ | 0,00205 $ | 0,00077 $ | **0,02144 $** | **×7,6** |
-| `gpt-4o-mini` | 0,00125 $ | 0,00205 $ | 0,00077 $ | **0,00407 $** | **×1,4** |
+> **La primera versión de esta sección se corrigió a sí misma mal.** Sustituyó el clasificador
+> por **0,00205 USD, atribuido a C31**, y publicó ×7,6 y ×1,4. C31 no publicó esa cifra —no está
+> en su informe ni en ninguno de sus diez artefactos, que no guardan tokens—: aparece por primera
+> vez en la HU de este change. El artefacto sí la mide: las 39 peticiones en que el argumentario no
+> corrió gastan fuera del bucle **3.301–3.312 tokens de prompt**, siempre en `gpt-4o`, es decir
+> **0,0084 USD por clasificación**; las 8 que el clasificador rechazó, que sólo lo llaman a él,
+> dicen lo mismo. Encontrado por la verificación independiente; reproducible con
+> `python -m jbg_ai.evals.agent_sweep --rescore evals/results/c32b-agent-sweep-293fe5c6e470.json`
+> y fijado por `test_the_rescore_of_the_committed_pass_reproduces_the_figures_the_report_publishes`.
 
-**El diseño estimó ×19 y el real es ×7,6.** Y la descomposición que el diseño daba por buena —«×5
-estructural de tokens por ×4 de modelo, y el ×4 es reversible con una variable»— **no se sostiene**:
-el brazo barato llega a ×1,4, mucho mejor de lo que predecía el ×4… **a cambio de no servir**.
+| | Bucle | + clasificador | + argumentario | **Total por petición** |
+|---|---|---|---|---|
+| `gpt-4o` | 0,01862 $ | 0,00841 $ | 0,00039 $ | **0,02742 $** |
+| `gpt-4o-mini` | 0,00125 $ | 0,00841 $ | 0,00041 $ | **0,01008 $** |
+
+**El pipeline, con el mismo clasificador.** `/v1/assist/sale` en consulta libre corre el mismo
+`router/v3` en `gpt-4o`, así que su clasificador cuesta lo mismo: 0,0084 USD. Su argumentario es
+una fracción: 0,00077 USD según C30b (modo anclado, 120 generaciones), o ~0,00058 USD estimados
+desde las 87 generaciones de consulta libre de C31 (`c31-free-query-gate-387fa94e792a`). El
+*pipeline* cuesta entre 0,0090 y 0,0092 USD, y **el cociente no depende de cuál se tome**:
+
+| | vs *pipeline* con argumentario de C30b | vs *pipeline* de consulta libre de C31 |
+|---|---|---|
+| `gpt-4o` | **×2,98** | **×3,04** |
+| `gpt-4o-mini` | **×1,10** | **×1,12** |
+
+**El diseño estimó ×19 y el real es ×3,0.** La estimación erraba en los dos lados: el agente entero
+cuesta la mitad de lo supuesto (0,027 USD frente a ~0,054), y el *pipeline* cuesta el triple
+(0,0092 frente a 0,0028), porque el clasificador que el diseño tomó de la cifra sin fuente cuesta
+cuatro veces más. Y la descomposición que el diseño daba
+por buena —«×5 estructural de tokens por ×4 de modelo, y el ×4 es reversible con una variable»—
+**no se sostiene**: el brazo barato llega a ×1,1, mucho mejor de lo que predecía el ×4… **a cambio
+de no servir**. Con el clasificador dominando el coste del *pipeline*, lo que la autonomía añade en
+`gpt-4o` es **~0,019 USD por petición**, casi todo el bucle.
+
+**La pasada completa costó 3,82 USD**, no ~2,60: el resumen que el propio artefacto lleva embebido
+sigue calculado con la fórmula vieja (3,63 USD), y se deja como está porque el artefacto es una
+medición fechada; las cifras válidas son las de `c32b-agent-sweep-293fe5c6e470.rescore.json`.
 
 ### 3.4 · Q-7 respondida: **el brazo barato no sostiene la selección de herramienta**
 
@@ -218,17 +279,25 @@ de herramienta inventados** en los dos brazos, que era «el dato más informativ
 producir» y sale vacío: no falta ninguna tool. **Cero llamadas consecutivas casi idénticas.** La
 única causa de fallo recurrente es `presupuesto_agotado`, que es del consumidor y no del esquema.
 
-**La etiqueta de disponibilidad.** Tasa de pivote por etiqueta:
+**La etiqueta de disponibilidad.** Tasa de pivote por etiqueta **y por brazo**:
 
-| Etiqueta | Escenarios | Pivotó | Debía | Veredicto |
+| Etiqueta | Escenarios | Debía | `gpt-4o` | `gpt-4o-mini` |
 |---|---|---|---|---|
-| `sin_existencias` | 6 | 5 | sí | **83 %** · un caso de infra-pivote |
-| `ultimas_unidades` | 2 | 0 | no | **0 % de sobre-pivote** |
-| `disponible` | 2 | 0 | no | **0 %** |
-| `sin_ambito` | 2 | 0 | no | **0 %** — no se produce el colapso que C32a prohíbe |
+| `sin_existencias` | 3 (C07, C11, C12) | sí | **3 de 3** | 2 de 3 · **infra-pivote en C11** |
+| `ultimas_unidades` | 1 (C08) | no | 0 de 1 | 0 de 1 |
+| `disponible` | 1 (C09) | no | 0 de 1 | 0 de 1 |
+| `sin_ambito` | 1 (C10) | no | 0 de 1 — no se produce el colapso que C32a prohíbe | 0 de 1 |
 
-**La etiqueta cualitativa basta para gobernar el pivote.** El fallo caro —apartar al cliente de una
-pieza vendible— **no se produjo ni una vez**, y el barato aparece en 1 de 6.
+**Compatible con que la etiqueta cualitativa baste para gobernar el pivote, y no más que eso.** El
+fallo caro —apartar al cliente de una pieza vendible— no se produjo en ningún brazo; el único
+infra-pivote es del brazo barato, en el escenario donde mutiló la referencia (§10). Pero la
+evidencia es de **un escenario por etiqueta y brazo** en las tres que no deben pivotar: el change de
+evaluación tiene que medirlo con más.
+
+> **Corregido por la verificación independiente.** La primera versión de esta tabla sumaba los dos
+> brazos, llamaba «6 escenarios» a 3 escenarios × 2 brazos y publicaba un 83 % en el que el único
+> fallo era del brazo descartado. Era lo que calculaba `pivot_rates`, que además lanzaba
+> `KeyError` con el C05 corregido; hoy separa por brazo y la tabla sale de `--rescore`.
 
 ### 3.6 · El techo de herramientas: medido, y movido de 6 a 8
 
@@ -247,6 +316,13 @@ comprobar la de la pieza que se va a ofrecer, y como mucho dos sustitutos:
 | | antes del cambio de prompt | después |
 |---|---|---|
 | Peticiones que tocan el techo | 3 de 21 (14 %) | **0 de 33** (y 4 de 102 en la pasada completa) |
+
+> **Las dos primeras cifras no son verificables.** Ningún artefacto conservado suma 21 ni 33
+> peticiones, y la última sonda antes de la pasada (`582b8517a235`, 10 minutos antes) tiene **6 de
+> 8** en el techo. Todas las ejecuciones registran `agent/v1` con el mismo `git_sha…+dirty` y sin
+> *digest* del texto, aunque el texto cambió entre ellas: no hay forma de saber qué versión del
+> prompt midió cada una. Lo verificable es la pasada: **4 de 102** en `gpt-4o`. Desde la
+> verificación independiente la procedencia registra el `sha256` de cada prompt.
 
 **Por qué dos sustitutos y no «los que hagan falta», con la medición detrás.** Sobre 60 piezas
 agotadas de MAO-AIR: sólo el **30 %** de los primeros sustitutos es vendible —**peor que la tasa
@@ -269,6 +345,12 @@ Los *embeddings* van aparte: p50 1, máximo 6, en el contador propio del registr
 
 Causa dominante: **`dangling_citation`** (40 y 45 violaciones iniciales). La ruta determinista con
 `assist/v3` mide **2 de 89 = 2,2 %**, así que **el agente retira 6× más**.
+
+**La tasa es de retirada por cualquier causa, no de `dangling_citation`.** De los 11 argumentarios
+retirados en `gpt-4o`, **8** llevan `dangling_citation` (**9,5 %** de los generados), **2** son
+*timeouts* del propio argumentario que ningún texto de este change mencionaba, y 1 es otra causa;
+en `gpt-4o-mini`, **12 de 13** (**14,8 %**). Precisado por la verificación independiente: la
+primera versión del QA y del plan atribuían el 13,1 % entero a `dangling_citation`.
 
 La prueba de humo ya había cazado este fallo en su forma aguda —el primer escenario retiraba el
 argumentario entero con cinco citas inventadas— y el arreglo de `assist/v4` lo redujo, **pero no lo
@@ -309,8 +391,10 @@ cuesta otra pasada.**
 
 ### 3.9 · El techo de tokens por minuto es la restricción operativa real
 
-La primera pasada murió en la petición 6 y las 64 siguientes volvieron vacías. **Dos diagnósticos
-míos fueron falsos antes de acertar**, y los dos valen para quien repita esto:
+La primera pasada murió en la petición 6 y las siguientes volvieron vacías —cuántas, no se puede
+verificar: la pasada no dejó artefacto y las dos cifras apuntadas de su consola, 46 (§2.6) y 64,
+no coinciden—. **Dos diagnósticos míos fueron falsos antes de acertar**, y los dos valen para quien
+repita esto:
 
 1. *«Es la clave nueva, que tiene poca cuota.»* Falso: el bucle seguía funcionando con esa misma
    clave mientras el clasificador fallaba.
@@ -355,7 +439,9 @@ ahora `test_snapshot_covers_the_frozen_surface`, que es su sitio.
 | Comprobación | Resultado |
 |---|---|
 | `sha256` antes (C32a) | `43f70fdadd2bd9aa90068d3e74ec2ee25c8d3b3b530f6d33907b1e73d068c684` |
-| `sha256` al cierre | **`7c6a038e9f749df2f9d23c024201e9fb2c4d2383cb7ff45eaf63a461ecaccc65`** |
+| `sha256` al cierre de la implementación | `7c6a038e9f749df2f9d23c024201e9fb2c4d2383cb7ff45eaf63a461ecaccc65` |
+| `sha256` tras la verificación independiente | **`d8d48f87b279d45d22bce80a67c4fd51caef6e679363c413f5b697c99ec2b875`** — sólo cambian dos descripciones de `AgentUsage`, esquema nuevo de este change |
+| Los mismos, como *blob* de git (LF) | `dd8df91d…` → `befdf436…` → **`8dd52feb…`**. Los de arriba son del checkout de Windows con `core.autocrlf=true` |
 | Hojas del documento | 1.103 → 1.289 |
 | **Retiradas** | **0** |
 | **Cambiadas de valor o de tipo** | **0** |
@@ -376,11 +462,12 @@ después de que `fallo_proveedor` moviera la descripción de `stop_reason`.
 | **1** | El bucle reúne evidencia y para cuando el modelo deja de pedir | `test_the_loop_stops_when_the_model_asks_for_no_more_tools` |
 | | …las citas publicadas son las que el argumentario declaró | `test_the_published_citations_are_the_ones_the_argument_declared_and_that_verified` |
 | **2** | Agotado el presupuesto de iteraciones, responde y lo declara | `test_the_iteration_budget_stops_the_loop_and_the_response_declares_it` |
+| | …y el de reloj acota la petición entera, argumentario incluido | `test_the_wall_clock_budget_bounds_the_whole_request_argument_included` *(verificación independiente)* |
 | **3** | Ningún texto de las vueltas llega a la respuesta | `test_no_fragment_of_the_loops_prose_reaches_the_response_or_the_wire_trace` |
 | | …y la propiedad es **del tipo** | `test_the_agent_step_type_declares_no_field_able_to_carry_the_models_prose` |
 | | …el adaptador descarta y registra longitud y digest | `test_the_adapter_discards_the_prose_and_records_only_its_length_and_digest` |
 | **4** | Cada turno viaja como dato delimitado | `test_every_turn_of_the_transcript_travels_inside_the_data_delimiters` |
-| | …inyección en el turno 3 sin mover el sistema | `test_an_injection_in_an_earlier_turn_does_not_change_the_system_message` |
+| | …inyección en el turno 3 sin mover el sistema | `test_an_injection_in_an_earlier_turn_does_not_change_the_system_message` — **reescrito**: comparaba una función sin argumentos consigo misma; ahora compara los mensajes de sistema que recibieron las llamadas reales, con la inyección en el turno 3 de 5 |
 | | …turno de asistente falsificado, tratado como dato | `test_a_turn_attributed_to_the_assistant_is_delimited_exactly_as_an_operator_turn` |
 | | …y no puede cerrar el bloque | `test_a_turn_that_writes_the_closing_mark_cannot_escape_its_block` |
 | | …rechazo antes de cualquier llamada | `test_a_transcript_over_its_caps_is_refused_before_any_provider_call` · `test_a_transcript_beyond_its_declared_caps_is_refused_with_422` |
@@ -393,9 +480,10 @@ después de que `fallo_proveedor` moviera la descripción de `stop_reason`.
 | **7** | La repregunta la decide el bucle y termina | `test_the_clarification_tool_ends_the_loop_with_the_deterministic_question` |
 | | …el clasificador no repregunta | `test_an_elliptical_follow_up_is_not_short_circuited_by_the_insufficiency_verdict` |
 | | …granularidad de la terminalidad | `test_clarification_is_terminal_at_the_granularity_of_a_turn` |
-| **8** | La disponibilidad dispara el pivote, y no de más | **Medido**: `sin_existencias` 83 %, las otras tres **0 %** (§3.5) |
+| **8** | La disponibilidad dispara el pivote, y no de más | **Medido por brazo**: `gpt-4o` 3 de 3 en `sin_existencias` y 0 de 1 en cada una de las otras tres (§3.5) |
 | | …los sustitutos llegan distinguidos | `test_substitute_groups_reach_the_payload_marked_apart_from_catalogue_matches` |
-| **9** | Ninguna etiqueta de disponibilidad llega al argumentario | `test_no_availability_label_reaches_the_generation_payload` |
+| | …y la pieza abandonada no encabeza como coincidencia | `test_a_piece_the_loop_pivoted_away_from_does_not_reach_the_payload_as_a_match` · `test_the_piece_cap_drops_further_matches_before_the_substitutes_of_a_pivot` *(verificación independiente)* |
+| **9** | Ninguna etiqueta de disponibilidad llega al argumentario | *payload*: `test_no_availability_label_reaches_the_generation_payload` · **argumento: medido, no asegurado** — nada lo impide (`verify()` deja pasar «disponible»), así que la pasada cuenta los términos por fila (`pitch_availability_terms`); la pasada `293fe5c6e470` es anterior al recuento y no lo tiene |
 | **10** | Las llamadas que no caben vuelven como observación | `test_tool_calls_beyond_the_budget_come_back_as_observations_and_touch_no_port` |
 | | …medido | 5 y 168 observaciones `presupuesto_agotado` por brazo (§3.4) |
 | **11** | La traza del cable dice qué se hizo, no qué se preguntó | `test_the_wire_trace_reports_what_was_done_and_never_what_was_asked` |
@@ -404,7 +492,7 @@ después de que `fallo_proveedor` moviera la descripción de `stop_reason`.
 | **12** | Los dos números, medidos y no declarados | §3.1, con p50/p95/máx · §3.2 la curva · §3.3 los dos brazos |
 | **13** | Las dos preguntas de C32a, con datos | §3.5 — granularidad y tasa de pivote por etiqueta |
 | **14** | El pipeline determinista no se mueve | `test_the_deterministic_route_answers_exactly_what_it_answered_before` |
-| | …adición pura hoja a hoja | `test_the_published_contract_moved_by_addition_only` · §5 |
+| | …adición pura hoja a hoja | `test_the_published_contract_moved_by_addition_only` — **reescrito**: sólo comparaba el *snapshot* con lo que genera la app; ahora parte hoja a hoja contra el contrato de C32a guardado como fixture · §5 |
 | | …el golden set no se ha usado | `test_no_transcript_of_either_agent_set_reuses_a_golden_query` · §7 |
 
 ---
@@ -511,13 +599,48 @@ proveedor, porque lo único que cambia es cómo se puntúa lo ya medido:
 
 | | antes | después |
 |---|---|---|
-| `gpt-4o` | 16 OK / 4 MISS de 20 | **18 OK / 1 MISS** de 19 reevaluables |
-| `gpt-4o-mini` | 14 OK / 6 MISS de 20 | **16 OK / 3 MISS** de 19 reevaluables |
+| `gpt-4o` | 16 OK / 4 MISS de 20 | **18 OK / 0 MISS / 1 discrepancia declarada** de 19 reevaluables |
+| `gpt-4o-mini` | 14 OK / 6 MISS de 20 | **16 OK / 2 MISS / 1 discrepancia declarada** de 19 reevaluables |
 
 **C05 no es reevaluable**: su transcripción cambió, así que la pasada vieja ya no la mide. Lo que
 queda fallando es lo que debe: `C19` en los dos brazos —la discrepancia que se deja abierta— y
 `C03` y `C11` sólo en el barato, que son fallos reales del modelo.
 
+> **Hasta la verificación independiente esta tabla no tenía código detrás**: se puntuó a mano, y el
+> arnés no leía `expects`, `expects_any` ni `forbids`. Hoy la calcula `expectation_verdict` con la
+> semántica que declara la cabecera del conjunto, `--rescore` la reproduce (16/4 y 14/6 tal como
+> se corrió; 18/1 y 16/3 con el fichero de hoy) y un test la fija. **C19 lleva su discrepancia en
+> el propio fichero**, en un campo `declared_discrepancy` que el evaluador cuenta aparte; antes
+> sólo constaba en la prosa de este informe y del QA, y su `why` seguía diciendo «la búsqueda debe
+> correr».
+
 **Esta proporción no es una nota de calidad y no debe publicarse como tal.** Sirve para leer *por
 qué* falla cada caso, que es para lo que el conjunto existe. La nota la da el change de evaluación
 sobre el golden set, que sigue limpio.
+
+---
+
+## 11 · La verificación independiente: qué cambió de este informe y del código
+
+Una segunda sesión reprodujo contra el árbol cada cifra de este informe y del QA, con la hipótesis
+de trabajo de que algo se había escapado. **Casi todo reprodujo al dígito**; lo que no, está en el
+[§12 del QA](../../../openspec/changes/add-sales-assistant-agent-loop/qa.md), con su medición y su
+control. Aquí, sólo lo que cambió.
+
+| Hallazgo | Qué era | Qué se hizo |
+|---|---|---|
+| **El sobrecoste ×7,6** | El clasificador se tarifaba a 0,00205 USD, cifra atribuida a C31 que C31 nunca publicó; el artefacto lo mide a 0,0084 | Coste por etapa en el arnés; `--rescore`; §3.3 reescrito: **×3,0 y ×1,1**, pasada de **3,82 USD** |
+| **`pivot_rates`** | `KeyError` con el C05 corregido, justo al escribir el artefacto; además sumaba los dos brazos | Por brazo y sólo sobre etiquetas; filas escritas según se producen; §3.5 por brazo |
+| **El reloj** | Sólo se miraba antes de cada vuelta: 31 s de peor caso por construcción | Reserva del argumentario dentro de los 15 s y corte de la vuelta en curso (§3.1) |
+| **Cuatro tests que no afirmaban lo que decían** | Adición pura sin línea base, *ledger* sólo en negativo, inyección comparando una función consigo misma, etiqueta en el argumento sobre un texto guionizado | Reescritos o ampliados sin retirar ni renombrar ninguno; el cuarto pasa a medición (§6) |
+| **Presupuesto de tokens** | Calibrado sobre `prompt_tokens` con argumentario; el código compara clasificador + bucle | Cifras rehechas (§3.1); el valor no cambia |
+| **Tras un pivote** | La pieza abandonada seguía como coincidencia de catálogo y el tope cortaba antes los sustitutos | Excluida; el tope prioriza sustitutos sin cambiar el orden (§6, escenario 8) |
+| **`usage` del cable** | Suma tres modelos bajo un solo `model` | `AgentRun` guarda las tres etapas; `AgentUsage.model` declara que no es clave de precio |
+| **La calibración** | OK/MISS puntuado a mano; C19 sólo declarado en prosa | `expectation_verdict` + `declared_discrepancy` (§10) |
+| **Procedencia** | Mismo `agent/v1` y `assist/v4` sobre textos distintos; la pasada abortada no dejó nada | `sha256` de cada prompt y modelos de las tres etapas; «46/64» y «3 de 21 → 0 de 33» marcados como no verificables |
+
+**Nada de esto exigió volver a llamar al proveedor**: todo sale del artefacto commiteado o de dobles.
+**Lo que la pasada no mide del código nuevo**, y se declara: la proyección tras un pivote cambia el
+*payload* que recibe el argumentario en 7 de las 10 peticiones de `gpt-4o` que pivotaron; los tokens
+no se mueven, porque el tope de ocho piezas es el mismo, pero la calidad de ese argumentario es cosa
+del change de evaluación.

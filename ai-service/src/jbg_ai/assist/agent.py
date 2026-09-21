@@ -54,6 +54,7 @@ from jbg_ai.assist.constants import (
     AGENT_DEADLINE_SECONDS,
     AGENT_OBSERVATION_BUDGET_CHARS,
     AGENT_PITCH_PROMPT_VERSION,
+    AGENT_PITCH_RESERVE_SECONDS,
     AGENT_PROMPT_VERSION,
     AGENT_TOKEN_BUDGET,
     GROUP_ORIGIN_CATALOGUE,
@@ -155,6 +156,10 @@ class AgentBudgets:
     context_chars: int = AGENT_CONTEXT_BUDGET_CHARS
     deadline_seconds: float = AGENT_DEADLINE_SECONDS
     pieces: int = MAX_AGENT_PIECES
+    #: Of `deadline_seconds`, what the argument may still take once the loop stops. The loop
+    #: runs against the deadline minus this, so the request as a whole keeps the deadline.
+    #: Ignored when no generation client is handed in: there is no argument to reserve for.
+    pitch_reserve_seconds: float = AGENT_PITCH_RESERVE_SECONDS
 
 
 @dataclass(frozen=True)
@@ -187,11 +192,12 @@ class IterationTrace:
     completion_tokens: int
     total_tokens: int
     elapsed_ms: float
-    #: Accumulated observation characters **as this turn was sent**, which is the deterministic
-    #: half of the context pair and the number the pre-flight budget reads. The other half is
-    #: `prompt_tokens`, which *is* the accumulated context measured by the provider rather than
-    #: estimated — so the growth curve this change has to publish can be read off either, and
-    #: publishing both is what says whether the character cap is a good proxy for the token one.
+    #: Accumulated observation characters **after this turn's observations were appended** —
+    #: that is, what the next turn would send, and the number the next pre-flight check reads.
+    #: It is the deterministic half of the context pair. The other half is `prompt_tokens`,
+    #: which *is* the context this turn sent, measured by the provider rather than estimated:
+    #: the two are one turn apart by construction, so a curve read off the characters is the
+    #: token curve shifted by one turn.
     context_chars: int = 0
     #: Length and digest of the prose this turn produced and the port threw away. Never the
     #: text: it makes two turns comparable and one re-derivable by nobody.
@@ -199,6 +205,9 @@ class IterationTrace:
     discarded_digest: str | None = None
     #: The cause of a provider fault on this turn, when there was one.
     provider_error: str | None = None
+    #: The turn was in flight when the loop's share of the deadline ran out, and was cut. Not a
+    #: provider fault: the provider may have been about to answer.
+    cut_by_clock: bool = False
 
 
 @dataclass(frozen=True)
@@ -230,6 +239,14 @@ class AgentRun:
     #: `None` when the generation layer did not run, exactly as the deterministic route's
     #: field means today: «the layer ran» and no longer «there is a pitch».
     prompt_version: str | None = None
+    #: **The three stages, kept apart.** `usage` is their sum and it carries one model name —
+    #: the last stage's — for tokens billed at up to three different prices: the classifier,
+    #: the loop (the arm under measurement) and the argument. Pricing that sum by that name is
+    #: the error the first cost figure of this change made, so whoever needs a cost prices
+    #: these three, each by its own `model`. Their sum is `usage`, field by field.
+    router_usage: TokenUsage = field(default_factory=TokenUsage)
+    loop_usage: TokenUsage = field(default_factory=TokenUsage)
+    pitch_usage: TokenUsage = field(default_factory=TokenUsage)
 
     def wire_trace(self) -> tuple[dict[str, object], ...]:
         """The trace as it travels on the response: **what was done, never what was asked.**
@@ -332,8 +349,6 @@ async def run_agent(
     router_client: RouterLlm | None = None,
     pitch_client: AssistLlm | None = None,
     budgets: AgentBudgets = AgentBudgets(),
-    agent_prompt_text: str | None = None,
-    pitch_prompt_text: str | None = None,
 ) -> AgentRun:
     """Serve one agent request. **Every port and every client is handed in, never built here.**
 
@@ -345,16 +360,28 @@ async def run_agent(
     fail-open, a loop fault costs the turn and leaves the evidence already gathered, and a
     generation fault serves the evidence without prose. It **does** raise `TranscriptError`,
     because a transcript over its caps is a bad request and not a degradation.
+
+    **The prompts are the versioned files, and there is no parameter to inject another text.**
+    A text handed in beside a version that stays the default is how a response gets stamped
+    with a prompt that never reached the model — the failure `enrichment/` already paid for.
+    The two parameters that allowed it were removed by the independent verification of C32b;
+    they had no caller. A sweep that needs another text needs a new version, or a parameter
+    that carries the text and its version together.
     """
     validate_transcript(turns)
     started = time.perf_counter()
-    deadline = started + budgets.deadline_seconds
+    # **The loop runs against the deadline minus the argument's reserve**, so the request as a
+    # whole keeps the deadline: checking the clock only before a turn let the turn in flight run
+    # its own timeout past it and the argument run after that, and a request with a 0,2 s
+    # deadline took 0,479 s. With no generation client there is no argument to reserve for.
+    reserve = budgets.pitch_reserve_seconds if pitch_client is not None else 0.0
+    loop_deadline = started + budgets.deadline_seconds - reserve
 
     def elapsed_ms() -> float:
         return (time.perf_counter() - started) * 1000.0
 
     def out_of_time() -> bool:
-        return time.perf_counter() >= deadline
+        return time.perf_counter() >= loop_deadline
 
     answered = answered_turn(turns)
 
@@ -394,10 +421,11 @@ async def run_agent(
         return _no_client(routing, principal, elapsed_ms())
 
     usage = routing.usage
+    loop_usage = TokenUsage()
     evidence = _Evidence()
     traces: list[IterationTrace] = []
     messages: list[dict[str, object]] = [
-        {"role": "system", "content": agent_system_message(agent_prompt_text)},
+        {"role": "system", "content": agent_system_message()},
         {"role": "user", "content": transcript_block(turns)},
     ]
     schemas = registry.schemas()
@@ -423,7 +451,32 @@ async def run_agent(
         iterations = iteration
         turn_started = time.perf_counter()
         try:
-            step: AgentStep = await agent_client.decide(messages, schemas)
+            # Bounded by what is left of the loop's share of the deadline, and not only by the
+            # client's own per-call timeout: otherwise a turn started just before the deadline
+            # spends its whole timeout after it.
+            step: AgentStep = await asyncio.wait_for(
+                agent_client.decide(messages, schemas),
+                timeout=max(loop_deadline - time.perf_counter(), 0.0),
+            )
+        except TimeoutError:
+            # **The clock, not the provider.** The adapter turns its own timeout into an
+            # `AgentProviderError`, so a bare timeout reaching here is the deadline's: the turn
+            # is lost, the evidence of the earlier ones is served, and the reason says which
+            # budget ran out rather than blaming a provider that may have been about to answer.
+            traces.append(
+                IterationTrace(
+                    iteration=iteration,
+                    tools=(),
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    total_tokens=0,
+                    elapsed_ms=(time.perf_counter() - turn_started) * 1000.0,
+                    context_chars=observation_chars,
+                    cut_by_clock=True,
+                )
+            )
+            stop_reason = STOP_CLOCK_BUDGET
+            break
         except AgentProviderError as exc:
             # The turn is lost and the request is not: the evidence the earlier turns gathered
             # is already in the ledger and is served. A fault on the first turn therefore
@@ -442,11 +495,13 @@ async def run_agent(
             # **Its own reason, and partial.** Reporting `sin_mas_herramientas` here
             # would say the model finished asking for tools about a request whose call
             # never arrived, and a consumer could not tell the two apart — which is
-            # exactly what forty-six responses of the first provider pass did.
+            # exactly what the responses of the first provider pass did after its rate
+            # limit (how many is not known: that run left no artefact).
             stop_reason = STOP_PROVIDER_ERROR
             break
 
         usage = usage + step.usage
+        loop_usage = loop_usage + step.usage
 
         if not step.wants_tools:
             # The model finished. The one stop reason that is not a budget and not a refusal,
@@ -523,10 +578,10 @@ async def run_agent(
         registry=registry,
         routing=routing,
         pitch_client=pitch_client,
-        pitch_prompt_text=pitch_prompt_text,
         budgets=budgets,
         evidence=evidence,
         usage=usage,
+        loop_usage=loop_usage,
         traces=tuple(traces),
         iterations=iterations,
         tool_calls_used=tool_calls_used,
@@ -668,9 +723,21 @@ def _pieces(registry: ToolRegistry, cap: int) -> tuple[list[FreeQueryGroup], lis
     **The cap is on distinct pieces per request.** A loop that searched five times would
     otherwise hand over fifty, and the numeric gate measured zero violations over a payload
     carrying one SKU.
+
+    **A piece the loop pivoted away from is not handed over as a catalogue match**, and the
+    substitutes the pivot produced are the last to be dropped by the cap. Both were found by the
+    independent verification of C32b: in the pass, 7 of the 10 pivots of `gpt-4o` followed a
+    catalogue search, so the piece that did not serve was also a catalogue candidate — and the
+    argument, told to say first what matches, headed its answer with it; and in 5 of those 7 the
+    cap was reached with the candidates, which were read first, cutting the substitutes the
+    pivot existed to find. The loop's decision is what excludes the piece, not its availability
+    label: the label stays out of the payload, as D-11 requires.
     """
     ledger = registry.evidence
     substitute_skus = {result.sku for _, result in ledger.substitutes}
+    # The pieces the loop asked substitutes for. `assist/v4` describes a substitute group as
+    # alternatives to a piece that does not serve, so that piece is not also offered as a match.
+    anchors = {anchor for anchor, _ in ledger.substitutes}
 
     # `sku -> (origin, object, family id)`. The family travels **beside** the object because
     # a roster member does not carry one: the port denormalises the family's *name* onto each
@@ -678,7 +745,11 @@ def _pieces(registry: ToolRegistry, cap: int) -> tuple[list[FreeQueryGroup], lis
     # invariant cannot be honoured for a roster of three without it.
     seen: dict[str, tuple[str, object, str | None]] = {}
     for result in ledger.candidates:
-        if result.sku not in seen and result.sku not in substitute_skus:
+        if (
+            result.sku not in seen
+            and result.sku not in substitute_skus
+            and result.sku not in anchors
+        ):
             seen[result.sku] = (GROUP_ORIGIN_CATALOGUE, result, result.family_id)
     for _, result in ledger.substitutes:
         if result.sku not in seen:
@@ -689,10 +760,21 @@ def _pieces(registry: ToolRegistry, cap: int) -> tuple[list[FreeQueryGroup], lis
     # carries the catalogue marker, and it is the one source here that contributes a size,
     # which is exactly the fact the question is about.
     for family_id, member in ledger.family_members:
-        if member.sku not in seen:
+        if member.sku not in seen and member.sku not in anchors:
             seen[member.sku] = (GROUP_ORIGIN_CATALOGUE, member, family_id)
 
-    kept = list(seen.items())[:cap]
+    # **Which pieces survive the cap is decided by priority; where they sit is not.** The
+    # substitutes are chosen first, then the rest in arrival order; the payload keeps the order
+    # the evidence arrived in, so the only thing this changes is what the cap drops.
+    by_priority = [
+        sku for sku, (origin, _item, _family) in seen.items()
+        if origin == GROUP_ORIGIN_SUBSTITUTES
+    ] + [
+        sku for sku, (origin, _item, _family) in seen.items()
+        if origin != GROUP_ORIGIN_SUBSTITUTES
+    ]
+    chosen = set(by_priority[:cap])
+    kept = [(sku, entry) for sku, entry in seen.items() if sku in chosen]
 
     payload_groups: list[FreeQueryGroup] = []
     response_groups: list[AssistGroup] = []
@@ -817,10 +899,10 @@ async def _compose(
     registry: ToolRegistry,
     routing: RoutingOutcome,
     pitch_client: AssistLlm | None,
-    pitch_prompt_text: str | None,
     budgets: AgentBudgets,
     evidence: _Evidence,
     usage: TokenUsage,
+    loop_usage: TokenUsage,
     traces: tuple[IterationTrace, ...],
     iterations: int,
     tool_calls_used: int,
@@ -912,6 +994,9 @@ async def _compose(
         embedding_calls=registry.embedding_calls,
         elapsed_ms=(time.perf_counter() - started) * 1000.0,
         prompt_version=outcome.prompt_version if outcome is not None else None,
+        router_usage=routing.usage,
+        loop_usage=loop_usage,
+        pitch_usage=outcome.usage if outcome is not None else TokenUsage(),
     )
     _log(run, principal)
     return run
@@ -947,6 +1032,7 @@ def _refused(
         # abstention.
         abstained=False,
         elapsed_ms=elapsed,
+        router_usage=routing.usage,
     )
     _log(run, principal)
     return run
@@ -968,6 +1054,7 @@ def _no_client(
         warnings=routing.refusal_codes,
         abstained=False,
         elapsed_ms=elapsed,
+        router_usage=routing.usage,
     )
     _log(run, principal)
     return run

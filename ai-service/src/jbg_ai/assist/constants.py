@@ -555,12 +555,18 @@ MAX_AGENT_PROVIDER_CALLS = (
 #: can be evaluated in advance plus a cut that can overshoot by **at most one turn** — and that
 #: turn is itself bounded by the other five budgets.
 #:
-#: **Fixed by measurement.** Run `293fe5c6e470`, 102 requests on `gpt-4o`: prompt tokens
-#: **p50 12.870 · p95 18.781 · max 23.210**; on the cheap arm p95 19.129 and max 24.866. The
-#: placeholder this replaces was 120.000, **6,4 times the p95** — loose on purpose so the pass
-#: could see a request whole, and useless as a budget.
+#: **What it compares is the classifier plus the loop**, because that is what has accumulated
+#: when the check runs: the argument is generated after the loop and never reaches it. The first
+#: calibration of this budget read the request's whole `prompt_tokens`, argument included, which
+#: is a different quantity (p95 18.781) — found by the independent verification of C32b.
 #:
-#: Forty thousand is ~2,1 x the p95 and ~1,6 x the largest request either arm produced, with
+#: **Fixed by measurement, over the quantity it governs.** Run `293fe5c6e470`, 102 requests on
+#: `gpt-4o`: classifier plus loop prompt tokens **p50 10.622 · p95 16.244 · max 18.260**; on the
+#: cheap arm p95 16.298 and max 22.019 (`--rescore`, with the classifier's share derived from
+#: the artefact's own requests that ran no argument). The placeholder this replaces was
+#: 120.000, loose on purpose so the pass could see a request whole, and useless as a budget.
+#:
+#: Forty thousand is ~2,5 x that p95 and ~1,8 x the largest request either arm produced, with
 #: room for the tool ceiling having moved from six to eight. A budget is there to stop a loop
 #: that runs away, not to trim the tail of ordinary traffic: nothing observed comes near it,
 #: and a request that did would be reporting something this pass never saw.
@@ -580,23 +586,44 @@ AGENT_OBSERVATION_BUDGET_CHARS = 30_000
 #: that a long conversation cannot eat the budget of the evidence, which is where the answer is.
 #: **Per section and also global**, which is why there are three numbers here and not one.
 #:
-#: The observation budget plus the transcript's own maximum plus a margin, so the global bound
-#: cannot be reached before the section bound it exists to protect.
+#: The observation budget plus the transcript's own maximum plus a margin. **With these default
+#: values the global bound cannot bind**: observations stop at 30.000 and a transcript cannot
+#: exceed `MAX_TRANSCRIPT_CHARS`, so the sum never reaches 36.000. That is deliberate and it is
+#: not decoration: lowering the global below the sum would let a long transcript eat the
+#: evidence's budget, which is what Q-4 forbade. It binds when a sweep raises the observation
+#: budget through `AgentBudgets`, which is the one configuration in which nothing else would
+#: bound the context, and a test drives that branch rather than leaving it unexecuted.
 AGENT_CONTEXT_BUDGET_CHARS = 36_000
 
-#: Seconds the **whole request** may take, argument included. A deadline and not a per-call
+#: Seconds the **whole request** may take, argument included — **plus, at most, the tool calls
+#: of the turn in flight**, which are not cancelled mid-query because cancelling a session in a
+#: pool of five with no overflow invalidates the connection. A deadline and not a per-call
 #: timeout: without one, the worst case is five turns at the provider's own timeout plus the
 #: tools plus the generation, which goes well past the latency this route declares.
 #:
-#: **Fixed by measurement.** Run `293fe5c6e470`, 102 requests on `gpt-4o`: **p50 5,3 s · p95
-#: 9,0 s · max 11,9 s**; on the cheap arm p95 10,3 s and max 14,3 s, which is the arm that
-#: loops until a budget stops it. Fifteen seconds is ~1,7 x the p95 and ~1,26 x the largest
-#: request this pass produced.
+#: **How it is held.** The loop runs against the deadline **minus the argument's reserve**
+#: (`AGENT_PITCH_RESERVE_SECONDS`), and the provider call of every turn is bounded by whatever is
+#: left of that, so a turn in flight is cut by the clock rather than allowed to spend its own
+#: timeout past it. The argument then has its reserve. Until the independent verification of
+#: C32b the clock was only checked **before** a turn, so a turn started at 14,9 s ran its full
+#: timeout and the argument ran after it: a request with a 0,2 s deadline took 0,479 s, and the
+#: worst case by construction was 15 + 8 + 2 x 4 = 31 s plus the tools.
 #:
-#: It also **tightens the declared worst case** from the 20 s the design wrote down to 15 s,
-#: which is the number a counter feels. Exceeding it is a degradation and not a failure: the
-#: evidence gathered so far is served and the response says the clock stopped it.
+#: **Fixed by measurement.** Run `293fe5c6e470`, 102 requests on `gpt-4o`: **p50 5,3 s · p95
+#: 9,0 s · max 11,9 s** end to end; on the cheap arm p95 10,3 s and max 14,3 s. The split is what
+#: makes the reserve free: on `gpt-4o` the loop alone takes **p95 4,7 s · max 5,8 s** and the
+#: classifier plus the argument **p95 5,2 s · max 8,0 s**. With seven seconds for the loop, **0
+#: of 102** `gpt-4o` requests and 3 of 102 on the cheap arm would have been cut.
+#:
+#: Exceeding it is a degradation and not a failure: the evidence gathered so far is served and
+#: the response says the clock stopped it.
 AGENT_DEADLINE_SECONDS = 15.0
+
+#: Seconds of the deadline **reserved for the argument**: its two provider calls at their own
+#: timeout. **Derived from the constants of that stage and never written as a digit**, like the
+#: provider-call ceiling — a change to either cannot leave a stale reserve behind. The route
+#: recomputes it from the configured timeout, because that is the value its client actually uses.
+AGENT_PITCH_RESERVE_SECONDS = MAX_PITCH_PROVIDER_CALLS * PITCH_TIMEOUT_SECONDS
 
 #: Distinct pieces that may reach the generation payload, however many turns saw them. The rule
 #: is C30b's and it is about the numeric gate, not about tidiness: **every field handed over
@@ -636,8 +663,9 @@ STOP_NO_CLIENT = "sin_cliente"
 #: **The turn died in the provider**, and this value exists because a measurement found its
 #: absence. C32b's first provider pass hit a rate limit on request six and every one after it
 #: came back reporting `sin_mas_herramientas` with `partial: false` — that is, «the model
-#: finished asking for tools» about a request whose call never arrived. Forty-six responses were
-#: indistinguishable from complete ones.
+#: finished asking for tools» about a request whose call never arrived, indistinguishable from a
+#: complete response. How many is not known: the run left no artefact, and the two counts written
+#: down from its console (46 and 64) disagree.
 #:
 #: A fault costs the turn and not the request: whatever earlier turns gathered is still served.
 #: But an answer built on a loop that was cut short is not the answer an unhurried request would

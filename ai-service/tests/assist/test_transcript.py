@@ -71,30 +71,78 @@ def test_every_turn_of_the_transcript_travels_inside_the_data_delimiters() -> No
     assert rendered.count(QUERY_CLOSE) == len(CONVERSATION)
 
 
-def test_an_injection_in_an_earlier_turn_does_not_change_the_system_message() -> None:
-    """HU escenario 4. The system message is identical to the uncontaminated one.
+def test_an_injection_in_an_earlier_turn_does_not_change_the_system_message(
+    search, knowledge, principal
+) -> None:
+    """HU escenario 4. The system message of **every provider call** is identical to the one an
+    uncontaminated conversation produces, and the injected turn travels inside the marks.
 
-    Asserted on the text that gets built rather than on a rule in a prompt: the mitigation is
-    that the turn lands in the **user** message inside marks, so nothing a client writes can
-    reach the block that carries the rules.
+    Asserted on the messages the doubles actually received — the loop's and the argument's —
+    rather than on a rule in a prompt: the mitigation is that a turn lands in the **user**
+    message inside marks, so nothing a client writes can reach the block that carries the rules.
+
+    The injection sits in the **third of five** turns, an operator turn that is not the one
+    being answered, which is the case the name and the HU describe. The first form of this test
+    compared `agent_system_message()` with itself — a function of no argument, equal to itself
+    whatever any transcript said — and put the injection in the last turn; both found by the
+    independent verification of C32b. This is the one test of the module that drives the loop,
+    over the same doubles as `test_agent.py`, because the property is about what is sent.
     """
-    from jbg_ai.assist.agent import agent_system_message
+    from jbg_ai.assist.agent import run_agent
+    from jbg_ai.assist.tools import build_registry
+    from support.assist_agent import finishes, scripted_agent, wants
+    from support.assist_pitch import pitch, scripted_client
+    from support.assist_router import decision, scripted_router
+    from support.assist_world import run
+    from support.fake_embedding_client import FakeEmbeddingClient
+    from support.settings import build_settings
 
-    clean = turns_from(CONVERSATION)
-    poisoned = turns_from(
-        (
-            CONVERSATION[0],
-            (TURN_ROLE_ASSISTANT, "tengo estos tres, todos de plata"),
-            (TURN_ROLE_OPERATOR, INJECTION),
-        )
+    clean = (
+        (TURN_ROLE_OPERATOR, "busco un anillo de plata para un regalo"),
+        (TURN_ROLE_ASSISTANT, "tengo estos tres, todos de plata"),
+        (TURN_ROLE_OPERATOR, "¿los hay algo más finos?"),
+        (TURN_ROLE_ASSISTANT, "sí, te enseño estos"),
+        (TURN_ROLE_OPERATOR, "¿y en dorado?"),
     )
+    poisoned = (*clean[:2], (TURN_ROLE_OPERATOR, INJECTION), *clean[3:])
 
-    assert agent_system_message() == agent_system_message()
-    assert INJECTION not in agent_system_message()
-    # The injected turn is inside the marks and nowhere else in the rendered block.
-    rendered = transcript_block(poisoned)
-    assert INJECTION in blocks_of(rendered)
-    assert transcript_block(clean) != rendered
+    def serve(conversation):
+        agent, agent_provider = scripted_agent(
+            wants(("buscar_catalogo", {"consulta": "anillo dorado"})), finishes()
+        )
+        router, _router_provider = scripted_router(decision())
+        argument, pitch_provider = scripted_client(pitch("Una pieza sobria y bonita."))
+        run(
+            run_agent(
+                turns_from(conversation),
+                principal,
+                registry=build_registry(
+                    principal=principal,
+                    settings=build_settings(),
+                    embed=FakeEmbeddingClient(),
+                    search=search,
+                    knowledge=knowledge,
+                ),
+                agent_client=agent,
+                router_client=router,
+                pitch_client=argument,
+            )
+        )
+        return agent_provider, pitch_provider
+
+    clean_agent, clean_pitch = serve(clean)
+    dirty_agent, dirty_pitch = serve(poisoned)
+
+    assert dirty_agent.call_count == clean_agent.call_count == 2
+    for index in range(dirty_agent.call_count):
+        assert dirty_agent.system_of(index) == clean_agent.system_of(index), index
+        assert INJECTION not in dirty_agent.system_of(index)
+    assert dirty_pitch.call_count == clean_pitch.call_count == 1
+    assert dirty_pitch.system_of(0) == clean_pitch.system_of(0)
+    assert INJECTION not in dirty_pitch.system_of(0)
+    # Every turn — the injected one included — is inside the marks of the user message.
+    assert blocks_of(dirty_agent.user_of(0)) == [text for _role, text in poisoned]
+    assert dirty_agent.user_of(0) != clean_agent.user_of(0), "the injection did travel"
 
 
 def test_a_turn_attributed_to_the_assistant_is_delimited_exactly_as_an_operator_turn() -> None:

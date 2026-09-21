@@ -295,8 +295,25 @@ class AgentUsage(Usage):
     registry's own counter and are not folded in here, because `usage.calls` already means
     exactly this on the other route and a number that means two things in two places is a
     number nobody can compare.
+
+    **`model` is redeclared here, and only here, because on this route it cannot be read as the
+    shared object's field is read.** The token counts add up to three stages that may run three
+    different models — the classifier, the loop and the argument — and `model` names only the
+    last one that reported, so tokens priced at that model's rate misstate the cost. The first
+    cost figure of C32b made exactly that mistake. The shared `Usage` keeps its description:
+    `POST /v1/assist/sale` must not move.
     """
 
+    model: str | None = Field(
+        default=None,
+        description=(
+            "Model of the LAST stage that reported one — the argument's when it ran, otherwise "
+            "the loop's or the classifier's. **Not a price key for the token counts beside "
+            "it**: on this route those counts add up to as many as three stages that may run "
+            "different models, so tokens multiplied by this model's price misstate the cost. "
+            "Null while stubbed"
+        ),
+    )
     calls: int = Field(
         default=0,
         ge=0,

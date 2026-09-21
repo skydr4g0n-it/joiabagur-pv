@@ -897,3 +897,74 @@ limita el ritmo: con peticiones de ~13.000 tokens, un techo de 25.000 TPM admite
 minuto**. Un mostrador con varios operarios simultáneos choca con eso mucho antes que con el coste,
 y el síntoma es un `RateLimitError` que la capa convierte en `fallo_proveedor` y sirve degradado.
 Dimensionar la cuota es parte de poner esta ruta en producción, no un detalle de la medición.
+
+> **Nota de la verificación independiente de C32b.** Los 15 s de la tabla de arriba **no acotaban
+> la petición** cuando se escribió: el reloj sólo se miraba antes de cada vuelta, y el peor caso por
+> construcción eran 15 + 8 + 2 × 4 = 31 s más las herramientas. Ahora el bucle corre contra 15 s
+> menos la reserva del argumentario y la vuelta en curso se corta; el límite es **15 s más, como
+> mucho, las herramientas de esa vuelta**, que no se cancelan a medias. Es el número que un
+> *timeout* .NET debe cubrir, con su margen de red.
+
+---
+
+## C32b · Once tests preexistentes de `ai-service` salen a la red con una clave falsa
+
+**Estado:** medido, **no corregido** y fuera del alcance de C32b: los tests son de C30b y C31, y
+ninguno lo introdujo este change. Encontrado por su verificación independiente.
+
+`tests/api/test_assist_generation.py` construye la app con una clave de mentira
+(`jpv_rag_llm_api_key="sk-test"` y análogas) e inyecta dobles para el *embedding*, la búsqueda y el
+corpus, **pero no para el clasificador ni para el argumentario**. La ruta construye entonces los
+clientes reales de LiteLLM y los usa: la llamada sale hacia `api.openai.com`, muere (TLS o 401) y
+el test pasa porque la capa degrada. Medido con un guardia de sockets y de `psycopg` sobre la suite
+entera: **12 resoluciones de `api.openai.com` y 1 de `raw.githubusercontent.com`** (la tabla de
+costes que descarga `litellm`), en estos once tests:
+
+- `test_the_configured_timeout_reaches_the_generation_client`
+- `test_the_dedicated_credential_is_preferred_over_the_enrichment_one`
+- `test_the_enrichment_credential_is_the_fallback_and_not_a_requirement`
+- `test_the_fallback_is_recorded_so_a_deployment_can_check_it_instead_of_assuming`
+- `test_the_configured_model_reaches_the_generation_client`
+- `test_the_enrichment_model_cannot_move_the_assistance_model`
+- `test_the_classifier_credential_falls_back_through_the_three_links` (tres veces)
+- `test_which_classifier_credential_is_in_force_is_recorded_without_the_key`
+- `test_the_configured_classifier_model_and_timeout_reach_the_client`
+- `test_the_argument_model_cannot_move_the_classifier_model`
+
+Y uno más de otro fichero, `tests/api/test_retrieval_real.py::test_missing_embedding_key_is_503`,
+intenta abrir una conexión de `psycopg`.
+
+**Es el mismo defecto que el §10.4 del QA de C32b encontró en su propio test y corrigió**: *«la suite
+no abre sockets» no es una propiedad que la suite compruebe sola*. Aparte, **72 tests `db`** corren
+contra un PostgreSQL real a través de testcontainers cuando Docker está disponible (y se saltan si
+no): eso es diseño, pero significa que «la suite corre sin base de datos» sólo es cierto en una
+máquina sin Docker.
+
+### Qué hace falta cuando se haga
+
+- **Pilotar el resolutor directamente**, como hace `test_the_credential_chain_is_agent_then_assist_then_enrichment`
+  desde C32b, o **inyectar los dobles** del clasificador y del argumentario en `app.state` antes de
+  servir la petición. Lo que se prueba es la resolución y lo que se registra, que ocurre antes de
+  cualquier llamada.
+- **Después, un guardia de sockets automático en `tests/conftest.py`** que rechace toda conexión que
+  no sea de bucle local y deje pasar la de testcontainers. Sin los once arreglados antes, ese
+  guardia los pondría en rojo el primer día; con ellos arreglados, convierte la propiedad en algo
+  que la suite comprueba en vez de algo que su README afirma.
+
+---
+
+## C32b · El desglose del uso por etapa en la respuesta de `POST /v1/assist/agent`
+
+**Estado:** identificado y **no hecho**, a decidir cuando la ruta tenga consumidor (C34/C36).
+
+`AgentUsage` suma los tokens de hasta tres etapas —clasificador, bucle y argumentario— que corren
+modelos distintos, y publica **un solo `model`**, el de la última. Quien tarife `usage` × `model`
+reproduce el error de coste que la verificación independiente encontró en el arnés. Dentro del
+proceso ya está resuelto (`AgentRun.router_usage`, `loop_usage` y `pitch_usage`, que el arnés
+tarifa una a una), y la descripción de `AgentUsage.model` en el contrato avisa de que no es una
+clave de precio.
+
+**Lo que falta, si un consumidor .NET necesita el coste**: añadir a `AgentUsage` un desglose por
+etapa, cada una con su modelo y sus tokens. Es **adición pura** sobre un esquema que sólo publica
+esta ruta —`/v1/assist/sale` no se mueve— y no se hace ahora porque, sin consumidor, agrandaría la
+superficie congelada para nadie.
