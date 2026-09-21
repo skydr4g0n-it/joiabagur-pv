@@ -43,11 +43,19 @@ def test_snapshot_covers_the_frozen_surface() -> None:
     read disjoint populations and converge differently: suggestion empties itself as
     batches are approved, while the audit is a standing signal over the families that
     exist. Folding it in would have moved this snapshot just the same.
+
+    `/v1/assist/agent` is the **eleventh**, added by C32b, and it is a route of its own
+    for a reason of latency rather than of taste: its worst case is several times what
+    `/v1/assist/sale` declares, so a flag on that route would put a long path in the one
+    a counter calls synchronously. Keeping both is also what the comparison of the
+    deterministic pipeline against the agent requires — the two have to stay runnable
+    over the same set — so this list growing by one is the shape of that decision.
     """
     paths = _committed()["paths"]
 
     assert sorted(paths) == [
         "/health",
+        "/v1/assist/agent",
         "/v1/assist/sale",
         "/v1/enrich/products",
         "/v1/evals/runs",

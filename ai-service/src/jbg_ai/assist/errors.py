@@ -42,6 +42,41 @@ class RouterProviderError(AssistError, RuntimeError):
         super().__init__(message)
 
 
+class AgentProviderError(AssistError, RuntimeError):
+    """The loop's provider failed, timed out, or returned something unusable. C32b.
+
+    **It never reaches the router either, and it costs the loop a turn rather than the
+    request.** A fault on the first turn leaves a request with no evidence, which is served as
+    a partial response with the cause recorded; a fault on a later turn leaves the evidence the
+    earlier turns gathered, which is served the same way. Failing the request instead would
+    throw away work already paid for, which is the argument its two siblings above already make
+    and this one inherits without change.
+
+    Third class and not a shared one, for the reason the third client is not a subclass of the
+    second: `cause` is partitioned per stage in the log and in the report, and one class for
+    three stages would make «which stage degraded» a string somebody has to parse.
+    """
+
+    def __init__(self, message: str, *, cause: str) -> None:
+        self.cause = cause
+        super().__init__(message)
+
+
+class TranscriptError(AssistError, ValueError):
+    """The transcript breaks one of its three declared caps. C32b.
+
+    Raised **before any provider call is made**, which is the requirement and not an
+    optimisation: the caps exist because carrying the conversation in the request hands the
+    client the factor that dominates the cost of a loop, and a cap enforced after the first
+    call has already let the request buy what it was meant to prevent.
+
+    In the HTTP path the request model rejects most of this first. It exists because the layer
+    is also a callable — the evaluation harness drives it directly, as it drives every other
+    part of this service — and a library that trusted its caller to have run a validator would
+    be one refactor away from serving what it declares it refuses.
+    """
+
+
 class NoAnchorError(AssistError, ValueError):
     """The request carried neither a piece nor a question.
 

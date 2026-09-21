@@ -1,0 +1,289 @@
+{
+  "provenance": {
+    "run_id": "40a9bb0f7911",
+    "git_sha": "2c9fd6a436101dc87344fb0128f7289b9d45aba5+dirty",
+    "taken_at": "2026-09-21T05:55:39+00:00",
+    "agent_prompt_version": "agent/v1",
+    "pitch_prompt_version": "assist/v4",
+    "router_prompt_version": "router/v3",
+    "deterministic_route_prompt_version": "assist/v3",
+    "arms": [
+      "openai/gpt-4o"
+    ],
+    "credential_link": "assist_fallback",
+    "sets": {
+      "calibration": {
+        "id": "c32b-agent-calibration/v1",
+        "size": 20
+      }
+    },
+    "point_of_sale": "43da2f6a-cb64-4067-b5c2-cd67f5a8f6b3",
+    "budgets": {
+      "iterations": 5,
+      "tool_calls": 6,
+      "concurrency": 4,
+      "prompt_tokens": 120000,
+      "observation_chars": 40000,
+      "context_chars": 48000,
+      "deadline_seconds": 20.0,
+      "pieces": 8
+    },
+    "provider_call_ceiling": 8,
+    "prices_usd_per_million": {
+      "openai/gpt-4o": [
+        2.5,
+        10.0
+      ],
+      "openai/gpt-4o-mini": [
+        0.15,
+        0.6
+      ]
+    },
+    "limit": 1,
+    "planned_requests": 1,
+    "resolved_pieces": {
+      "sin_existencias": "SKU637",
+      "disponible": "SKU530",
+      "ultimas_unidades": "SKU488",
+      "sin_ambito": "SKU01"
+    },
+    "index_compatible_documents": 1168,
+    "assortment_size": 416,
+    "skipped": []
+  },
+  "summary": {
+    "openai/gpt-4o::calibration": {
+      "requests": 1,
+      "partial": 0,
+      "stop_reasons": {
+        "sin_mas_herramientas": 1
+      },
+      "tokens_prompt": {
+        "n": 1,
+        "p50": 11395,
+        "p95": 11395,
+        "max": 11395,
+        "mean": 11395.0
+      },
+      "tokens_total": {
+        "n": 1,
+        "p50": 11994,
+        "p95": 11994,
+        "max": 11994,
+        "mean": 11994.0
+      },
+      "context_chars": {
+        "n": 1,
+        "p50": 2417,
+        "p95": 2417,
+        "max": 2417,
+        "mean": 2417.0
+      },
+      "wall_ms": {
+        "n": 1,
+        "p50": 12006.6,
+        "p95": 12006.6,
+        "max": 12006.6,
+        "mean": 12006.6
+      },
+      "iterations": {
+        "n": 1,
+        "p50": 3.0,
+        "p95": 3.0,
+        "max": 3.0,
+        "mean": 3.0
+      },
+      "provider_calls": {
+        "n": 1,
+        "p50": 5.0,
+        "p95": 5.0,
+        "max": 5.0,
+        "mean": 5.0
+      },
+      "provider_calls_over_ceiling": 0,
+      "growth_by_turn": {
+        "1": {
+          "requests": 1,
+          "prompt_tokens_p50": 1722,
+          "context_chars_p50": 1777
+        },
+        "2": {
+          "requests": 1,
+          "prompt_tokens_p50": 2403,
+          "context_chars_p50": 2417
+        },
+        "3": {
+          "requests": 1,
+          "prompt_tokens_p50": 2760,
+          "context_chars_p50": 2417
+        }
+      },
+      "tool_usage": {
+        "buscar_catalogo": 1,
+        "buscar_sustitutos": 0,
+        "listar_familia": 0,
+        "consultar_conocimiento": 0,
+        "consultar_disponibilidad": 5,
+        "pedir_aclaracion": 0
+      },
+      "tools_never_chosen": [
+        "buscar_sustitutos",
+        "consultar_conocimiento",
+        "listar_familia",
+        "pedir_aclaracion"
+      ],
+      "invented_tool_names": [],
+      "failure_causes": {},
+      "pitch_ran": 1,
+      "pitch_withheld": 1,
+      "pitch_violation_causes": {
+        "dangling_citation": 5
+      },
+      "cost_usd_total": 0.0345,
+      "cost_usd_per_request": 0.034478
+    }
+  },
+  "pivot_rates": {},
+  "rows": [
+    {
+      "id": "C01",
+      "set": "calibration",
+      "arm": "openai/gpt-4o",
+      "operator_turns": 1,
+      "measures": "granularidad",
+      "expects": [
+        "buscar_catalogo"
+      ],
+      "forbids": [
+        "pedir_aclaracion",
+        "buscar_sustitutos"
+      ],
+      "fixture": null,
+      "stop_reason": "sin_mas_herramientas",
+      "partial": false,
+      "iterations": 3,
+      "tool_calls_used": 6,
+      "tools_invoked": [
+        "buscar_catalogo",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad"
+      ],
+      "invented_tools": [],
+      "abstained": false,
+      "clarified": false,
+      "warnings": [],
+      "groups": 5,
+      "citations": 0,
+      "pitch_chars": 0,
+      "pitch_withheld": true,
+      "pitch_ran": true,
+      "pitch_violations": [
+        "dangling_citation",
+        "dangling_citation",
+        "dangling_citation",
+        "dangling_citation"
+      ],
+      "pitch_initial_violations": [
+        "dangling_citation",
+        "dangling_citation",
+        "dangling_citation",
+        "dangling_citation",
+        "dangling_citation"
+      ],
+      "pitch_withdrawn_citations": [],
+      "pitch_provider_error": null,
+      "pitch_calls": 2,
+      "prompt_tokens": 11395,
+      "completion_tokens": 599,
+      "total_tokens": 11994,
+      "provider_calls": 5,
+      "embedding_calls": 1,
+      "elapsed_ms": 12006.6,
+      "per_iteration": [
+        {
+          "iteration": 1,
+          "prompt_tokens": 1722,
+          "completion_tokens": 20,
+          "context_chars": 1777,
+          "elapsed_ms": 1929.7,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "buscar_catalogo",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "consulta": "pulsera de plata para regalar"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 2,
+          "prompt_tokens": 2403,
+          "completion_tokens": 106,
+          "context_chars": 2417,
+          "elapsed_ms": 1041.2,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU546"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU543"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU545"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU544"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU105"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 3,
+          "prompt_tokens": 2760,
+          "completion_tokens": 30,
+          "context_chars": 2417,
+          "elapsed_ms": 736.7,
+          "discarded_chars": 145,
+          "provider_error": null,
+          "tools": []
+        }
+      ]
+    }
+  ]
+}

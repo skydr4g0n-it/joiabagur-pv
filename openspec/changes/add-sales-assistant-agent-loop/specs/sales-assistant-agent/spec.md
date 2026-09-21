@@ -216,6 +216,28 @@ The evaluation this capability exists to enable compares the two routes over the
 - **WHEN** a request completes
 - **THEN** the usage the response carries reports how many provider calls were made
 
+### Requirement: The response publishes the identifiers and scores the model was never shown
+The service SHALL publish, for every piece and every corpus fragment it returns, the identifier and the ranking score the assistance response declares, and it MUST NOT derive any of them from what the tools reported to the model nor invent one where the tool layer does not supply it.
+
+What a tool returns to a model is bounded by rule: no internal identifier, because a model cannot say one at a counter and its digits widen the whitelist the numeric gate admits; and no retrieval score, because scores from different tools do not measure the same thing. What a consumer of this route needs is the opposite — an identifier to hydrate a piece with and a score to order it by — and the published response requires both. The two sets do not overlap, so the values a response carries cannot be rebuilt from an observation, and a document title cannot be rebuilt from a citation identifier at all.
+
+The consequence is that the tool layer keeps what it read for the consumer alongside what it reported to the model, and the two are separate by construction rather than by discipline. A piece enumerated from a family roster was not ranked against anything, so it carries the value and the meaning the deterministic route already gives an enumeration rather than a rank invented for the occasion.
+
+#### Scenario: A published piece carries what the model never saw
+- **WHEN** a request that searched the catalogue returns candidates
+- **THEN** every published piece carries its identifier and its ranking score
+- **AND** neither value appeared in any observation the model was given
+
+#### Scenario: A published citation carries its document and its type
+- **WHEN** a request that consulted the corpus publishes a citation
+- **THEN** it carries the document title and the document type
+- **AND** neither is derived from the citation identifier
+
+#### Scenario: An enumerated piece is not given an invented rank
+- **WHEN** a family roster reaches the response
+- **THEN** its members carry no match reason
+- **AND** their score is the one the deterministic route gives an enumeration
+
 ### Requirement: The wire trace reports what was done and never what was asked
 The response SHALL carry a trace reporting, per iteration, which tools were invoked, whether each succeeded and with what cause if not, together with what the iteration cost and how long it took; and that trace MUST NOT carry tool arguments or observation contents.
 

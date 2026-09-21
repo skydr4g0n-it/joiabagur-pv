@@ -8,6 +8,7 @@ request must always produce the same body.
 from jbg_ai.stubs.responses import (
     OVER_RETRIEVAL_CAP,
     OVER_RETRIEVAL_FACTOR,
+    assist_agent_stub,
     assist_sale_stub,
     enrich_products_stub,
     evals_runs_stub,
@@ -24,6 +25,7 @@ from jbg_ai.stubs.responses import (
 __all__ = [
     "OVER_RETRIEVAL_CAP",
     "OVER_RETRIEVAL_FACTOR",
+    "assist_agent_stub",
     "assist_sale_stub",
     "enrich_products_stub",
     "evals_runs_stub",

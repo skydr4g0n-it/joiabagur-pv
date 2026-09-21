@@ -24,8 +24,21 @@ from jbg_ai.api.deps import (
     get_app_settings,
     get_service_principal,
 )
-from jbg_ai.api.schemas.assist import AssistRequest, AssistResponse
-from jbg_ai.assist.errors import NoAnchorError, UnusableAnchorProductError
+from jbg_ai.api.schemas.assist import (
+    AgentAssistRequest,
+    AgentAssistResponse,
+    AssistRequest,
+    AssistResponse,
+)
+from jbg_ai.assist.agent import agent_response, run_agent
+from jbg_ai.assist.agent_llm import AgentLlm, LiteLlmAgentClient
+from jbg_ai.assist.errors import (
+    NoAnchorError,
+    TranscriptError,
+    UnusableAnchorProductError,
+)
+from jbg_ai.assist.tools import build_registry
+from jbg_ai.assist.transcript import turns_from
 from jbg_ai.assist.llm import AssistLlm, LiteLlmAssistClient
 from jbg_ai.assist.router_llm import LiteLlmRouterClient, RouterLlm
 from jbg_ai.assist.orchestrator import assist_sale as run_assist_sale
@@ -42,7 +55,7 @@ from jbg_ai.retrieval.errors import (
 from jbg_ai.retrieval.orchestrator import build_retrieval_embed_client
 from jbg_ai.retrieval.ports import ProductSearchPort
 from jbg_ai.retrieval.search import SqlAlchemyProductSearch
-from jbg_ai.stubs import assist_sale_stub
+from jbg_ai.stubs import assist_agent_stub, assist_sale_stub
 
 logger = logging.getLogger(__name__)
 
@@ -253,3 +266,118 @@ async def assist_sale(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
         ) from exc
+
+
+def _resolve_agent_client(request: Request, settings: Settings) -> AgentLlm | None:
+    """The loop's client, or **None**, which is a deployment state and not a failure. C32b.
+
+    With no credential at all the loop is not constructed and `POST /v1/assist/agent` answers
+    the shape without running it, rather than 503. That is the fail-open, **the ablation and
+    the rollback in one**: removing the credential is how a deployment returns to the
+    behaviour that preceded this capability, and the row it produces is the one the comparison
+    against the deterministic pipeline needs.
+
+    **Its own credential, with a chain that is logged rather than silent.** C30b opened
+    `JPV_ASSIST_LLM_API_KEY` falling back to `JPV_RAG_LLM_API_KEY` and C31 prepended
+    `JPV_ROUTER_LLM_API_KEY` to its own chain; this prepends `JPV_AGENT_LLM_API_KEY` to the
+    generation chain — **agent, then assist, then rag** — so a deployment that sets none keeps
+    working and one that sets the new one bills the loop apart. The classifier's credential is
+    deliberately **not** a link: a request of this route resolves two clients, and letting one
+    fall back to the other would make the cost of the two stages impossible to tell apart.
+
+    **Its own model too**, and never the argument's nor the classifier's: choosing which tool
+    to call is a harder task than choosing which label, and sharing a variable would make any
+    comparison of cost between the three false.
+    """
+    injected = getattr(request.app.state, "assist_agent_client", None)
+    if injected is not None:
+        return injected  # type: ignore[no-any-return]
+
+    if settings.jpv_agent_llm_api_key:
+        api_key, credential = settings.jpv_agent_llm_api_key, "agent"
+    elif settings.jpv_assist_llm_api_key:
+        api_key, credential = settings.jpv_assist_llm_api_key, "assist_fallback"
+    elif settings.jpv_rag_llm_api_key:
+        api_key, credential = settings.jpv_rag_llm_api_key, "rag_fallback"
+    else:
+        return None
+
+    client = LiteLlmAgentClient(
+        api_key=api_key,
+        # The base URL stays C09's, for the reason the two sibling clients give: it names the
+        # PROVIDER endpoint and not the account.
+        base_url=settings.jpv_rag_llm_base_url,
+        model=settings.jpv_agent_llm_model,
+        timeout=settings.jpv_agent_timeout_seconds,
+    )
+    # Once per process, never per request, and it carries no secret and no transcript — only
+    # WHICH link was resolved. `stage=agent_client` absent from the container log says no loop
+    # client was built and the route degrades, which is the verification a deployment needs
+    # without opening a console or reading a key.
+    logger.info(
+        "stage=agent_client model=%s timeout_s=%s credential=%s",
+        client.model_id,
+        settings.jpv_agent_timeout_seconds,
+        credential,
+    )
+    request.app.state.assist_agent_client = client
+    return client
+
+
+@router.post(
+    "/agent",
+    response_model=AgentAssistResponse,
+    summary="Assist a sale with an agent loop over a multi-turn transcript",
+)
+async def assist_agent(
+    payload: AgentAssistRequest,
+    request: Request,
+    principal: ServicePrincipal = Depends(get_service_principal),
+    settings: Settings = Depends(get_app_settings),
+) -> AgentAssistResponse:
+    """Run the loop over the transcript; the pitch keeps price and stock as placeholders.
+
+    **A route of its own, and the separation is the decision this change turns on.** Its worst
+    case is several times the latency the deterministic route declares, so a flag on that route
+    would put a long path in the one a counter calls synchronously — and the comparison this
+    capability exists to enable needs both to stay runnable over the same set.
+
+    The error mapping is the deterministic route's, extended by one: a transcript over its
+    declared caps is a 422, the status this service already uses for a body naming something
+    it cannot process. It is unreachable through HTTP — the request model refuses it first —
+    and it is here because the layer is also a callable.
+    """
+    if settings.stub_mode:
+        return assist_agent_stub(payload, principal)
+
+    _require_real_settings(request, settings)
+    try:
+        run = await run_agent(
+            turns_from([(turn.role, turn.text) for turn in payload.turns]),
+            principal,
+            registry=build_registry(
+                principal=principal,
+                settings=settings,
+                embed=_resolve_embed(request, settings),
+                search=_resolve_search(request, settings),
+                knowledge=_resolve_knowledge(request, settings),
+            ),
+            agent_client=_resolve_agent_client(request, settings),
+            router_client=_resolve_router_client(request, settings),
+            pitch_client=_resolve_pitch_client(request, settings),
+        )
+    except TranscriptError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except InvalidPosIdError as exc:
+        # A token whose point of sale cannot be read is a mis-issued token. The sibling routes
+        # refuse it for the same reason and must not be contradicted here.
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except DatabaseNotConfiguredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
+    except (RetrievalDependencyError, KnowledgeSearchError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
+    return agent_response(run, principal)

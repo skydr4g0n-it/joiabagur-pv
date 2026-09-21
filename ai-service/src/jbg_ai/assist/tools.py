@@ -40,14 +40,18 @@ import inspect
 import logging
 import time
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from jbg_ai.api.auth import ServicePrincipal
-from jbg_ai.api.schemas.retrieval import RetrievalRequest, SubstitutesRequest
+from jbg_ai.api.schemas.retrieval import (
+    RetrievalRequest,
+    RetrievalResult,
+    SubstitutesRequest,
+)
 from jbg_ai.assist.constants import (
     AVAILABILITY_LABEL_BY_BUCKET,
     AVAILABILITY_NO_SCOPE,
@@ -68,14 +72,18 @@ from jbg_ai.assist.knowledge_scope import piece_scoped_exclusions
 from jbg_ai.assist.routing import clarification_axes, clarification_for
 from jbg_ai.config.settings import Settings
 from jbg_ai.indexing.embeddings import EmbeddingClient, EmbedResult
-from jbg_ai.knowledge.search import KnowledgeSearchIndex, search_knowledge
+from jbg_ai.knowledge.search import (
+    KnowledgeCitation,
+    KnowledgeSearchIndex,
+    search_knowledge,
+)
 from jbg_ai.retrieval.errors import (
     InvalidPosIdError,
     RetrievalDependencyError,
     UnusableSourceProductError,
 )
 from jbg_ai.retrieval.orchestrator import retrieve_products
-from jbg_ai.retrieval.ports import ProductSearchPort, SourceDocument
+from jbg_ai.retrieval.ports import FamilyMember, ProductSearchPort, SourceDocument
 from jbg_ai.retrieval.projection import ProjectionFreshness, age_seconds, parse_pos_id
 from jbg_ai.retrieval.substitutes import retrieve_substitutes
 
@@ -122,6 +130,53 @@ class ToolObservation:
     @classmethod
     def failure(cls, tool: str, cause: str) -> "ToolObservation":
         return cls(tool=tool, ok=False, content={}, cause=cause)
+
+
+@dataclass
+class EvidenceLedger:
+    """What the tools **saw**, kept for the consumer and never shown to the model. C32b.
+
+    **This is the second side-channel of this registry and it exists for the same reason as the
+    first.** `CountingEmbeddings` is here because the loop needs a number the observation must
+    not carry; this is here because the loop needs *objects* the observation must not carry.
+
+    An observation is bounded by rule: no `product_id`, no retrieval score, no document title —
+    everything a tool returns is re-sent on every later turn, and identifiers and scores widen
+    the numeric whitelist while meaning nothing to a model. But the response of the assistance
+    contract requires exactly those fields. `AssistGroupMember` requires `product_id` and
+    `score`; `Citation` requires `document_title`, `doc_type` and `score`. **Rebuilding them
+    from an observation is impossible, and inventing them is the failure this layer exists to
+    prevent** — so the tools record the objects they already held and the consumer reads them
+    here, one hop away from the model's context.
+
+    It is **written to and never read by a tool**, which is what keeps it from becoming a cache
+    or a way for one tool to see another's work. Ordering is arrival order, which is the order
+    the loop asked, and duplicates are kept: the consumer deduplicates, because «the same piece
+    came back from two searches» is a signal it may want.
+
+    **It is inert to the read-only invariant, structurally and not by exemption.** It declares
+    no public method, so `_is_collaborator` does not classify it as a collaborator at all — it
+    is not excluded by name the way configuration and identity are, and it does not lean on the
+    gap in the write vocabulary that C32a declared. A ledger with a `save()` on it would fail
+    the check, which is the correct outcome for an object that persisted anything.
+    """
+
+    #: Catalogue hits, in the order the searches returned them.
+    candidates: list[RetrievalResult] = field(default_factory=list)
+    #: `(sku of the piece that did not serve, alternative)`. The anchor is what makes a
+    #: substitute a substitute; without it the group could not be labelled as one.
+    substitutes: list[tuple[str, RetrievalResult]] = field(default_factory=list)
+    #: `(family id, member)`. The **family** and not the anchoring SKU, because the consumer
+    #: groups by it and the contract's *null family implies exactly one member* invariant
+    #: cannot be honoured without it. Which piece the roster was asked about is already in the
+    #: in-process trace, as the argument of the call.
+    family_members: list[tuple[str, FamilyMember]] = field(default_factory=list)
+    citations: list[KnowledgeCitation] = field(default_factory=list)
+    #: `(sku, label)` of every availability read. **For the loop's decision and for the
+    #: calibration run only**: no label of this list may reach the generation payload, because
+    #: the authority over stock is .NET's and one of the labels is a member of the stock-marker
+    #: vocabulary the numeric gate watches for.
+    availability: list[tuple[str, str]] = field(default_factory=list)
 
 
 class UnknownSkuError(LookupError):
@@ -185,7 +240,13 @@ class ToolRegistry:
     could pass.
     """
 
-    def __init__(self, specs: Sequence[ToolSpec], *, embeddings: "CountingEmbeddings") -> None:
+    def __init__(
+        self,
+        specs: Sequence[ToolSpec],
+        *,
+        embeddings: "CountingEmbeddings",
+        ledger: EvidenceLedger | None = None,
+    ) -> None:
         names = tuple(spec.name for spec in specs)
         if len(set(names)) != len(names):
             raise ToolRegistryError(f"duplicate tool name in registry: {names}")
@@ -198,6 +259,7 @@ class ToolRegistry:
             )
         self._specs: dict[str, ToolSpec] = {spec.name: spec for spec in specs}
         self._embeddings = embeddings
+        self._ledger = ledger if ledger is not None else EvidenceLedger()
         verify_read_only(self)
 
     def __len__(self) -> int:
@@ -219,6 +281,16 @@ class ToolRegistry:
     def schemas(self) -> list[dict[str, Any]]:
         """Every tool's function-calling schema, in the frozen order."""
         return [spec.schema() for spec in self.specs()]
+
+    @property
+    def evidence(self) -> EvidenceLedger:
+        """What the tools of this request saw. **Never handed to the model.**
+
+        A property and not a constructor argument the caller must remember to read: the
+        registry is built per request, so the ledger's lifetime is the request's and a consumer
+        that forgot to pass one still gets the objects it needs.
+        """
+        return self._ledger
 
     @property
     def embedding_calls(self) -> int:
@@ -627,6 +699,7 @@ def build_registry(
     freshness: ProjectionFreshness | None = None,
     roster_cap: int = FAMILY_ROSTER_CAP,
     citation_top_k: int = TOOL_CITATION_TOP_K,
+    ledger: EvidenceLedger | None = None,
 ) -> ToolRegistry:
     """Assemble the six tools over ports that are **handed in, never constructed here**.
 
@@ -640,6 +713,10 @@ def build_registry(
     """
     embeddings = CountingEmbeddings(embed)
     projection = freshness or ProjectionFreshness()
+    # Captured by the closures below exactly as `embeddings` is, and read by the consumer off
+    # the registry. What each tool records here is the object it already held; nothing is
+    # fetched for the ledger's sake and no tool ever reads it.
+    seen = ledger if ledger is not None else EvidenceLedger()
 
     async def buscar_catalogo(args: _BuscarCatalogoArgs) -> Mapping[str, Any]:
         # **`on_abstention` and not `low_confidence`, and the difference is measured.** An
@@ -658,6 +735,7 @@ def build_registry(
             search=search,
             on_abstention=decisions.append,
         )
+        seen.candidates.extend(response.results)
         return {
             "candidatos": [
                 {
@@ -686,6 +764,9 @@ def build_registry(
             settings=settings,
             search=search,
         )
+        # Anchored to the piece that did not serve: that anchor is what makes an alternative a
+        # substitute rather than a match, and the consumer needs it to say so.
+        seen.substitutes.extend((document.sku, result) for result in response.results)
         return {
             "pieza": document.sku,
             "alternativas": [
@@ -711,6 +792,9 @@ def build_registry(
             # consumer's next move is to stop asking, which an empty roster says plainly.
             return {"pieza": document.sku, "familia": None, "miembros": []}
         members = await search.family_roster(document.family_id, cap=roster_cap)
+        seen.family_members.extend(
+            (str(document.family_id), member) for member in members
+        )
         return {
             "pieza": document.sku,
             "familia": next(
@@ -746,6 +830,10 @@ def build_registry(
             distance_threshold=settings.jpv_knowledge_distance_threshold,
             trace_id=principal.trace_id,
         )
+        # The whole citation and not the four fields the observation shows: the response
+        # contract requires the document title, the document type and the score, and none of
+        # the three can be rebuilt from an identifier.
+        seen.citations.extend(citations)
         return {
             "pieza": anchored,
             "fragmentos": [
@@ -790,6 +878,11 @@ def build_registry(
                 etiqueta = AVAILABILITY_LABEL_BY_BUCKET[bucket]
 
         age = age_seconds(await projection.synced_at(search))
+        # **For the loop's decision and for the calibration run, never for the payload.** The
+        # pivot to substitutes is the one thing this label governs, and a consumer that let it
+        # reach the generation layer would put a minutes-stale statement about stock in the one
+        # place no numeric gate can undo it.
+        seen.availability.append((document.sku, etiqueta))
         return {
             "pieza": document.sku,
             # A qualitative band and never a figure: the buckets the projection stores are
@@ -868,4 +961,4 @@ def build_registry(
             run=pedir_aclaracion,
         ),
     )
-    return ToolRegistry(specs, embeddings=embeddings)
+    return ToolRegistry(specs, embeddings=embeddings, ledger=seen)

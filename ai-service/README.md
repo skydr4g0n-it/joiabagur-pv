@@ -951,8 +951,8 @@ backoff would consume two thirds of the per-call budget before the retried call 
 C30a gave the assistance layer its structure, C30b its prose and C31 its entry guardrail. What
 was missing to close the agentic branch was the layer of decision, and C32 was split on
 2026-09-20 into the two halves that compose it. **This is the lower one: the tools and their
-registry, and it calls no chat provider at all.** The loop, its three budgets, `partial: true`
-and `POST /v1/assist/agent` are C32b.
+registry, and it calls no chat provider at all.** The loop, its budgets, `partial: true` and
+`POST /v1/assist/agent` are C32b, and they **landed**: see the section below.
 
 `jbg_ai/assist/tools.py` holds six read-only tools — `buscar_catalogo`, `buscar_sustitutos`,
 `listar_familia`, `consultar_conocimiento`, `consultar_disponibilidad` and `pedir_aclaracion` —
@@ -1035,6 +1035,94 @@ with measurement — that happens in C32b. The granularity of six may equally tu
 wrong, and the registry is left with its ports injected precisely so that regrouping a tool
 costs neither the ports nor their suite.
 
+## The sale assistant's agent loop (C32b)
+
+C32a delivered the instrument and nobody to decide: six read-only tools, their frozen registry
+and the read-only invariant. **This is the layer of decision, and it is the half that calls a
+provider.** Of the four things the Proyecto Final evaluates about an agentic layer — the loop,
+the hard budget, the read-only invariant and `partial: true` — C32a delivered one and this
+delivers the other three.
+
+`POST /v1/assist/agent` is a **route of its own** and `POST /v1/assist/sale` is untouched, field
+for field and ceiling for ceiling. That is not caution: the comparison this capability exists to
+enable runs both over the same set, and it would disappear if the loop replaced the pipeline
+behind a flag. The two also have latency budgets that differ by a factor the deterministic
+route's consumer cannot absorb — **5 s against 15 s**.
+
+**The port has nowhere to put prose.** `AgentStep` returns the tool calls a turn requested and
+what it cost, and declares no field able to carry free text: «the textual content of a loop turn
+is discarded» is a property of the type rather than a rule somebody must respect. It is the same
+choice C32a made when it verified the read-only invariant by introspecting the object graph
+instead of trusting a boolean. The adapter records the length and a digest of what it threw
+away, never the text.
+
+**Six budgets, and three of them were fixed by measurement.** Iterations (5) and tool calls (8)
+bound the steps; the provider-call ceiling (8) is **derived** from the constants of its three
+stages rather than written as a digit. Tokens, accumulated context in characters and a
+wall-clock deadline were placeholders until run `293fe5c6e470` — 204 requests over two model
+arms — set them:
+
+| Budget | p50 | p95 | max | Shipped |
+|---|---|---|---|---|
+| Prompt tokens | 12.870 | 18.781 | 23.210 | **40.000** |
+| Context characters | 1.847 | 4.709 | 17.053 | **30.000** |
+| Wall clock | 5,3 s | 9,0 s | 11,9 s | **15,0 s** |
+
+Exhausting any of them serves the evidence gathered so far, marks the response `partial` and
+names the budget in a `stop_reason` drawn from a closed vocabulary. **The reason is never
+inferred from the counters**: five iterations does not say whether the fifth was the last one
+needed or the one that ran out.
+
+**The classifier is a guardrail here and not a router.** One classification per request, over the
+turn being answered. A refusal short-circuits on any turn; the insufficiency verdict is
+**ignored**, because «¿y en dorado?» judged alone reports a missing axis the conversation already
+supplied; and the index verdict is **discarded**, because choosing where to look is the decision
+the loop exists to make. The matrix C31 published stays intact, since what reaches the classifier
+is still a standalone query.
+
+**The transcript travels in the request and nothing is stored between calls.** Every turn is
+enclosed in the same data delimiters C30b uses, **including the ones the client attributes to the
+assistant** — the client composed the whole request and can forge that label — and the delimiters
+are stripped from a turn's text so a client cannot close the block and write outside it. Three
+caps bound it: 12 turns, 500 characters per turn and 4.000 in total.
+
+**No availability label reaches the generated argument.** The label governs the loop's decision to
+pivot and never the prose: authority over stock is .NET's, the projection can be minutes stale,
+and one of the labels is literally a member of the stock-marker vocabulary the numeric gate
+watches for. Substitutes do reach the generation layer, marked with a closed-vocabulary value that
+tells them from catalogue matches — which is why the argument prompt moves to `assist/v4` while
+**`assist/v3` stays on disk untouched** and keeps serving the deterministic route.
+
+**Two traces.** On the wire, per iteration: the tool names, whether each succeeded and with what
+cause, plus tokens and elapsed time — and **no argument and no observation content**, because a
+consumer logs what it receives and a tool's arguments are the operator's question as the model
+reformulated it. In process, the same plus arguments and observations, which is how the
+evaluation harness consumes every other part of this service.
+
+**Without a credential the route degrades instead of failing**, which is the fail-open, the
+ablation and the rollback at once. The chain is `agent → assist → rag` and the link that won is
+logged once per process as `stage=agent_client`; the classifier's key is deliberately not a link.
+
+### What the provider pass measured
+
+Run `293fe5c6e470`, 204 requests, two arms, ~2,60 USD and 3,4 h of wall clock. Full figures in
+[the implementation report](../Documentos/Proyecto%20Final%20AIEng/informes/c32b-implementation-measurements.md).
+
+- **The overhead against the deterministic pipeline is ×7,6, not the ×19 the design estimated**:
+  0,02144 USD per request against 0,00282.
+- **The cheap arm does not sustain tool selection.** `gpt-4o-mini` costs ×1,4 instead of ×7,6 but
+  exhausts a budget in **66 % of requests against 1,2 %** — it does not know when to stop. The
+  model multiplier is reversible in price and **not in behaviour**, which is what the design
+  assumed was separable.
+- **The context does not need compacting.** Median prompt tokens go from 1.974 on turn one to
+  3.470 on turn five: shallow and roughly linear.
+- **The availability label is enough to govern the pivot.** It fires on 83 % of out-of-stock
+  scenarios and on **0 %** of the three labels where pivoting would be the expensive mistake.
+- **No invented tool names, no dead tool and no near-identical consecutive calls**, which answers
+  the granularity question C32a left open.
+- **The argument is withheld on 13,1 % of requests**, dominated by `dangling_citation`, against
+  2,2 % on the deterministic route. Identified, measured and **not closed**.
+
 ## Tests
 
 ```bash
@@ -1075,7 +1163,7 @@ These four tests exist to catch failures that produce **no error at all**: an HN
 - No `ai.query_log` (unassigned; the pipeline logs `stage=expand|embed|search|lexical|filters|fuse` with `trace_id` instead). The `ai.eval_*` tables **exist since C24** and are written only with `--persist`
 - No reranking. C24 measured the number that would make it decidable and C25 re-measured it under the two-stage fusion — **two queries of forty-three** have a maximum-grade document inside the window a reranker would reorder but outside the five that are shown — and a cross-encoder at ~250 ms would spend 10-15 % of C16's budget for a ceiling of 2 % of the queries. Adding one is a `configs/v2-rerank.yaml` plus a run, which is the protocol being executable rather than rhetorical
 - No recalibration of `JPV_RETRIEVAL_DISTANCE_THRESHOLD`, and **C25 settled that it was never the right lever**. Over 3.926 judgements the relevant documents reach a distance of 0,8008 and the irrelevant ones start at 0,3268, so the two populations overlap; per QUERY — the quantity that actually decides — the answerable best hits reach 0,7118 while the out-of-domain ones start at 0,4469, which is **containment and not partial overlap**: the impossible range sits *inside* the answerable one. No scalar can separate them, so C25 ships a **relative per-query rule** (`retrieval/abstention.py`) that reads the SHAPE of the distance profile, runs after the fusion and does not alter the candidate set. The scalar stays where it is **by decision rather than by deferral**
-- **No agent loop, and C32a is deliberately only its lower half.** The six read-only tools, their frozen registry and the read-only invariant exist and are tested; the loop, its iteration/tool/provider budgets, `partial: true`, `POST /v1/assist/agent` and the multi-turn transcript are **C32b**. Nothing in `assist/tools.py` is reachable from outside the process, because it is wired to no route — which is also why `openapi.json` did not move. The point availability endpoint on the .NET side is **identified, bounded and not built**, recorded in `openspec/DEFERRED_TASKS.md` with its reason
+- **The agent loop EXISTS since C32b** and this is no longer a non-goal. The six read-only tools and the loop that drives them are both real: `POST /v1/assist/agent` runs up to five turns under **six budgets** — three of them fixed by a provider pass and not by judgement — returns `partial: true` with a closed-vocabulary `stop_reason` when one is exhausted, and carries the multi-turn transcript in the request because the service stores nothing between calls. What remains a non-goal is **evaluating the agent's quality**: the multi-turn, adversarial and injection scenarios are a later change, which writes its own sets and checks they do not overlap with C32b's `calibration-only` one. The point availability endpoint on the .NET side is still **identified, bounded and not built**, and so is the **timeout and circuit policy of the new route in the .NET layer** — the route has no consumer today — both recorded in `openspec/DEFERRED_TASKS.md` with their reasons
 - No SQL access to schema `public`, ever
 - No production deploy, SSM or `CREATE EXTENSION` on RDS. C17 delivered the **enriched health** — `GET /health` reports database reachability, indexed document count, whether the embedding provider credential is configured, and a contrast between the configured embedding model and the one recorded on the index rows, all without ever calling the provider — and deployed it to an **isolated demo account**, not to the shop's production account. The return annotation stays an open mapping, so `openapi.json` is unchanged
 - No production tuning: `halfvec`, `hnsw.iterative_scan`, `CREATE INDEX CONCURRENTLY` and the `VACUUM`/`REINDEX` cycle are deliberate omissions at ~1,500 vectors, not oversights

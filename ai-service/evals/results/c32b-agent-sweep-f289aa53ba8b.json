@@ -1,0 +1,387 @@
+{
+  "provenance": {
+    "run_id": "f289aa53ba8b",
+    "git_sha": "2c9fd6a436101dc87344fb0128f7289b9d45aba5+dirty",
+    "taken_at": "2026-09-21T05:53:58+00:00",
+    "agent_prompt_version": "agent/v1",
+    "pitch_prompt_version": "assist/v4",
+    "router_prompt_version": "router/v3",
+    "deterministic_route_prompt_version": "assist/v3",
+    "arms": [
+      "openai/gpt-4o"
+    ],
+    "credential_link": "assist_fallback",
+    "sets": {
+      "calibration": {
+        "id": "c32b-agent-calibration/v1",
+        "size": 20
+      }
+    },
+    "point_of_sale": "43da2f6a-cb64-4067-b5c2-cd67f5a8f6b3",
+    "budgets": {
+      "iterations": 5,
+      "tool_calls": 6,
+      "concurrency": 4,
+      "prompt_tokens": 120000,
+      "observation_chars": 40000,
+      "context_chars": 48000,
+      "deadline_seconds": 20.0,
+      "pieces": 8
+    },
+    "provider_call_ceiling": 8,
+    "prices_usd_per_million": {
+      "openai/gpt-4o": [
+        2.5,
+        10.0
+      ],
+      "openai/gpt-4o-mini": [
+        0.15,
+        0.6
+      ]
+    },
+    "limit": 3,
+    "planned_requests": 3,
+    "resolved_pieces": {
+      "sin_existencias": "SKU637",
+      "disponible": "SKU530",
+      "ultimas_unidades": "SKU488",
+      "sin_ambito": "SKU01"
+    },
+    "index_compatible_documents": 1168,
+    "assortment_size": 416,
+    "skipped": []
+  },
+  "summary": {
+    "openai/gpt-4o::calibration": {
+      "requests": 3,
+      "partial": 0,
+      "stop_reasons": {
+        "sin_mas_herramientas": 2,
+        "aclaracion": 1
+      },
+      "tokens_prompt": {
+        "n": 3,
+        "p50": 10047,
+        "p95": 10047,
+        "max": 11551,
+        "mean": 8872.0
+      },
+      "tokens_total": {
+        "n": 3,
+        "p50": 10331,
+        "p95": 10331,
+        "max": 12495,
+        "mean": 9293.0
+      },
+      "context_chars": {
+        "n": 3,
+        "p50": 2417,
+        "p95": 2417,
+        "max": 2998,
+        "mean": 1864.3
+      },
+      "wall_ms": {
+        "n": 3,
+        "p50": 7451.1,
+        "p95": 7451.1,
+        "max": 23809.8,
+        "mean": 10900.9
+      },
+      "iterations": {
+        "n": 3,
+        "p50": 2.0,
+        "p95": 2.0,
+        "max": 3.0,
+        "mean": 2.0
+      },
+      "provider_calls": {
+        "n": 3,
+        "p50": 4.0,
+        "p95": 4.0,
+        "max": 5.0,
+        "mean": 3.7
+      },
+      "provider_calls_over_ceiling": 0,
+      "growth_by_turn": {
+        "1": {
+          "requests": 3,
+          "prompt_tokens_p50": 1722,
+          "context_chars_p50": 1777
+        },
+        "2": {
+          "requests": 2,
+          "prompt_tokens_p50": 2504.0,
+          "context_chars_p50": 2707.5
+        },
+        "3": {
+          "requests": 1,
+          "prompt_tokens_p50": 2760,
+          "context_chars_p50": 2417
+        }
+      },
+      "tool_usage": {
+        "buscar_catalogo": 1,
+        "buscar_sustitutos": 0,
+        "listar_familia": 0,
+        "consultar_conocimiento": 1,
+        "consultar_disponibilidad": 5,
+        "pedir_aclaracion": 1
+      },
+      "tools_never_chosen": [
+        "buscar_sustitutos",
+        "listar_familia"
+      ],
+      "invented_tool_names": [],
+      "failure_causes": {},
+      "cost_usd_total": 0.0792,
+      "cost_usd_per_request": 0.02639
+    }
+  },
+  "pivot_rates": {},
+  "rows": [
+    {
+      "id": "C01",
+      "set": "calibration",
+      "arm": "openai/gpt-4o",
+      "operator_turns": 1,
+      "measures": "granularidad",
+      "expects": [
+        "buscar_catalogo"
+      ],
+      "forbids": [
+        "pedir_aclaracion",
+        "buscar_sustitutos"
+      ],
+      "fixture": null,
+      "stop_reason": "sin_mas_herramientas",
+      "partial": false,
+      "iterations": 3,
+      "tool_calls_used": 6,
+      "tools_invoked": [
+        "buscar_catalogo",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad"
+      ],
+      "invented_tools": [],
+      "abstained": false,
+      "clarified": false,
+      "warnings": [],
+      "groups": 5,
+      "citations": 0,
+      "pitch_chars": 0,
+      "prompt_tokens": 11551,
+      "completion_tokens": 944,
+      "total_tokens": 12495,
+      "provider_calls": 5,
+      "embedding_calls": 1,
+      "elapsed_ms": 23809.8,
+      "per_iteration": [
+        {
+          "iteration": 1,
+          "prompt_tokens": 1722,
+          "completion_tokens": 20,
+          "context_chars": 1777,
+          "elapsed_ms": 9003.9,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "buscar_catalogo",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "consulta": "pulsera de plata para regalar"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 2,
+          "prompt_tokens": 2403,
+          "completion_tokens": 106,
+          "context_chars": 2417,
+          "elapsed_ms": 1676.3,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU546"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU543"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU545"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU544"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU105"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 3,
+          "prompt_tokens": 2760,
+          "completion_tokens": 116,
+          "context_chars": 2417,
+          "elapsed_ms": 1804.8,
+          "discarded_chars": 524,
+          "provider_error": null,
+          "tools": []
+        }
+      ]
+    },
+    {
+      "id": "C02",
+      "set": "calibration",
+      "arm": "openai/gpt-4o",
+      "operator_turns": 1,
+      "measures": "granularidad",
+      "expects": [
+        "pedir_aclaracion"
+      ],
+      "forbids": [
+        "buscar_catalogo",
+        "buscar_sustitutos",
+        "consultar_disponibilidad"
+      ],
+      "fixture": null,
+      "stop_reason": "aclaracion",
+      "partial": false,
+      "iterations": 1,
+      "tool_calls_used": 1,
+      "tools_invoked": [
+        "pedir_aclaracion"
+      ],
+      "invented_tools": [],
+      "abstained": false,
+      "clarified": true,
+      "warnings": [],
+      "groups": 0,
+      "citations": 0,
+      "pitch_chars": 0,
+      "prompt_tokens": 5018,
+      "completion_tokens": 35,
+      "total_tokens": 5053,
+      "provider_calls": 2,
+      "embedding_calls": 0,
+      "elapsed_ms": 1441.8,
+      "per_iteration": [
+        {
+          "iteration": 1,
+          "prompt_tokens": 1717,
+          "completion_tokens": 19,
+          "context_chars": 178,
+          "elapsed_ms": 608.3,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "pedir_aclaracion",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "eje": "piece_type"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C03",
+      "set": "calibration",
+      "arm": "openai/gpt-4o",
+      "operator_turns": 1,
+      "measures": "granularidad",
+      "expects": [
+        "consultar_conocimiento"
+      ],
+      "forbids": [
+        "buscar_catalogo"
+      ],
+      "fixture": null,
+      "stop_reason": "sin_mas_herramientas",
+      "partial": false,
+      "iterations": 2,
+      "tool_calls_used": 1,
+      "tools_invoked": [
+        "consultar_conocimiento"
+      ],
+      "invented_tools": [],
+      "abstained": false,
+      "clarified": false,
+      "warnings": [],
+      "groups": 0,
+      "citations": 2,
+      "pitch_chars": 485,
+      "prompt_tokens": 10047,
+      "completion_tokens": 284,
+      "total_tokens": 10331,
+      "provider_calls": 4,
+      "embedding_calls": 1,
+      "elapsed_ms": 7451.1,
+      "per_iteration": [
+        {
+          "iteration": 1,
+          "prompt_tokens": 1722,
+          "completion_tokens": 26,
+          "context_chars": 2998,
+          "elapsed_ms": 2559.0,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "consultar_conocimiento",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "pregunta": "¿la plata se puede llevar a la playa?"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 2,
+          "prompt_tokens": 2605,
+          "completion_tokens": 1,
+          "context_chars": 2998,
+          "elapsed_ms": 1270.8,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": []
+        }
+      ]
+    }
+  ]
+}

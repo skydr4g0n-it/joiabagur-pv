@@ -849,3 +849,51 @@ When implementing deferred tasks:
 
 **Last Updated:** 2026-09-20
 **Maintained By:** Development Team
+
+---
+
+## C32b · La política de *timeout* y de circuito de `POST /v1/assist/agent` en la capa .NET
+
+**Estado:** identificada, acotada y **no hecha**. Aplazada **con motivo**: hoy la ruta no tiene
+ningún consumidor.
+
+C32b publica `POST /v1/assist/agent` y **nadie la llama**. `IAiGatewayClient` no tiene método para
+ella, no hay pantalla detrás y el change de hidratación no la consume. Escribir su política de
+tiempo de espera y de cortocircuito ahora sería escribirla contra un consumidor imaginario, que es
+la misma razón por la que C32a difirió el endpoint de disponibilidad.
+
+### Por qué la política no puede ser la de `/v1/assist/sale`
+
+Medido en la pasada `293fe5c6e470`, sobre 102 peticiones con `gpt-4o`:
+
+| | `/v1/assist/sale` | `/v1/assist/agent` |
+|---|---|---|
+| Latencia declarada | **5 s** (§6.4 del diseño) | **15 s**, fijados por medición |
+| p50 medido | — | **5,3 s** |
+| p95 medido | — | **9,0 s** |
+| Máximo medido | — | **11,9 s** |
+
+**Un cliente .NET con el *timeout* de la ruta determinista cortaría más de la mitad de las
+peticiones del agente.** El p50 del agente es del orden de la latencia total que la otra ruta
+declara como techo.
+
+### Qué hace falta cuando se haga
+
+- **Un *timeout* propio por ruta**, no uno compartido: 15 s más el margen de red, contra los 5 s
+  de la determinista.
+- **Un cortocircuito que distinga degradación de fallo.** Esta ruta **no devuelve 5xx** cuando el
+  proveedor cae: responde 200 con `partial: true` y un `stop_reason` del vocabulario cerrado. Un
+  circuito que contase esas respuestas como fallos se abriría sobre una ruta que está funcionando
+  como está diseñada; el que las ignorase perdería la única señal de que el proveedor está caído.
+  Lo que hay que contar es `stop_reason=fallo_proveedor`, que existe precisamente porque la
+  primera pasada de C32b demostró que sin él esas respuestas son indistinguibles de una completa.
+- **Decidir qué hace el mostrador con `partial: true`.** Es una respuesta útil e incompleta, y la
+  pantalla tiene que poder decirlo sin alarmar: no es un error.
+
+### Y una restricción operativa que el consumidor heredará
+
+La pasada midió que **la cuota de tokens por minuto de la organización**, y no el dinero, es lo que
+limita el ritmo: con peticiones de ~13.000 tokens, un techo de 25.000 TPM admite **una petición por
+minuto**. Un mostrador con varios operarios simultáneos choca con eso mucho antes que con el coste,
+y el síntoma es un `RateLimitError` que la capa convierte en `fallo_proveedor` y sirve degradado.
+Dimensionar la cuota es parte de poner esta ruta en producción, no un detalle de la medición.

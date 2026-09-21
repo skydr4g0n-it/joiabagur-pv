@@ -38,7 +38,7 @@ from jbg_ai.assist.constants import MAX_PITCH_PROVIDER_CALLS, PROMPT_VERSION
 from jbg_ai.assist.llm import AssistLlm, TokenUsage
 from jbg_ai.assist.modes import AssistMode
 from jbg_ai.assist.errors import PitchProviderError
-from jbg_ai.assist.prompt import PitchContext, PitchTask, build_messages
+from jbg_ai.assist.prompt import AgentPitchTask, PitchContext, PitchTask, build_messages
 from jbg_ai.assist.schema import AssistPitch
 from jbg_ai.assist.verification import Violation, repair_message, verify
 
@@ -108,16 +108,23 @@ def _published_ids(
 
 async def generate_pitch(
     payload: PitchContext,
-    task: PitchTask | AssistMode,
+    task: PitchTask | AgentPitchTask | AssistMode,
     *,
     client: AssistLlm,
     prompt_text: str | None = None,
+    prompt_version: str = PROMPT_VERSION,
 ) -> PitchOutcome:
     """Generate, verify, repair at most once, and apply the policy of what survives.
 
     Never raises on a provider fault: it returns an outcome with no argument and the cause
     recorded. A five-hundred for a timeout would throw away the half of the response that is
     already computed and works.
+
+    `prompt_version` travels **beside** `prompt_text` because the two are one fact seen twice:
+    a caller that supplies another version's text and lets the reported version default would
+    stamp the response with a prompt that never reached the model — the failure `enrichment/`
+    already paid for once, and the reason the path is derived from the constant rather than
+    written next to it. The default is the deterministic route's, so that route is unchanged.
     """
     started = time.perf_counter()
     usage = TokenUsage()
@@ -142,7 +149,7 @@ async def generate_pitch(
             pitch=EMPTY_PITCH,
             used_citation_ids=(),
             usage=usage,
-            prompt_version=PROMPT_VERSION,
+            prompt_version=prompt_version,
             provider_error=exc.cause,
             elapsed_ms=elapsed(),
             call_latencies_ms=tuple(latencies),
@@ -173,6 +180,7 @@ async def generate_pitch(
                 usage=usage,
                 elapsed_ms=elapsed(),
                 provider_error=exc.cause,
+                prompt_version=prompt_version,
                 initial=initial,
                 initial_generated=initial_generated,
                 latencies=tuple(latencies),
@@ -191,6 +199,7 @@ async def generate_pitch(
         violations,
         usage=usage,
         elapsed_ms=elapsed(),
+        prompt_version=prompt_version,
         initial=initial,
         initial_generated=initial_generated,
         latencies=tuple(latencies),
@@ -203,6 +212,7 @@ def _decide(
     *,
     usage: TokenUsage,
     elapsed_ms: float,
+    prompt_version: str = PROMPT_VERSION,
     provider_error: str | None = None,
     initial: Sequence[Violation] = (),
     initial_generated: AssistPitch | None = None,
@@ -219,7 +229,7 @@ def _decide(
             pitch=EMPTY_PITCH,
             used_citation_ids=(),
             usage=usage,
-            prompt_version=PROMPT_VERSION,
+            prompt_version=prompt_version,
             violations=tuple(violations),
             provider_error=provider_error,
             elapsed_ms=elapsed_ms,
@@ -236,7 +246,7 @@ def _decide(
         pitch=generated.pitch,
         used_citation_ids=_published_ids(generated, withdrawn),
         usage=usage,
-        prompt_version=PROMPT_VERSION,
+        prompt_version=prompt_version,
         violations=tuple(violations),
         withdrawn_citation_ids=withdrawn,
         provider_error=provider_error,

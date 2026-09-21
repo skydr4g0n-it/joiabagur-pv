@@ -184,7 +184,7 @@ def _anchored_group(
     )
 
 
-def _to_citation(
+def to_citation(
     citation: KnowledgeCitation, *, product_id: str | None
 ) -> Citation:
     return Citation(
@@ -473,7 +473,7 @@ async def assist_sale(
         intent=intent,
         groups=groups,
         pitch=outcome.pitch if outcome is not None else EMPTY_PITCH,
-        citations=[_to_citation(item, product_id=anchored_id) for item in citations],
+        citations=[to_citation(item, product_id=anchored_id) for item in citations],
         warnings=warnings,
         # Prose, and the **only** prose in this response no model wrote: the contract types
         # this field as a sentence rather than as a code, so the presentation layer cannot

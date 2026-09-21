@@ -14,6 +14,39 @@
 
 Este documento se escribió antes de implementar. Cuando una sesión de diseño de un change concreto altera lo que su ficha decía, el cambio se registra aquí con fecha y motivo, y la ficha afectada se corrige en el sitio.
 
+### 2026-09-21 — C32b implementado: el sobrecoste es ×7,6 y el brazo barato no sostiene la selección
+
+La pasada `293fe5c6e470` —**204 peticiones, dos brazos, ~2,60 USD y 3,4 h**— refuta el número
+central de la ficha y una de sus dos mitades:
+
+| | ficha | medido |
+|---|---|---|
+| Sobrecoste del agente | ~×19 | **×7,6** (0,02144 USD/petición) |
+| Brazo barato | «el ×4 es elección reversible con una variable» | **×1,4 en precio, pero topa un presupuesto en el 66 % de las peticiones** contra el 1,2 % del caro |
+
+**El ×4 de modelo es reversible en el precio y no en el comportamiento.** `gpt-4o-mini` no elige
+peor: **no sabe parar** — 50 `presupuesto_tools` y 4 `presupuesto_iteraciones` sobre 82
+transcripciones, y 168 llamadas devueltas con `presupuesto_agotado` contra 5. Q-7 queda
+respondida en no, con el mismo desenlace que C31 midió para el clasificador y por otro síntoma.
+
+**Tres presupuestos dejan de ser marcadores y pasan a ser mediciones**: tokens **40.000**
+(p95 18.781), contexto **30.000** caracteres (p95 4.709) y reloj **15,0 s** (p95 9,0 s), que
+**tensa** el peor caso de 20 s que el diseño había declarado. El techo de herramientas sube de 6
+a **8** tras medir p95 5 con un 3,9 % truncado — y con el aviso de que de esas peticiones
+truncadas **nadie sabe cuántas llamadas habrían usado**, así que el 8 es un juicio informado.
+
+**O-5 se cierra con el dato:** la curva de crecimiento va de 1.974 a 3.470 tokens entre la vuelta
+1 y la 5, casi lineal. **No hace falta compactar.**
+
+**Las dos preguntas de C32a quedan respondidas:** cero herramientas muertas, **cero nombres
+inventados** y cero llamadas consecutivas idénticas; y la etiqueta cualitativa **basta** para
+gobernar el pivote, con 83 % donde debe y **0 % de sobre-pivote** en las tres etiquetas caras.
+
+**Lo que queda abierto y medido:** `dangling_citation` retira el **13,1 %** de los argumentarios
+contra el 2,2 % de la ruta determinista. Y una restricción operativa que ninguna ficha anticipaba:
+**la cuota de tokens por minuto de la organización**, y no el dinero, es lo que fija el reloj de
+una medición de agente — a 25.000 TPM con peticiones de ~13.000 tokens cabe **una por minuto**.
+
 ### 2026-09-20 — C32 se parte en C32a y C32b, y tres supuestos de su ficha se caen contra el árbol
 
 **C32 se desdobla por la regla 5 del §1** —*«si un change se desborda de la sesión, se parte y se entrega primero la mitad que desbloquea el grafo»*—, con el mismo corte que funcionó en C30: **la mitad que no llama a ningún proveedor va primero**.
@@ -813,13 +846,13 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 | **C30b** | `add-assist-pitch-generation` | Python | C30a | ✅ **archivado 2026-09-14** | **nace el 13 sep** al partir C30 · *la única mitad que llama a un LLM* · **implementado el 14 sep**: la puerta numérica rechaza **0 de 120** y el *timeout* sube a 4 s con la cifra delante |
 | **C31** | `add-guardrails-and-intent-router` | Python | C30b | 🟡 **implementado 2026-09-15** | *prereq afinado el 13 sep: su validación de salida necesita una salida* · **el veto tumbó la primera configuración** y lo que lo cerró fue el **modelo**, no el prompt: `gpt-4o-mini` silencia 3 contestables, `gpt-4o` con el mismo prompt silencia **0** y acierta **48/48** en `catalog` |
 | **C32a** | `add-sales-assistant-tool-registry` | Python | C30b, C31 | 🔴 | — · **nace el 20 sep** al partir C32 (§0) · *la mitad sin proveedor: seis tools, registro, esquemas de function calling e invariante de solo-lectura por introspección* · **resuelve la decisión abierta del §6.1 del diseño difiriéndola**: `consultar_disponibilidad` se sirve desde `ai.pos_projection` con **etiqueta cualitativa**, porque `QTY_BUCKETS` son dígitos y el bucket crudo en el contexto del modelo es una cifra de stock |
-| **C32b** | `add-sales-assistant-agent-loop` | Python | **C32a** | 🔴 | — · **hereda de C31 el patrón del techo, no la cifra**: cinco vueltas no caben en 3, y el techo pasa a **8 por petición** (1 enrutador + ≤5 vueltas + ≤2 argumentario), más el de tokens que nadie había escrito. **Ruta propia `POST /v1/assist/agent`**, porque el peor caso son ~15-20 s contra los 5 s que el §6.4 declara para `/v1/assist`. Su tool `pedir_aclaracion` **no es** la `clarification_question` de C31: elige **eje** de un enum cerrado y el texto lo sigue escribiendo el código |
+| **C32b** | `add-sales-assistant-agent-loop` | Python | **C32a** | 🟢 **implementado 21 sep** | — · **hereda de C31 el patrón del techo, no la cifra**: cinco vueltas no caben en 3, y el techo pasa a **8 por petición** (1 enrutador + ≤5 vueltas + ≤2 argumentario), más el de tokens que nadie había escrito. **Ruta propia `POST /v1/assist/agent`**, porque el peor caso son ~15-20 s contra los 5 s que el §6.4 declara para `/v1/assist`. Su tool `pedir_aclaracion` **no es** la `clarification_question` de C31: elige **eje** de un enum cerrado y el texto lo sigue escribiendo el código |
 | ~~**C33**~~ | ~~`add-pos-sales-profile`~~ | .NET + Python | ~~C19~~ → C08, C12 | ⛔ | **rev. dec. 7** · **anulado el 31 ago** · *rescatable suelto* |
 | **C34** | `add-dotnet-assist-and-recommendation-endpoints` | .NET | C15, C26, **C30a** *(C27 cortado el 12 sep)* | 🔴 | — · *prereq afinado el 13 sep: depende de la **forma**, no de la prosa — es la razón del corte* · **gana los dos avisos de stock y `?question=`** · **y de C31, la ruta de la consulta libre más tres códigos nuevos de `warnings[]`** (`query_out_of_domain`, `query_not_in_catalogue`, `knowledge_not_covered`) y el campo `clarification_question`, que deja de ser nulo. **`intent` gana tres valores**: un consumidor que compare contra `unclassified` verá `in_domain`, `out_of_domain` y `not_in_catalogue`. **El presupuesto de 5 s se hereda sin resolver**, y C31 no lo empeora: el enrutador corre sólo en M1, que no tiene ruta .NET |
 | ~~**C35**~~ | ~~`add-inventory-agent-proposals`~~ | Python | C26, C29, C32, C33 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
 | **C36** | `add-frontend-assist-card-and-family-disambiguation` | Frontend | C16, C34 | 🔴 | — · **hereda de C31 tres filas más en la tabla de copy** —los dos rechazos, que son **dos textos distintos** y no uno, más «el corpus no cubre esta pregunta»— y **una excepción razonada**: `clarification_question` viaja **como prosa ya resuelta** y no como código, porque el contrato la tipa así; el frontend la pinta tal cual. **Pintar el rechazo igual que `abstained` borraría la distinción** que las dos cifras publicadas existen para sostener |
 | ~~**C37**~~ | ~~`add-frontend-inventory-review-and-print`~~ | Frontend | C29, C35 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
-| **C38** | `add-generation-and-agent-evals` | Python + .NET | C24, **C30b**, **C32b**, C34 | 🔴 | — · *sin escenarios de inventario* · **la excepción de persistencia del arnés la declara C30b** · **de C31 hereda el conjunto de enrutado ya cableado** (119 casos, seis clases, carga que falla si los recuentos no cuadran) y **una cifra que contradice lo esperado**: la puerta numérica de la consulta libre rechaza **0 por cifras** con una lista blanca de ~13 numerales, así que el riesgo que quedaba abierto ahí **no era el numérico** sino `dangling_citation`. Los casos adversarios y de inyección sistemáticos siguen siendo suyos |
+| **C38** | `add-generation-and-agent-evals` | Python + .NET | C24, **C30b**, **C32b**, C34 | 🔴 | — · *sin escenarios de inventario* · **la excepción de persistencia del arnés la declara C30b** · **de C31 hereda el conjunto de enrutado ya cableado** (119 casos, seis clases, carga que falla si los recuentos no cuadran) y **una cifra que contradice lo esperado**: la puerta numérica de la consulta libre rechaza **0 por cifras** con una lista blanca de ~13 numerales, así que el riesgo que quedaba abierto ahí **no era el numérico** sino `dangling_citation`. Los casos adversarios y de inyección sistemáticos siguen siendo suyos · **y de C32b hereda cuatro cosas escritas**: (1) el **golden set está intacto y comprobado** — dos tests cruzan sus 72 consultas contra los dos conjuntos del agente en las dos direcciones, así que puede arbitrar la ablación sin reservas; (2) `evals/agent/calibration.yaml` está declarado **`calibration-only`** y contra él se iteraron DOS prompts, así que C38 escribe los suyos aparte y comprueba el no solape, que es la razón de que la etiqueta exista; (3) la ablación ya tiene una de sus dos filas medida — **×7,6 el agente contra el pipeline, 0,02144 frente a 0,00282 USD/petición** — y la fila del brazo barato **descartada por comportamiento y no por precio**; (4) el hallazgo abierto que C38 tiene que medir sobre el golden set: **`dangling_citation` retira el 13,1 % de los argumentarios del agente contra el 2,2 % de la ruta determinista**, seis veces más, con `assist/v4` ya mejorado una vez y sin cerrar. Y un aviso operativo: la cuota de **tokens por minuto de la organización** fija el reloj de cualquier pasada — 204 peticiones costaron 3,4 h a 25.000 TPM |
 | **C39** | `finalize-pf-readme-and-evidence` | Docs | todos los vivos | 🔴 | — |
 
 **Origen** indica de dónde sale el change: en **negrita**, los que existen por la revisión del compañero.
