@@ -31,7 +31,8 @@ tests/
 │                     # deterministic grounding — generation (C30b) — versioned prompt,
 │                     # the three checks, the single repair, degradation — and the tool
 │                     # registry (C32a) — the frozen set of six, the read-only invariant by
-│                     # introspection, failures as observations. The agent LOOP is C32b
+│                     # introspection, failures as observations — and the agent loop (C32b)
+│                     # — transcript caps and delimiting, six budgets, stop reasons, two traces
 └── evals/            # harness, metrics, baselines, scenario replays
 ```
 
@@ -42,7 +43,7 @@ parallel taxonomy later.
 
 | Folder | Changes that will land here |
 |---|---|
-| `api/` | C01 (health), C02 (contracts, service auth, stubs, snapshot), C08 (enrichment provenance, catalog-scoped auth), C13 (landed: `/v1/index/*` real), C14 (landed: `/v1/retrieval/products` real), C17 (landed: enriched `/health` — database, index, provider credential, model contrast), C18b (landed: `POST /v1/families/audit` — tenth route, service token, judged pairs travelling in the request) |
+| `api/` | C01 (health), C02 (contracts, service auth, stubs, snapshot), C08 (enrichment provenance, catalog-scoped auth), C13 (landed: `/v1/index/*` real), C14 (landed: `/v1/retrieval/products` real), C17 (landed: enriched `/health` — database, index, provider credential, model contrast), C18b (landed: `POST /v1/families/audit` — tenth route, service token, judged pairs travelling in the request), C32b (landed: `POST /v1/assist/agent` — eleventh route, the contract moved by pure addition and verified leaf by leaf against C32a's snapshot kept as a fixture) |
 | `config/` | C01, C02 (settings, canonical OpenAPI profile), C13 (feed settings) |
 | `db/` | C05 (engine, bounded pool, boot without a database) |
 | `migrations/` | C05, C13 (landed: `text_provenance`, `sync_checkpoint`), C18b (landed: Alembic logging isolation — `fileConfig` must not disable the service loggers, which is destructive in-process and invisible under the CLI), C22 (landed: `pos_projection.computed_as_of` — one additive nullable column, and a test that the revision touches nothing else), C24 (landed: `ai.eval_run` / `ai.eval_case` / `ai.eval_result` — the provenance tuple a run is compared by, the CHECK that keeps a result unjudged exactly when it carries no grade, and a downgrade that leaves no trace) |

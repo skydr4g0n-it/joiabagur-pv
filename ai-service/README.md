@@ -69,6 +69,9 @@ Boundary rule: *Python computes similarity and writes prose; .NET computes numbe
 | `JPV_ROUTER_LLM_API_KEY` | no | — | C31 credential for the **intent classifier**. Optional, and it falls back in a chain: **router → `JPV_ASSIST_LLM_API_KEY` → `JPV_RAG_LLM_API_KEY`**. With none of the three the classifier is **not constructed**, `intent` returns `unclassified` and the route serves exactly C30b's response — the *fail-open*, the ablation and the rollback in one. Which link is in force is logged once as `stage=router_client credential=router\|assist_fallback\|rag_fallback`; its absence says no client was built |
 | `JPV_ROUTER_LLM_MODEL` | no | `openai/gpt-4o` | C31 model that classifies the query. Its **own** variable and never `JPV_ASSIST_LLM_MODEL` nor `JPV_RAG_LLM_MODEL`: ~30 output tokens against a paragraph is not the same call, and sharing one would make any cost comparison false. **The default was moved by the measurement, not chosen:** over the 119 cases of `evals/routing/cases.yaml`, same prompt `router/v3` and temperature zero, `gpt-4o-mini` silenced **3** answerable queries (false positive 6,25 %, `catalog` 81,3 %) and the veto of D12 **rejected** it, while `gpt-4o` silenced **0** (false positive 0,00 %, `catalog` 48/48) and **passed**. A deployment pointing this at `gpt-4o-mini` is serving a configuration the veto rejected |
 | `JPV_ROUTER_TIMEOUT_SECONDS` | no | `2` | C31 seconds the **single** classifier call may take. **Declared NOT calibrated**: a product judgement with no latency measurement behind it, in the position C30b's three seconds occupied before its sweep moved it to four — and a harder cut, because this one runs **in front of everything**. Supplies only the default; the value travels by parameter. Exceeding it is a *fail-open*: the request proceeds unclassified. Deliberately left out of the deployment steps until the deployment measures its own distribution |
+| `JPV_AGENT_LLM_API_KEY` | no | — | C32b credential for the **agent loop** of `POST /v1/assist/agent`. Optional, and it falls back in a chain: **agent → `JPV_ASSIST_LLM_API_KEY` → `JPV_RAG_LLM_API_KEY`**; the classifier's key is deliberately **not** a link. With none of the three the loop is **not constructed** and the route answers without running it — `stop_reason=sin_cliente`, `partial: true`, **200 and never 503**. Which link is in force is logged once as `stage=agent_client credential=agent\|assist_fallback\|rag_fallback` |
+| `JPV_AGENT_LLM_MODEL` | no | `openai/gpt-4o` | C32b model that runs the loop; it must support function calling. Its **own** variable and never the argument's nor the classifier's. The provider pass measured `gpt-4o-mini` exhausting a budget on **66 %** of requests against 1,2 %: pointing it there is cheaper and **does not hold tool selection** |
+| `JPV_AGENT_TIMEOUT_SECONDS` | no | `8` | C32b seconds **one turn** of the loop may take (`> 0`, `≤ 60`); per turn, never per request. **Declared NOT calibrated.** A turn is also cut by what is left of the request's 15 s deadline minus the argument's reserve |
 | `JPV_RETRIEVAL_DISTANCE_THRESHOLD` | no | `0.65` | C14 cosine-distance cutoff `(0, 2]`. Absence does not block `/health`; blank → the default. Distinct from `JPV_EMBEDDING_*` |
 | `JPV_QUERY_EXPANSION_ENABLED` | no | `true` | C20 query-side synonym expansion. Supplies only the **default**: the effective value travels as a parameter of the retrieval orchestration call, so C24 can sweep configurations in one process without restarting and without moving the frozen `openapi.json`. Default on because, measured on the live index, the lexical branch answers **nothing at all** without it for ordinary surface-form variants of catalogue vocabulary. Turning it off is also the rollback for C20. Absence does not block `/health`, which never loads the dictionary |
 | `JPV_RRF_K` | no | `60` | C21 smoothing constant of the reciprocal rank fusion; blank → the default. **Not independent of `JPV_BRANCH_DEPTH`**: `k` governs how slowly a document's vote decays as its rank grows, so a deeper branch keeps more of its tail voting and the two are swept together, never separately. Absence does not block `/health` |
@@ -94,6 +97,7 @@ The **C20 synonym dictionary is curated against the corpus, not against observed
 | `POST` | `/v1/retrieval/products` | Bearer | returns `min(top_k × 3, 60)` candidates, reported in `candidates_returned` |
 | `POST` | `/v1/retrieval/substitutes` | Bearer | retrieval result shape plus `similarity_signals` |
 | `POST` | `/v1/assist/sale` | Bearer | `groups[]` by **nullable** `family_id`, rule warnings as codes, citations that resolve. Real since C30a; **writes the argument since C30b** in the two piece-anchored modes, always keeping `{{price}}` / `{{stock}}` unresolved. With **neither** `JPV_ASSIST_LLM_API_KEY` **nor** its fallback `JPV_RAG_LLM_API_KEY` it serves C30a's response with 200, never 503 |
+| `POST` | `/v1/assist/agent` | Bearer | **C32b**: the agent loop over a multi-turn transcript carried in the request (≤ 12 turns, ≤ 500 characters each, ≤ 4.000 in total). Every field of the deterministic response **plus** `partial`, `stop_reason`, `iterations`, `tool_calls_used`, a bounded `trace` and `agent_prompt_version`, with `usage.calls`. With no agent credential it answers without the loop, with 200 |
 | `POST` | `/v1/inventory/propose` | Bearer | prioritized proposals, never quantities |
 | `POST` | `/v1/enrich/products` | Bearer | proposed profiles with per-field confidence |
 | `POST` | `/v1/families/suggest` | Bearer (catalog) | family proposals plus the groups a guard refused and the products the gate excluded; writes nothing |
@@ -1181,7 +1185,7 @@ These four tests exist to catch failures that produce **no error at all**: an HN
 
 ## Explicit non-goals
 
-- No real retrieval or agent loops — stubs are replaced route by route in later changes. Enrichment is real when `STUB_MODE=false` (C09). Catalog index sync is real when `STUB_MODE=false` (C13). Product retrieval is real when `STUB_MODE=false` (C14), **hybrid since C21** and **fused in two stages since C25**: the two lexical lists are fused with each other and the result with the vector list under per-branch weights, so a branch's vote is the one declared however many of its lists matched. The scalar distance threshold 0.65 remains a floor rather than a discriminator, and C25 answers that with a relative per-query rule instead of moving it. Substitutes are real when `STUB_MODE=false` (C26), over the embedding the index already holds. **Sale assistance is real when `STUB_MODE=false` (C30a), writes its argument since C30b and routes since C31** — structure, rule warnings and citations; prose in **all three** modes, guarded by three deterministic checks; and, in the free-query mode, a classifier that runs **before any retrieval** and either admits the query, refuses it with one of **two distinct** reason codes, or answers it with a clarification question chosen in code. With **neither** `JPV_ASSIST_LLM_API_KEY` **nor** its fallback `JPV_RAG_LLM_API_KEY` it serves exactly C30a's response, and with none of the three classifier credentials it serves exactly C30b's — two ablations and two rollbacks, each of them a credential away. No `query_log`, `indexing/embeddings.py` unchanged, and `openapi.json` regenerated by **one description**
+- Stubs are replaced route by route as each change makes a route real — the agent loop included since C32b, see below. Enrichment is real when `STUB_MODE=false` (C09). Catalog index sync is real when `STUB_MODE=false` (C13). Product retrieval is real when `STUB_MODE=false` (C14), **hybrid since C21** and **fused in two stages since C25**: the two lexical lists are fused with each other and the result with the vector list under per-branch weights, so a branch's vote is the one declared however many of its lists matched. The scalar distance threshold 0.65 remains a floor rather than a discriminator, and C25 answers that with a relative per-query rule instead of moving it. Substitutes are real when `STUB_MODE=false` (C26), over the embedding the index already holds. **Sale assistance is real when `STUB_MODE=false` (C30a), writes its argument since C30b and routes since C31** — structure, rule warnings and citations; prose in **all three** modes, guarded by three deterministic checks; and, in the free-query mode, a classifier that runs **before any retrieval** and either admits the query, refuses it with one of **two distinct** reason codes, or answers it with a clarification question chosen in code. With **neither** `JPV_ASSIST_LLM_API_KEY` **nor** its fallback `JPV_RAG_LLM_API_KEY` it serves exactly C30a's response, and with none of the three classifier credentials it serves exactly C30b's — two ablations and two rollbacks, each of them a credential away. No `query_log`, `indexing/embeddings.py` unchanged, and `openapi.json` regenerated by **three descriptions** and no field — `intent` and `warnings` rewritten to name the new intent and refusal vocabularies, and one added to `clarification_question`
 - No `POST /v1/retrieval/complementary` — later OpenAPI negotiation. `POST /v1/families/suggest` **exists since C18a**, which is the change that first called it; `POST /v1/families/audit` since C18b, for the same reason
 - `ai.product_document` is written by C13 from the catalog feed; `ai.pos_projection` is **written by C22** from the POS availability feed; `ai.knowledge_document` and `ai.knowledge_chunk` are **written by C23**, by `python -m jbg_ai.indexing sync-knowledge`, from the corpus in `data/knowledge/`
 - No `ai.query_log` (unassigned; the pipeline logs `stage=expand|embed|search|lexical|filters|fuse` with `trace_id` instead). The `ai.eval_*` tables **exist since C24** and are written only with `--persist`
@@ -1243,6 +1247,11 @@ ai-service/
                     # vocabulary — the projection's buckets are numerals, so a bucket never
                     # reaches a model — with «sin ambito» as a fourth value that is not
                     # «agotado», plus the tool failure causes and the write-method vocabulary
+                    # + C32b the agent loop: agent.py (the loop, six budgets, the evidence
+                    # projection and the two traces), agent_llm.py (the port whose return type
+                    # has NO field for prose), transcript.py (turns, three caps, every turn
+                    # delimited). tools.py gains the evidence ledger; constants.py the budgets,
+                    # the closed stop reasons and a fifth failure cause, `presupuesto_agotado`
     evals/          # C24 harness: golden.py (load + the composition validation that fails the
                     # load), pooling.py (adaptive depth), metrics.py (graded and binary),
                     # + C31 routing.py / routing_run.py (the 119-case manifest, five of its six
@@ -1255,15 +1264,25 @@ ai-service/
                     # report.py, repository.py (opt-in sink, imported by nobody upstream),
                     # cli.py (`uv run evals`), assist_sweep.py (C30b context-width sweep:
                     # dated, calls a provider, and the declared persistence exception)
+                    # + C32b agent_sets.py (generates the load set) and agent_sweep.py (the
+                    # two-armed pass: each stage priced by its own model, rows written as they
+                    # are produced, and `--rescore` to recompute an artefact with no provider)
   prompts/          # versioned prompts: catalog-synth/v3 (C06b generate) + enrichment/v1 and v2 (extract; v2 in force since FIX1)
                     # + knowledge/v1: eight block prompts, one per generation block of the corpus
                     # + assist/v1 (C30b sale argument; system rules + one task block per mode,
                     #   and deliberately written without a single digit)
+                    # + assist/v2 and v3 (C31: v3 is what `POST /v1/assist/sale` runs; v1 and v2
+                    #   stay on disk because figures were measured against them) and router/v1-v3
+                    #   (C31 intent classifier; v3 in force)
+                    # + agent/v1 (C32b loop) and assist/v4 (C32b agent evidence; v3 untouched)
   evals/            # the yardstick, versioned: golden/ (queries, judgements, frozen query vectors,
                     # criterion.md, pricing.yaml), configs/ (the five baseline configurations —
                     # globbed by load_all(), so nothing else may live there), assist/ (C30b's
-                    # declared sweep sample) and results/ (C20 reach report, C21 arm comparison,
-                    # C24 baselines + runs/<run_id>.jsonl, C30b sweep artefacts)
+                    # declared sweep sample), routing/ (C31's 119-case routing manifest),
+                    # agent/ (C32b load set and calibration-only set) and results/ (C20 reach
+                    # report, C21 arm comparison, C24 baselines + runs/<run_id>.jsonl, C30b sweep
+                    # artefacts, C31 confusion matrices, C32b pass artefacts and their
+                    # `.rescore.json`)
   migrations/
     bootstrap.sql   # one-off: extension, schema, dedicated role, grants
     env.py          # version table in `ai`; provisions before revisions run
@@ -1277,6 +1296,7 @@ ai-service/
     assist/         # C30a three modes, grouping, rule warnings, addressing (fakes; offline)
                     # + C30b prompt, the three checks, the repair policies and the wiring
                     # (the real client over a scripted `complete`; no socket)
+                    # + C32b the loop, the transcript, the six budgets and the two traces
     knowledge/      # C23 corpus rules, chunking, sizing, indexer, search, measurement
                     # + C30a exclusion filter and addressing by identity
     migrations/     # schema, indexes, reversibility (marked `db`)
