@@ -28,3 +28,16 @@ The budget cause exists because the alternative leaves the model blind in the on
 - **WHEN** the set of causes any failed observation can carry is enumerated
 - **THEN** it is exactly the declared five
 - **AND** no cause is prose
+
+### Requirement: The registry is not wired to any route and the frozen contract does not move
+This capability SHALL NOT add, remove or modify any route of the service, and the frozen OpenAPI snapshot MUST remain unchanged.
+
+The consumer of this registry is the agent loop, which serves `POST /v1/assist/agent` from the `sales-assistant-agent` capability: that route, and the movement of the published contract it brought, belong to that capability and not to this one. The registry stays a library that declares no route and no budget of its own, so that exposing a surface remains a decision taken where there is a decision behind it — and the separation is what lets either layer change without the other noticing.
+
+#### Scenario: The snapshot is untouched
+- **WHEN** the committed OpenAPI snapshot is compared against the one the service generates
+- **THEN** they are identical
+
+#### Scenario: Sale assistance is unaffected
+- **WHEN** a sale-assistance request is served in any of its three modes
+- **THEN** the response is the one the assistance layer already produced, with no field added and none changed

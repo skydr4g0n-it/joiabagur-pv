@@ -1,7 +1,7 @@
 # C32b — informe de implementación: el bucle agéntico, sus seis presupuestos y lo que la pasada refuta
 
 **Change:** `add-sales-assistant-agent-loop` (C32b) · **Rama:** `c32b-add-sales-assistant-agent-loop`
-**Fecha:** 2026-09-21 · **Historia:** [HU-AIENG-032b](../../Historias/AI-Eng/HU-AIENG-032b.md) · **Ticket:** [T-AIENG-032b](../../../openspec/changes/add-sales-assistant-agent-loop/ticket.md)
+**Fecha:** 2026-09-21 · **Historia:** [HU-AIENG-032b](../../Historias/AI-Eng/HU-AIENG-032b.md) · **Ticket:** [T-AIENG-032b](../../../openspec/changes/archive/2026-09-21-add-sales-assistant-agent-loop/ticket.md)
 **Capability nueva:** `sales-assistant-agent` — 22 requisitos, 44 escenarios · **Modificada:** `sales-assistant-tools`
 
 C32b entrega la mitad cara de C32: **el bucle de *function calling* con sus seis presupuestos,
@@ -624,7 +624,7 @@ sobre el golden set, que sigue limpio.
 
 Una segunda sesión reprodujo contra el árbol cada cifra de este informe y del QA, con la hipótesis
 de trabajo de que algo se había escapado. **Casi todo reprodujo al dígito**; lo que no, está en el
-[§12 del QA](../../../openspec/changes/add-sales-assistant-agent-loop/qa.md), con su medición y su
+[§12 del QA](../../../openspec/changes/archive/2026-09-21-add-sales-assistant-agent-loop/qa.md), con su medición y su
 control. Aquí, sólo lo que cambió.
 
 | Hallazgo | Qué era | Qué se hizo |

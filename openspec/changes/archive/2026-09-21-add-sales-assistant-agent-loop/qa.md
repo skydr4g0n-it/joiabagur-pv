@@ -760,6 +760,20 @@ calidad del argumento es del change de evaluación.
 | El stub emitía dos avisos que la ruta nunca emite | `stubs/responses.py` | Avisos vacíos; grupos y argumentario se mantienen, como en el stub de `/sale` |
 | «1.557 / 88», «surtido 456», «16/16 del DoD», `context_chars` «as sent», digests sólo del checkout CRLF, coste del §9.3 por métodos mezclados | informe §1, §9.5, cabecera, `IterationTrace`, §7, §9.3 | Corregidos en el sitio, con la cifra correcta y su fuente |
 
+### 12.14. Al sincronizar: `sales-assistant-tools` seguía diciendo que el bucle «is a later change» — **redacción de la spec viva; corregida**
+
+Encontrado al sincronizar las deltas en el archivado, no en la verificación. El requisito
+«The registry is not wired to any route and the frozen contract does not move» y el `## Purpose` de
+la spec viva, escritos en C32a, llamaban al bucle agéntico «a later change» y afirmaban que el
+*snapshot* no se movía. La línea normativa seguía siendo cierta —esta capability no añade rutas—,
+pero la prosa describía un estado anterior a C32b. **Qué se hizo**: un segundo `## MODIFIED` en la
+delta de `sales-assistant-tools` con la línea SHALL idéntica y el párrafo explicativo nombrando
+`POST /v1/assist/agent` y la capability `sales-assistant-agent`, sincronizado bloque a bloque; y la
+frase equivalente del `## Purpose`, que no es materia de delta, corregida en la spec viva durante
+la misma sincronización. Así, la delta pasa a tener **dos** requisitos modificados, no uno como dice
+el §3; `sales-assistant-tools` sigue con 13 requisitos y `openspec validate --all --strict` da
+**60 / 0** con la capability nueva.
+
 ### Lo que la segunda pasada **sí** reprodujo
 
 Todo esto se midió, no se leyó, y coincidió con lo escrito:

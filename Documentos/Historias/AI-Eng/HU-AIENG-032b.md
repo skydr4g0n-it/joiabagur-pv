@@ -182,7 +182,7 @@ sesión de exploración previa a esta historia.
 ### Referencias
 
 - Change de OpenSpec: `openspec/changes/add-sales-assistant-agent-loop/` (C32b), rama `c32b-add-sales-assistant-agent-loop`
-- Ticket: [T-AIENG-032b](../../../openspec/changes/add-sales-assistant-agent-loop/ticket.md)
+- Ticket: [T-AIENG-032b](../../../openspec/changes/archive/2026-09-21-add-sales-assistant-agent-loop/ticket.md)
 - Ficha del plan: [§3 · C32b](../../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md) y la nota del **§0 del 2026-09-20**
 - Diseño RAG: [§6.1, §6.4, §9.1, §9.2, §11.2, §11.4](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md)
 - Capability que se modifica: [`sales-assistant-tools`](../../../openspec/specs/sales-assistant-tools/spec.md)
