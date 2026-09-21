@@ -231,7 +231,7 @@ flowchart TB
 ### 6.4. Seguridad y degradación
 
 - El frontend nunca habla con Python. .NET → Python con **JWT interno de servicio** (HS256, TTL corto, secreto en SSM) que transporta `user_id`, `role`, `pos_id`, `trace_id`. Python valida y aplica ese scope; no confía en el body. Red interna Docker, puerto no publicado en nginx.
-- Timeouts (0,8 s retrieval / 5 s assist), reintento único, circuit breaker con Polly. Si el circuito abre, .NET responde con el **buscador léxico existente** y `ai_available: false`. **El sistema nunca se cae por culpa de la IA.** Feature flag por POS.
+- Timeouts (0,8 s retrieval / 5 s assist; **15 s el agente de venta, en ruta propia —`POST /v1/assist/agent`—** *(añadido el 2026-09-21: su peor caso no cabía en los 5 s, así que C32b le dio ruta aparte y `/v1/assist/sale` conserva los suyos. Los 15 s son el* deadline *del lado Python, que acota la petición entera; la política de* timeout *y circuito de .NET para esa ruta está identificada y no hecha, en `openspec/DEFERRED_TASKS.md`)*), reintento único, circuit breaker con Polly. Si el circuito abre, .NET responde con el **buscador léxico existente** y `ai_available: false`. **El sistema nunca se cae por culpa de la IA.** Feature flag por POS.
 
 ---
 
@@ -525,7 +525,7 @@ Eran dos hasta el 2026-08-31; el de inventario se anuló con toda su rama de imp
 
 ### 9.2. Control del bucle y HITL
 
-- Presupuesto duro: 5 iteraciones y 6 llamadas a tools por consulta; superado, responde con lo que tenga y marca `partial: true`.
+- Presupuesto duro: 5 iteraciones y ~~6~~ → **8** llamadas a tools por consulta *(corregido el 2026-09-21: el techo lo movió la medición de C32b, que en 6 truncaba el 3,9 % de las peticiones con un p95 de 5 y no dejaba sitio al pivote)*, más los cuatro que C32b añadió —llamadas al proveedor (8, derivado de sus tres tramos), tokens (40.000), contexto en caracteres (30.000) y **reloj de pared** (15 s para la petición entera, argumentario incluido)—; superado cualquiera, responde con lo que tenga, marca `partial: true` y nombra el presupuesto en un motivo de parada de vocabulario cerrado.
 - **Ninguna tool escribe.** La única acción con efecto en venta es "seleccionar para venta", que devuelve un borrador confirmado por el operador en el flujo existente. En inventario, toda recomendación nace `Proposed` y requiere aprobación explícita del admin.
 - Orquestación: bucle manual con function calling. No se adopta LangGraph: no hay ramificación con estado ni reanudación que lo justifique. El punto de migración queda identificado.
 

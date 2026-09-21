@@ -1,0 +1,1067 @@
+{
+  "provenance": {
+    "run_id": "582b8517a235",
+    "git_sha": "2c9fd6a436101dc87344fb0128f7289b9d45aba5+dirty",
+    "taken_at": "2026-09-21T06:22:53+00:00",
+    "agent_prompt_version": "agent/v1",
+    "pitch_prompt_version": "assist/v4",
+    "router_prompt_version": "router/v3",
+    "deterministic_route_prompt_version": "assist/v3",
+    "arms": [
+      "openai/gpt-4o"
+    ],
+    "credential_links": {
+      "agent": "agent",
+      "router": "router",
+      "pitch": "assist"
+    },
+    "delay_seconds": 0.0,
+    "tokens_per_minute_ceiling": 25000,
+    "sets": {
+      "load": {
+        "id": "c32b-agent-load/v1",
+        "size": 82
+      }
+    },
+    "point_of_sale": "43da2f6a-cb64-4067-b5c2-cd67f5a8f6b3",
+    "budgets": {
+      "iterations": 5,
+      "tool_calls": 6,
+      "concurrency": 4,
+      "prompt_tokens": 120000,
+      "observation_chars": 40000,
+      "context_chars": 48000,
+      "deadline_seconds": 20.0,
+      "pieces": 8
+    },
+    "provider_call_ceiling": 8,
+    "prices_usd_per_million": {
+      "openai/gpt-4o": [
+        2.5,
+        10.0
+      ],
+      "openai/gpt-4o-mini": [
+        0.15,
+        0.6
+      ]
+    },
+    "limit": 8,
+    "planned_requests": 8,
+    "resolved_pieces": {
+      "sin_existencias": "SKU637",
+      "disponible": "SKU530",
+      "ultimas_unidades": "SKU488",
+      "sin_ambito": "SKU01"
+    },
+    "index_compatible_documents": 1168,
+    "assortment_size": 416,
+    "skipped": [],
+    "paced_seconds": 235.2
+  },
+  "summary": {
+    "openai/gpt-4o::load": {
+      "requests": 8,
+      "partial": 0,
+      "stop_reasons": {
+        "aclaracion": 1,
+        "sin_mas_herramientas": 7
+      },
+      "tokens_prompt": {
+        "n": 8,
+        "p50": 12434.0,
+        "p95": 15451,
+        "max": 20415,
+        "mean": 12445.0
+      },
+      "tokens_total": {
+        "n": 8,
+        "p50": 12714.5,
+        "p95": 16052,
+        "max": 21297,
+        "mean": 12794.6
+      },
+      "context_chars": {
+        "n": 8,
+        "p50": 2306.5,
+        "p95": 2509,
+        "max": 14825,
+        "mean": 3563.8
+      },
+      "wall_ms": {
+        "n": 8,
+        "p50": 6473.6,
+        "p95": 10989.1,
+        "max": 16094.2,
+        "mean": 8031.9
+      },
+      "iterations": {
+        "n": 8,
+        "p50": 3.0,
+        "p95": 3.0,
+        "max": 3.0,
+        "mean": 2.8
+      },
+      "provider_calls": {
+        "n": 8,
+        "p50": 5.0,
+        "p95": 6.0,
+        "max": 6.0,
+        "mean": 4.8
+      },
+      "provider_calls_over_ceiling": 0,
+      "growth_by_turn": {
+        "1": {
+          "requests": 8,
+          "prompt_tokens_p50": 1763.5,
+          "context_chars_p50": 1665.5
+        },
+        "2": {
+          "requests": 7,
+          "prompt_tokens_p50": 2411,
+          "context_chars_p50": 2315
+        },
+        "3": {
+          "requests": 7,
+          "prompt_tokens_p50": 2760,
+          "context_chars_p50": 2315
+        }
+      },
+      "tool_usage": {
+        "buscar_catalogo": 7,
+        "buscar_sustitutos": 0,
+        "listar_familia": 1,
+        "consultar_conocimiento": 5,
+        "consultar_disponibilidad": 25,
+        "pedir_aclaracion": 1
+      },
+      "tools_never_chosen": [
+        "buscar_sustitutos"
+      ],
+      "invented_tool_names": [],
+      "failure_causes": {},
+      "pitch_ran": 7,
+      "pitch_withheld": 1,
+      "pitch_violation_causes": {
+        "dangling_citation": 4,
+        "claim_not_in_pitch": 2
+      },
+      "cost_usd_total": 0.2769,
+      "cost_usd_per_request": 0.034609
+    }
+  },
+  "pivot_rates": {},
+  "rows": [
+    {
+      "id": "L001",
+      "set": "load",
+      "arm": "openai/gpt-4o",
+      "operator_turns": 3,
+      "measures": null,
+      "expects": null,
+      "forbids": null,
+      "fixture": null,
+      "stop_reason": "aclaracion",
+      "partial": false,
+      "iterations": 1,
+      "tool_calls_used": 1,
+      "tools_invoked": [
+        "pedir_aclaracion"
+      ],
+      "invented_tools": [],
+      "abstained": false,
+      "clarified": true,
+      "warnings": [],
+      "groups": 0,
+      "citations": 0,
+      "pitch_chars": 0,
+      "pitch_withheld": false,
+      "pitch_ran": false,
+      "pitch_violations": [],
+      "pitch_initial_violations": [],
+      "pitch_withdrawn_citations": [],
+      "pitch_provider_error": null,
+      "pitch_calls": 0,
+      "prompt_tokens": 1806,
+      "completion_tokens": 19,
+      "total_tokens": 1825,
+      "provider_calls": 1,
+      "embedding_calls": 0,
+      "elapsed_ms": 16094.2,
+      "per_iteration": [
+        {
+          "iteration": 1,
+          "prompt_tokens": 1806,
+          "completion_tokens": 19,
+          "context_chars": 178,
+          "elapsed_ms": 2798.7,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "pedir_aclaracion",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "eje": "piece_type"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "L002",
+      "set": "load",
+      "arm": "openai/gpt-4o",
+      "operator_turns": 1,
+      "measures": null,
+      "expects": null,
+      "forbids": null,
+      "fixture": null,
+      "stop_reason": "sin_mas_herramientas",
+      "partial": false,
+      "iterations": 3,
+      "tool_calls_used": 6,
+      "tools_invoked": [
+        "buscar_catalogo",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad"
+      ],
+      "invented_tools": [],
+      "abstained": false,
+      "clarified": false,
+      "warnings": [],
+      "groups": 7,
+      "citations": 0,
+      "pitch_chars": 435,
+      "pitch_withheld": false,
+      "pitch_ran": true,
+      "pitch_violations": [],
+      "pitch_initial_violations": [],
+      "pitch_withdrawn_citations": [],
+      "pitch_provider_error": null,
+      "pitch_calls": 1,
+      "prompt_tokens": 12471,
+      "completion_tokens": 284,
+      "total_tokens": 12755,
+      "provider_calls": 5,
+      "embedding_calls": 1,
+      "elapsed_ms": 6187.8,
+      "per_iteration": [
+        {
+          "iteration": 1,
+          "prompt_tokens": 1721,
+          "completion_tokens": 19,
+          "context_chars": 1871,
+          "elapsed_ms": 1425.8,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "buscar_catalogo",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "consulta": "cadena de baño de oro"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 2,
+          "prompt_tokens": 2427,
+          "completion_tokens": 106,
+          "context_chars": 2509,
+          "elapsed_ms": 1641.2,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU382"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU381"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU134"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU133"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU131"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 3,
+          "prompt_tokens": 2783,
+          "completion_tokens": 43,
+          "context_chars": 2509,
+          "elapsed_ms": 819.2,
+          "discarded_chars": 214,
+          "provider_error": null,
+          "tools": []
+        }
+      ]
+    },
+    {
+      "id": "L003",
+      "set": "load",
+      "arm": "openai/gpt-4o",
+      "operator_turns": 2,
+      "measures": null,
+      "expects": null,
+      "forbids": null,
+      "fixture": null,
+      "stop_reason": "sin_mas_herramientas",
+      "partial": false,
+      "iterations": 3,
+      "tool_calls_used": 2,
+      "tools_invoked": [
+        "buscar_catalogo",
+        "listar_familia"
+      ],
+      "invented_tools": [],
+      "abstained": false,
+      "clarified": false,
+      "warnings": [],
+      "groups": 8,
+      "citations": 0,
+      "pitch_chars": 359,
+      "pitch_withheld": false,
+      "pitch_ran": true,
+      "pitch_violations": [],
+      "pitch_initial_violations": [],
+      "pitch_withdrawn_citations": [],
+      "pitch_provider_error": null,
+      "pitch_calls": 1,
+      "prompt_tokens": 12204,
+      "completion_tokens": 158,
+      "total_tokens": 12362,
+      "provider_calls": 5,
+      "embedding_calls": 1,
+      "elapsed_ms": 4781.1,
+      "per_iteration": [
+        {
+          "iteration": 1,
+          "prompt_tokens": 1763,
+          "completion_tokens": 22,
+          "context_chars": 1715,
+          "elapsed_ms": 1020.4,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "buscar_catalogo",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "consulta": "tobilleras de estilo romántico"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 2,
+          "prompt_tokens": 2411,
+          "completion_tokens": 19,
+          "context_chars": 1795,
+          "elapsed_ms": 678.6,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "listar_familia",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU1134"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 3,
+          "prompt_tokens": 2471,
+          "completion_tokens": 18,
+          "context_chars": 1795,
+          "elapsed_ms": 820.8,
+          "discarded_chars": 72,
+          "provider_error": null,
+          "tools": []
+        }
+      ]
+    },
+    {
+      "id": "L004",
+      "set": "load",
+      "arm": "openai/gpt-4o",
+      "operator_turns": 4,
+      "measures": null,
+      "expects": null,
+      "forbids": null,
+      "fixture": null,
+      "stop_reason": "sin_mas_herramientas",
+      "partial": false,
+      "iterations": 3,
+      "tool_calls_used": 6,
+      "tools_invoked": [
+        "buscar_catalogo",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad"
+      ],
+      "invented_tools": [],
+      "abstained": false,
+      "clarified": false,
+      "warnings": [],
+      "groups": 8,
+      "citations": 0,
+      "pitch_chars": 0,
+      "pitch_withheld": true,
+      "pitch_ran": true,
+      "pitch_violations": [
+        "dangling_citation",
+        "dangling_citation",
+        "dangling_citation",
+        "dangling_citation"
+      ],
+      "pitch_initial_violations": [
+        "dangling_citation",
+        "dangling_citation",
+        "dangling_citation",
+        "dangling_citation"
+      ],
+      "pitch_withdrawn_citations": [],
+      "pitch_provider_error": null,
+      "pitch_calls": 2,
+      "prompt_tokens": 15451,
+      "completion_tokens": 601,
+      "total_tokens": 16052,
+      "provider_calls": 6,
+      "embedding_calls": 1,
+      "elapsed_ms": 8563.5,
+      "per_iteration": [
+        {
+          "iteration": 1,
+          "prompt_tokens": 1847,
+          "completion_tokens": 20,
+          "context_chars": 1702,
+          "elapsed_ms": 880.9,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "buscar_catalogo",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "consulta": "anillos estilo étnico"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 2,
+          "prompt_tokens": 2491,
+          "completion_tokens": 107,
+          "context_chars": 2349,
+          "elapsed_ms": 1055.4,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU618"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU962"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU607"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU1004"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU958"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 3,
+          "prompt_tokens": 2849,
+          "completion_tokens": 67,
+          "context_chars": 2349,
+          "elapsed_ms": 1212.1,
+          "discarded_chars": 315,
+          "provider_error": null,
+          "tools": []
+        }
+      ]
+    },
+    {
+      "id": "L005",
+      "set": "load",
+      "arm": "openai/gpt-4o",
+      "operator_turns": 2,
+      "measures": null,
+      "expects": null,
+      "forbids": null,
+      "fixture": null,
+      "stop_reason": "sin_mas_herramientas",
+      "partial": false,
+      "iterations": 3,
+      "tool_calls_used": 6,
+      "tools_invoked": [
+        "buscar_catalogo",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad"
+      ],
+      "invented_tools": [],
+      "abstained": false,
+      "clarified": false,
+      "warnings": [],
+      "groups": 8,
+      "citations": 0,
+      "pitch_chars": 301,
+      "pitch_withheld": false,
+      "pitch_ran": true,
+      "pitch_violations": [],
+      "pitch_initial_violations": [],
+      "pitch_withdrawn_citations": [],
+      "pitch_provider_error": null,
+      "pitch_calls": 1,
+      "prompt_tokens": 12397,
+      "completion_tokens": 277,
+      "total_tokens": 12674,
+      "provider_calls": 5,
+      "embedding_calls": 1,
+      "elapsed_ms": 6759.4,
+      "per_iteration": [
+        {
+          "iteration": 1,
+          "prompt_tokens": 1763,
+          "completion_tokens": 20,
+          "context_chars": 1601,
+          "elapsed_ms": 1572.4,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "buscar_catalogo",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "consulta": "acero estilo vintage para fiesta"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 2,
+          "prompt_tokens": 2368,
+          "completion_tokens": 106,
+          "context_chars": 2241,
+          "elapsed_ms": 1684.1,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU500"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU601"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU518"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU370"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU506"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 3,
+          "prompt_tokens": 2723,
+          "completion_tokens": 67,
+          "context_chars": 2241,
+          "elapsed_ms": 1438.4,
+          "discarded_chars": 330,
+          "provider_error": null,
+          "tools": []
+        }
+      ]
+    },
+    {
+      "id": "L006",
+      "set": "load",
+      "arm": "openai/gpt-4o",
+      "operator_turns": 5,
+      "measures": null,
+      "expects": null,
+      "forbids": null,
+      "fixture": null,
+      "stop_reason": "sin_mas_herramientas",
+      "partial": false,
+      "iterations": 3,
+      "tool_calls_used": 6,
+      "tools_invoked": [
+        "buscar_catalogo",
+        "consultar_conocimiento",
+        "consultar_conocimiento",
+        "consultar_conocimiento",
+        "consultar_conocimiento",
+        "consultar_conocimiento"
+      ],
+      "invented_tools": [],
+      "abstained": false,
+      "clarified": false,
+      "warnings": [],
+      "groups": 8,
+      "citations": 1,
+      "pitch_chars": 718,
+      "pitch_withheld": false,
+      "pitch_ran": true,
+      "pitch_violations": [
+        "claim_not_in_pitch"
+      ],
+      "pitch_initial_violations": [
+        "claim_not_in_pitch",
+        "claim_not_in_pitch"
+      ],
+      "pitch_withdrawn_citations": [
+        "niquel-y-piel-sensible#que-es-la-dermatitis-de-contacto"
+      ],
+      "pitch_provider_error": null,
+      "pitch_calls": 2,
+      "prompt_tokens": 20415,
+      "completion_tokens": 882,
+      "total_tokens": 21297,
+      "provider_calls": 6,
+      "embedding_calls": 6,
+      "elapsed_ms": 10989.1,
+      "per_iteration": [
+        {
+          "iteration": 1,
+          "prompt_tokens": 1889,
+          "completion_tokens": 24,
+          "context_chars": 1611,
+          "elapsed_ms": 1315.8,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "buscar_catalogo",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "consulta": "joyas de acero estilo boho para piel sensible"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 2,
+          "prompt_tokens": 2499,
+          "completion_tokens": 156,
+          "context_chars": 14825,
+          "elapsed_ms": 2083.2,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "consultar_conocimiento",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "pregunta": "¿Es adecuado para piel sensible?",
+                "sku": "SKU370"
+              }
+            },
+            {
+              "tool": "consultar_conocimiento",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "pregunta": "¿Es adecuado para piel sensible?",
+                "sku": "SKU497"
+              }
+            },
+            {
+              "tool": "consultar_conocimiento",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "pregunta": "¿Es adecuado para piel sensible?",
+                "sku": "SKU957"
+              }
+            },
+            {
+              "tool": "consultar_conocimiento",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "pregunta": "¿Es adecuado para piel sensible?",
+                "sku": "SKU929"
+              }
+            },
+            {
+              "tool": "consultar_conocimiento",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "pregunta": "¿Es adecuado para piel sensible?",
+                "sku": "SKU518"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 3,
+          "prompt_tokens": 6116,
+          "completion_tokens": 224,
+          "context_chars": 14825,
+          "elapsed_ms": 2179.8,
+          "discarded_chars": 997,
+          "provider_error": null,
+          "tools": []
+        }
+      ]
+    },
+    {
+      "id": "L007",
+      "set": "load",
+      "arm": "openai/gpt-4o",
+      "operator_turns": 2,
+      "measures": null,
+      "expects": null,
+      "forbids": null,
+      "fixture": null,
+      "stop_reason": "sin_mas_herramientas",
+      "partial": false,
+      "iterations": 3,
+      "tool_calls_used": 6,
+      "tools_invoked": [
+        "buscar_catalogo",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad"
+      ],
+      "invented_tools": [],
+      "abstained": false,
+      "clarified": false,
+      "warnings": [],
+      "groups": 8,
+      "citations": 0,
+      "pitch_chars": 368,
+      "pitch_withheld": false,
+      "pitch_ran": true,
+      "pitch_violations": [],
+      "pitch_initial_violations": [],
+      "pitch_withdrawn_citations": [],
+      "pitch_provider_error": null,
+      "pitch_calls": 1,
+      "prompt_tokens": 12493,
+      "completion_tokens": 318,
+      "total_tokens": 12811,
+      "provider_calls": 5,
+      "embedding_calls": 1,
+      "elapsed_ms": 5787.1,
+      "per_iteration": [
+        {
+          "iteration": 1,
+          "prompt_tokens": 1764,
+          "completion_tokens": 24,
+          "context_chars": 1674,
+          "elapsed_ms": 1107.5,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "buscar_catalogo",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "consulta": "joyas de oro estilo romántico para uso diario"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 2,
+          "prompt_tokens": 2401,
+          "completion_tokens": 107,
+          "context_chars": 2315,
+          "elapsed_ms": 1390.5,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU603"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU591"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU607"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU1082"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU615"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 3,
+          "prompt_tokens": 2760,
+          "completion_tokens": 77,
+          "context_chars": 2315,
+          "elapsed_ms": 1156.7,
+          "discarded_chars": 328,
+          "provider_error": null,
+          "tools": []
+        }
+      ]
+    },
+    {
+      "id": "L008",
+      "set": "load",
+      "arm": "openai/gpt-4o",
+      "operator_turns": 1,
+      "measures": null,
+      "expects": null,
+      "forbids": null,
+      "fixture": null,
+      "stop_reason": "sin_mas_herramientas",
+      "partial": false,
+      "iterations": 3,
+      "tool_calls_used": 6,
+      "tools_invoked": [
+        "buscar_catalogo",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad",
+        "consultar_disponibilidad"
+      ],
+      "invented_tools": [],
+      "abstained": false,
+      "clarified": false,
+      "warnings": [],
+      "groups": 7,
+      "citations": 0,
+      "pitch_chars": 335,
+      "pitch_withheld": false,
+      "pitch_ran": true,
+      "pitch_violations": [],
+      "pitch_initial_violations": [],
+      "pitch_withdrawn_citations": [],
+      "pitch_provider_error": null,
+      "pitch_calls": 1,
+      "prompt_tokens": 12323,
+      "completion_tokens": 258,
+      "total_tokens": 12581,
+      "provider_calls": 5,
+      "embedding_calls": 1,
+      "elapsed_ms": 5093.1,
+      "per_iteration": [
+        {
+          "iteration": 1,
+          "prompt_tokens": 1725,
+          "completion_tokens": 20,
+          "context_chars": 1657,
+          "elapsed_ms": 1188.1,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "buscar_catalogo",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "consulta": "colgantes en tono blanco"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 2,
+          "prompt_tokens": 2356,
+          "completion_tokens": 107,
+          "context_chars": 2298,
+          "elapsed_ms": 961.6,
+          "discarded_chars": 0,
+          "provider_error": null,
+          "tools": [
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU1152"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU134"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU122"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU342"
+              }
+            },
+            {
+              "tool": "consultar_disponibilidad",
+              "ok": true,
+              "cause": null,
+              "arguments": {
+                "sku": "SKU341"
+              }
+            }
+          ]
+        },
+        {
+          "iteration": 3,
+          "prompt_tokens": 2714,
+          "completion_tokens": 26,
+          "context_chars": 2298,
+          "elapsed_ms": 774.8,
+          "discarded_chars": 113,
+          "provider_error": null,
+          "tools": []
+        }
+      ]
+    }
+  ]
+}

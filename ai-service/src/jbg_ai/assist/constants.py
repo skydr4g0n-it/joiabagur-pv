@@ -406,11 +406,24 @@ TOOL_CAUSE_UNUSABLE_REFERENCE = "referencia_no_utilizable"
 #: tool, which is a different decision from reformulating, so it is a different code.
 TOOL_CAUSE_DEPENDENCY_UNAVAILABLE = "dependencia_no_disponible"
 
+#: **The fifth, added by C32b, and the only one a tool never emits.** The consumer refused the
+#: call because the request's tool budget was spent, so nothing was executed and **no port was
+#: touched**. It lives in this vocabulary rather than in one of the loop's own because it
+#: reaches the model in exactly the same place the other four do — as the cause of a failed
+#: observation — and a consumer that had to read two vocabularies to branch on one field would
+#: be reading the seam rather than the answer.
+#:
+#: It exists because the alternative leaves the model blind in the one situation where it can
+#: still act usefully: silently dropping the calls that do not fit returns a turn with fewer
+#: observations than calls requested, which is indistinguishable from a tool that failed.
+TOOL_CAUSE_BUDGET_EXHAUSTED = "presupuesto_agotado"
+
 TOOL_FAILURE_CAUSES: tuple[str, ...] = (
     TOOL_CAUSE_INVALID_ARGUMENT,
     TOOL_CAUSE_UNKNOWN_REFERENCE,
     TOOL_CAUSE_UNUSABLE_REFERENCE,
     TOOL_CAUSE_DEPENDENCY_UNAVAILABLE,
+    TOOL_CAUSE_BUDGET_EXHAUSTED,
 )
 
 #: Candidates one catalogue search may return, as the tool's schema declares them. **A declared
@@ -453,3 +466,254 @@ WRITE_METHOD_VERBS: frozenset[str] = frozenset(
 #: client that **can** issue it, which is what the third axis of the read-only check refuses —
 #: the question is what the object is able to do, never what it happens to do today.
 WRITE_HTTP_VERBS: frozenset[str] = frozenset({"post", "put", "patch", "delete"})
+
+
+# --- C32b · the agent loop -------------------------------------------------------------------
+
+#: The prompt of the **loop**, versioned apart from the argument's for the reason the
+#: classifier's already is: it is another call, with another output and another model, and a
+#: single version field would make either figure unreadable the first time one of the two
+#: moved. The path is **derived** from this value in `assist/agent.py`, never named beside it.
+AGENT_PROMPT_VERSION = "agent/v1"
+
+#: The prompt the argument runs with **on this route**, and `assist/v3` stays on disk untouched.
+#: The evidence payload of the loop carries a field v3 never described — the marker that tells a
+#: substitute from a catalogue match — so the text that reads it moves to a new version instead
+#: of being edited in place: the 120 generations C30b measured against v3, and the 89 of C31,
+#: have to stay interpretable. Same precedent, same reason, third time.
+#:
+#: `PROMPT_VERSION` above is **unchanged and still what `POST /v1/assist/sale` reports**. The two
+#: travel as separate values on the agent's response.
+AGENT_PITCH_PROMPT_VERSION = "assist/v4"
+
+#: The model that runs the loop. A **setting with its own variable**, and it never inherits the
+#: argument's nor the classifier's: choosing *which tool* is a harder call than choosing *which
+#: label*, and sharing a variable would make any comparison of cost between the three false —
+#: the argument C30b made against C09's and C31 made against C30b's, applied a third time.
+#:
+#: **Opened at `gpt-4o` and declared as a choice to be measured, not as a preference.** C31
+#: measured `gpt-4o-mini` silencing three answerable queries of 119 where `gpt-4o` silenced none
+#: with no prompt change at all, and tool selection is the harder task. The cheap arm is run in
+#: the same pass over the same two sets, because the fourfold of model in the cost arithmetic is
+#: a variable and not a law: if it holds the selection it is one environment variable away.
+DEFAULT_AGENT_MODEL = "openai/gpt-4o"
+
+#: Seconds **one** provider call of the loop may take. Per call and never per request: a request
+#: makes up to five of them and measuring the total against a one-call limit is how a small cut
+#: reads as a large one, the mistake `PITCH_TIMEOUT_SECONDS` already names.
+#:
+#: **Declared NOT calibrated**, in the position `ROUTER_TIMEOUT_SECONDS` occupies and for the
+#: same reason: there is no latency distribution of a tool-calling turn behind it. It is an
+#: upper bound taken from the wall-clock budget divided by the iteration ceiling, not a budget.
+AGENT_TIMEOUT_SECONDS = 8.0
+
+#: Turns of the loop one request may take. The guard of the loop, with an explicit exhaustion
+#: branch rather than a silent fall-through: a loop that ends by running out of range and a loop
+#: that ends because the model finished are two different answers to the consumer.
+MAX_AGENT_ITERATIONS = 5
+
+#: Tool executions one request may pay for, accumulated **across** turns and not per turn. A
+#: per-turn cap would let five turns of four calls through, which is twenty.
+#:
+#: **Opened at six by the change's ficha and moved to eight by the pass**, run
+#: `293fe5c6e470` over 102 requests on `gpt-4o`: p50 **2**, p95 **5**, and **4 of 102 (3,9 %)**
+#: at the ceiling. Eight is p95 plus three.
+#:
+#: **What the measurement does NOT say, and it matters:** of the four requests the ceiling
+#: truncated, nobody knows how many calls they would have used — the ceiling cut them. So
+#: eight is a judgement informed by the distribution, not a measurement of the untruncated
+#: need, and it is written here as such.
+#:
+#: The number also has to fit the one sequence this capability exists for. A full pivot is a
+#: search, the availability of the piece to be offered, the substitutes call and the
+#: availability of at most two of them: **five**, which left one spare under six and leaves
+#: three under eight. That budget was being spent before `agent/v1` told the loop to check the
+#: availability of the piece it will offer rather than of every candidate — with five
+#: candidates that pattern cost exactly six calls and the pivot never happened.
+MAX_AGENT_TOOL_CALLS = 8
+
+#: Tool calls of a single turn that may run at once. **Four, and the number comes from the tree
+#: rather than from taste**: the connection pool is five with no overflow and each search opens
+#: its own session, so six concurrent tools queue against themselves and the last waits out
+#: `pool_timeout` — which reads like an unavailable database rather than like self-inflicted
+#: contention.
+MAX_AGENT_CONCURRENT_TOOL_CALLS = 4
+
+#: **The ceiling of one agent request, and it is derived from the constants of its three stages
+#: rather than written as a digit**: one classification, at most one decision per loop turn, and
+#: the argument with its single repair. A change to any of the three cannot leave a stale
+#: literal behind, and an assertion at the close reads the accumulated figure against it — the
+#: property C31 delivered for three, one layer up.
+MAX_AGENT_PROVIDER_CALLS = (
+    MAX_ROUTER_PROVIDER_CALLS + MAX_AGENT_ITERATIONS + MAX_PITCH_PROVIDER_CALLS
+)
+
+#: Accumulated **prompt** tokens after which the loop stops. Enforced **after** a turn and not
+#: before one, and that is a dependency decision rather than a preference: enforcing it
+#: beforehand needs a tokeniser, which `openspec/project.md` does not document as a dependency
+#: of this service. The pair «characters before, tokens after» gives a deterministic bound that
+#: can be evaluated in advance plus a cut that can overshoot by **at most one turn** — and that
+#: turn is itself bounded by the other five budgets.
+#:
+#: **What it compares is the classifier plus the loop**, because that is what has accumulated
+#: when the check runs: the argument is generated after the loop and never reaches it. The first
+#: calibration of this budget read the request's whole `prompt_tokens`, argument included, which
+#: is a different quantity (p95 18.781) — found by the independent verification of C32b.
+#:
+#: **Fixed by measurement, over the quantity it governs.** Run `293fe5c6e470`, 102 requests on
+#: `gpt-4o`: classifier plus loop prompt tokens **p50 10.622 · p95 16.244 · max 18.260**; on the
+#: cheap arm p95 16.298 and max 22.019 (`--rescore`, with the classifier's share derived from
+#: the artefact's own requests that ran no argument). The placeholder this replaces was
+#: 120.000, loose on purpose so the pass could see a request whole, and useless as a budget.
+#:
+#: Forty thousand is ~2,5 x that p95 and ~1,8 x the largest request either arm produced, with
+#: room for the tool ceiling having moved from six to eight. A budget is there to stop a loop
+#: that runs away, not to trim the tail of ordinary traffic: nothing observed comes near it,
+#: and a request that did would be reporting something this pass never saw.
+AGENT_TOKEN_BUDGET = 40_000
+
+#: Characters of accumulated observations, evaluated **before** a turn is sent. The section that
+#: grows: every observation is re-sent on every later turn, so this is the budget that actually
+#: governs the cost of a loop, and it is the deterministic half of the pair above.
+#:
+#: **Fixed by the same run: p50 1.847 · p95 4.709 · max 17.053.** The placeholder was 40.000,
+#: 8,5 times the p95. Thirty thousand is ~1,8 x the largest observed accumulation and leaves
+#: margin for the tool ceiling having moved from six to eight, which is the change that makes
+#: this section grow.
+AGENT_OBSERVATION_BUDGET_CHARS = 30_000
+
+#: Characters of the whole context — the transcript section plus the observation section — so
+#: that a long conversation cannot eat the budget of the evidence, which is where the answer is.
+#: **Per section and also global**, which is why there are three numbers here and not one.
+#:
+#: The observation budget plus the transcript's own maximum plus a margin. **With these default
+#: values the global bound cannot bind**: observations stop at 30.000 and a transcript cannot
+#: exceed `MAX_TRANSCRIPT_CHARS`, so the sum never reaches 36.000. That is deliberate and it is
+#: not decoration: lowering the global below the sum would let a long transcript eat the
+#: evidence's budget, which is what Q-4 forbade. It binds when a sweep raises the observation
+#: budget through `AgentBudgets`, which is the one configuration in which nothing else would
+#: bound the context, and a test drives that branch rather than leaving it unexecuted.
+AGENT_CONTEXT_BUDGET_CHARS = 36_000
+
+#: Seconds the **whole request** may take, argument included — **plus, at most, the tool calls
+#: of the turn in flight**, which are not cancelled mid-query because cancelling a session in a
+#: pool of five with no overflow invalidates the connection. A deadline and not a per-call
+#: timeout: without one, the worst case is five turns at the provider's own timeout plus the
+#: tools plus the generation, which goes well past the latency this route declares.
+#:
+#: **How it is held.** The loop runs against the deadline **minus the argument's reserve**
+#: (`AGENT_PITCH_RESERVE_SECONDS`), and the provider call of every turn is bounded by whatever is
+#: left of that, so a turn in flight is cut by the clock rather than allowed to spend its own
+#: timeout past it. The argument then has its reserve. Until the independent verification of
+#: C32b the clock was only checked **before** a turn, so a turn started at 14,9 s ran its full
+#: timeout and the argument ran after it: a request with a 0,2 s deadline took 0,479 s, and the
+#: worst case by construction was 15 + 8 + 2 x 4 = 31 s plus the tools.
+#:
+#: **Fixed by measurement.** Run `293fe5c6e470`, 102 requests on `gpt-4o`: **p50 5,3 s · p95
+#: 9,0 s · max 11,9 s** end to end; on the cheap arm p95 10,3 s and max 14,3 s. The split is what
+#: makes the reserve free: on `gpt-4o` the loop alone takes **p95 4,7 s · max 5,8 s** and the
+#: classifier plus the argument **p95 5,2 s · max 8,0 s**. With seven seconds for the loop, **0
+#: of 102** `gpt-4o` requests and 3 of 102 on the cheap arm would have been cut.
+#:
+#: Exceeding it is a degradation and not a failure: the evidence gathered so far is served and
+#: the response says the clock stopped it.
+AGENT_DEADLINE_SECONDS = 15.0
+
+#: Seconds of the deadline **reserved for the argument**: its two provider calls at their own
+#: timeout. **Derived from the constants of that stage and never written as a digit**, like the
+#: provider-call ceiling — a change to either cannot leave a stale reserve behind. The route
+#: recomputes it from the configured timeout, because that is the value its client actually uses.
+AGENT_PITCH_RESERVE_SECONDS = MAX_PITCH_PROVIDER_CALLS * PITCH_TIMEOUT_SECONDS
+
+#: Distinct pieces that may reach the generation payload, however many turns saw them. The rule
+#: is C30b's and it is about the numeric gate, not about tidiness: **every field handed over
+#: widens the whitelist of admissible numerals**, and the gate measured zero violations over a
+#: payload carrying one SKU. A loop that searched five times could otherwise hand over fifty.
+MAX_AGENT_PIECES = 8
+
+#: Where a group of the evidence payload came from. **A closed vocabulary of two**, because a
+#: substitute and a match are different things to say to a customer and a payload that flattened
+#: them would let the argument offer a second best as though it were what was asked for.
+GROUP_ORIGIN_CATALOGUE = "catalogo"
+GROUP_ORIGIN_SUBSTITUTES = "sustitutos"
+
+GROUP_ORIGINS: tuple[str, ...] = (GROUP_ORIGIN_CATALOGUE, GROUP_ORIGIN_SUBSTITUTES)
+
+#: Why the loop stopped. **A closed vocabulary, and never deduced by the consumer from the
+#: counters**: «five iterations» does not say whether the fifth was the last one needed or the
+#: one that ran out, and those are opposite statements about the answer being read.
+STOP_NO_MORE_TOOLS = "sin_mas_herramientas"
+STOP_ITERATION_BUDGET = "presupuesto_iteraciones"
+STOP_TOOL_BUDGET = "presupuesto_tools"
+STOP_TOKEN_BUDGET = "presupuesto_tokens"
+STOP_CONTEXT_BUDGET = "presupuesto_contexto"
+STOP_CLOCK_BUDGET = "presupuesto_reloj"
+STOP_CLARIFICATION = "aclaracion"
+
+#: The reason a request that never entered the loop reports. **Not one of the budget values and
+#: not `sin_mas_herramientas` either**: the guardrail refused before any turn, so saying the
+#: model stopped asking for tools would describe a loop that never ran.
+STOP_REFUSED = "rechazado"
+
+#: And the one a deployment with no agent credential reports, which is the fail-open, the
+#: ablation and the rollback in one. Distinct from a refusal for the same reason the two refusal
+#: codes are distinct from each other: they are different sentences for whoever reads them.
+STOP_NO_CLIENT = "sin_cliente"
+
+#: **The turn died in the provider**, and this value exists because a measurement found its
+#: absence. C32b's first provider pass hit a rate limit on request six and every one after it
+#: came back reporting `sin_mas_herramientas` with `partial: false` — that is, «the model
+#: finished asking for tools» about a request whose call never arrived, indistinguishable from a
+#: complete response. How many is not known: the run left no artefact, and the two counts written
+#: down from its console (46 and 64) disagree.
+#:
+#: A fault costs the turn and not the request: whatever earlier turns gathered is still served.
+#: But an answer built on a loop that was cut short is not the answer an unhurried request would
+#: have produced, so it is **partial**, and the reason says which of the endings it was.
+STOP_PROVIDER_ERROR = "fallo_proveedor"
+
+AGENT_STOP_REASONS: tuple[str, ...] = (
+    STOP_NO_MORE_TOOLS,
+    STOP_ITERATION_BUDGET,
+    STOP_TOOL_BUDGET,
+    STOP_TOKEN_BUDGET,
+    STOP_CONTEXT_BUDGET,
+    STOP_CLOCK_BUDGET,
+    STOP_CLARIFICATION,
+    STOP_REFUSED,
+    STOP_NO_CLIENT,
+    STOP_PROVIDER_ERROR,
+)
+
+#: The stop reasons that mean a budget cut the request short. Held apart so «partial exactly
+#: when a budget stopped it» is a membership test rather than a list restated at each site.
+AGENT_BUDGET_STOP_REASONS: tuple[str, ...] = (
+    STOP_ITERATION_BUDGET,
+    STOP_TOOL_BUDGET,
+    STOP_TOKEN_BUDGET,
+    STOP_CONTEXT_BUDGET,
+    STOP_CLOCK_BUDGET,
+)
+
+#: Turns a transcript may carry, and the two length caps that go with it. **Part of the contract
+#: and not an implementation detail**: carrying the conversation in the request is what lets this
+#: service store nothing between calls, and the price of that is that the client now controls the
+#: factor that dominates the cost of a loop. `MAX_TURN_CHARS` is the cap the single-query field
+#: already declares, so one turn of a conversation cannot be longer than one query of the other
+#: route.
+MAX_TRANSCRIPT_TURNS = 12
+MAX_TURN_CHARS = 500
+MAX_TRANSCRIPT_CHARS = 4_000
+
+#: Who a turn is attributed to. **`asistente` is attributed and never trusted**: the client
+#: composed the whole request and can forge that label, so a turn carrying it is client-supplied
+#: data under exactly the rules the operator's own words are under.
+#:
+#: Spanish, like every vocabulary this layer added since C32a and for the same reason its
+#: implementation report recorded: the neighbours in this file — tool names, availability
+#: labels, failure causes, stop reasons — are Spanish, and reading `asistente` beside
+#: `out_of_domain` would be reading two vocabularies where there is one.
+TURN_ROLE_OPERATOR = "operario"
+TURN_ROLE_ASSISTANT = "asistente"
+
+TURN_ROLES: tuple[str, ...] = (TURN_ROLE_OPERATOR, TURN_ROLE_ASSISTANT)

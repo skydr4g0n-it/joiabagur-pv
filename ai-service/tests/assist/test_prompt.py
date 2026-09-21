@@ -108,12 +108,18 @@ def test_every_assist_prompt_version_is_preserved_with_its_measurement() -> None
     **measured a 75 % rejection rate in the free-query mode, all of it `dangling_citation` and
     none of it figures**, and v3 is the one-paragraph fix that measurement produced. A version
     that fails and is then deleted is a measurement nobody can repeat.
+
+    **Four since C32b, and the fourth did not move `PROMPT_VERSION`.** `assist/v4` exists
+    because the agent loop's evidence payload carries a field v3 never described, and it is
+    loaded by that route only: `POST /v1/assist/sale` still runs v3, which is exactly what
+    keeps the 120 generations of C30b and the 89 of C31 interpretable. Adding a version rather
+    than editing a file is the rule, applied a third time.
     """
     directory = AI_SERVICE_ROOT / "prompts" / "assist"
     versions = sorted(path.name for path in directory.glob("*.md"))
 
-    assert versions == ["v1.md", "v2.md", "v3.md"]
-    assert PROMPT_VERSION == "assist/v3", "the version the service actually runs"
+    assert versions == ["v1.md", "v2.md", "v3.md", "v4.md"]
+    assert PROMPT_VERSION == "assist/v3", "the version the DETERMINISTIC route actually runs"
     for name in versions:
         text = (directory / name).read_text(encoding="utf-8")
         assert text.splitlines()[0].strip() == f"# assist/{name[:-3]}"

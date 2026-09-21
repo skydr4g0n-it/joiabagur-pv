@@ -6,6 +6,9 @@ from datetime import UTC, datetime
 
 from jbg_ai.api.auth import ServicePrincipal
 from jbg_ai.api.schemas.assist import (
+    AgentAssistRequest,
+    AgentAssistResponse,
+    AgentUsage,
     AssistGroup,
     AssistGroupMember,
     AssistRequest,
@@ -63,6 +66,7 @@ from jbg_ai.api.schemas.retrieval import (
 from jbg_ai.assist.constants import (
     INTENT_PRODUCT_PITCH,
     INTENT_UNCLASSIFIED,
+    STOP_NO_CLIENT,
     WARNING_FAMILY_HAS_VARIANTS,
     WARNING_SIZE_LABEL_MISSING,
 )
@@ -597,4 +601,59 @@ def families_audit_stub(
         families_reviewed_count=1,
         members_examined_count=2,
         trace_id=principal.trace_id,
+    )
+
+
+def assist_agent_stub(
+    request: AgentAssistRequest, principal: ServicePrincipal
+) -> AgentAssistResponse:
+    """The agent route's fixture. Still a pure function of its input, and still no loop.
+
+    **This route declares stub behaviour because every `/v1` route does**, and being the one
+    exception would be the thing a client discovers in integration. So the body has the
+    shape a client renders — groups, citations and an argument with the two placeholders —
+    as the stub of `POST /v1/assist/sale` does. What it does not pretend is a loop: the stub
+    runs none and calls no provider, so the trace has **zero iterations** and the stop reason
+    is the one that says the loop did not run — the one a deployment with no agent credential
+    reports, because it is the same fact. `partial: true` follows from that, for the reason
+    the credential-less path gives: no loop gathered the evidence this body shows.
+
+    **The warnings are the ones this route can emit, which here is none.** The route reports
+    a refusal code on a refusal and nothing else; the two rule-derived warnings of C30a are
+    statements about an anchored piece this route does not read. The first form of this stub
+    emitted both, so a client integrating against it would have handled codes that never
+    arrive — found by the independent verification of C32b.
+    """
+    answered = next(
+        (turn.text for turn in reversed(request.turns) if turn.role == "operario"),
+        request.turns[-1].text,
+    )
+    groups = [_assist_group(index) for index in range(request.top_k)]
+    citations = [
+        _assist_citation(index, group.members[0].product_id)
+        for index, group in enumerate(groups)
+    ]
+    warnings: list[str] = []
+    return AgentAssistResponse(
+        intent=INTENT_UNCLASSIFIED,
+        groups=groups,
+        pitch=(
+            f"Para «{answered}» te encajan {len(groups)} familias. "
+            f"Precio {PRICE_PLACEHOLDER} y quedan {STOCK_PLACEHOLDER} unidades "
+            "en tu punto de venta."
+        ),
+        citations=citations,
+        warnings=warnings,
+        clarification_question=None,
+        usage=AgentUsage(),
+        abstained=False,
+        prompt_version=None,
+        partial=True,
+        stop_reason=STOP_NO_CLIENT,
+        iterations=0,
+        tool_calls_used=0,
+        trace=[],
+        agent_prompt_version=None,
+        trace_id=principal.trace_id,
+        effective_pos_id=principal.pos_id,
     )

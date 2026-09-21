@@ -1,6 +1,346 @@
 {
   "components": {
     "schemas": {
+      "AgentAssistRequest": {
+        "description": "A conversation to answer, and the caps that bound it. C32b.\n\n**The transcript travels in the request because this service stores nothing between\ncalls** — the property the generation and routing capabilities already hold with tests,\nwhich a session store would collide with head-on. The price is that the client now\ncontrols the factor that dominates the cost of a loop, which is why the three caps are\npart of the contract rather than an implementation detail.",
+        "properties": {
+          "context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssistContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "locale": {
+            "default": "es-ES",
+            "title": "Locale",
+            "type": "string"
+          },
+          "pos_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Accepted for client compatibility and ignored; scope comes from the token",
+            "title": "Pos Id"
+          },
+          "top_k": {
+            "default": 5,
+            "description": "Families wanted after hydration",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Top K",
+            "type": "integer"
+          },
+          "turns": {
+            "description": "The conversation so far, oldest first. At least one turn must be the operator's: the one being answered is the last of those, because a client that appends its own account of the reply must not move what the request is asking",
+            "items": {
+              "$ref": "#/components/schemas/AgentTurn"
+            },
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "Turns",
+            "type": "array"
+          }
+        },
+        "required": [
+          "turns"
+        ],
+        "title": "AgentAssistRequest",
+        "type": "object"
+      },
+      "AgentAssistResponse": {
+        "description": "What `POST /v1/assist/agent` returns: the deterministic shape **plus** five fields.\n\n**A subclass and not an independent model, and that is the whole value of the cut.** The\ncomparison this capability exists to enable runs both routes over the same set, so it has\nto be a difference of fields rather than a translation between two shapes: every field of\nthe deterministic response is present here with the same meaning, and what the agent adds\nare additions.",
+        "properties": {
+          "abstained": {
+            "description": "The retrieval's abstention rule decided the catalogue cannot answer this query, so no group is returned. Emitted in every mode — constantly false for a piece with no question, where there is no retrieval to abstain from — and deliberately **not** `low_confidence`, whose measured meaning is cross-branch consensus and fires on answerable queries far more often than on out-of-domain ones",
+            "title": "Abstained",
+            "type": "boolean"
+          },
+          "agent_prompt_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Version of the **loop's** prompt, reported apart from `prompt_version`, which keeps the meaning it already has: the version the argument was written with. Two calls with different outputs and potentially different models, so a single field would make either figure unreadable the first time one of the two moved. Null when no loop ran",
+            "title": "Agent Prompt Version"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "clarification_question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A question back to the operator when the classifier found the query carries too little to search with, naming the axis it left out. Null in every other case, including a refusal. Selected in code from a closed catalogue of es-ES templates and never written by the model: the field is typed as prose rather than as a code, so the presentation layer cannot resolve it, and two requests carrying the same query produce exactly the same text",
+            "title": "Clarification Question"
+          },
+          "effective_pos_id": {
+            "description": "Scope applied by the handler; always the token claim, never the body value",
+            "title": "Effective Pos Id",
+            "type": "string"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/AssistGroup"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "intent": {
+            "description": "Closed vocabulary of the assistance capability: product_pitch, in_domain, out_of_domain, not_in_catalogue, unclassified. `product_pitch` for a piece with no question, derived from the request shape and unchanged since C30a. For a free query it is the verdict C31's classifier reached before retrieving anything: `in_domain` admitted, `out_of_domain` not this business, `not_in_catalogue` jewellery this catalogue does not stock. `unclassified` means no classification was made — no classifier ran, or one ran and could not be used — and the request was served exactly as it was before this capability routed anything",
+            "title": "Intent",
+            "type": "string"
+          },
+          "iterations": {
+            "description": "Turns of the loop that ran; zero when it never started",
+            "minimum": 0.0,
+            "title": "Iterations",
+            "type": "integer"
+          },
+          "partial": {
+            "description": "The answer is not the one an unhurried request would have produced: a declared budget cut the loop short, or no agent credential is configured and nothing was gathered. **False for a refusal**, which is a complete answer to a request this shop will not serve, and false when the model simply stopped asking for tools",
+            "title": "Partial",
+            "type": "boolean"
+          },
+          "pitch": {
+            "description": "Generated prose with unresolved {{price}} / {{stock}} placeholders",
+            "title": "Pitch",
+            "type": "string"
+          },
+          "prompt_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Version of the prompt the generation layer ran with; null when it did not run",
+            "title": "Prompt Version"
+          },
+          "stop_reason": {
+            "description": "Why the loop stopped, from a closed vocabulary: sin_mas_herramientas, presupuesto_iteraciones, presupuesto_tools, presupuesto_tokens, presupuesto_contexto, presupuesto_reloj, aclaracion, rechazado, sin_cliente, fallo_proveedor. **Always present and never to be inferred from the counters**: five iterations does not say whether the fifth was the last one needed or the one that ran out, and those are opposite statements about the answer being read",
+            "title": "Stop Reason",
+            "type": "string"
+          },
+          "tool_calls_used": {
+            "description": "Tool executions this request paid for, accumulated across turns. Calls refused for want of budget are counted in neither this figure nor the tool budget: no port was touched for them",
+            "minimum": 0.0,
+            "title": "Tool Calls Used",
+            "type": "integer"
+          },
+          "trace": {
+            "description": "Per iteration: the tools invoked, whether each succeeded and with what cause if not, plus what the iteration cost and how long it took. **Always present and bounded** rather than requested by a parameter, which would create two response shapes to test. It carries no tool argument and no observation content; a richer trace is available in process to a caller that embeds this layer directly",
+            "items": {
+              "$ref": "#/components/schemas/AgentTraceIteration"
+            },
+            "title": "Trace",
+            "type": "array"
+          },
+          "trace_id": {
+            "description": "Correlation id, from the token claim when present",
+            "title": "Trace Id",
+            "type": "string"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/AgentUsage"
+          },
+          "warnings": {
+            "description": "Rule-derived codes, from the closed vocabulary of the assistance capability: family_has_variants, size_label_missing, query_out_of_domain, query_not_in_catalogue, knowledge_not_covered. Never a sentence: the Spanish a human reads belongs to the frontend. The two refusal codes are distinct on purpose — a trade this shop does not practise and a piece it does not carry are two different things to say to a customer — and `knowledge_not_covered` states that an anchored question produced no citation after the corpus distance threshold, so the argument describes the piece without claiming to have answered",
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "trace_id",
+          "effective_pos_id",
+          "intent",
+          "groups",
+          "pitch",
+          "usage",
+          "abstained",
+          "partial",
+          "stop_reason",
+          "iterations",
+          "tool_calls_used"
+        ],
+        "title": "AgentAssistResponse",
+        "type": "object"
+      },
+      "AgentTraceIteration": {
+        "description": "One turn of the loop: which tools it ran, what it cost and how long it took.",
+        "properties": {
+          "completion_tokens": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "elapsed_ms": {
+            "default": 0.0,
+            "minimum": 0.0,
+            "title": "Elapsed Ms",
+            "type": "number"
+          },
+          "iteration": {
+            "minimum": 1.0,
+            "title": "Iteration",
+            "type": "integer"
+          },
+          "prompt_tokens": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/AgentTraceTool"
+            },
+            "title": "Tools",
+            "type": "array"
+          },
+          "total_tokens": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Total Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "iteration"
+        ],
+        "title": "AgentTraceIteration",
+        "type": "object"
+      },
+      "AgentTraceTool": {
+        "description": "One tool call of one iteration, as the wire reports it: **what, and how it went.**\n\nThe arguments are absent by rule and not by omission. A consumer logs the responses it\nreceives, and the arguments a tool was called with are the operator's question as the\nmodel reformulated it — which the rule this service already holds keeps out of durable\nstorage. Tool names are what the evaluation compares: tools invoked against tools expected.",
+        "properties": {
+          "cause": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Closed-vocabulary failure cause when the observation failed, null otherwise. `presupuesto_agotado` means the consumer refused the call because the request's tool budget was spent, and that **no port was touched** for it",
+            "title": "Cause"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "tool": {
+            "description": "Name of the tool invoked, from the frozen set of six",
+            "title": "Tool",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool",
+          "ok"
+        ],
+        "title": "AgentTraceTool",
+        "type": "object"
+      },
+      "AgentTurn": {
+        "description": "One turn of the conversation the agent route answers. C32b.\n\n**A turn attributed to the assistant is client-supplied data.** The client composes the\nwhole request and can write what it likes in `role`, so trusting that label would hand an\nattacker a channel the operator's own field does not offer. Both roles travel under the\nsame length cap and both are enclosed in the same data delimiters inside the user message.",
+        "properties": {
+          "role": {
+            "description": "Who the turn is attributed to. `asistente` is **attributed and never trusted**: this service stores no conversation, so every turn arrives from the client",
+            "enum": [
+              "operario",
+              "asistente"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "text": {
+            "description": "What was said. The cap is the one a single query of the deterministic route already declares, so one turn of a conversation cannot be longer than one query",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "text"
+        ],
+        "title": "AgentTurn",
+        "type": "object"
+      },
+      "AgentUsage": {
+        "description": "The agent's usage object: everything the shared one carries, plus the call count. C32b.\n\n**Added here and deliberately not to `Usage`.** The shared model is what\n`POST /v1/assist/sale` publishes, and widening it would move that route's schema — which\nthis change promises not to do. Without the count, though, «the ceiling is observable from\nthe same object a consumer reads» would not be true of this route, and the ceiling is one\nof the four things the project evaluates about an agent.\n\nThe figure counts **chat calls of one request**: the classification, the loop's turns and\nthe argument with its repair. The embedding lookups the tools make are counted by the\nregistry's own counter and are not folded in here, because `usage.calls` already means\nexactly this on the other route and a number that means two things in two places is a\nnumber nobody can compare.\n\n**`model` is redeclared here, and only here, because on this route it cannot be read as the\nshared object's field is read.** The token counts add up to three stages that may run three\ndifferent models — the classifier, the loop and the argument — and `model` names only the\nlast one that reported, so tokens priced at that model's rate misstate the cost. The first\ncost figure of C32b made exactly that mistake. The shared `Usage` keeps its description:\n`POST /v1/assist/sale` must not move.",
+        "properties": {
+          "calls": {
+            "default": 0,
+            "description": "Chat-provider calls this request made: one classification, at most one per loop turn, and the argument with its single repair. Bounded by a ceiling **derived from the constants of those three stages** rather than written as a literal. Embedding lookups are counted apart and are not included",
+            "minimum": 0.0,
+            "title": "Calls",
+            "type": "integer"
+          },
+          "completion_tokens": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Model of the LAST stage that reported one — the argument's when it ran, otherwise the loop's or the classifier's. **Not a price key for the token counts beside it**: on this route those counts add up to as many as three stages that may run different models, so tokens multiplied by this model's price misstate the cost. Null while stubbed",
+            "title": "Model"
+          },
+          "prompt_tokens": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "total_tokens": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Total Tokens",
+            "type": "integer"
+          }
+        },
+        "title": "AgentUsage",
+        "type": "object"
+      },
       "AssistContext": {
         "description": "Optional hints the operator can pass along with the query.",
         "properties": {
@@ -2216,6 +2556,59 @@
         "summary": "Public liveness probe",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/v1/assist/agent": {
+      "post": {
+        "description": "Run the loop over the transcript; the pitch keeps price and stock as placeholders.\n\n**A route of its own, and the separation is the decision this change turns on.** Its worst\ncase is several times the latency the deterministic route declares, so a flag on that route\nwould put a long path in the one a counter calls synchronously — and the comparison this\ncapability exists to enable needs both to stay runnable over the same set.\n\nThe error mapping is the deterministic route's, extended by one: a transcript over its\ndeclared caps is a 422, the status this service already uses for a body naming something\nit cannot process. It is unreachable through HTTP — the request model refuses it first —\nand it is here because the layer is also a callable.",
+        "operationId": "assist_agent_v1_assist_agent_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentAssistRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentAssistResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Invalid or missing internal service token"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "description": "Not implemented yet; delivered in a later change"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Assist a sale with an agent loop over a multi-turn transcript",
+        "tags": [
+          "assist"
         ]
       }
     },

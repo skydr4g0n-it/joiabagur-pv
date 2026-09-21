@@ -1,0 +1,970 @@
+# Conjunto de CARGA del bucle agéntico — C32b. **GENERADO, no escrito a mano.**
+#
+# `uv run python -m jbg_ai.evals.agent_sets` lo reescribe; `--check` falla si está atrasado.
+# No se edita a mano: lo que se edita es el guion, y el diff del fichero dice qué cambió.
+#
+# ── Qué mide, y qué NO mide ────────────────────────────────────────────────────────────────
+#
+# Mide **acumulación**: tokens, reloj de pared, la curva de crecimiento del contexto por vuelta
+# y el coste de cada brazo de modelo. **No mide calidad y no trae verdad de terreno.** Ninguna
+# de estas transcripciones lleva anotada la herramienta que debería elegirse, y ninguna se puede
+# usar para decir si una respuesta fue buena. Para eso está `calibration.yaml`, que es pequeño,
+# está escrito a mano y está declarado `calibration-only`.
+#
+# ── Por qué generado, y por qué el otro es lo contrario ────────────────────────────────────
+#
+# A temperatura cero y sobre un registro determinista, repetir una transcripción devuelve casi
+# lo mismo: las repeticiones **no compran resolución de p95**. Un percentil alto necesita
+# VARIEDAD de transcripciones; la verdad de terreno necesita lo contrario, pocas y anotadas.
+# Son dos preguntas distintas y por eso son dos instrumentos de tamaños muy distintos.
+#
+# ── De dónde sale el vocabulario ───────────────────────────────────────────────────────────
+#
+# De `src/jbg_ai/enrichment/vocabularies.yaml` y de nada más: es el vocabulario cerrado con el
+# que se enriquece el índice, así que estas conversaciones hablan de cosas por las que a esta
+# tienda se le puede preguntar de verdad. **No** se usa el simulador de mundo sintético, que
+# arrastraría su modelo del mundo a un instrumento que sólo mide acumulación.
+#
+# ── El muro de contaminación ───────────────────────────────────────────────────────────────
+#
+# **Ninguna consulta de `evals/golden/` se lee, se copia ni se referencia aquí.** La comparación
+# entre el pipeline determinista y el agente se corre sobre ese conjunto en un change posterior,
+# y un instrumento sembrado de él inhabilitaría su propio veredicto.
+# `test_no_transcript_of_either_agent_set_reuses_a_golden_query` recorre las dos direcciones.
+#
+# ── La forma, que es deliberada ────────────────────────────────────────────────────────────
+#
+# Las longitudes están repartidas a propósito: la curva que este conjunto existe para publicar
+# es el crecimiento del contexto **por vuelta**, y un conjunto de longitud uniforme daría un
+# solo punto de esa curva. Los turnos atribuidos al asistente son carga como cualquier otra —
+# los compone el cliente, igual que los del operario.
+#
+# Topes del contrato que todas cumplen: ≤ 12 turnos,
+# ≤ 500 caracteres por turno, ≤ 4000 en total.
+id: c32b-agent-load/v1
+seed: c32b-load/v1
+generated_by: python -m jbg_ai.evals.agent_sets
+measures: load
+carries_ground_truth: false
+size: 82
+by_operator_turns:
+  '1': 22
+  '2': 22
+  '3': 18
+  '4': 12
+  '5': 8
+transcripts:
+- id: L001
+  operator_turns: 3
+  turns:
+  - role: operario
+    text: me piden algo de oro para verano
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: no le convence, ¿qué más hay?
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: enséñame otra cosa, esa no
+- id: L002
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: busco una cadena de baño de oro
+- id: L003
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: querría ver tobilleras de estilo romantico
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿hay otra talla?
+- id: L004
+  operator_turns: 4
+  turns:
+  - role: operario
+    text: tengo un cliente que busca anillos en tono negro
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: ¿y en plateado?
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿eso se puede mojar?
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿y algo más de estilo etnico?
+- id: L005
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: algo de acero para fiesta, estilo vintage
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: no le convence, ¿qué más hay?
+- id: L006
+  operator_turns: 5
+  turns:
+  - role: operario
+    text: algo de acero para regalo, estilo boho
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: ¿le va bien a alguien con la piel sensible?
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: ¿y algo más de estilo moderno?
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿y en negro?
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿le va bien a alguien con la piel sensible?
+- id: L007
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: algo de oro para diario, estilo romantico
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: enséñame otra cosa, esa no
+- id: L008
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: tengo un cliente que busca colgantes en tono blanco
+- id: L009
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: tengo un cliente que busca cadenas en tono marron
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿tienes algo parecido pero para diario?
+- id: L010
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: algo de perla para regalo, estilo minimalista
+- id: L011
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: quiero enseñarle tobilleras de acero para regalo
+- id: L012
+  operator_turns: 3
+  turns:
+  - role: operario
+    text: quiero enseñarle cadenas de acero para boda
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: prefiere con jade
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿y en verde?
+- id: L013
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: busco una tobillera de oro
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: enséñame otra cosa, esa no
+- id: L014
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: quiero enseñarle pulseras de acero para regalo
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: prefiere con coral
+- id: L015
+  operator_turns: 4
+  turns:
+  - role: operario
+    text: algo de acero para regalo, estilo minimalista
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: ¿y si lo quiere para un regalo?
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: ¿tienes algo parecido pero para regalo?
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿cómo se cuida eso?
+- id: L016
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: tengo un cliente que busca diademas en tono blanco
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿y algo más de estilo boho?
+- id: L017
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: busco un colgante con turquesa
+- id: L018
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: quiero enseñarle collares de resina para ceremonia
+- id: L019
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: algo de plata para diario, estilo clasico
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿hay otra talla?
+- id: L020
+  operator_turns: 5
+  turns:
+  - role: operario
+    text: algo de plata para boda, estilo marino
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: prefiere con ojo de tigre
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿lo tienes en acero?
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿eso se puede mojar?
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿y si lo quiere para un regalo?
+- id: L021
+  operator_turns: 3
+  turns:
+  - role: operario
+    text: quiero enseñarle llaveros de latón para boda
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: no le convence, ¿qué más hay?
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: ¿y algo más de estilo marino?
+- id: L022
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: qué llaveros de perla me recomiendas para verano
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: prefiere con nacar
+- id: L023
+  operator_turns: 3
+  turns:
+  - role: operario
+    text: algo de cuero para diario, estilo romantico
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: ¿eso se puede mojar?
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: prefiere con piedra luna
+- id: L024
+  operator_turns: 4
+  turns:
+  - role: operario
+    text: necesito unos gemelos de cuero para regalar
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: ¿eso se puede mojar?
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: ¿hay otra talla?
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: enséñame otra cosa, esa no
+- id: L025
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: busco una diadema con diamante
+- id: L026
+  operator_turns: 3
+  turns:
+  - role: operario
+    text: me piden algo de perla para fiesta
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: ¿eso se puede mojar?
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿tienes algo parecido pero para boda?
+- id: L027
+  operator_turns: 3
+  turns:
+  - role: operario
+    text: quiero enseñarle colgantes de oro para boda
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: enséñame otra cosa, esa no
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: ¿hay otra talla?
+- id: L028
+  operator_turns: 3
+  turns:
+  - role: operario
+    text: qué anillos de latón me recomiendas para regalo
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿eso se puede mojar?
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: ¿tienes algo parecido pero para ceremonia?
+- id: L029
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: busco una pulsera de hilo
+- id: L030
+  operator_turns: 5
+  turns:
+  - role: operario
+    text: me piden algo de acero para verano
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: no le convence, ¿qué más hay?
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: ¿y si lo quiere para un regalo?
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: ¿y en marron?
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿eso se puede mojar?
+- id: L031
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: enséñame diademas en rojo que no sean caros
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿y si lo quiere para un regalo?
+- id: L032
+  operator_turns: 3
+  turns:
+  - role: operario
+    text: algo de plata para boda, estilo moderno
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿hay otra talla?
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: enséñame otra cosa, esa no
+- id: L033
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: algo de acero para boda, estilo etnico
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: no le convence, ¿qué más hay?
+- id: L034
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: querría ver pendientes de estilo clasico
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿tienes algo parecido pero para boda?
+- id: L035
+  operator_turns: 3
+  turns:
+  - role: operario
+    text: quiero enseñarle gemelos de plata para diario
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿lo tienes en oro?
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: ¿y si lo quiere para un regalo?
+- id: L036
+  operator_turns: 5
+  turns:
+  - role: operario
+    text: busco unos gemelos con perla
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: ¿y si lo quiere para un regalo?
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿y si lo quiere para un regalo?
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: ¿lo tienes en plata?
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: enséñame otra cosa, esa no
+- id: L037
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: enséñame diademas en blanco que no sean caros
+- id: L038
+  operator_turns: 4
+  turns:
+  - role: operario
+    text: enséñame cinturones en verde que no sean caros
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿y algo más de estilo clasico?
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: ¿eso se puede mojar?
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: ¿tienes algo parecido pero para boda?
+- id: L039
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: necesito una tobillera de latón para regalar
+- id: L040
+  operator_turns: 5
+  turns:
+  - role: operario
+    text: necesito una cadena de plata para regalar
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: enséñame otra cosa, esa no
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: ¿y algo más de estilo moderno?
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿hay otra talla?
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: ¿tienes algo parecido pero para diario?
+- id: L041
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: me piden algo de latón para ceremonia
+- id: L042
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: tengo un cliente que busca pendientes en tono negro
+- id: L043
+  operator_turns: 3
+  turns:
+  - role: operario
+    text: qué anillos de acero me recomiendas para boda
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: no le convence, ¿qué más hay?
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: ¿cómo se cuida eso?
+- id: L044
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: enséñame broches en blanco que no sean caros
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: enséñame otra cosa, esa no
+- id: L045
+  operator_turns: 3
+  turns:
+  - role: operario
+    text: necesito un broche de cuero para regalar
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: ¿tienes algo parecido pero para fiesta?
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: ¿y algo más de estilo marino?
+- id: L046
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: qué colgantes de baño de oro me recomiendas para boda
+- id: L047
+  operator_turns: 4
+  turns:
+  - role: operario
+    text: tengo un cliente que busca pulseras en tono beige
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: ¿y si lo quiere para un regalo?
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: ¿lo tienes en acero?
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿tienes algo parecido pero para verano?
+- id: L048
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: me piden algo de plata para boda
+- id: L049
+  operator_turns: 5
+  turns:
+  - role: operario
+    text: busco una tobillera de oro
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: ¿y si lo quiere para un regalo?
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿tienes algo parecido pero para fiesta?
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: no le convence, ¿qué más hay?
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿y algo más de estilo clasico?
+- id: L050
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: querría ver colgantes de estilo marino
+- id: L051
+  operator_turns: 5
+  turns:
+  - role: operario
+    text: busco un collar de resina
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿y algo más de estilo minimalista?
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: prefiere con nacar
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: no le convence, ¿qué más hay?
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: ¿tienes algo parecido pero para diario?
+- id: L052
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: qué llaveros de oro me recomiendas para verano
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: ¿cómo se cuida eso?
+- id: L053
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: quiero enseñarle gemelos de resina para ceremonia
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: ¿hay otra talla?
+- id: L054
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: algo de perla para regalo, estilo minimalista
+- id: L055
+  operator_turns: 3
+  turns:
+  - role: operario
+    text: quiero enseñarle gemelos de acero para ceremonia
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿cómo se cuida eso?
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: ¿tienes algo parecido pero para boda?
+- id: L056
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: querría ver colgantes de estilo romantico
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: no le convence, ¿qué más hay?
+- id: L057
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: tengo un cliente que busca llaveros en tono plateado
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: ¿le va bien a alguien con la piel sensible?
+- id: L058
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: busco un llavero con perla
+- id: L059
+  operator_turns: 4
+  turns:
+  - role: operario
+    text: busco un cinturón con calcedonia
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿le va bien a alguien con la piel sensible?
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: ¿y si lo quiere para un regalo?
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: ¿cómo se cuida eso?
+- id: L060
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: querría ver broches de estilo etnico
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿eso se puede mojar?
+- id: L061
+  operator_turns: 4
+  turns:
+  - role: operario
+    text: tengo un cliente que busca pendientes en tono negro
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿lo tienes en cuero?
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: prefiere con diamante
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿tienes algo parecido pero para verano?
+- id: L062
+  operator_turns: 3
+  turns:
+  - role: operario
+    text: quiero enseñarle gemelos de plata para regalo
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿y algo más de estilo vintage?
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿y algo más de estilo clasico?
+- id: L063
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: necesito un cinturón de hilo para regalar
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿tienes algo parecido pero para ceremonia?
+- id: L064
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: algo de oro para boda, estilo marino
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: prefiere con granate
+- id: L065
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: tengo un cliente que busca broches en tono rojo
+- id: L066
+  operator_turns: 3
+  turns:
+  - role: operario
+    text: necesito un broche de plata para regalar
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: ¿y en beige?
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿lo tienes en hilo?
+- id: L067
+  operator_turns: 3
+  turns:
+  - role: operario
+    text: necesito una cadena de acero para regalar
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿hay otra talla?
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: no le convence, ¿qué más hay?
+- id: L068
+  operator_turns: 4
+  turns:
+  - role: operario
+    text: me piden algo de oro para ceremonia
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: ¿y en dorado?
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: ¿le va bien a alguien con la piel sensible?
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: ¿tienes algo parecido pero para boda?
+- id: L069
+  operator_turns: 4
+  turns:
+  - role: operario
+    text: tengo un cliente que busca colgantes en tono marron
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: prefiere con piedra
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿y en beige?
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: ¿hay otra talla?
+- id: L070
+  operator_turns: 3
+  turns:
+  - role: operario
+    text: busco una cadena con coral
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: enséñame otra cosa, esa no
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿le va bien a alguien con la piel sensible?
+- id: L071
+  operator_turns: 4
+  turns:
+  - role: operario
+    text: busco unos pendientes con topacio
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿hay otra talla?
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿tienes algo parecido pero para boda?
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿hay otra talla?
+- id: L072
+  operator_turns: 3
+  turns:
+  - role: operario
+    text: algo de resina para ceremonia, estilo moderno
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: ¿y en rojo?
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿le va bien a alguien con la piel sensible?
+- id: L073
+  operator_turns: 5
+  turns:
+  - role: operario
+    text: querría ver cinturones de estilo clasico
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: ¿tienes algo parecido pero para regalo?
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: ¿cómo se cuida eso?
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: no le convence, ¿qué más hay?
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: ¿cómo se cuida eso?
+- id: L074
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: tengo un cliente que busca colgantes en tono rosa
+- id: L075
+  operator_turns: 4
+  turns:
+  - role: operario
+    text: busco un collar con piedra luna
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: enséñame otra cosa, esa no
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿cómo se cuida eso?
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: prefiere con nacar
+- id: L076
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: me piden algo de oro para ceremonia
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿y algo más de estilo marino?
+- id: L077
+  operator_turns: 2
+  turns:
+  - role: operario
+    text: me piden algo de acero para verano
+  - role: asistente
+    text: hay varias opciones, mira
+  - role: operario
+    text: ¿y algo más de estilo marino?
+- id: L078
+  operator_turns: 4
+  turns:
+  - role: operario
+    text: busco un anillo con malaquita
+  - role: asistente
+    text: estas son las que encajan
+  - role: operario
+    text: no le convence, ¿qué más hay?
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿y si lo quiere para un regalo?
+  - role: asistente
+    text: tengo dos que le pueden servir
+  - role: operario
+    text: ¿le va bien a alguien con la piel sensible?
+- id: L079
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: me piden algo de cuero para boda
+- id: L080
+  operator_turns: 3
+  turns:
+  - role: operario
+    text: quiero enseñarle gemelos de plata para verano
+  - role: asistente
+    text: te enseño lo que tenemos
+  - role: operario
+    text: ¿tienes algo parecido pero para diario?
+  - role: asistente
+    text: esta es la que más se acerca
+  - role: operario
+    text: ¿lo tienes en baño de oro?
+- id: L081
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: algo de hilo para verano, estilo minimalista
+- id: L082
+  operator_turns: 1
+  turns:
+  - role: operario
+    text: enséñame gemelos en marron que no sean caros

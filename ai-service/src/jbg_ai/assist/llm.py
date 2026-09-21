@@ -58,8 +58,12 @@ class TokenUsage:
             prompt_tokens=self.prompt_tokens + other.prompt_tokens,
             completion_tokens=self.completion_tokens + other.completion_tokens,
             total_tokens=self.total_tokens + other.total_tokens,
-            # The model of whichever call reported one. Two different models for one request
-            # cannot happen here: the client is built once and the repair is the same client.
+            # The model of whichever call reported one — **the last**, so a sum across stages
+            # that ran different models carries one name for tokens that are not all its own.
+            # Within the argument it cannot happen (the repair is the same client), but since
+            # C31 a request of `/v1/assist/sale` adds the classifier's usage to the argument's,
+            # and a request of `/v1/assist/agent` adds three stages. Whoever prices a sum must
+            # price its parts: `AgentRun` keeps them apart for exactly that reason (C32b).
             model=other.model or self.model,
             calls=self.calls + other.calls,
         )

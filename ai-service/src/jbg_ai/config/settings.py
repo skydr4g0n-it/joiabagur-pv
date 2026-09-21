@@ -11,6 +11,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Imported rather than restated, so the library default and the environment default cannot
 # drift: `assist/constants.py` carries the value together with the measurement that set it.
 from jbg_ai.assist.constants import (
+    AGENT_TIMEOUT_SECONDS as DEFAULT_AGENT_TIMEOUT_SECONDS,
+    DEFAULT_AGENT_MODEL,
     DEFAULT_ASSIST_MODEL,
     DEFAULT_ROUTER_MODEL,
     PITCH_TIMEOUT_SECONDS as DEFAULT_ASSIST_PITCH_TIMEOUT_SECONDS,
@@ -348,6 +350,50 @@ class Settings(BaseSettings):
             "value travels as a parameter of the client, so an evaluation can sweep it in one "
             "process. Exceeding it is a fail-open: the request proceeds unclassified and is "
             "served exactly as it was before routing existed. Not required to boot /health."
+        ),
+    )
+
+    jpv_agent_llm_api_key: str | None = Field(
+        default=None,
+        description=(
+            "C32b credential for the agent loop (JPV_AGENT_LLM_API_KEY). **Optional, and it "
+            "falls back in a chain: agent, then JPV_ASSIST_LLM_API_KEY, then "
+            "JPV_RAG_LLM_API_KEY.** With none of the three the loop is not constructed at all: "
+            "POST /v1/assist/agent answers without running it rather than failing, which is a "
+            "declared deployment state and is the rollback and the ablation at once — removing "
+            "the credential is how a deployment returns to the behaviour that preceded the "
+            "loop. The resolved link is logged once per process, so which credential is in "
+            "force is something a deployment can check instead of assume. Not required to boot "
+            "/health, and POST /v1/assist/sale never reads it."
+        ),
+    )
+    jpv_agent_llm_model: str = Field(
+        default=DEFAULT_AGENT_MODEL,
+        min_length=1,
+        description=(
+            "C32b model that runs the agent loop (JPV_AGENT_LLM_MODEL). Deliberately its OWN "
+            "variable and never JPV_ASSIST_LLM_MODEL nor JPV_ROUTER_LLM_MODEL: choosing which "
+            "TOOL to call is a harder task than choosing which label, and sharing a variable "
+            "would make any comparison of cost between the three false. It must support "
+            "function calling. **It is also the cheapest lever this capability has**: the model "
+            "multiplier of the agent's overhead against the deterministic pipeline is this one "
+            "setting, so pointing it at a cheaper model reverts that multiplier with no code "
+            "change. Not required to boot /health."
+        ),
+    )
+    jpv_agent_timeout_seconds: float = Field(
+        default=DEFAULT_AGENT_TIMEOUT_SECONDS,
+        gt=0,
+        le=60,
+        description=(
+            "C32b seconds ONE turn of the loop may take (JPV_AGENT_TIMEOUT_SECONDS). Per call "
+            "and never per request: a request makes up to five of them, and measuring the "
+            "total against a one-call limit is how a small cut reads as a large one. **The "
+            "default is declared NOT calibrated** — it is the wall-clock budget divided by the "
+            "iteration ceiling, an upper bound rather than a budget. Supplies only the DEFAULT: "
+            "the effective value travels as a parameter of the client, so an evaluation can "
+            "sweep it in one process. A turn that exceeds it costs the turn and not the "
+            "request, and the evidence already gathered is served. Not required to boot /health."
         ),
     )
 
@@ -750,6 +796,28 @@ class Settings(BaseSettings):
             return DEFAULT_ROUTER_TIMEOUT_SECONDS
         return value
 
+    @field_validator("jpv_agent_llm_api_key", mode="before")
+    @classmethod
+    def blank_agent_llm_key_is_unset(cls, value: object) -> object:
+        """A blank export means "unset", so it falls back rather than configuring an empty key."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("jpv_agent_llm_model", mode="before")
+    @classmethod
+    def blank_agent_llm_model_is_default(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return DEFAULT_AGENT_MODEL
+        return value
+
+    @field_validator("jpv_agent_timeout_seconds", mode="before")
+    @classmethod
+    def blank_agent_timeout_is_default(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return DEFAULT_AGENT_TIMEOUT_SECONDS
+        return value
+
     @field_validator("jpv_retrieval_distance_threshold", mode="before")
     @classmethod
     def blank_retrieval_threshold_is_default(cls, value: object) -> object:
@@ -891,6 +959,11 @@ def canonical_openapi_settings() -> Settings:
         jpv_router_llm_api_key=None,
         jpv_router_llm_model=DEFAULT_ROUTER_MODEL,
         jpv_router_timeout_seconds=DEFAULT_ROUTER_TIMEOUT_SECONDS,
+        # C32b, pinned for the same reason as every line above: an exported
+        # JPV_AGENT_LLM_MODEL must not reach the committed contract.
+        jpv_agent_llm_api_key=None,
+        jpv_agent_llm_model=DEFAULT_AGENT_MODEL,
+        jpv_agent_timeout_seconds=DEFAULT_AGENT_TIMEOUT_SECONDS,
         jpv_query_expansion_enabled=True,
         jpv_pos_prefilter_enabled=True,
         jpv_pos_projection_max_age_seconds=3600,

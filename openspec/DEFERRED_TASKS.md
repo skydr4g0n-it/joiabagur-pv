@@ -849,3 +849,122 @@ When implementing deferred tasks:
 
 **Last Updated:** 2026-09-20
 **Maintained By:** Development Team
+
+---
+
+## C32b · La política de *timeout* y de circuito de `POST /v1/assist/agent` en la capa .NET
+
+**Estado:** identificada, acotada y **no hecha**. Aplazada **con motivo**: hoy la ruta no tiene
+ningún consumidor.
+
+C32b publica `POST /v1/assist/agent` y **nadie la llama**. `IAiGatewayClient` no tiene método para
+ella, no hay pantalla detrás y el change de hidratación no la consume. Escribir su política de
+tiempo de espera y de cortocircuito ahora sería escribirla contra un consumidor imaginario, que es
+la misma razón por la que C32a difirió el endpoint de disponibilidad.
+
+### Por qué la política no puede ser la de `/v1/assist/sale`
+
+Medido en la pasada `293fe5c6e470`, sobre 102 peticiones con `gpt-4o`:
+
+| | `/v1/assist/sale` | `/v1/assist/agent` |
+|---|---|---|
+| Latencia declarada | **5 s** (§6.4 del diseño) | **15 s**, fijados por medición |
+| p50 medido | — | **5,3 s** |
+| p95 medido | — | **9,0 s** |
+| Máximo medido | — | **11,9 s** |
+
+**Un cliente .NET con el *timeout* de la ruta determinista cortaría más de la mitad de las
+peticiones del agente.** El p50 del agente es del orden de la latencia total que la otra ruta
+declara como techo.
+
+### Qué hace falta cuando se haga
+
+- **Un *timeout* propio por ruta**, no uno compartido: 15 s más el margen de red, contra los 5 s
+  de la determinista.
+- **Un cortocircuito que distinga degradación de fallo.** Esta ruta **no devuelve 5xx** cuando el
+  proveedor cae: responde 200 con `partial: true` y un `stop_reason` del vocabulario cerrado. Un
+  circuito que contase esas respuestas como fallos se abriría sobre una ruta que está funcionando
+  como está diseñada; el que las ignorase perdería la única señal de que el proveedor está caído.
+  Lo que hay que contar es `stop_reason=fallo_proveedor`, que existe precisamente porque la
+  primera pasada de C32b demostró que sin él esas respuestas son indistinguibles de una completa.
+- **Decidir qué hace el mostrador con `partial: true`.** Es una respuesta útil e incompleta, y la
+  pantalla tiene que poder decirlo sin alarmar: no es un error.
+
+### Y una restricción operativa que el consumidor heredará
+
+La pasada midió que **la cuota de tokens por minuto de la organización**, y no el dinero, es lo que
+limita el ritmo: con peticiones de ~13.000 tokens, un techo de 25.000 TPM admite **una petición por
+minuto**. Un mostrador con varios operarios simultáneos choca con eso mucho antes que con el coste,
+y el síntoma es un `RateLimitError` que la capa convierte en `fallo_proveedor` y sirve degradado.
+Dimensionar la cuota es parte de poner esta ruta en producción, no un detalle de la medición.
+
+> **Nota de la verificación independiente de C32b.** Los 15 s de la tabla de arriba **no acotaban
+> la petición** cuando se escribió: el reloj sólo se miraba antes de cada vuelta, y el peor caso por
+> construcción eran 15 + 8 + 2 × 4 = 31 s más las herramientas. Ahora el bucle corre contra 15 s
+> menos la reserva del argumentario y la vuelta en curso se corta; el límite es **15 s más, como
+> mucho, las herramientas de esa vuelta**, que no se cancelan a medias. Es el número que un
+> *timeout* .NET debe cubrir, con su margen de red.
+
+---
+
+## C32b · Once tests preexistentes de `ai-service` salen a la red con una clave falsa
+
+**Estado:** medido, **no corregido** y fuera del alcance de C32b: los tests son de C30b y C31, y
+ninguno lo introdujo este change. Encontrado por su verificación independiente.
+
+`tests/api/test_assist_generation.py` construye la app con una clave de mentira
+(`jpv_rag_llm_api_key="sk-test"` y análogas) e inyecta dobles para el *embedding*, la búsqueda y el
+corpus, **pero no para el clasificador ni para el argumentario**. La ruta construye entonces los
+clientes reales de LiteLLM y los usa: la llamada sale hacia `api.openai.com`, muere (TLS o 401) y
+el test pasa porque la capa degrada. Medido con un guardia de sockets y de `psycopg` sobre la suite
+entera: **12 resoluciones de `api.openai.com` y 1 de `raw.githubusercontent.com`** (la tabla de
+costes que descarga `litellm`), en estos once tests:
+
+- `test_the_configured_timeout_reaches_the_generation_client`
+- `test_the_dedicated_credential_is_preferred_over_the_enrichment_one`
+- `test_the_enrichment_credential_is_the_fallback_and_not_a_requirement`
+- `test_the_fallback_is_recorded_so_a_deployment_can_check_it_instead_of_assuming`
+- `test_the_configured_model_reaches_the_generation_client`
+- `test_the_enrichment_model_cannot_move_the_assistance_model`
+- `test_the_classifier_credential_falls_back_through_the_three_links` (tres veces)
+- `test_which_classifier_credential_is_in_force_is_recorded_without_the_key`
+- `test_the_configured_classifier_model_and_timeout_reach_the_client`
+- `test_the_argument_model_cannot_move_the_classifier_model`
+
+Y uno más de otro fichero, `tests/api/test_retrieval_real.py::test_missing_embedding_key_is_503`,
+intenta abrir una conexión de `psycopg`.
+
+**Es el mismo defecto que el §10.4 del QA de C32b encontró en su propio test y corrigió**: *«la suite
+no abre sockets» no es una propiedad que la suite compruebe sola*. Aparte, **72 tests `db`** corren
+contra un PostgreSQL real a través de testcontainers cuando Docker está disponible (y se saltan si
+no): eso es diseño, pero significa que «la suite corre sin base de datos» sólo es cierto en una
+máquina sin Docker.
+
+### Qué hace falta cuando se haga
+
+- **Pilotar el resolutor directamente**, como hace `test_the_credential_chain_is_agent_then_assist_then_enrichment`
+  desde C32b, o **inyectar los dobles** del clasificador y del argumentario en `app.state` antes de
+  servir la petición. Lo que se prueba es la resolución y lo que se registra, que ocurre antes de
+  cualquier llamada.
+- **Después, un guardia de sockets automático en `tests/conftest.py`** que rechace toda conexión que
+  no sea de bucle local y deje pasar la de testcontainers. Sin los once arreglados antes, ese
+  guardia los pondría en rojo el primer día; con ellos arreglados, convierte la propiedad en algo
+  que la suite comprueba en vez de algo que su README afirma.
+
+---
+
+## C32b · El desglose del uso por etapa en la respuesta de `POST /v1/assist/agent`
+
+**Estado:** identificado y **no hecho**, a decidir cuando la ruta tenga consumidor (C34/C36).
+
+`AgentUsage` suma los tokens de hasta tres etapas —clasificador, bucle y argumentario— que corren
+modelos distintos, y publica **un solo `model`**, el de la última. Quien tarife `usage` × `model`
+reproduce el error de coste que la verificación independiente encontró en el arnés. Dentro del
+proceso ya está resuelto (`AgentRun.router_usage`, `loop_usage` y `pitch_usage`, que el arnés
+tarifa una a una), y la descripción de `AgentUsage.model` en el contrato avisa de que no es una
+clave de precio.
+
+**Lo que falta, si un consumidor .NET necesita el coste**: añadir a `AgentUsage` un desglose por
+etapa, cada una con su modelo y sus tokens. Es **adición pura** sobre un esquema que sólo publica
+esta ruta —`/v1/assist/sale` no se mueve— y no se hace ahora porque, sin consumidor, agrandaría la
+superficie congelada para nadie.

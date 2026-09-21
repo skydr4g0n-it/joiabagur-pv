@@ -67,6 +67,22 @@ class PitchTask(Enum):
     FREE_QUERY_BOTH = "free_query_both"
 
 
+class AgentPitchTask(Enum):
+    """The task the **agent loop's** evidence generates with. C32b.
+
+    **A second enum and deliberately not a seventh member of `PitchTask`.** Its section lives
+    in `assist/v4` and nowhere else, while every member of `PitchTask` has a section in the
+    version `PROMPT_VERSION` names — a property the suite reads by walking both the enum and
+    `TASK_SECTIONS` against the loaded file. Adding a member whose section is in another
+    version would break that walk, and the walk is worth more than the tidiness of one enum:
+    it is what catches a task declared with no text behind it.
+    """
+
+    #: Evidence a loop gathered: candidates, substitute groups distinguished as such, family
+    #: members and corpus fragments, over a multi-turn conversation.
+    AGENT_EVIDENCE = "agent_evidence"
+
+
 #: The heading whose body is the task, one per task. The **only** thing that differs between two
 #: calls besides the data.
 TASK_SECTIONS: dict[PitchTask, str] = {
@@ -77,6 +93,18 @@ TASK_SECTIONS: dict[PitchTask, str] = {
     PitchTask.FREE_QUERY_KNOWLEDGE: "Tarea · consulta libre · conocimiento",
     PitchTask.FREE_QUERY_BOTH: "Tarea · consulta libre · catálogo y conocimiento",
 }
+
+#: The agent loop's section, held **apart from the mapping above** for the reason its enum is
+#: held apart from `PitchTask`: everything in `TASK_SECTIONS` must exist in the version
+#: `PROMPT_VERSION` names, and this one exists in `assist/v4`.
+AGENT_TASK_SECTIONS: dict[AgentPitchTask, str] = {
+    AgentPitchTask.AGENT_EVIDENCE: "Tarea · evidencia del agente",
+}
+
+#: One lookup for `task_message`, so a caller does not have to know which of the two mappings
+#: its task belongs to. Built by merging rather than by chaining `.get` calls, so a task added
+#: to either mapping is resolvable with no edit here.
+_SECTION_BY_TASK: dict[object, str] = {**TASK_SECTIONS, **AGENT_TASK_SECTIONS}
 
 #: The task an **anchored** mode runs by default. The free query is deliberately absent: its
 #: task depends on the route the classifier decided, which a mode cannot know, so asking for it
@@ -190,14 +218,20 @@ def system_message(text: str | None = None) -> str:
     return prompt_sections(text)[SYSTEM_SECTION]
 
 
-def task_message(task: PitchTask | AssistMode, text: str | None = None) -> str:
+def task_message(
+    task: PitchTask | AgentPitchTask | AssistMode, text: str | None = None
+) -> str:
     """The one block that differs between two calls.
 
     Accepts a mode for the two anchored defaults, which is what every call site that predates
-    C31 passes, and a task for everything the route or the coverage decides.
+    C31 passes, a task for everything the route or the coverage decides, and since C32b the
+    agent's own task — whose section lives in a later version, so a caller asking for it must
+    supply that version's text.
     """
-    resolved = task if isinstance(task, PitchTask) else resolve_task(task)
-    section = TASK_SECTIONS[resolved]
+    resolved = (
+        task if isinstance(task, (PitchTask, AgentPitchTask)) else resolve_task(task)
+    )
+    section = _SECTION_BY_TASK[resolved]
     sections = prompt_sections(text)
     if section not in sections:
         raise KeyError(
@@ -347,10 +381,23 @@ class FreeQueryCandidate:
 
 @dataclass(frozen=True)
 class FreeQueryGroup:
-    """One family of candidates. `family_label` and never `family_id`, for the same reason."""
+    """One family of candidates. `family_label` and never `family_id`, for the same reason.
+
+    `origin` arrives with C32b and it is **`None` for everything the deterministic route
+    builds**. A substitute and a catalogue match are different things to say to a customer, so
+    the agent marks the groups it pivoted to with a value of a closed vocabulary and the prompt
+    that reads the payload explains what the mark means.
+
+    **It renders only when it is set, and that is not a style choice.** `as_data()` is the
+    object the numeric gate reads and the user message prints, and the deterministic route
+    shares this class: a field rendered unconditionally would move the bytes of a payload that
+    120 measured generations were taken against, on a route this change promises not to touch.
+    """
 
     family_label: str | None = None
     members: tuple[FreeQueryCandidate, ...] = ()
+    #: One of `GROUP_ORIGINS`, or `None` when the caller does not distinguish origins at all.
+    origin: str | None = None
 
 
 @dataclass(frozen=True)
@@ -383,6 +430,9 @@ class FreeQueryPayload(_NumeralsFromData):
             "candidatas": [
                 {
                     "familia": group.family_label,
+                    # Present only when the caller distinguishes origins, so the payload the
+                    # deterministic route builds is byte for byte the one it built before.
+                    **({"procedencia": group.origin} if group.origin is not None else {}),
                     "piezas": [
                         {
                             "sku": member.sku,
@@ -436,7 +486,7 @@ def loose_numeral(raw: str) -> str:
 
 def build_messages(
     payload: PitchContext,
-    task: PitchTask | AssistMode,
+    task: PitchTask | AgentPitchTask | AssistMode,
     *,
     prompt_text: str | None = None,
     repair: str | None = None,
@@ -509,7 +559,12 @@ def free_query_payload_from(
     citations: Sequence[PitchCitation] = (),
     query: str | None = None,
 ) -> FreeQueryPayload:
-    """Build the free-query payload from what the orchestrator already holds. No I/O."""
+    """Build the free-query payload from what the orchestrator already holds. No I/O.
+
+    Reused unchanged by the agent loop, which supplies groups carrying an `origin`: the
+    projection of the loop's evidence onto this payload is the same construction the
+    deterministic route makes, which is what keeps the two comparable field by field.
+    """
     return FreeQueryPayload(
         groups=tuple(groups),
         warnings=tuple(warnings),

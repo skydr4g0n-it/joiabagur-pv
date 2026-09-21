@@ -653,13 +653,21 @@ def test_the_assistance_layer_provider_call_figure_is_untouched_by_this_capabili
 
 
 def test_the_registry_publishes_no_route_and_declares_no_iteration_budget() -> None:
-    """HU escenario 9. No agent route exists and no budget of turns is declared anywhere."""
-    # Read from the generated document rather than from `app.routes`, because the document is
-    # the thing the frozen snapshot is compared against.
-    paths = set(create_app(build_settings()).openapi()["paths"])
-    assert "/v1/assist/agent" not in paths
-    assert not [path for path in paths if "agent" in path]
+    """C32a's HU escenario 9, **read at the scope its name actually names: the registry.**
 
+    When C32a wrote it, «no agent route exists» could be asserted over the generated document,
+    because this half shipped no route and nothing else could have added one. C32b adds
+    `POST /v1/assist/agent`, so that reading of the sentence is now false **by design** — it is
+    the thing the second half was cut out to deliver, and `test_snapshot_covers_the_frozen_
+    surface` is where the published surface is pinned.
+
+    What the name asserts, and what stays worth protecting, is the **separation of the two
+    layers**: the tool registry is a library, it declares no route of its own and it knows
+    nothing about the loop's budgets. A budget constant appearing in this module would mean the
+    tool layer had started deciding how many turns a consumer may take, which is precisely the
+    mixing the cut exists to prevent — the loop owns its budgets and reads them from the
+    vocabulary module, never from here.
+    """
     from jbg_ai.assist import tools
 
     budgets = [
@@ -667,7 +675,16 @@ def test_the_registry_publishes_no_route_and_declares_no_iteration_budget() -> N
         for name in dir(tools)
         if any(word in name.upper() for word in ("MAX_ITERATION", "BUDGET", "MAX_TURNS"))
     ]
-    assert budgets == []
+    assert budgets == [], "the loop's budgets are not the registry's business"
+
+    # And no route is declared here: the registry is a library, and the surface that consumes
+    # it lives in the API layer where every other route of this service lives.
+    assert not [name for name in dir(tools) if "router" in name.lower()]
+    assert not hasattr(tools, "APIRouter")
+
+    # The route the API layer added is C32b's, and it is the only one carrying the word.
+    paths = set(create_app(build_settings()).openapi()["paths"])
+    assert [path for path in paths if "agent" in path] == ["/v1/assist/agent"]
 
 
 def test_the_sale_assistance_response_shape_is_the_one_the_router_change_left() -> None:
