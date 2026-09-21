@@ -14,6 +14,39 @@
 
 Este documento se escribió antes de implementar. Cuando una sesión de diseño de un change concreto altera lo que su ficha decía, el cambio se registra aquí con fecha y motivo, y la ficha afectada se corrige en el sitio.
 
+### 2026-09-21 — C34 explorado: sólo el card, y unos marcadores que no dicen de quién son
+
+**La anotación del 14 de septiembre que daba a C34 la ruta de la consulta libre es falsa en su
+premisa.** Decía *«ninguna hidratación nueva: no hay más `{{price}}` ni `{{stock}}` que los de los
+candidatos»*. Pero los dos tokens no llevan referencia a una pieza. En M2 y M3 da igual, porque sólo
+hay una. En M1 y en el agente, el prompt pide hablar de **varias piezas** con los mismos dos tokens,
+y .NET no puede asignarlos sin adivinar, cuando el propio prompt llama a una cifra equivocada *«un
+error de venta»*. **C34 se queda con las dos rutas del card**, y el §15.12 del diseño (*«la pregunta
+libre sin pieza elegida no tiene pantalla»*) sigue siendo cierto. El arreglo que lo desbloquearía es
+de Python y es pequeño: prohibir los marcadores en las tareas sin pieza anclada, porque las filas ya
+enseñan el precio hidratado. Queda identificado y no hecho.
+
+**Cinco mediciones reproducibles decidieron el resto**, tres sobre la base local y dos sobre el
+artefacto de C30b:
+
+| | medido | qué decidió |
+|---|---|---|
+| Latencia del argumentario, en el ancho que se sirve | p50 3,8 s · p95 5,2 s · **7,5 % por encima de 5 s** · 55 % con reparación | El presupuesto de .NET pasa de **5 s a 10 s**, derivado del peor caso de Python (2 × 4 s), y **sin reintento en timeout** |
+| Cómo escribe el modelo `{{stock}}` | **88,3 %** como número («tenemos {{stock}} en tienda») | Se sustituye por el entero, no por «N unidades» ni por una etiqueta |
+| `family_has_variants` después de hidratar | **19,2 %** falso en las tiendas | .NET lo recalcula sobre los miembros que ese punto de venta lleva |
+| Ventana de sustitutos | Con `top_k = 5`, en Fornells el **71,1 %** no llena una página de 5; con `top_k = 20`, el 7,1 % | .NET pide siempre la ventana máxima |
+| Umbral de stock bajo | `≤ 2` salta en el 4,2 % de las filas con stock; `≤ 5`, en el 14,4 % | `stock_critical` = 1 o 2 unidades, configurable, frente a las dos definiciones incompatibles que ya hay en .NET |
+
+**Cuatro decisiones se cerraron con el desarrollador:** sólo el card; `POST` con `question` en el
+cuerpo, porque en una URL la pregunta del cliente acaba en el log de nginx; con la pieza anclada sin
+stock, el argumentario se retira si no hay pregunta y se conserva si la hay; y **encender la
+generación en la demo es la última tarea de C34**, así que su zona gana `deploy/demo/` y
+`compose.demo.yaml`. **Un cambio de política respecto a la ficha**: un marcador sin resolver retira el
+argumentario y **no la respuesta**, que es lo que ya hacen las puertas de C30b.
+
+Ficha corregida en el sitio. Informe con las catorce decisiones, sus alternativas descartadas y el
+SQL de cada cifra: [`c34-exploration-decisions.md`](informes/c34-exploration-decisions.md).
+
 ### 2026-09-21 — C32b implementado: el sobrecoste es ×3,0 y el brazo barato no sostiene la selección
 
 La pasada `293fe5c6e470` —**204 peticiones, dos brazos, 3,82 USD y 3,4 h**— refuta el número
@@ -862,7 +895,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 | **C32a** | `add-sales-assistant-tool-registry` | Python | C30b, C31 | ✅ **archivado 2026-09-20** | — · **nace el 20 sep** al partir C32 (§0) · *la mitad sin proveedor: seis tools, registro, esquemas de function calling e invariante de solo-lectura por introspección* · **resuelve la decisión abierta del §6.1 del diseño difiriéndola**: `consultar_disponibilidad` se sirve desde `ai.pos_projection` con **etiqueta cualitativa**, porque `QTY_BUCKETS` son dígitos y el bucket crudo en el contexto del modelo es una cifra de stock |
 | **C32b** | `add-sales-assistant-agent-loop` | Python | **C32a** | ✅ **archivado 2026-09-21** | — · **hereda de C31 el patrón del techo, no la cifra**: cinco vueltas no caben en 3, y el techo pasa a **8 por petición** (1 enrutador + ≤5 vueltas + ≤2 argumentario), más el de tokens que nadie había escrito. **Ruta propia `POST /v1/assist/agent`**, porque el peor caso son ~15-20 s contra los 5 s que el §6.4 declara para `/v1/assist`. Su tool `pedir_aclaracion` **no es** la `clarification_question` de C31: elige **eje** de un enum cerrado y el texto lo sigue escribiendo el código |
 | ~~**C33**~~ | ~~`add-pos-sales-profile`~~ | .NET + Python | ~~C19~~ → C08, C12 | ⛔ | **rev. dec. 7** · **anulado el 31 ago** · *rescatable suelto* |
-| **C34** | `add-dotnet-assist-and-recommendation-endpoints` | .NET | C15, C26, **C30a** *(C27 cortado el 12 sep)* | 🔴 | — · *prereq afinado el 13 sep: depende de la **forma**, no de la prosa — es la razón del corte* · **gana los dos avisos de stock y `?question=`** · **y de C31, la ruta de la consulta libre más tres códigos nuevos de `warnings[]`** (`query_out_of_domain`, `query_not_in_catalogue`, `knowledge_not_covered`) y el campo `clarification_question`, que deja de ser nulo. **`intent` gana tres valores**: un consumidor que compare contra `unclassified` verá `in_domain`, `out_of_domain` y `not_in_catalogue`. **El presupuesto de 5 s se hereda sin resolver**, y C31 no lo empeora: el enrutador corre sólo en M1, que no tiene ruta .NET |
+| **C34** | `add-dotnet-assist-and-recommendation-endpoints` | .NET | C15, C26, **C30a** *(C27 cortado el 12 sep)* | 🔴 | — · *prereq afinado el 13 sep: depende de la **forma**, no de la prosa — es la razón del corte* · **gana los dos avisos de stock y `question`** · **y de C31** ~~la ruta de la consulta libre~~ *(no entra: 21 sep)* **tres códigos nuevos de `warnings[]`** (`query_out_of_domain`, `query_not_in_catalogue`, `knowledge_not_covered`) y el campo `clarification_question`, que deja de ser nulo. **`intent` gana tres valores**: un consumidor que compare contra `unclassified` verá `in_domain`, `out_of_domain` y `not_in_catalogue`. ~~**El presupuesto de 5 s se hereda sin resolver**~~ · **explorado el 21 sep** ([informe](informes/c34-exploration-decisions.md)): **sólo las dos rutas del card**, porque en M1 y en el agente los marcadores no dicen de qué pieza son; `POST` con `question` en el cuerpo; el presupuesto pasa a **10 s** porque 5 s cortan el **7,5 %**; y la zona gana `deploy/demo/` para encender la generación en la demo |
 | ~~**C35**~~ | ~~`add-inventory-agent-proposals`~~ | Python | C26, C29, C32, C33 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
 | **C36** | `add-frontend-assist-card-and-family-disambiguation` | Frontend | C16, C34 | 🔴 | — · **hereda de C31 tres filas más en la tabla de copy** —los dos rechazos, que son **dos textos distintos** y no uno, más «el corpus no cubre esta pregunta»— y **una excepción razonada**: `clarification_question` viaja **como prosa ya resuelta** y no como código, porque el contrato la tipa así; el frontend la pinta tal cual. **Pintar el rechazo igual que `abstained` borraría la distinción** que las dos cifras publicadas existen para sostener |
 | ~~**C37**~~ | ~~`add-frontend-inventory-review-and-print`~~ | Frontend | C29, C35 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
@@ -1625,15 +1658,15 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 #### C34 · `add-dotnet-assist-and-recommendation-endpoints` 🔴
 
-**Objetivo.** Exponer venta asistida, sustitutos y complementarios con hidratación y resolución de placeholders.
-**Prereq.** C15, C26, **C30a** *(afinado el 13 sep: este change depende de la **forma** de la respuesta y no de la prosa, y ésa es precisamente la razón por la que C30 se partió — con C30a archivado, C34 puede abrirse sin esperar al argumentario)* *(C27 **cayó** el 12 sep: la cláusula condicional se ejecuta — fuera la ruta `.../recommendations` y fuera su test `Recommendations_ManualPairsRankedFirst`, y el resto del change no se toca, tal como esta ficha ya instruía)* · **Zona.** `API/Controllers/`, `Application/`
-**Alcance.** `GET /api/ai/products/{id}/sales-assist` y `.../substitutes?pointOfSaleId=`; **sustitución de `{{price}}`/`{{stock}}`** por valores reales; **rechazo de la respuesta si queda algún placeholder sin resolver**.
+**Objetivo.** Exponer venta asistida y sustitutos con hidratación y resolución de placeholders. *(Los complementarios salieron con C27 el 12 sep; corregido el 21 sep.)*
+**Prereq.** C15, C26, **C30a** *(afinado el 13 sep: este change depende de la **forma** de la respuesta y no de la prosa, y ésa es precisamente la razón por la que C30 se partió — con C30a archivado, C34 puede abrirse sin esperar al argumentario)* *(C27 **cayó** el 12 sep: la cláusula condicional se ejecuta — fuera la ruta `.../recommendations` y fuera su test `Recommendations_ManualPairsRankedFirst`, y el resto del change no se toca, tal como esta ficha ya instruía)* · **Zona.** `API/Controllers/`, `Application/` **+ `deploy/demo/` y `compose.demo.yaml`** *(añadidos el 21 sep, sólo para la última tarea: activar la generación en la demo)*
+**Alcance** *(reescrito el 21 sep al explorar C34; ver la revisión de abajo)*. **`POST /api/ai/products/{id}/sales-assist`** con cuerpo `{pointOfSaleId, question?}` y **`GET /api/ai/products/{id}/substitutes?pointOfSaleId=&pageSize=`**, las dos con el punto de venta **obligatorio**; **sustitución de `{{price}}`/`{{stock}}` contra la pieza anclada**; **retirada del argumentario —no de la respuesta— si queda algún marcador sin resolver**; y, como última tarea, **la generación encendida en la demo**. *(Decía `GET …/sales-assist` sin punto de venta y «rechazo de la respuesta si queda algún placeholder sin resolver».)*
 **Dos añadidos del 13 sep, y los dos vienen de que la autoridad sobre el dato es de aquí:**
 
 - **Los dos avisos de stock.** `stock_critical` y `family_members_out_of_stock` **se calculan aquí, tras hidratar**, y se apilan sobre los códigos estructurales que trae C30a (`family_has_variants`, `size_label_missing`). En Python sólo existe `qty_bucket`, declarado como algo que *«never emitted: a bucket on the wire would be the beginning of one»* y capaz de desfasarse minutos: un aviso «stock crítico» mostrado cuando hay doce unidades en el cajón no es un matiz, es la credibilidad del asistente en el mostrador. **Es el segundo caso de la misma forma** que la exclusión por stock que la nota de abajo recoge — misma regla, no una distinta.
-- **`?question=` en `/sales-assist`.** Un parámetro opcional que viaja al modo **M3** de `POST /v1/assist/sale`. Es el camino más barato que existe para que el corpus de conocimiento de C23 —32 documentos y 161 fragmentos, indexados desde el 6 de septiembre— llegue por fin a una pantalla: hoy **no tiene ninguna ruta hasta el joyero**, porque esta ficha sólo exponía rutas por pieza y C36 sólo pinta un card. No hay ruta nueva ni contrato nuevo: un parámetro y un `question` en el cuerpo que se reenvía.
+- **`question` en `/sales-assist`.** Un campo opcional que viaja al modo **M3** de `POST /v1/assist/sale`. Es el camino más barato que existe para que el corpus de conocimiento de C23 —32 documentos y 161 fragmentos, indexados desde el 6 de septiembre— llegue por fin a una pantalla: hoy **no tiene ninguna ruta hasta el joyero**, porque esta ficha sólo exponía rutas por pieza y C36 sólo pinta un card. No hay contrato nuevo en Python: un `question` que se reenvía. *(Hasta el 21 sep decía `?question=` en la URL; pasa al **cuerpo de un `POST`** porque es texto libre del cliente y en una URL acaba en el log de acceso de nginx — D-B del [informe](informes/c34-exploration-decisions.md).)*
 
-**Tests.** `SalesAssist_ReplacesPlaceholdersWithRealValues`; `SalesAssist_WhenPlaceholderUnresolved_ReturnsErrorInsteadOfRawTemplate`; `Substitutes_ExcludeProductsWithoutStockAtTargetPos`; `SalesAssist_AsOperatorOfAnotherPos_Returns403`; **`SalesAssist_StockWarningsComputedAfterHydration_NotTakenFromPython`**; **`SalesAssist_WithQuestion_ReturnsCitationsCarryingClaimScope`**. *(`Recommendations_ManualPairsRankedFirst` no se escribe: su ruta se retiró con C27.)*
+**Tests.** `SalesAssist_ReplacesPlaceholdersWithRealValues`; **`SalesAssist_WhenPlaceholderUnresolved_WithholdsThePitchInsteadOfShippingTheRawTemplate`** *(renombrado el 21 sep: era `…_ReturnsErrorInsteadOfRawTemplate`, y lo que se retira es el argumentario, no la respuesta)*; `Substitutes_ExcludeProductsWithoutStockAtTargetPos`; `SalesAssist_AsOperatorOfAnotherPos_Returns403`; **`SalesAssist_StockWarningsComputedAfterHydration_NotTakenFromPython`**; **`SalesAssist_WithQuestion_ReturnsCitationsCarryingClaimScope`**; y **los catorce que añade la exploración del 21 sep**, uno por decisión que lo necesita, en el §7 del [informe](informes/c34-exploration-decisions.md). *(`Recommendations_ManualPairsRankedFirst` no se escribe: su ruta se retiró con C27.)*
 **Conflicto de zona.** Mismo controlador que C15 → nunca simultáneos.
 
 > **Revisada el 2026-09-13, al implementar C30a. La ficha se sostiene entera; se le añaden
@@ -1672,6 +1705,10 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 > eso se deja, pero conviene saberlo antes de medir aquí. Está en el §7 de
 > [`c26-implementation-measurements.md`](informes/c26-implementation-measurements.md).
 
+> ⚠ **Refutada en parte el 2026-09-21, al explorar C34** — la ruta de la consulta libre **no entra
+> en este change**, y el párrafo «Ninguna hidratación nueva» de abajo **es falso**: los marcadores
+> no dicen de qué pieza son. Ver la revisión que sigue a esta anotación. Se conserva como registro.
+>
 > **La consulta libre gana ruta, y la ruta es de aquí** *(anotado el 2026-09-14, al explorar
 > C31)*. C31 pone argumentario en el modo **M1** —consulta sin pieza—, con lo que ese modo deja
 > de ser un hueco del servicio y pasa a tener respuesta redactada, **rechazo cortés** y
@@ -1690,10 +1727,11 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 > copy para códigos de vocabulario cerrado: el rechazo y la repregunta son **dos filas más de esa
 > tabla**, no un componente nuevo.
 >
-> **Ninguna hidratación nueva.** M1 no ancla pieza, así que no hay más `{{price}}` ni `{{stock}}`
+> ~~**Ninguna hidratación nueva.** M1 no ancla pieza, así que no hay más `{{price}}` ni `{{stock}}`
 > que los de los candidatos, que es el mismo camino que `/sales-assist` ya recorre; y el rechazo
 > del enrutador llega **sin grupos**, con lo que no hay nada que hidratar en el caso que esta
-> anotación añade.
+> anotación añade.~~ **Falso** *(21 sep)*: en M1 el argumentario habla de **varias piezas** con
+> los mismos dos tokens, y .NET no puede saber a cuál se refiere cada uno sin adivinar.
 >
 > **Lo único que esta ficha hereda de C31 es mapear el veredicto a pantalla, y ahí hay una
 > distinción que no se puede perder.** `abstained: true` y el rechazo del enrutador son **dos
@@ -1703,6 +1741,36 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 > con la misma pantalla borra justamente la distinción que las **dos cifras publicadas por
 > separado** existen para sostener. La tercera, `clarification_question`, no es una negativa: es
 > una petición de dato, y su pantalla tiene que invitar a escribir, no cerrar la consulta.
+
+> **Revisada el 2026-09-21, al explorar C34.** Catorce decisiones, cuatro de ellas cerradas con el
+> desarrollador en la sesión, y cinco mediciones reproducibles, todas en
+> [`c34-exploration-decisions.md`](informes/c34-exploration-decisions.md). Lo que cambia en esta
+> ficha:
+>
+> - **Sólo las dos rutas del card** *(cerrada)*. Ni la consulta libre ni la ruta del agente: en las
+>   dos, el argumentario habla de varias piezas con los mismos `{{price}}` y `{{stock}}`, y no hay a
+>   cuál asignarlos. El arreglo es pequeño y es de Python —prohibir los marcadores en las tareas sin
+>   pieza anclada, porque las filas ya enseñan el precio hidratado—, y queda identificado y no hecho.
+>   **El §15.12 del diseño sigue siendo cierto.**
+> - **`POST` con `question` en el cuerpo** *(cerrada)*, y `pointOfSaleId` obligatorio en las dos rutas,
+>   con la regla de C15.
+> - **Los marcadores se resuelven contra la pieza anclada**: el precio con formato «39,90 €» y el
+>   stock **como entero**, porque el 88,3 % de los 213 argumentarios de C30b lo escribe como número
+>   («tenemos {{stock}} en tienda»). Si queda cualquier `{{…}}`, **se retira el argumentario y se
+>   sirve el resto**, que es la misma política de las puertas de C30b.
+> - **Pieza anclada con stock 0** *(cerrada)*: sin pregunta se retira el argumentario —147 de 213
+>   escriben «disponible por {{price}}» antes de saber el stock—; con pregunta se sustituye el 0.
+> - **El presupuesto de 5 s pasa a 10 s**, derivado del peor caso de Python (2 × 4 s): con 5 s se
+>   cortaría el **7,5 %** de las peticiones en el ancho que se sirve. Además, **ningún reintento en
+>   timeout** y un 422 que deja de leerse como «IA no disponible».
+> - **`family_has_variants` se recalcula tras hidratar**: sin eso, el **19,2 %** de las piezas
+>   ancladas con familia llevaría un aviso de variantes falso. **`stock_critical` = 1 o 2 unidades**,
+>   configurable, frente a las dos definiciones incompatibles que .NET ya tiene.
+> - **Sustitutos con la ventana máxima (`top_k = 20`)**: con la de 15, en Fornells el **71,1 %** de
+>   las piezas ancladas no llenaría una página de 5; con la de 60, el 7,1 %.
+> - **Activar la generación en la demo es la última tarea** *(cerrada)*, con los cuatro pasos ya
+>   escritos en `DEFERRED_TASKS.md` más la configuración .NET de la demo y una nueva medición de la
+>   memoria del `t3.small`.
 
 ---
 
@@ -1725,7 +1793,7 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 **Alcance.** Card con argumentario, avisos calculados y citas desplegables; bloque de **variantes de la familia con `variant_label` destacado y confirmación explícita antes de vender**; bloque de sustitutos cuando `stock = 0`. ~~Bloque "También puede encajar" con complementarios~~ — **retirado el 12 sep con el corte de C27** (§0): la card entrega **tres bloques de los cuatro previstos**, y el que falta se declara en el §15 del diseño con su medición, no se calla.
 **Dos añadidos del 13 sep:**
 
-- **Caja de pregunta en el card**, que llama a `/sales-assist?question=` (C34) y con ella al modo **M3**. Es la superficie por la que el corpus de C23 llega al joyero, y cubre la situación real del mostrador: el cliente tiene la pieza en la mano y pregunta. Las citas que se despliegan **deben distinguir `claim_scope`**: un compromiso de la casa —**25 de los 161 fragmentos**— no se presenta con el mismo aspecto que un hecho del mundo, y la ficha de `baño de oro` dice ella misma que sus condiciones *«se confirman en tienda antes de trasladarlas a un cliente»*.
+- **Caja de pregunta en el card**, que llama a `POST /api/ai/products/{id}/sales-assist` (C34) con `question` en el cuerpo y con ella al modo **M3** *(corregido el 21 sep: decía `/sales-assist?question=`; la pregunta del cliente pasa al cuerpo para que no acabe en el log de acceso de nginx — D-B del [informe de C34](informes/c34-exploration-decisions.md))*. Es la superficie por la que el corpus de C23 llega al joyero, y cubre la situación real del mostrador: el cliente tiene la pieza en la mano y pregunta. Las citas que se despliegan **deben distinguir `claim_scope`**: un compromiso de la casa —**25 de los 161 fragmentos**— no se presenta con el mismo aspecto que un hecho del mundo, y la ficha de `baño de oro` dice ella misma que sus condiciones *«se confirman en tienda antes de trasladarlas a un cliente»*.
 - **Tabla de copy para los códigos de aviso.** C30a y C34 emiten **códigos**, no prosa, así que el castellano lo escribe esta capa. Hay precedente literal en la spec viva del panel —*«MUST NOT render the retriever's raw match reason values, which are engineering vocabulary»*—, incluida su regla de tolerar un valor desconocido con una etiqueta neutra en vez de romper la fila.
 
 > **Revisada el 2026-09-13, al implementar C30a. Sin cambios de alcance, y con dos garantías
@@ -1878,7 +1946,7 @@ flowchart LR
 
 **Y el hueco que el corte de C27 deja a la vista, que conviene no perder de vista al elegir el siguiente:** `ai-service/src/jbg_ai/assist/` **no existe**. C30a, C30b, C31 y C32 están a cero, y son lo que el rubro del PF nombra por su nombre —*«escala desde un prototipo CAG hasta un sistema RAG **con agentes**»*—. Ésa, y no complementarios, es la deuda grande que queda.
 
-**Un segundo hueco, descubierto el 13 sep al explorar C30 y que tampoco es de C30:** el corpus de conocimiento de C23 —32 documentos, 161 fragmentos, indexado y calibrado desde el 6 de septiembre— **no tiene ninguna ruta hasta la pantalla del joyero**. C34 exponía sólo rutas por pieza y C36 sólo un card. Se cierra con `?question=` en C34 y una caja de pregunta en C36, las dos anotadas en sus fichas. Sin eso, una capacidad que costó una sesión entera sólo se demostraría en el arnés.
+**Un segundo hueco, descubierto el 13 sep al explorar C30 y que tampoco es de C30:** el corpus de conocimiento de C23 —32 documentos, 161 fragmentos, indexado y calibrado desde el 6 de septiembre— **no tiene ninguna ruta hasta la pantalla del joyero**. C34 exponía sólo rutas por pieza y C36 sólo un card. Se cierra con un `question` en C34 —en el cuerpo de un `POST`, no en la URL *(corregido el 21 sep)*— y una caja de pregunta en C36, las dos anotadas en sus fichas. Sin eso, una capacidad que costó una sesión entera sólo se demostraría en el arnés.
 
 ---
 
