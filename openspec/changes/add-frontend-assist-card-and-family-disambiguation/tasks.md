@@ -56,7 +56,7 @@
 - [x] 7.9 `should fill and send in one act from a suggested question`, `should reject a question over five hundred characters before sending` y `should never put the question in the url`
 - [x] 7.10 `should distinguish a rate limited response from an unavailable service` y el 404 como «esta tienda no lleva la pieza»
 - [x] 7.11 `should reach the card from the result row, the sale page and the scan page`, y que el panel de C16 conserva su selección para venta intacta
-- [ ] 7.12 **Mutaciones de control**: romper a mano la preselección, la etiqueta neutra y el disparador de sustitutos, comprobar que fallan exactamente los tests que deben, y revertir
+- [x] 7.12 **Mutaciones de control**: romper a mano la preselección, la etiqueta neutra y el disparador de sustitutos, comprobar que fallan exactamente los tests que deben, y revertir
 
 ## 8. Cierre
 
