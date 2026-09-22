@@ -45,17 +45,17 @@
 
 ## 7. Tests
 
-- [ ] 7.1 Montar el entorno de test del card envolviendo `AuthProvider` —y `CartProvider` donde toque—, con los servicios sustituidos por `vi.mock`, sobre la plantilla de `pages/sales/__tests__/cart.test.tsx`
-- [ ] 7.2 `should issue exactly one assist request per visit` y `should not retry a failed assist request`
-- [ ] 7.3 `should require variant confirmation when family has multiple members`, `should preselect no member when the group has several` y `should carry the chosen member to the manual sale page`
-- [ ] 7.4 `should degrade a member row with no variant label to its sku`
-- [ ] 7.5 `should render citations when pitch has sources`, `should mark an establishment claim differently from a general one` y `should hide citations when the argument was withheld`
-- [ ] 7.6 `should fall back to a neutral label for an unknown warning code` y `should render size label missing as a piece attribute and not as a warning`
-- [ ] 7.7 `should tell a degraded card from one whose argument was not generated` y `should say what to do next when the argument is withheld`
-- [ ] 7.8 `should show substitutes block when selected product is out of stock`, `should not request substitutes when the card is degraded`, `should tell the four substitute outcomes apart` y `should declare a short substitutes page instead of padding it`
-- [ ] 7.9 `should fill and send in one act from a suggested question`, `should reject a question over five hundred characters before sending` y `should never put the question in the url`
-- [ ] 7.10 `should distinguish a rate limited response from an unavailable service` y el 404 como «esta tienda no lleva la pieza»
-- [ ] 7.11 `should reach the card from the result row, the sale page and the scan page`, y que el panel de C16 conserva su selección para venta intacta
+- [x] 7.1 Montar el entorno de test del card envolviendo `AuthProvider` —y `CartProvider` donde toque—, con los servicios sustituidos por `vi.mock`, sobre la plantilla de `pages/sales/__tests__/cart.test.tsx`
+- [x] 7.2 `should issue exactly one assist request per visit` y `should not retry a failed assist request`
+- [x] 7.3 `should require variant confirmation when family has multiple members`, `should preselect no member when the group has several` y `should carry the chosen member to the manual sale page`
+- [x] 7.4 `should degrade a member row with no variant label to its sku`
+- [x] 7.5 `should render citations when pitch has sources`, `should mark an establishment claim differently from a general one` y `should hide citations when the argument was withheld`
+- [x] 7.6 `should fall back to a neutral label for an unknown warning code` y `should render size label missing as a piece attribute and not as a warning`
+- [x] 7.7 `should tell a degraded card from one whose argument was not generated` y `should say what to do next when the argument is withheld`
+- [x] 7.8 `should show substitutes block when selected product is out of stock`, `should not request substitutes when the card is degraded`, `should tell the four substitute outcomes apart` y `should declare a short substitutes page instead of padding it`
+- [x] 7.9 `should fill and send in one act from a suggested question`, `should reject a question over five hundred characters before sending` y `should never put the question in the url`
+- [x] 7.10 `should distinguish a rate limited response from an unavailable service` y el 404 como «esta tienda no lleva la pieza»
+- [x] 7.11 `should reach the card from the result row, the sale page and the scan page`, y que el panel de C16 conserva su selección para venta intacta
 - [ ] 7.12 **Mutaciones de control**: romper a mano la preselección, la etiqueta neutra y el disparador de sustitutos, comprobar que fallan exactamente los tests que deben, y revertir
 
 ## 8. Cierre

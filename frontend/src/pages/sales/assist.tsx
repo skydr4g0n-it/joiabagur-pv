@@ -105,12 +105,19 @@ export function SalesAssistCardPage() {
   const requestSeq = useRef(0);
 
   /**
-   * Whether the one request of this visit has been issued.
+   * The point of sale the one request of this visit was issued for, or null before it was.
    *
-   * A ref and not state, because it must be true *before* the render that follows the request
+   * A ref and not state, because it must be set *before* the render that follows the request
    * rather than after it — a state flag would let a second effect run first and pay twice.
+   *
+   * It holds the point of sale rather than a boolean so that the one thing that legitimately
+   * asks for another card is told apart from the three that must not. Re-rendering, the
+   * response arriving and a failure all leave it equal and issue nothing; an operator naming a
+   * different shop is an explicit act, like navigating here in the first place, and the card it
+   * asks for is a different card. Keeping the old shop's prices under the new shop's name would
+   * be the screen stating something false.
    */
-  const askedRef = useRef(false);
+  const askedForRef = useRef<string | null>(null);
 
   const [pointsOfSale, setPointsOfSale] = useState<PointOfSale[]>([]);
   const [pointOfSaleId, setPointOfSaleId] = useState<string>(navigatedPointOfSaleId ?? '');
@@ -200,8 +207,9 @@ export function SalesAssistCardPage() {
    * re-enters here** — the retry button calls `requestAssist` directly.
    */
   useEffect(() => {
-    if (!productId || !pointOfSaleId || askedRef.current) return;
-    askedRef.current = true;
+    if (!productId || !pointOfSaleId) return;
+    if (askedForRef.current === pointOfSaleId) return;
+    askedForRef.current = pointOfSaleId;
     void requestAssist();
   }, [productId, pointOfSaleId, requestAssist]);
 
@@ -224,7 +232,12 @@ export function SalesAssistCardPage() {
    */
   useEffect(() => {
     if (!response || !productId || !anchor) return;
-    if (anchor.hasStock) return;
+    if (anchor.hasStock) {
+      // Cleared rather than left behind: another shop is another assortment, and a block of
+      // alternatives for a piece that this shop does have would answer a question nobody asked.
+      setSubstitutes({ kind: 'idle' });
+      return;
+    }
 
     if (!response.aiAvailable) {
       setSubstitutes({ kind: 'not-requested' });
