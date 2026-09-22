@@ -13,9 +13,9 @@
 
 ## 3. Tabla de copia
 
-- [ ] 3.1 Crear `frontend/src/lib/assist-copy.ts` con funciones exportadas: los **cinco** códigos de aviso alcanzables, la **etiqueta neutra**, los **cinco mensajes** de los seis estados del argumentario y los **cuatro** desenlaces de sustitutos
-- [ ] 3.2 Añadir las **cinco preguntas sugeridas** del corpus: mojar la pieza, piel sensible, limpieza en casa, regalo sin saber la talla, playa o piscina
-- [ ] 3.3 Tests directos del módulo, incluido `should label a router refusal code with the neutral fallback` para los dos códigos inalcanzables
+- [x] 3.1 Crear `frontend/src/lib/assist-copy.ts` con funciones exportadas: los **cinco** códigos de aviso alcanzables, la **etiqueta neutra**, los **cinco mensajes** de los seis estados del argumentario y los **cuatro** desenlaces de sustitutos
+- [x] 3.2 Añadir las **cinco preguntas sugeridas** del corpus: mojar la pieza, piel sensible, limpieza en casa, regalo sin saber la talla, playa o piscina
+- [x] 3.3 Tests directos del módulo, incluido `should label a router refusal code with the neutral fallback` para los dos códigos inalcanzables
 
 ## 4. Componentes de la ficha
 
