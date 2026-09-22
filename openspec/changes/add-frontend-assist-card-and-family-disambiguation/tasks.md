@@ -7,9 +7,9 @@
 
 ## 2. Contrato y servicio
 
-- [ ] 2.1 Crear `frontend/src/types/sales-assist.types.ts` fiel a `SalesAssistDtos.cs`: `SalesAssistResponse`, `SalesAssistGroup`, `SalesAssistMember`, `SalesAssistCitation`, `SubstitutesResponse`, `SubstituteResult`, y los dos enumerados **en snake_case** tal como .NET los serializa
-- [ ] 2.2 Crear `frontend/src/services/sales-assist.service.ts` con las dos llamadas y desenlaces tipados que **nunca lanzan**, siguiendo `ai-search.service.ts`, con miembros propios para 429 y para 404
-- [ ] 2.3 Tests del servicio: cada código de estado del backend cae en su miembro, y ninguna llamada propaga una excepción
+- [x] 2.1 Crear `frontend/src/types/sales-assist.types.ts` fiel a `SalesAssistDtos.cs`: `SalesAssistResponse`, `SalesAssistGroup`, `SalesAssistMember`, `SalesAssistCitation`, `SubstitutesResponse`, `SubstituteResult`, y los dos enumerados **en snake_case** tal como .NET los serializa
+- [x] 2.2 Crear `frontend/src/services/sales-assist.service.ts` con las dos llamadas y desenlaces tipados que **nunca lanzan**, siguiendo `ai-search.service.ts`, con miembros propios para 429 y para 404
+- [x] 2.3 Tests del servicio: cada código de estado del backend cae en su miembro, y ninguna llamada propaga una excepción
 
 ## 3. Tabla de copia
 
