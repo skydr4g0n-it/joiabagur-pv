@@ -19,13 +19,13 @@
 
 ## 4. Componentes de la ficha
 
-- [ ] 4.1 Cabecera de la pieza: foto, nombre, SKU, precio en es-ES/EUR, unidades en esa tienda, y **«Sin talla declarada» como atributo junto al SKU**, nunca como alerta
-- [ ] 4.2 Bloque de avisos con los cuatro códigos restantes y la etiqueta neutra para cualquier otro
-- [ ] 4.3 Bloque de argumentario: los seis estados pintados como cinco mensajes, con los tres retenidos terminando en una acción, y `ai_unavailable` separado de `not_generated`
-- [ ] 4.4 Citas plegadas por defecto con documento, sección y fragmento; `claimScope` distinguido con insignia y frase propias; **ocultas cuando el argumentario no se entrega**
-- [ ] 4.5 Bloque de familia: una fila y un botón por miembro, **sin preselección**, con etiqueta de variante destacada, precio, unidades, marca de agotado, marca del ancla, y degradación al SKU cuando falta la etiqueta
-- [ ] 4.6 Caja de pregunta con las cinco sugeridas que rellenan y envían en un solo acto, y el límite de **500 caracteres** comprobado antes de enviar
-- [ ] 4.7 Bloque de sustitutos con los cuatro desenlaces, el orden recibido y la **página corta declarada y no rellenada**
+- [x] 4.1 Cabecera de la pieza: foto, nombre, SKU, precio en es-ES/EUR, unidades en esa tienda, y **«Sin talla declarada» como atributo junto al SKU**, nunca como alerta
+- [x] 4.2 Bloque de avisos con los cuatro códigos restantes y la etiqueta neutra para cualquier otro
+- [x] 4.3 Bloque de argumentario: los seis estados pintados como cinco mensajes, con los tres retenidos terminando en una acción, y `ai_unavailable` separado de `not_generated`
+- [x] 4.4 Citas plegadas por defecto con documento, sección y fragmento; `claimScope` distinguido con insignia y frase propias; **ocultas cuando el argumentario no se entrega**
+- [x] 4.5 Bloque de familia: una fila y un botón por miembro, **sin preselección**, con etiqueta de variante destacada, precio, unidades, marca de agotado, marca del ancla, y degradación al SKU cuando falta la etiqueta
+- [x] 4.6 Caja de pregunta con las cinco sugeridas que rellenan y envían en un solo acto, y el límite de **500 caracteres** comprobado antes de enviar
+- [x] 4.7 Bloque de sustitutos con los cuatro desenlaces, el orden recibido y la **página corta declarada y no rellenada**
 
 ## 5. Página y ruta
 
