@@ -199,6 +199,23 @@ public class AiGatewayClientTests
         handler.RequestCount.Should().Be(1, "a mismatched secret is not fixed by trying again");
     }
 
+    /// <summary>
+    /// C34 reads a 422 as a rejection on sale assistance and substitutes only. The translation is
+    /// shared by the whole client, and every other operation keeps reading it as unavailability.
+    /// </summary>
+    [Fact]
+    public async Task SearchAsync_When422_StillThrowsUnavailable()
+    {
+        var handler = new FakeHttpMessageHandler().AlwaysRespond(HttpStatusCode.UnprocessableEntity);
+        await using var provider = AiGatewayTestHost.Build(handler);
+
+        var act = async () => await provider.Client().SearchAsync(AnyRequest(), AnyScope());
+
+        (await act.Should().ThrowAsync<AiUnavailableException>())
+            .Which.Should().NotBeOfType<AiRequestRejectedException>();
+        handler.RequestCount.Should().Be(1, "a 4xx other than 408 is not retried");
+    }
+
     [Fact]
     public async Task SearchAsync_WhenServiceReturns503_RetriesOnceThenSucceeds()
     {

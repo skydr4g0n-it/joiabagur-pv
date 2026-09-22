@@ -8,6 +8,7 @@ using JoiabagurPV.Application.Exceptions;
 using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Infrastructure.Data;
+using JoiabagurPV.Tests.TestHelpers;
 using JoiabagurPV.Tests.TestHelpers.Mothers;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -281,13 +282,9 @@ public class AiCatalogControllerTests : IAsyncLifetime
     }
 
     /// <summary>Returns one proposal so the string-enum bind can be asserted end to end.</summary>
-    private sealed class SucceedingGateway(Guid productId) : IAiGatewayClient
+    private sealed class SucceedingGateway(Guid productId) : ThrowingAiGatewayClient
     {
-        public Task<AiSearchResponse> SearchAsync(
-            AiSearchRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AiEnrichResponse> EnrichAsync(
+        public override Task<AiEnrichResponse> EnrichAsync(
             AiEnrichRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
             Task.FromResult(new AiEnrichResponse
             {
@@ -309,44 +306,23 @@ public class AiCatalogControllerTests : IAsyncLifetime
                 PromptVersion = "enrichment/v1",
                 Usage = new AiUsage()
             });
-
-        public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AiFamilyAuditResponse> AuditFamiliesAsync(
-
-            AiFamilyAuditRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-
-            throw new NotSupportedException();
-
-
-        public Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
-            AiFamilySuggestRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
     }
 
     /// <summary>A gateway that only knows how to fail, in the way the test chooses.</summary>
-    private sealed class ThrowingGateway(Func<Exception> failure) : IAiGatewayClient
+    private sealed class ThrowingGateway(Func<Exception> failure) : ThrowingAiGatewayClient
     {
-        public Task<AiSearchResponse> SearchAsync(
+        public override Task<AiSearchResponse> SearchAsync(
             AiSearchRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
             throw failure();
 
-        public Task<AiEnrichResponse> EnrichAsync(
+        public override Task<AiEnrichResponse> EnrichAsync(
             AiEnrichRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
             throw failure();
 
-        public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
+        public override Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
             throw failure();
 
-        public Task<AiFamilyAuditResponse> AuditFamiliesAsync(
-
-            AiFamilyAuditRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-
-            throw new NotSupportedException();
-
-
-        public Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
+        public override Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
             AiFamilySuggestRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
             throw failure();
     }
@@ -355,13 +331,9 @@ public class AiCatalogControllerTests : IAsyncLifetime
     /// Simulates the competing batch by writing the rival profile from inside the model call —
     /// which is exactly where the real window is.
     /// </summary>
-    private sealed class RaceWinningGateway(Guid productId, IServiceProvider services) : IAiGatewayClient
+    private sealed class RaceWinningGateway(Guid productId, IServiceProvider services) : ThrowingAiGatewayClient
     {
-        public Task<AiSearchResponse> SearchAsync(
-            AiSearchRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public async Task<AiEnrichResponse> EnrichAsync(
+        public override async Task<AiEnrichResponse> EnrichAsync(
             AiEnrichRequest request, AiCallScope scope, CancellationToken cancellationToken = default)
         {
             using var scoped = services.CreateScope();
@@ -404,20 +376,6 @@ public class AiCatalogControllerTests : IAsyncLifetime
                 Usage = new AiUsage()
             };
         }
-
-        public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AiFamilyAuditResponse> AuditFamiliesAsync(
-
-            AiFamilyAuditRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-
-            throw new NotSupportedException();
-
-
-        public Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
-            AiFamilySuggestRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
     }
 
     private async Task AssertProfileCountAsync(int expected, string because)

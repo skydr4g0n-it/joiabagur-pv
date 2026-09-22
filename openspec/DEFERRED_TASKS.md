@@ -384,6 +384,14 @@ does — which is the whole point of D18. No resizing, and the swap file the des
 mitigation is not needed at these numbers. Re-measure if the corpus grows by an order of
 magnitude or if a generative route lands.
 
+> **A generative route landed with C34** (2026-09-21): the demo configuration now passes
+> `JPV_ASSIST_LLM_API_KEY` to `jbg-demo-ai` and switches the sale card on. **The re-measurement is
+> pending** because it needs the parameter created by hand and a deployment (C34 tasks 11.3 and
+> 11.4). What to record here when it is done: `docker stats --no-stream jbg-demo-ai` after a
+> handful of sale assistance requests, against the 512 MiB cap and the 232,5 MiB above; and
+> whether several requests in a row hit the organisation's tokens-per-minute quota before the
+> money does — the constraint C32b measured on the agent route.
+
 ---
 
 ## **Este repositorio no tiene CI** — causa ya documentada, confirmada el 2026-08-30
@@ -604,8 +612,27 @@ one sheet* · `ai-service/tests/knowledge/test_corpus_rules.py:257`
 
 ## C30b — la demo no genera argumentario, y lo que hace falta para que genere
 
-**Estado:** pendiente · **Abierto el:** 2026-09-14 · **Zona:** `deploy/demo/`, `compose.demo.yaml`
+**Estado:** **cerrada en el repositorio por C34** (2026-09-21): los pasos 2, 3 y 4 están hechos, más
+la configuración .NET que el card necesita. **Queda sólo el paso 1 —crear el parámetro— y la
+verificación en el entorno**, que son manuales y del desarrollador (tareas 11.3 y 11.4 de C34).
+· **Abierto el:** 2026-09-14 · **Zona:** `deploy/demo/`, `compose.demo.yaml`
 **No es un fallo:** es el comportamiento declarado, verificado y con test.
+
+> **Lo que C34 hizo con esta entrada** *(2026-09-21)*:
+>
+> | Paso | Estado |
+> |---|---|
+> | 1 · `/jbg-demo/ASSIST_LLM_API_KEY` como `SecureString` | **pendiente, manual** — el comando está abajo y en `deploy/demo/README.md` §3 |
+> | 2 · `deploy.sh` lee el parámetro **sin `:?`** y con `\|\| true` | **hecho**, y además registra `Generation credential: present/absent` —si está, nunca qué es— |
+> | 3 · `JPV_ASSIST_LLM_MODEL` y `JPV_ASSIST_LLM_API_KEY` en `jbg-demo-ai` | **hecho**. La clave se interpola como `${ASSIST_LLM_API_KEY:-}`, con valor por defecto vacío, para que `docker compose config` resuelva también sin el script de despliegue; vacía equivale a no configurada (`blank_assist_llm_key_is_unset`) |
+> | 4 · El parámetro en la lista de secretos manuales del runbook, marcado como el único opcional | **hecho**, con una §5.6b de comprobación del card |
+> | + `AiSalesAssist__EnabledByDefault: "true"` y `AiGateway__AssistTimeoutMs: "10000"` en la API | **hecho** — sin el interruptor el card saldría siempre degradado y sin llamar a la IA |
+>
+> **Dos precisiones a lo que dice la entrada de abajo.** La primera: `prompt_version` ya no pasa a
+> `assist/v1` sino a la versión vigente para M2/M3, **`assist/v3`**. La segunda: con la clave
+> puesta, el log mostrará **también** `stage=router_client … credential=assist_fallback`, porque el
+> enrutador de C31 repliega a esta clave cuando no tiene la suya. Es esperado y no gasta nada: el
+> enrutador sólo corre en M1 —consulta libre sin pieza—, que C34 no expone.
 
 ### Qué pasa hoy
 
@@ -855,7 +882,15 @@ When implementing deferred tasks:
 ## C32b · La política de *timeout* y de circuito de `POST /v1/assist/agent` en la capa .NET
 
 **Estado:** identificada, acotada y **no hecha**. Aplazada **con motivo**: hoy la ruta no tiene
-ningún consumidor.
+ningún consumidor. *(Sigue abierta tras C34, que dejó fuera la ruta del agente por decisión cerrada
+—sus marcadores hablan de varias piezas—.)*
+
+> **Lo que C34 cambia en esta entrada** *(2026-09-21)*. La ruta determinista ya no declara 5 s: C34
+> registró el cliente `ai-assist` para `/v1/assist/sale` con **10 s y un suelo de 8 s validado al
+> arranque**, sin reintento en timeout y con circuito propio. El agente **no debe reutilizarlo**:
+> su techo es otro (15 s más las herramientas de la vuelta en curso) y su circuito tiene que contar
+> `stop_reason=fallo_proveedor`, que la ruta determinista no emite. El patrón a copiar sí está ya:
+> un cliente con nombre por ruta, `HttpClient.Timeout` infinito y el presupuesto en el *pipeline*.
 
 C32b publica `POST /v1/assist/agent` y **nadie la llama**. `IAiGatewayClient` no tiene método para
 ella, no hay pantalla detrás y el change de hidratación no la consume. Escribir su política de

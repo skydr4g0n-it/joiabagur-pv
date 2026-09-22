@@ -22,5 +22,11 @@ public enum AiGatewayOutcome
     ServerError,
 
     /// <summary>The service could not be reached at all.</summary>
-    Transport
+    Transport,
+
+    /// <summary>
+    /// The service refused to process what the request named (HTTP 422 on sale assistance and
+    /// substitutes). An answer, not an outage.
+    /// </summary>
+    Rejected
 }

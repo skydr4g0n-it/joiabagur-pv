@@ -220,6 +220,9 @@ put JWT_SIGNING_KEY          "$(openssl rand -base64 48 | tr -d '/+=')"
 put AI_SERVICE_SHARED_SECRET "$(openssl rand -base64 48 | tr -d '/+=')"
 put INDEX_FEED_SHARED_KEY    "$(openssl rand -base64 32 | tr -d '/+=')"
 put EMBEDDING_API_KEY        "sk-..."      # the provider key, pasted
+
+# OPTIONAL — the only one. Without it the sale card serves no argument (see below).
+put ASSIST_LLM_API_KEY       "sk-..."      # the key the sale argument is generated with
 ```
 
 | Parameter | Injected as | Into |
@@ -230,10 +233,20 @@ put EMBEDDING_API_KEY        "sk-..."      # the provider key, pasted
 | **`AI_SERVICE_SHARED_SECRET`** | `JWT_SECRET` **and** `AiGateway__JwtSecret` | **both** |
 | **`INDEX_FEED_SHARED_KEY`** | `JPV_INDEX_FEED_API_KEY` **and** `IndexFeed__ApiKey` | **both** |
 | `EMBEDDING_API_KEY` | `JPV_EMBEDDING_API_KEY` | AI service |
+| `ASSIST_LLM_API_KEY` *(optional)* | `JPV_ASSIST_LLM_API_KEY` | AI service |
 
 The two rows in bold are **one parameter read twice**, never two parameters. Two
 would be free to drift, and a drifted pair produces a 401 whose cause the AI
 service is specified not to disclose — a failure with no message pointing at it.
+
+**`ASSIST_LLM_API_KEY` is the only secret whose absence is a valid state** (C30b, switched
+on by C34). `deploy.sh` reads it with `|| true` and never validates it as non-empty. Without
+it no generation client is built: the sale assistance route still answers 200 with the group,
+the warnings and the citations, but no argument — `prompt_version: null`, which the card
+reports as `pitchStatus: not_generated`. Deleting the parameter and redeploying is therefore
+also the rollback of the generation. Separate from `EMBEDDING_API_KEY` on purpose, so the two
+costs can be told apart; it may hold the same provider key. **Terraform is not touched**: the
+instance role already reads the whole `/jbg-demo/` prefix.
 
 What is **not** here, and must not be added: the embedding model, the retrieval
 distance threshold, and stub mode. Those are versioned literals in
@@ -421,6 +434,36 @@ Sign in as the **operator** account, run a natural-language search from
 «Buscar con Ayuda», and confirm the badge reports the **assisted** origin — not
 the degraded lexical path. A degraded badge with results still looks like it
 works, which is precisely why it has to be read rather than assumed.
+
+### 5.6b The sale card generates (C34)
+
+The card has two routes, `POST /api/ai/products/{productId}/sales-assist` and
+`GET /api/ai/products/{productId}/substitutes`, both switched on in this environment by
+`AiSalesAssist__EnabledByDefault: "true"` and with the generative budget pinned by
+`AiGateway__AssistTimeoutMs: "10000"` (start-up refuses anything below 8000). Three checks,
+none of which needs the console or a key:
+
+1. **The credential was picked up.** In `docker logs jbg-demo-ai`, after the first sale
+   assistance request (the client is built lazily, once per process):
+
+   ```text
+   stage=assist_client model=openai/gpt-4o-mini timeout_s=4.0 credential=assist
+   ```
+
+   `credential=rag_fallback` would mean it fell back to the enrichment key; no
+   `stage=assist_client` line at all means no client was built — the parameter is absent or
+   empty, and `deploy.sh` said so (`Generation credential: absent`). A line
+   `stage=router_client … credential=assist_fallback` is **expected** alongside it: the C31
+   router falls back to this key, and it runs only for a free query with no product, which
+   this environment never sends.
+2. **An argument arrives, resolved.** As the operator, a sale assistance request for a piece
+   the shop carries returns `aiAvailable: true`, `pitchStatus: "generated"`, a `promptVersion`
+   and a `pitch` carrying the piece's catalog price as «39,90 €» and its units as a bare
+   number — never `{{price}}` or `{{stock}}`. For a piece the shop has run out of, the same
+   request with no question returns `withheld_out_of_stock`: that is the rule, not a fault.
+3. **The container still fits.** `docker stats --no-stream jbg-demo-ai` against its 512 MiB
+   limit (232.5 MiB before generation was switched on), and a handful of requests in a row
+   to see whether the organisation's tokens-per-minute quota is what gives first.
 
 ## 5.7 Two ways to leave the demo quietly broken
 

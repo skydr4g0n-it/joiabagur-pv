@@ -7,6 +7,7 @@ using JoiabagurPV.Application.DTOs.Products;
 using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Infrastructure.Data;
+using JoiabagurPV.Tests.TestHelpers;
 using JoiabagurPV.Tests.TestHelpers.Mothers;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -886,27 +887,12 @@ public class FamilyReviewControllerTests : IAsyncLifetime
     // ── Gateway doubles ───────────────────────────────────────────────────────────────────────
 
     /// <summary>Answers an audit with one finding of each kind, and records what it was asked.</summary>
-    private sealed class AuditingGateway(Product flagged, Product candidate) : IAiGatewayClient
+    private sealed class AuditingGateway(Product flagged, Product candidate) : ThrowingAiGatewayClient
     {
         /// <summary>What the last call carried, so a test can assert the judged pairs travelled.</summary>
         public AiFamilyAuditRequest? LastRequest { get; private set; }
 
-        public Task<AiSearchResponse> SearchAsync(
-            AiSearchRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AiEnrichResponse> EnrichAsync(
-            AiEnrichRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
-            AiFamilySuggestRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AiFamilyAuditResponse> AuditFamiliesAsync(
+        public override Task<AiFamilyAuditResponse> AuditFamiliesAsync(
             AiFamilyAuditRequest request,
             AiCallScope scope,
             CancellationToken cancellationToken = default)
@@ -973,24 +959,9 @@ public class FamilyReviewControllerTests : IAsyncLifetime
     }
 
     /// <summary>Fails the way an unreachable service fails, so the controller's answer is testable.</summary>
-    private sealed class UnavailableGateway : IAiGatewayClient
+    private sealed class UnavailableGateway : ThrowingAiGatewayClient
     {
-        public Task<AiSearchResponse> SearchAsync(
-            AiSearchRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AiEnrichResponse> EnrichAsync(
-            AiEnrichRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
-            AiFamilySuggestRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AiFamilyAuditResponse> AuditFamiliesAsync(
+        public override Task<AiFamilyAuditResponse> AuditFamiliesAsync(
             AiFamilyAuditRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
             throw new Application.Exceptions.AiUnavailableException("The AI service could not be reached.");
     }

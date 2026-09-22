@@ -213,7 +213,11 @@ Viven en la misma capa de aplicación que los anteriores; se listan aparte porqu
 
 - **Family Suggestion Service** (C18a): orquesta la agrupación asistida. `jbg-ai` propone y este lado persiste, con el mismo patrón que el enriquecimiento por lotes de C09. **Proponer no escribe absolutamente nada** —ni familia, ni pertenencia, ni watermark—; aplicar recorre el lote familia a familia y registra `Origin = AiApproved` con el administrador y el instante. Un producto en disputa **no tumba el lote**: esa familia se salta entera y se nombra en la respuesta, y las demás se crean.
 
-- **AI Gateway Client** (C03, C08): cliente tipado hacia `jbg-ai`, con una familia de ruta por tipo de llamada y **cortacircuitos aislados entre ellas**, de modo que un enriquecimiento lento no pueda empujar la búsqueda del operador a su vía léxica degradada.
+- **AI Gateway Client** (C03, C08): cliente tipado hacia `jbg-ai`, con una familia de ruta por tipo de llamada y **cortacircuitos aislados entre ellas**, de modo que un enriquecimiento lento no pueda empujar la búsqueda del operador a su vía léxica degradada. **C34 añade la tercera familia, la generativa** (`ai-assist`, para `POST /v1/assist/sale`): presupuesto de 10 s con **suelo de 8 s comprobado al arrancar** —el peor caso que Python declara, 2 × 4 s—, circuito propio y **ningún reintento salvo una conexión que no llegó a abrirse**, porque cualquier otro fallo pudo ocurrir con la generación ya en marcha y repetir paga dos veces al proveedor. Los sustitutos (`POST /v1/retrieval/substitutes`) van por la familia de recuperación: no llaman a ningún modelo. En esas dos operaciones, y sólo en ellas, un **422** es un rechazo de la pieza y no «IA no disponible».
+
+- **Sales Assist Service** (C34): el card de venta de una pieza tras `POST /api/ai/products/{id}/sales-assist`. Autoriza el punto de venta y **comprueba que la tienda lleva la pieza antes de llamar a la IA** —ninguna llamada de pago para una petición que va a rechazar—, hidrata el grupo que devuelve `jbg-ai` en una sola consulta conservando su orden, **recalcula aquí** los dos avisos de stock y el de variantes, y resuelve `{{price}}`/`{{stock}}` **contra la pieza anclada**; si queda cualquier `{{…}}`, retira el argumentario y sirve el resto. Con la IA caída sirve el card desde el catálogo: la pieza, su familia de `ProductFamily` y los avisos.
+
+- **Substitutes Service** (C34): los sustitutos de una pieza tras `GET /api/ai/products/{id}/substitutes`. Una sola llamada con la ventana máxima, una hidratación, y **sólo lo que la tienda puede vender hoy**: la exclusión por stock que C26 dejó fuera de Python a propósito vive aquí, junto al stock. Cuatro resultados vacíos distinguibles y ninguno es un error del servidor.
 
 - **Assisted Search Service** (C15): orquesta la búsqueda del operador tras `POST /api/ai/search`. Pide a `jbg-ai` la **ventana máxima que el contrato puede producir en una sola llamada** y no repite: el recuperador aplica su umbral antes del límite de filas, así que volver a pedir devolvería lo mismo cobrando un segundo embedding. Después hidrata, trunca a la página pedida conservando el orden de relevancia, y registra la telemetría. **Ningún fallo del servicio de IA rompe la búsqueda**: todos degradan al buscador léxico propio y se reportan al llamante.
 
@@ -263,9 +267,11 @@ C4Component
         Component(profileReviewService, "Profile Review Service", "C#", "Revisión humana de perfiles y sus métricas (C28) · cola por origen, muestra estratificada y determinista, sin persistir el lote")
         Component(familyService, "Product Family Service", "C#", "Familias de producto y pertenencia declarativa (C07) · única vía de escritura, también para la aprobación asistida (C18a)")
         Component(familySuggestionService, "Family Suggestion Service", "C#", "Agrupación asistida (C18a) · jbg-ai propone, este lado persiste; proponer no escribe nada")
-        Component(aiGatewayClient, "AI Gateway Client", "C#", "Cliente tipado hacia jbg-ai (C03, C08) · breakers aislados por familia de ruta")
+        Component(aiGatewayClient, "AI Gateway Client", "C#", "Cliente tipado hacia jbg-ai (C03, C08, C34) · breakers aislados por familia de ruta: recuperación, enriquecimiento y generativa")
         Component(assistedSearchService, "Assisted Search Service", "C#", "Búsqueda asistida (C15) · ventana máxima en una llamada, hidratación autoritativa, degradación acotada")
         Component(assistedSearchRepo, "Assisted Search Repository", "C#", "Hidratación conjunta por POS y buscador léxico español en consulta (C15)")
+        Component(salesAssistService, "Sales Assist Service", "C#", "Card de venta (C34) · pieza comprobada antes de llamar, grupo hidratado, marcadores contra la pieza anclada, degradación desde el catálogo")
+        Component(substitutesService, "Substitutes Service", "C#", "Sustitutos (C34) · ventana máxima en una llamada, sólo lo vendible hoy en la tienda, cuatro resultados")
         
         Component(fileStorageService, "File Storage Service", "C#", "Abstracción de almacenamiento de archivos")
         Component(stockValidationService, "Stock Validation Service", "C#", "Validación de stock disponible")
@@ -296,6 +302,13 @@ C4Component
     
     Rel(aiProfileService, reviewPolicy, "Usa")
     Rel(aiProfileService, aiGatewayClient, "Usa")
+    Rel(controllers, salesAssistService, "Usa")
+    Rel(controllers, substitutesService, "Usa")
+    Rel(salesAssistService, aiGatewayClient, "POST /v1/assist/sale · ai-assist")
+    Rel(substitutesService, aiGatewayClient, "POST /v1/retrieval/substitutes · ai-retrieval")
+    Rel(salesAssistService, assistedSearchRepo, "Hidrata")
+    Rel(substitutesService, assistedSearchRepo, "Hidrata")
+    Rel(salesAssistService, repositories, "Familia (degradado)")
     
     Rel(saleService, stockValidationService, "Usa")
     Rel(saleService, paymentValidationService, "Usa")
@@ -558,6 +571,14 @@ C4Component
 6. Si se pide asistencia, **Assist Router** genera el argumentario con citas y placeholders, que el Backend API sustituye antes de responder
 7. Si `jbg-ai` no responde dentro del timeout, el **circuit breaker** degrada al buscador léxico y marca `ai_available: false`
 
+#### Flujo del card de venta (C34)
+1. Con una pieza delante, el card (C36) pide en paralelo `POST /api/ai/products/{id}/sales-assist` —`{pointOfSaleId, question?}`, la pregunta **siempre en el cuerpo**— y `GET /api/ai/products/{id}/substitutes`
+2. **Sales Assist Service** y **Substitutes Service** autorizan el punto de venta y comprueban con una hidratación que la tienda lleva la pieza: **400 / 403 / 404 sin llamar a la IA**
+3. **AI Gateway Client** llama a `POST /v1/assist/sale` por el cliente generativo (10 s, circuito propio) o a `POST /v1/retrieval/substitutes` por el de recuperación, con el `pos_id` en el JWT interno y nunca en el cuerpo
+4. El Backend API hidrata el grupo o la ventana contra `public` en una consulta: miembros que la tienda no lleva fuera, orden de la IA intacto; en sustitutos, sólo `quantity > 0`
+5. Calcula `stock_critical` y `family_members_out_of_stock`, ajusta `family_has_variants` a lo que sobrevive, y sustituye `{{price}}` («39,90 €») y `{{stock}}` (el entero) **con los valores de la pieza anclada**; un marcador sin resolver retira el argumentario y no la respuesta
+6. Con la IA caída o el interruptor apagado, el card sale igual —`aiAvailable: false`— con la pieza y su familia leída de `ProductFamily`, y los sustitutos con `outcome: ai_unavailable`
+
 ---
 
 ## Notas sobre Desarrollo vs Producción
@@ -723,7 +744,7 @@ C4Component
 
 ### EP15: Venta Asistida, Sustitutos y Agentes
 - **AI Service**: Assist Router, Generation Service, Guardrails / Intent Router, Agent Loop
-- **Backend**: endpoints de asistencia y recomendaciones
+- **Backend**: Sales Assist Service y Substitutes Service tras `AiSalesAssistController` (C34: `POST /api/ai/products/{id}/sales-assist`, `GET /api/ai/products/{id}/substitutes`), con la familia generativa `ai-assist` del AI Gateway Client. *(Los complementarios salieron con C27.)*
 - **Frontend**: tarjeta de asistencia y desambiguación por familia
 
 ### EP16: Inventario Asistido y Señales de Demanda

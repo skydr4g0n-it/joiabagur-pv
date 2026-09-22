@@ -132,6 +132,70 @@ public class AiGatewayRegistrationTests
                 + "whose value contradicts the agreed limits");
     }
 
+    /// <summary>
+    /// The outer budget must cover the worst case the AI service declares inside, or this side
+    /// throws away answers the service was still entitled to deliver.
+    /// </summary>
+    [Fact]
+    public void AddAiGateway_WhenAssistBudgetBelowServiceWorstCase_FailsAtStartup()
+    {
+        using var provider = BuildProvider(new Dictionary<string, string?>
+        {
+            ["AiGateway:BaseUrl"] = "http://localhost:8001",
+            ["AiGateway:JwtSecret"] = ValidSecret,
+            ["AiGateway:AssistTimeoutMs"] = "5000"
+        });
+
+        ValidateStartup(provider).Should().Throw<OptionsValidationException>()
+            .WithMessage("*AssistTimeoutMs*", "the error must name the key")
+            .WithMessage("*MAX_PITCH_PROVIDER_CALLS*PITCH_TIMEOUT_SECONDS*",
+                "and the constants of the AI service that fix the floor");
+    }
+
+    [Fact]
+    public void AddAiGateway_WithTheAssistBudgetAtTheFloor_Starts()
+    {
+        using var provider = BuildProvider(new Dictionary<string, string?>
+        {
+            ["AiGateway:BaseUrl"] = "http://localhost:8001",
+            ["AiGateway:JwtSecret"] = ValidSecret,
+            ["AiGateway:AssistTimeoutMs"] = AiGatewayOptions.MinimumAssistTimeoutMs.ToString()
+        });
+
+        ValidateStartup(provider).Should().NotThrow();
+    }
+
+    /// <summary>
+    /// The generative client exists under its own name so its circuit cannot take retrieval down
+    /// with it, and its budget comes from configuration — ten seconds unless configured.
+    /// </summary>
+    [Fact]
+    public void AddAiGateway_RegistersTheAssistClientWithItsOwnConfiguredBudget()
+    {
+        using var defaults = BuildProvider(new Dictionary<string, string?>
+        {
+            ["AiGateway:BaseUrl"] = "http://localhost:8001",
+            ["AiGateway:JwtSecret"] = ValidSecret
+        });
+
+        ValidateStartup(defaults).Should().NotThrow();
+        defaults.GetRequiredService<IHttpClientFactory>().CreateClient(AiGatewayClient.AssistClientName)
+            .Should().NotBeNull("the generative route must resolve under its own name");
+        defaults.GetRequiredService<IOptions<AiGatewayOptions>>().Value.AssistTimeoutMs
+            .Should().Be(10_000);
+
+        using var configured = BuildProvider(new Dictionary<string, string?>
+        {
+            ["AiGateway:BaseUrl"] = "http://localhost:8001",
+            ["AiGateway:JwtSecret"] = ValidSecret,
+            ["AiGateway:AssistTimeoutMs"] = "12000"
+        });
+
+        ValidateStartup(configured).Should().NotThrow();
+        configured.GetRequiredService<IOptions<AiGatewayOptions>>().Value.AssistTimeoutMs
+            .Should().Be(12_000);
+    }
+
     [Fact]
     public void AddAiGateway_WhenEnrichBudgetIsNotPositive_FailsOnStart()
     {

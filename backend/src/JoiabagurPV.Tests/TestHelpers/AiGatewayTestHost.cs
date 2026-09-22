@@ -39,7 +39,10 @@ public static class AiGatewayTestHost
         int enrichTimeoutMs = 120_000,
         FakeHttpMessageHandler? enrichHandler = null,
         FakeHttpMessageHandler? healthHandler = null,
-        int healthTimeoutMs = 2000)
+        int healthTimeoutMs = 2000,
+        FakeHttpMessageHandler? assistHandler = null,
+        int assistTimeoutMs = 10_000,
+        TimeProvider? timeProvider = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -53,11 +56,22 @@ public static class AiGatewayTestHost
                 ["AiGateway:BreakerSamplingDurationSeconds"] = breakerSamplingDurationSeconds.ToString(),
                 ["AiGateway:BreakerBreakDurationSeconds"] = breakerBreakDurationSeconds.ToString(),
                 ["AiGateway:EnrichTimeoutMs"] = enrichTimeoutMs.ToString(),
-                ["AiGateway:HealthTimeoutMs"] = healthTimeoutMs.ToString()
+                ["AiGateway:HealthTimeoutMs"] = healthTimeoutMs.ToString(),
+                ["AiGateway:AssistTimeoutMs"] = assistTimeoutMs.ToString()
             })
             .Build();
 
         var services = new ServiceCollection();
+
+        // Registered before the gateway, which only adds the system clock when none is present.
+        // The resilience pipelines read it from the container, so a fake one lets a test expire
+        // the ten-second generative budget without waiting it out — the start-up floor forbids
+        // configuring a budget short enough to wait for.
+        if (timeProvider is not null)
+        {
+            services.AddSingleton(timeProvider);
+        }
+
         services.AddLogging(builder =>
         {
             if (logs is not null)
@@ -90,6 +104,13 @@ public static class AiGatewayTestHost
             AiGatewayClient.HealthClientName,
             options => options.HttpMessageHandlerBuilderActions.Add(
                 b => b.PrimaryHandler = healthHandler ?? handler));
+
+        // The generative client (C34), for the same reason as enrichment: the property most
+        // worth asserting is that its circuit is independent of retrieval's.
+        services.Configure<HttpClientFactoryOptions>(
+            AiGatewayClient.AssistClientName,
+            options => options.HttpMessageHandlerBuilderActions.Add(
+                b => b.PrimaryHandler = assistHandler ?? handler));
 
         return services.BuildServiceProvider();
     }

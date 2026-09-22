@@ -112,6 +112,13 @@ services:
       STUB_MODE: "false"
       JPV_EMBEDDING_MODEL: openai/text-embedding-3-small
       JPV_RETRIEVAL_DISTANCE_THRESHOLD: "0.65"
+      # The model that writes the sale argument (C30b, switched on by C34). Same
+      # rule as the two above: the model changes what a request costs and what
+      # was measured, so it is a reviewed literal and not a parameter.
+      # JPV_ASSIST_PITCH_TIMEOUT_SECONDS stays out until this deployment has a
+      # measurement of its own: the 4 s default is an upper bound taken through
+      # a TLS interceptor on a development machine.
+      JPV_ASSIST_LLM_MODEL: openai/gpt-4o-mini
 
       # -- Class A - secrets ----------------------------------------------
       # Source: /jbg-demo/AI_SERVICE_SHARED_SECRET — ONE parameter, read once
@@ -125,6 +132,15 @@ services:
       JPV_INDEX_FEED_API_KEY: ${INDEX_FEED_SHARED_KEY}
       # Source: /jbg-demo/EMBEDDING_API_KEY
       JPV_EMBEDDING_API_KEY: ${EMBEDDING_API_KEY}
+      # Source: /jbg-demo/ASSIST_LLM_API_KEY — the ONLY optional secret. Absent
+      # or empty, no generation client is built and POST /v1/assist/sale serves
+      # the structured response with a 200 (`prompt_version: null`), which the
+      # card shows as `not_generated`: that is also the rollback. The log line
+      # `stage=assist_client ... credential=assist` says it was picked up, without
+      # showing it. It also becomes the router's fallback credential
+      # (`stage=router_client ... credential=assist_fallback`); the router runs
+      # only for a free query with no product, which the demo never sends.
+      JPV_ASSIST_LLM_API_KEY: ${ASSIST_LLM_API_KEY:-}
     # Never `env_file:`. The deploy script exports these into its own process
     # and Compose interpolates them here; writing an environment file next to
     # this one would put every secret on the host's disk (C17 D10).
@@ -175,6 +191,15 @@ services:
       # errors, nothing is logged, and the AI service is never even called.
       # C17 found it only by running a real search through the public URL.
       AiSearch__EnabledByDefault: "true"
+      # Class C - versioned literals for the sale card (C34). Both routes of the
+      # card are behind the same kind of rollout gate as search, and without the
+      # switch the demo would answer every card with the degraded one read from
+      # the catalog — a 200, `aiAvailable: false`, and the AI never called.
+      AiSalesAssist__EnabledByDefault: "true"
+      # The budget of the generative client. 10 s, because the AI service
+      # declares a worst case of 2 x 4 s for the provider calls of one request;
+      # start-up refuses anything below 8000.
+      AiGateway__AssistTimeoutMs: "10000"
       # Class A - secret, the other half of the shared pair.
       IndexFeed__ApiKey: ${INDEX_FEED_SHARED_KEY}
       # Class B. Same origin in practice — the SPA is served by this very
