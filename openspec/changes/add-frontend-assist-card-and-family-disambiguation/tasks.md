@@ -38,10 +38,10 @@
 
 ## 6. Las tres entradas y la salida
 
-- [ ] 6.1 Extender `assisted-search-result-row.tsx` con la acción secundaria hacia la ficha, **sin tocar la firma de `onSelect`** y **sin reportar selección de telemetría**
-- [ ] 6.2 Añadir el botón hacia la ficha en `new.tsx`, junto al producto seleccionado, y comprobar que esa página acepta un `productId` distinto al que ya tenía
-- [ ] 6.3 Añadir el salto a la ficha en `scan.tsx`, tras resolver el código
-- [ ] 6.4 Implementar el traspaso a la venta por estado de navegación con el **miembro elegido**, nunca con el ancla cuando se eligió otro
+- [x] 6.1 Extender `assisted-search-result-row.tsx` con la acción secundaria hacia la ficha, **sin tocar la firma de `onSelect`** y **sin reportar selección de telemetría**
+- [x] 6.2 Añadir el botón hacia la ficha en `new.tsx`, junto al producto seleccionado, y comprobar que esa página acepta un `productId` distinto al que ya tenía
+- [x] 6.3 Añadir el salto a la ficha en `scan.tsx`, tras resolver el código
+- [x] 6.4 Implementar el traspaso a la venta por estado de navegación con el **miembro elegido**, nunca con el ancla cuando se eligió otro
 
 ## 7. Tests
 

@@ -211,6 +211,20 @@ export function AssistedSalesSearchPage() {
     });
   };
 
+  /**
+   * Opens the sale card for a result, scoped to the point of sale this search was scoped to.
+   *
+   * **No selection is reported.** Opening a card is not choosing the piece to sell, and counting
+   * it as one would inflate the selection rate the search event exists to measure. It issues no
+   * search, changes no displayed result and does not end the search episode of this visit — the
+   * episode identifier lives in a ref that this navigation does not touch.
+   */
+  const handleOpenCard = (result: AssistedSearchResult) => {
+    navigate(ROUTES.SALES.ASSIST(result.productId), {
+      state: { pointOfSaleId },
+    });
+  };
+
   const hasFilters = materials.length > 0 || category !== '';
 
   const response = state.kind === 'answered' ? state.response : null;
@@ -459,6 +473,7 @@ export function AssistedSalesSearchPage() {
               key={result.productId}
               result={result}
               onSelect={handleSelect}
+              onOpenCard={handleOpenCard}
             />
           ))}
 
