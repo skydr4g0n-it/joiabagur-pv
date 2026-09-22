@@ -198,7 +198,7 @@
   "areas": [
     {
       "name": "docs-themselves",
-      "globs": ["README.md", "backend/README.md", "frontend/README.md", "ai-service/README.md", "ai-service/tests/README.md", "terraform/README.md", "Documentos/**", "openspec/project.md", "openspec/config.yaml", "openspec/DEFERRED_TASKS.md"],
+      "globs": ["README.md", "backend/README.md", "frontend/README.md", "ai-service/README.md", "ai-service/tests/README.md", "terraform/README.md", "deploy/demo/README.md", "Documentos/**", "openspec/project.md", "openspec/config.yaml", "openspec/DEFERRED_TASKS.md"],
       "docs": [],
       "reason": "El propio cambio ya toca documentacion: comprueba coherencia con el resto, no lo cuentes como disparador nuevo."
     },
@@ -324,7 +324,7 @@
     },
     {
       "name": "infra-docker",
-      "globs": ["**/Dockerfile*", "**/docker-compose*.yml", "**/.dockerignore", "**/nginx*.conf", "**/deploy*.sh"],
+      "globs": ["**/Dockerfile*", "**/docker-compose*.yml", "**/compose*.yml", "**/compose*.yaml", "**/.dockerignore", "**/nginx*.conf", "**/deploy*.sh", "deploy/demo/**"],
       "docs": ["doc-arquitectura", "readme-root", "doc-guias-deploy"],
       "reason": "Contenedores o proxy: entorno de desarrollo/produccion e instrucciones de instalacion."
     },
