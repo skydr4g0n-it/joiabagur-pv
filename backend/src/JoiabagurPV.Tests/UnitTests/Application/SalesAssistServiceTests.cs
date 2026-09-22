@@ -450,6 +450,27 @@ public class SalesAssistServiceTests
         (await AssistAsync()).Response!.PitchStatus.Should().Be(PitchStatus.WithheldByAi);
     }
 
+    /// <summary>
+    /// The only pair of the design's order (D6) the rest of this class leaves undecided: rule 4,
+    /// the sold-out anchor, comes before rule 5, the placeholder that would not resolve. Both
+    /// withhold the argument, so only the state told apart distinguishes them — and the state is
+    /// what C36 paints. Added by the independent verification, which swapped the two rules and
+    /// watched all forty-two tests here stay green.
+    /// </summary>
+    [Fact]
+    public async Task SalesAssist_OutOfStockAnchor_WinsOverAnUnresolvedPlaceholder()
+    {
+        _carried.Clear();
+        Carry(Anchor, "ERIZO-M", quantity: 0);
+        GatewayReturns(Ai([Member(Anchor, "ERIZO-M")], pitch: "Por {{precio}} la tienes hoy."));
+
+        var response = (await AssistAsync()).Response!;
+
+        response.PitchStatus.Should().Be(PitchStatus.WithheldOutOfStock,
+            "rule 4 precedes rule 5, and the first that applies wins");
+        response.Pitch.Should().BeNull();
+    }
+
     [Fact]
     public async Task SalesAssist_WithQuestion_ReturnsCitationsCarryingClaimScope()
     {

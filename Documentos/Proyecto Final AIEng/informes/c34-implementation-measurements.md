@@ -311,8 +311,18 @@ una propiedad que ningún test nombra.
 ## 6 · La demo, desplegada y verificada (tareas 11.3 y 11.4)
 
 Hecho el **2026-09-22**, con el parámetro creado a mano y la rama `demo` avanzada al commit `d6a740f`.
-El despliegue traía **188 commits** —la demo corría C17— y aun así **cero migraciones de EF Core**; el
-servicio de IA aplicó dos revisiones de Alembic durante `deploy.sh`.
+El despliegue traía **188 commits** —la demo corría C17— y con ellos **tres migraciones de EF Core**:
+`AddFamilyReviewVerdict`, `AddFamilyReviewSeconds` y `AddVerdictSubjectPopulation`, las tres de **C28** y
+**ninguna de C34**. Las aplica la propia API al arrancar (`Program.cs:67`,
+`context.Database.MigrateAsync()`, sin condicionar por entorno), que es la razón real de que el salto
+fuera seguro. El servicio de IA aplicó además dos revisiones de Alembic durante `deploy.sh`.
+
+> **Corrección de la verificación independiente (2026-09-22).** Este párrafo y la fila equivalente del
+> §13.1 del QA decían **«cero migraciones de EF Core»**, y era falso: la comprobación previa al empuje
+> dio la respuesta equivocada. No tuvo consecuencia —el salto era seguro de todos modos, por el
+> `MigrateAsync()` del arranque—, pero el razonamiento que la frase encierra («no hay migraciones, luego
+> no hay riesgo de esquema») habría sido peligroso si se reutilizara. Reproducible con
+> `git diff --name-only --diff-filter=A f5212a7..d6a740f -- 'backend/src/JoiabagurPV.Infrastructure/Data/Migrations/*'`.
 
 | Comprobación | Resultado |
 |---|---|
@@ -322,12 +332,12 @@ servicio de IA aplicó dos revisiones de Alembic durante `deploy.sh`.
 | El cliente generativo | `stage=assist_client model=openai/gpt-4o-mini timeout_s=4.0 credential=assist` |
 | El enrutador, como anticipaba el §2.4 | `stage=router_client model=openai/gpt-4o timeout_s=2.0 credential=assist_fallback` — construido y **sin uso**, porque sólo corre en la consulta libre |
 | **Una asistencia real (SKU1051)** | `pitchStatus: generated`, `assist/v3`, 2 citas, sin marcadores: *«Este anillo está disponible por **250,00 €** y cuenta con **5**»* — precio en formato es-ES y stock como entero, los dos **resueltos dentro del texto** |
-| Sobre 6 piezas | 6 de 6 `generated`; **4 de 6** con precio y stock en el texto; 0 con marcadores sobrantes |
-| Sustitutos | `outcome: ok`, **60 candidatos → 28 en la tienda → página de 5**: el embudo del diseño, entero |
+| Sobre 6 piezas | 6 de 6 `generated`; **4 de 6** con precio y stock en el texto; 0 con marcadores sobrantes. **No es comparable con el 22 de 37 del §4**: aquél cuenta sólo el precio sobre 37 M2, y con n = 6 aquí no hay proporción que sostener |
+| Sustitutos | `outcome: ok`, **60 candidatos → 28 en la tienda → página de 5**: tres de los cuatro tramos del embudo del diseño (`candidates_returned → carried → in_stock → returned`); el tramo intermedio no se anotó al medir |
 | Latencia observada | 1,3 s a 3,8 s por petición, dentro de la distribución del §4 |
-| **Memoria de `jbg-demo-ai` (11.4)** | **269,9 MiB de 512 (52,7 %)**, e **idéntica antes y después** de diez generaciones seguidas. Eran 232,5 MiB en C17: los ~37 MiB de más son los clientes y el corpus, no el generar |
+| **Memoria de `jbg-demo-ai` (11.4)** | **269,9 MiB de 512 (52,7 %)**, e **idéntica antes y después** de las diez generaciones que permitió la ventana. Eran 232,5 MiB en C17: los ~37 MiB de más son los clientes y el corpus, no el generar |
 | Host | 751 MB usados de 1.909, 836 disponibles, **sin swap** |
-| **La cuota de tokens por minuto (11.4)** | **No es la restricción operativa.** Diez generaciones consecutivas salieron todas `generated`, sin una sola degradación del proveedor. Quien corta primero es **el límite propio**: 10 por minuto y usuario, con 429 a partir de la 11.ª petición de la ventana |
+| **La cuota de tokens por minuto (11.4)** | **No es la restricción operativa.** Las diez generaciones que la ventana permitió salieron todas `generated`, sin una sola degradación del proveedor. Quien corta primero es **el límite propio**: 10 por minuto y usuario, con 429 a partir de la 11.ª petición de la ventana. **No fueron diez seguidas**: 6 del sondeo de piezas + 4 de una ráfaga de 12, con las otras 8 en 429 (§13.3 del QA) |
 
 **El escenario 12 de la HU queda cubierto.** Y el camino hasta aquí dejó dos hallazgos que no son de
 C34 pero que este change fue el primero en tropezar:

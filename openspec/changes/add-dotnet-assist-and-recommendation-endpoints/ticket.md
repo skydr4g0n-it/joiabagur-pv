@@ -350,7 +350,7 @@ el log de `jbg-ai`.
 | Capability | Delta | Requisitos |
 |---|---|---|
 | **`ai-sales-assist`** | **nueva** (`## ADDED`) | Las dos rutas; punto de venta obligatorio; autorización y comprobación de la pieza **antes** de llamar a la IA; hidratación del grupo en orden y con autoridad de catálogo; avisos de stock y recálculo de variantes; resolución de marcadores y los seis estados de `pitchStatus`; retirada del argumentario de una pieza agotada sólo sin pregunta; ventana máxima y exclusión por stock en sustitutos; los cuatro `outcome`; degradación con la familia de .NET; política de logs |
-| `ai-gateway-client` | `## ADDED` + `## MODIFIED` | **ADDED** «Typed gateway client exposes sale assistance and substitutes». **MODIFIED** «Retry policy never retries a permanent condition» (el cliente generativo no reintenta timeouts; el 422 no se reintenta), «Degradation is bounded per call and isolated per route family» (cliente `ai-assist`, circuito propio y suelo de presupuesto) y «Contract failure modes are distinguishable by the caller» (el 422 es un rechazo, no una indisponibilidad) |
+| `ai-gateway-client` | `## ADDED` + `## MODIFIED` | **ADDED** «Typed gateway client exposes sale assistance and substitutes». **MODIFIED, cinco**: «Retry policy never retries a permanent condition» (el cliente generativo no reintenta timeouts; el 422 no se reintenta), «Degradation is bounded per call and isolated per route family» (cliente `ai-assist` con circuito propio), «Contract failure modes are distinguishable by the caller» (el 422 es un rechazo, no una indisponibilidad), «Gateway configuration is validated at application start» (el **suelo de 8.000 ms** comprobado al arrancar) y «Client models cannot drift from the committed contract» (las nueve filas nuevas de `ModelToSchema`) |
 
 > **Aviso de `CLAUDE.md`, que cuesta una sesión la primera vez:** el validador lee **sólo la primera
 > línea física** de la descripción de un requisito. El `SHALL`/`MUST` tiene que estar en esa línea, sin
@@ -438,26 +438,26 @@ El enrutador de C31 **no** hace falta en la demo para C34: M2 y M3 no lo invocan
 
 ## Definición de Hecho (DoD)
 
-- [ ] Código según las capas de `Documentos/modelo-c4.md` y las convenciones de `openspec/project.md`
-- [ ] Backend: xUnit + Moq + FluentAssertions + Bogus; integración con Testcontainers; nomenclatura `Método_Escenario_ResultadoEsperado`; cobertura ≥ 70 % en el código nuevo
-- [ ] **Línea base de la suite medida antes de tocar nada** (`git stash push -u`, correr, `git stash pop`): se compara el **conjunto de nombres** que fallan, nunca el número
-- [ ] Los tests de integración **invocan el doble del gateway** y lo comprueban. Un test en verde que no llega al gateway es el defecto de C15 (H8)
-- [ ] Un test comprueba que **no** se llama a la IA con 403, 404 ni 400
-- [ ] Un test comprueba que el argumentario **resuelto no aparece en ningún log** (proveedor de log de grabación, como en `AssistedSearchServiceTests`)
-- [ ] Un test comprueba que la **pregunta viaja en el cuerpo** y que el DTO hacia Python **no lleva `pos_id`**
-- [ ] Un test comprueba que el circuito de `ai-assist` **no abre** el de recuperación (patrón de `EnrichAsync_WhenItsCircuitOpens_RetrievalKeepsWorking`)
-- [ ] Un test comprueba el **suelo de 8.000 ms** al arranque
-- [ ] Los DTO nuevos están en `AiContractSnapshotTests.ModelToSchema`
-- [ ] Los objetos madre fijan `.WithPhone("600123456")`; las familias se crean por `POST /api/product-families` como administrador, porque **no hay madre de familias a propósito**
-- [ ] Las aserciones de 401 piden un **cliente nuevo** a la factoría: el compartido conserva las cookies
-- [ ] **Sin migración de EF Core**
-- [ ] `sha256` de `ai-service/openapi.json` **igual** al del inicio del change
-- [ ] Specs delta en `openspec/changes/add-dotnet-assist-and-recommendation-endpoints/specs/`, con la **primera línea física** de cada requisito llevando su `SHALL`/`MUST`
-- [ ] `openspec validate --all --strict` → **0 failed** (el de un solo change no basta)
-- [ ] Latencia de extremo a extremo de M2 y M3 medida en Docker Compose y escrita con su procedencia
-- [ ] Demo: los cuatro pasos hechos, la línea `credential=assist` vista en el log, una asistencia real con `pitchStatus: generated` y la memoria de `jbg-demo-ai` medida
-- [ ] Documentación: `Documentos/epicas.md`, plan de changes, `backend/README.md` (endpoints, matriz de autorización y variables), `Documentos/arquitectura.md` y `Documentos/modelo-c4.md` si procede, `deploy/demo/README.md`, `openspec/DEFERRED_TASKS.md` (se cierra la entrada de C30b) y `openspec/config.yaml` si cambia algún hecho que resume
-- [ ] Sin TODO/FIXME sin tarea de seguimiento
+- [x] Código según las capas de `Documentos/modelo-c4.md` y las convenciones de `openspec/project.md`
+- [x] Backend: xUnit + Moq + FluentAssertions + Bogus; integración con Testcontainers; nomenclatura `Método_Escenario_ResultadoEsperado`; cobertura ≥ 70 % en el código nuevo
+- [x] **Línea base de la suite medida antes de tocar nada** (`git stash push -u`, correr, `git stash pop`): se compara el **conjunto de nombres** que fallan, nunca el número
+- [x] Los tests de integración **invocan el doble del gateway** y lo comprueban. Un test en verde que no llega al gateway es el defecto de C15 (H8)
+- [x] Un test comprueba que **no** se llama a la IA con 403, 404 ni 400
+- [x] Un test comprueba que el argumentario **resuelto no aparece en ningún log** (proveedor de log de grabación, como en `AssistedSearchServiceTests`)
+- [x] Un test comprueba que la **pregunta viaja en el cuerpo** y que el DTO hacia Python **no lleva `pos_id`**
+- [x] Un test comprueba que el circuito de `ai-assist` **no abre** el de recuperación (patrón de `EnrichAsync_WhenItsCircuitOpens_RetrievalKeepsWorking`)
+- [x] Un test comprueba el **suelo de 8.000 ms** al arranque
+- [x] Los DTO nuevos están en `AiContractSnapshotTests.ModelToSchema`
+- [x] Los objetos madre fijan `.WithPhone("600123456")`; las familias se crean por `POST /api/product-families` como administrador, porque **no hay madre de familias a propósito**
+- [x] Las aserciones de 401 piden un **cliente nuevo** a la factoría: el compartido conserva las cookies
+- [x] **Sin migración de EF Core**
+- [x] `sha256` de `ai-service/openapi.json` **igual** al del inicio del change
+- [x] Specs delta en `openspec/changes/add-dotnet-assist-and-recommendation-endpoints/specs/`, con la **primera línea física** de cada requisito llevando su `SHALL`/`MUST`
+- [x] `openspec validate --all --strict` → **0 failed** (el de un solo change no basta)
+- [x] Latencia de extremo a extremo de M2 y M3 medida en Docker Compose y escrita con su procedencia
+- [x] Demo: los cuatro pasos hechos, la línea `credential=assist` vista en el log, una asistencia real con `pitchStatus: generated` y la memoria de `jbg-demo-ai` medida — **marcada con una salvedad**: el `generated` se obtuvo tras **dos arreglos manuales del entorno** (`sync-pos --full` y el corpus copiado dentro del contenedor), ninguno de C34 y los dos en `DEFERRED_TASKS.md`; un redespliegue con imagen nueva vuelve a necesitar el segundo. El runbook los recoge en su §5.5c
+- [x] Documentación: `Documentos/epicas.md`, plan de changes, `backend/README.md` (endpoints, matriz de autorización y variables), `Documentos/arquitectura.md` y `Documentos/modelo-c4.md` si procede, `deploy/demo/README.md`, `openspec/DEFERRED_TASKS.md` (se cierra la entrada de C30b) y `openspec/config.yaml` si cambia algún hecho que resume
+- [x] Sin TODO/FIXME sin tarea de seguimiento
 
 **No aplica:** Vitest, Playwright, cobertura de frontend y UI es-ES (la pantalla es de C36);
 `uv run pytest` y regenerar `openapi.json` (C34 no toca `ai-service/`).

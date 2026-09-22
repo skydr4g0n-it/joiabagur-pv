@@ -1,7 +1,7 @@
 # QA — C34 `add-dotnet-assist-and-recommendation-endpoints`
 
 > Registro de las comprobaciones **realmente ejecutadas** sobre la implementación del change, con sus resultados y su evidencia.
-> **Fecha:** implementación del **2026-09-21** al **2026-09-22** · **Rama:** `c34-add-dotnet-assist-and-recommendation-endpoints` · **Artefactos de partida:** `6030aa3`, árbol limpio · **Implementación commiteada en `eb44711`** (51 ficheros, +6.162 / −211) y **este QA en `d6a740f`**, que es el commit desplegado en la demo. La ampliación del §13 y sus cambios de documentación quedan por commitear.
+> **Fecha:** implementación del **2026-09-21** al **2026-09-22** · **Rama:** `c34-add-dotnet-assist-and-recommendation-endpoints` · **Artefactos de partida:** `6030aa3`, árbol limpio · **Implementación commiteada en `eb44711`** (51 ficheros, +6.162 / −211) y **este QA en `d6a740f`**, que es el commit desplegado en la demo. La ampliación del §13 y sus cambios de documentación quedaron commiteados en **`fd554c9`**, que **no toca una sola línea de código**: el árbol desplegado en la demo y la punta de la rama tienen el mismo `backend/`, así que lo verificado allí vale para lo que se archiva.
 > **Idioma:** cuerpo en español, identificadores técnicos en inglés, por coherencia con [ticket.md](ticket.md) y con la HU.
 > **Alcance:** **50/50 tareas**. Las dos últimas —11.3 y 11.4— las ejecutó el desarrollador en el entorno el 2026-09-22, con la evidencia en el §13. DoD del ticket: **20 de 20** casillas cumplidas con evidencia (§12).
 > **Este change NO mueve el contrato:** `ai-service/openapi.json` tiene el mismo `sha256` al empezar y al terminar, y el commit no toca `ai-service/` (§8).
@@ -451,7 +451,7 @@ recrea.
 
 La cabecera del informe de implementación daba `ai-sales-assist — 13 requisitos`, confundiendo la
 cifra con los 13 escenarios de la HU. El recuento programático del §3 dio **15 requisitos y 45
-escenarios**. Corregido en el informe; **esa corrección queda sin commitear**, junto con este QA.
+escenarios**. Corregido en el informe; **esa corrección entró en `d6a740f`**, junto con este QA.
 
 ### 10.7. Unas comillas invertidas en bash se comieron un identificador — **defecto mío de herramienta; corregido antes del commit**
 
@@ -512,7 +512,10 @@ La primera versión decía «18 de 20» y que la casilla de la demo eran «dos d
 - **La latencia en producción.** La del §9 es de una máquina de desarrollo, n = 80, una franja
   horaria y sin concurrencia. No sustituye la de la demo en eu-west-1.
 - **La concurrencia real** frente a la cuota de tokens por minuto: la pasada fue en serie a propósito.
-- **Una verificación independiente**: esta es la pasada del autor. `/opsx:verify` no se ha ejecutado.
+- ~~**Una verificación independiente**: esta es la pasada del autor. `/opsx:verify` no se ha ejecutado.~~
+  **Hecha el 2026-09-22 y registrada en el §14**, con línea base propia y mutaciones de control. Encontró
+  una cifra falsa en el §13.1 de este QA —las migraciones de EF Core del salto de la demo— y un hueco de
+  test en el orden del D6, los dos corregidos.
 - **La suite de `ai-service` y la del frontend**: no se ejecutaron porque el diff no toca ninguno de
   los dos (§8).
 - **Las ramas de fallo de `SubstitutesAsync` en el cliente** (timeout, transporte, cuerpo vacío o
@@ -543,7 +546,7 @@ La primera versión decía «18 de 20» y que la casilla de la demo eran «dos d
 | 15 | Deltas con el `SHALL`/`MUST` en la primera línea física | ✅ | 21 / 21 (§3.2) |
 | 16 | `openspec validate --all --strict` → 0 failed | ✅ | 60 / 0 |
 | 17 | Latencia de M2 y M3 medida en Docker Compose, con su procedencia | ✅ | §9 |
-| 18 | **Demo**: los cuatro pasos, `credential=assist` en el log, asistencia `generated` y memoria medida | ✅ | §13: parámetro creado, desplegado `sha-d6a740fa…`, `credential=assist` en el log, SKU1051 `generated` con «250,00 €» y «5» en el texto, y 269,9 MiB de 512 medidos antes y después de diez generaciones |
+| 18 | **Demo**: los cuatro pasos, `credential=assist` en el log, asistencia `generated` y memoria medida | ✅ | §13: parámetro creado, desplegado `sha-d6a740fa…`, `credential=assist` en el log, SKU1051 `generated` con «250,00 €» y «5» en el texto, y 269,9 MiB de 512 medidos antes y después de las diez generaciones de la ventana (6 + 4, §13.3) |
 | 19 | Documentación | ✅ | Los siete documentos de la tarea 12.5, más `CLAUDE.md`, en `eb44711` |
 | 20 | Sin TODO/FIXME sin tarea de seguimiento | ✅ | §5, grupo 12 |
 
@@ -563,7 +566,7 @@ salidas reales, no expectativas.
 | Cuenta correcta | `sts get-caller-identity` → **666823181744**, la cuenta de la demo, distinta de la de producción |
 | Parámetro creado | `/jbg-demo/ASSIST_LLM_API_KEY`, **`SecureString`**, versión 1. Verificado **sin descifrarlo** |
 | Código desplegado | `git push origin c34-…:demo` — avance rápido `f5212a7..d6a740f`, **188 commits**, porque la demo corría C17 |
-| Riesgo comprobado antes de empujar | **0 migraciones de EF Core** entre `demo` y la rama; 2 revisiones de Alembic, que `deploy.sh` aplica |
+| Riesgo comprobado antes de empujar | **Tres migraciones de EF Core** entre `demo` y la rama —`AddFamilyReviewVerdict`, `AddFamilyReviewSeconds` y `AddVerdictSubjectPopulation`, las tres de **C28** y **ninguna de C34**—, que la API aplica sola al arrancar (`Program.cs:67`, `context.Database.MigrateAsync()`); 2 revisiones de Alembic, que `deploy.sh` aplica. **Esta fila decía «0 migraciones de EF Core» y era falso**: corregido por la verificación independiente (§14) |
 | Despliegue | `[deploy] Generation credential: present` · `Applying schema revisions` · `Deployed sha-d6a740fa…` |
 | Verificación del despliegue | `verify.sh`: **1.200 documentos indexados**, en verde |
 | Cliente generativo | `stage=assist_client model=openai/gpt-4o-mini timeout_s=4.0 credential=assist` |
@@ -582,8 +585,11 @@ SKU984   200  3849 ms · generated  citas 2 · precio SÍ · stock SÍ · marcad
 SKU983   200  2484 ms · generated  citas 2 · precio SÍ · stock SÍ · marcadores no
 ```
 
-**6 de 6 `generated`, 0 con marcadores sobrantes, 4 de 6 con el precio y el stock dentro del texto** —
-la proporción que el §4 midió en local (22 de 37). El ejemplo, SKU1051 a 250 € con 5 unidades:
+**6 de 6 `generated`, 0 con marcadores sobrantes, 4 de 6 con el precio y el stock dentro del texto**.
+Eso **no es** la misma cifra que el 22 de 37 del §4, y no debe leerse como su confirmación: aquélla
+cuenta **sólo el precio** sobre 37 M2, y ésta **precio y stock a la vez** sobre 6. Con n = 6 el
+intervalo es tan ancho que lo único que se sostiene es que el mecanismo escribe las dos cifras cuando
+el modelo las pide. El ejemplo, SKU1051 a 250 € con 5 unidades:
 *«Este anillo está disponible por **250,00 €** y cuenta con **5**.»* Precio en formato es-ES, stock como
 entero: los dos, resueltos por .NET contra la pieza anclada.
 
@@ -591,7 +597,7 @@ Sustitutos de la misma pieza: **`outcome: ok`, 60 candidatos → 28 en la tienda
 
 ### 13.3 · Memoria y cuota (11.4)
 
-| Contenedor | En reposo | Tras diez generaciones seguidas |
+| Contenedor | En reposo | Tras las diez generaciones de la ventana (6 + 4) |
 |---|---|---|
 | `jbg-demo-ai` | **269,9 MiB / 512 MiB · 52,7 %** | **269,9 MiB · 52,7 %**, idéntico |
 | `jbg-demo-api` | 235,2 MiB | 238,6 MiB |
@@ -603,12 +609,17 @@ corpus, y **generar no mueve la aguja**, porque el modelo vive en el proveedor. 
 de 512 MiB siguen bien dimensionados.
 
 **La cuota de tokens por minuto no es la restricción operativa, y esto refuta lo que yo esperaba.**
-Diez generaciones consecutivas salieron **todas `generated`**, sin una sola degradación del proveedor.
-Lo que corta es el límite propio de la ruta: **10 por minuto y usuario**, con **429 a partir de la
-11.ª petición de la ventana** — verificado en el entorno real, no sólo en el test de integración. La
-ráfaga de prueba se leyó mal al principio (4 servidas y 8 rechazos en vez de 10 y 2) hasta caer en que
-la fase anterior ya había gastado 6 peticiones **de la misma ventana**: 6 + 4 = 10. El límite estaba
-bien; el guion de medición, no.
+Las **diez** generaciones que la ventana permitió salieron **todas `generated`**, sin una sola
+degradación del proveedor. Lo que corta es el límite propio de la ruta: **10 por minuto y usuario**,
+con **429 a partir de la 11.ª petición de la ventana** — verificado en el entorno real, no sólo en el
+test de integración.
+
+**Y no fueron diez seguidas, aunque al escribirlo lo pareciera.** Fueron **6 + 4**: las 6 piezas del
+§13.2 y luego 4 de una ráfaga de 12, con las **8 restantes rechazadas con 429**. La ráfaga se leyó mal
+al principio (4 servidas y 8 rechazos donde se esperaban 10 y 2) hasta caer en que la fase anterior ya
+había gastado 6 peticiones **de la misma ventana**: 6 + 4 = 10, que es exactamente lo que da una
+ventana fija de 10 por minuto y usuario. Las dos lecturas de `docker stats` de la tabla de arriba
+abarcan **las dos fases**, no una ráfaga sola. El límite estaba bien; el guion de medición, no.
 
 ### 13.4 · Dos hallazgos del entorno, ninguno de C34
 
@@ -635,3 +646,160 @@ bien; el guion de medición, no.
   `Admin123!` si no existe, y el runbook vacía la tabla de usuarios; parecía una credencial por defecto
   en un entorno público. La consulta lo desmintió: `admin` existe **desactivado** (`IsActive = f`), y
   `LoginAsync` rechaza a un usuario desactivado aunque la contraseña sea correcta.
+
+---
+
+## 14 · Verificación independiente (`/opsx:verify`, 2026-09-22)
+
+> Pasada **adversarial** sobre `fd554c9`, hecha por una sesión distinta de la que implementó y escribió
+> los §1–§13, con el encargo de buscar lo que a aquélla se le escapó y no de confirmarla. Nada se
+> desplegó y no se llamó al proveedor: la demo se auditó **leyendo**. El árbol de partida estaba limpio
+> y la rama sincronizada con `origin`.
+
+### 14.1 · Lo que se reprodujo, midiéndolo otra vez
+
+| Afirmación de este QA | Cómo se comprobó | Resultado |
+|---|---|---|
+| `openspec validate --all --strict` → 0 failed | Ejecutado | **60 passed / 0 failed**, y el change es uno de los 60. `openspec validate <change> --strict` → *valid* |
+| `sha256` de `ai-service/openapi.json` | `sha256sum` sobre el árbol y `git rev-parse` sobre el blob | **`d8d48f87…c2b875`** en el árbol (CRLF), y el **blob es el mismo objeto** —`f70594f9…`— en `687e98a`, `6030aa3` y `HEAD`: idéntico byte a byte. La cifra del §8 es la del fichero tal y como lo deja el *checkout* de esta máquina |
+| El change no toca las zonas congeladas | `git diff --stat 687e98a^..HEAD` sobre las cinco rutas | **Vacío**, para **toda la rama** y no sólo para `eb44711`. **0** ficheros bajo `Infrastructure/`, luego 0 migraciones propias |
+| Deltas: 15 + 45, 1 + 5, 5 + 23 | *Parser* propio, escrito sin mirar el suyo | **Exacto**: `ai-sales-assist` ADDED 15 · 45; `ai-gateway-client` ADDED 1 · 5 y MODIFIED 5 · 23 |
+| `SHALL`/`MUST` en la primera línea física | El mismo *parser* | **21 de 21** |
+| Los `## MODIFIED` reproducen el requisito vivo entero | Comparación contra `openspec/specs/ai-gateway-client/spec.md` | **Ningún escenario vivo falta**, y los cuerpos conservados son byte-idénticos salvo los dos de *Client models*, que **amplían** y no sustituyen — igual que dice el §3.1 |
+| Los 52 tests que `tasks.md` nombra existen y están en verde | *Parser* propio contra mi `.trx` de cierre | **52 de 52 presentes y en verde.** Además, **63 de 63** de los nombrados en el §8 del informe y **91 de 91** de los nombrados en este QA |
+| `MaxQueryLength = 500` y `MaxTopK = 50` salen del contrato | Leídos de `openapi.json` | `AssistRequest.query.maxLength = 500` y `SubstitutesRequest.top_k.maximum = 50`: **coinciden**, no son números elegidos aquí |
+| `top_k = 20` da la ventana de 60 | `over_retrieval_count` en `stubs/responses.py` | `min(3 × 20, 60) = 60`. Y `candidates_returned = len(results)` en `retrieval/substitutes.py`, así que el `Results.Count` que usa el servicio **es** el `candidates_returned` del contrato |
+
+### 14.2 · La suite, con línea base propia y comparada por nombres
+
+El árbol está limpio y la implementación commiteada, así que `git stash` **no** habría medido nada. La
+línea base se tomó en un **`git worktree` desprendido en `6030aa3`**, fuera del repositorio, sin tocar
+la rama.
+
+```text
+LÍNEA BASE  (6030aa3, worktree propio)          1060 nombres, 49 en rojo   8 m 08 s
+CIERRE      (fd554c9, sin el test de 14.4)      1240 nombres, 49 en rojo   8 m 29 s
+CIERRE      (fd554c9 + el test de 14.4)         1241 nombres, 50 en rojo   7 m 40 s
+
+Contra la línea base, en las dos corridas de cierre:
+  nombres de la línea base ausentes    →  0        y  0
+  nombres nuevos                       →  180      y  181
+  nombres NUEVOS en rojo               →  0        y  0
+  entran en rojo / salen del rojo      →  7 / 7    y  6 / 5
+```
+
+**Ningún nombre nuevo falla en ninguna de las dos**, y **ningún nombre de la línea base desaparece**.
+Todo lo que rota está identificado:
+
+- **`InventoryIntegrationTests`**, la clase que
+  [testing-backend.md](../../../Documentos/testing-backend.md) documenta como *«baraja los suyos de una
+  vez a otra»*: aporta los 7 ↔ 7 de la primera corrida y 5 ↔ 5 de la segunda. Los nombres **no se
+  repiten entre corridas** ni coinciden con los que el §1.1 vio rotar — que es justo lo que hace una
+  rotación por orden de ejecución.
+- **El +1 de rojo de la última corrida es
+  `ProductsControllerTests.Update_WithValidData_ShouldReturnUpdatedProduct`**, la carrera de reloj que
+  el §10.9 registró: *«Expected updated.UpdatedAt to be on or after ‹…16.462865›, but found
+  ‹…16.462797›»* — **68 µs**, contra los 0,6 ms de aquella vez. `ProductsController` está fuera del
+  diff de C34.
+
+De ahí que el **recuento suba de 49 a 50 sin que nada empeore**, que es exactamente el aviso de
+`CLAUDE.md`: se comparan nombres, no números.
+
+Dos precisiones al §1, ninguna de ellas un defecto:
+
+- **Mi línea base da 49 en rojo y no 46.** Mismo árbol, mismo commit, distinta corrida. Es el aviso de
+  `CLAUDE.md` en estado puro. Lo que importa —**0 nombres desaparecidos y 0 nombres nuevos en rojo**—
+  coincide con el §1.1.
+- **Son 180 nombres nuevos, no 179, y el total es 1240, no 1239.** El §1.2 lo dice: el 180º
+  (`SalesAssist_KnowledgeNotCovered_IsPassedThrough`) se añadió **después** de la corrida de cierre. La
+  consecuencia, que el §1 no saca: **hasta esta pasada, el árbol que se va a archivar no se había
+  corrido entero nunca de una vez**. Ahora sí.
+
+### 14.3 · Mutaciones de control, compilando cada una
+
+Ocho mutaciones, aplicadas de una en una con un guion que **compila antes de correr** —la trampa del
+§10.2— y revierte comprobando el `sha256` del fichero. Las ocho compilaron.
+
+| # | Mutación | Resultado |
+|---|---|---|
+| 1 | **D6: intercambiar la regla 4 (agotado) y la 5 (sin resolver)** | **VERDE — la mutación sobrevivió.** Ver §14.4 |
+| 2 | Sustitutos: `Quantity > 0` → `>= 0` | **4 en rojo**: `…_ExcludeProductsWithoutStockAtTargetPos`, `…_TruncateToThePageAfterFiltering`, `…_DistinguishesTheFourEmptyOutcomes(none_in_stock)`, `…_LogsTheFunnel` |
+| 3 | `family_has_variants` no se retira nunca | **1 en rojo**: `SalesAssist_FamilyHasVariantsDroppedWhenOneMemberSurvives` |
+| 4 | `stock_critical` con `<` en vez de `<=` (umbral 2) | **2 en rojo**: `…_CriticalStock_FollowsTheDefaultThreshold(quantity: 2)` y `…_StockWarningsComputedAfterHydration_NotTakenFromPython` |
+| 5 | `stock_critical` desde 0 unidades | **1 en rojo**: `SalesAssist_ZeroStock_IsNotCriticalStock` |
+| 6 | El resolvedor deja de buscar un `}}` suelto | **1 en rojo**: `PlaceholderResolver_MalformedToken_Withholds(template: "Quedan stock}} unidades.")` |
+| 7 | `family_has_variants` **añadido** en el camino servido | **1 en rojo**: `SalesAssist_FamilyHasVariantsNeverAddedOnTheServedPath` |
+| 8 | `pos_id` de vuelta en el cuerpo hacia `jbg-ai` | **1 en rojo**: `AssistSaleRequest_Serialization_OmitsPosId` |
+
+**Siete de ocho mueren donde deben.** El filtro de stock de sustitutos, el umbral de stock crítico, la
+regla de variantes, la resolución de marcadores y la ausencia de `pos_id` en el cuerpo están pinchados
+por tests que fallan si la regla se invierte.
+
+### 14.4 · El hueco que la mutación 1 destapó, y el test que lo cierra
+
+El orden del **D6** fija que la regla 4 —pieza agotada y sin pregunta— gana a la regla 5 —marcador sin
+resolver—. Intercambiarlas dejaba **las 42 pruebas de `SalesAssistServiceTests` en verde**: el par no
+estaba cubierto. `SalesAssist_WithheldByAi_WinsOverOutOfStock` cubre el par 3↔4, y
+`…_AnchorOutOfStock_WithholdsPitchWithoutQuestion_KeepsItWithQuestion` usa una plantilla que **sí**
+resuelve, así que nunca llega a la regla 5.
+
+No es cosmético: los dos estados retiran el argumentario, pero **son los estados los que C36 pinta**, y
+`withheld_out_of_stock` manda al operario al bloque de sustitutos mientras que `withheld_unresolved` es
+un defecto de la plantilla.
+
+Añadido **`SalesAssist_OutOfStockAnchor_WinsOverAnUnresolvedPlaceholder`** —pieza a 0, sin pregunta, y
+un argumentario con `{{precio}}`—. Verde sobre el árbol (43 de 43) y **rojo, él solo, bajo la mutación
+1**. Es el único cambio de código de esta pasada, y es de test.
+
+### 14.5 · Los invariantes, uno a uno
+
+| Invariante | Veredicto |
+|---|---|
+| Ninguna cifra que vea el operario viene de la IA | **Se sostiene.** `ToMemberAsync` y `SubstituteDto` toman `Price` y `Quantity` de `AssistedSearchRow`. `SalesAssistMemberDto` **no** expone el `score` de la IA. `VariantLabel`, `Materials` y `MatchReasons` sí vienen de la IA, y la spec los deja fuera de la lista de campos que manda la hidratación, a propósito |
+| Autorizar y comprobar la pieza **antes** de llamar | **Se sostiene**, con el doble a cero llamadas en los cinco rechazos de integración |
+| `{{price}}` con `ToString("C2", es-ES)`, `{{stock}}` entero invariante, sólo los dos tokens | **Se sostiene**; mutación 6 y los 16 tests del resolvedor. Los tests **formatean con la cultura** en vez de escribir el espacio duro a mano, que es la trampa del repositorio |
+| El argumentario resuelto no aparece en ningún log | **Se sostiene, y más allá del test.** No hay middleware que registre cuerpos —`API/Middleware/` sólo tiene el de excepciones—, `AiGatewayClient` registra `PitchLength` y nunca el texto, y el `RecordingLoggerProvider` corre a nivel `Trace`, así que la aserción de «sólo a `Debug`» no es un verde en vacío |
+| El 422 se traduce sólo en `AssistSaleAsync` y `SubstitutesAsync` | **Se sostiene.** Vive en `TranslateAnchoredStatus`, un método aparte que sólo invocan esas dos; `TranslateStatus` está intacto |
+| `ai-assist` no reintenta *timeouts* ni 5xx | **Se sostiene.** El predicado es `HttpRequestException { HttpRequestError: ConnectionError }` y nada más, y el test del *timeout* dispara la estrategia de Polly de verdad con `FakeTimeProvider` |
+| Una llamada de sustitutos con `top_k = 20`, orden intacto, `Take(pageSize)` | **Se sostiene** |
+| `POST /api/ai/search` se comporta igual | **Se sostiene.** `AssistedSearchService.cs` y `AiSearchController.cs` fuera del diff, y sus tests con el mismo resultado en mis dos corridas |
+| La clave de generación no puede acabar en un log | **Se sostiene.** `deploy.sh` sólo prueba si está vacía —y documenta por qué no hay `set -x`—, y `jbg-ai` registra el **nombre** de la credencial, nunca su valor |
+| El `credential=assist_fallback` no puede activarse por accidente | **Se sostiene, por tres vías independientes.** `classify_query` corre **sólo** en `AssistMode.QUERY_ONLY`; el cliente .NET lanza `ArgumentException` ante una petición sin pieza; y `jbg-demo-ai` **no publica puertos**, así que nadie de fuera puede pedirle un M1 |
+
+### 14.6 · Lo que se corrigió en esta pasada
+
+1. **La cifra falsa del §13.1.** Decía *«0 migraciones de EF Core entre `demo` y la rama»*. Son **tres**,
+   las de C28. Corregido aquí y en el §6 del informe, con la razón real de que el salto fuera seguro:
+   `Program.cs:67` aplica las migraciones al arrancar, en todos los entornos.
+2. **Las 20 casillas del DoD del ticket**, que seguían sin marcar mientras el §12 afirmaba *«20 de 20
+   cumplidas»*. Marcadas, con la salvedad anotada en la del despliegue.
+3. **Tres frases desfasadas por sus propios commits**: la cabecera y el §10.6 decían *«queda sin
+   commitear»* de cosas que `d6a740f` y `fd554c9` ya habían commiteado, y el §11 daba `/opsx:verify`
+   por no ejecutado.
+4. **Dos comparaciones que iban más lejos que su evidencia**: el «4 de 6» de la demo no es el «22 de 37»
+   del §4 —bases distintas y n = 6—, y el embudo de sustitutos que se enseña tiene **tres** de sus
+   cuatro tramos, no los cuatro.
+5. **El «diez generaciones seguidas»**, en los seis sitios donde estaba (§13.3 y la casilla 18 de este
+   QA, la tarea 11.4, el §6 del informe y las dos apariciones de `DEFERRED_TASKS.md`). La aritmética
+   era correcta; la descripción, no: fueron **6 + 4** con **8 rechazos de por medio**, y las dos
+   lecturas de `docker stats` abarcan las dos fases.
+6. **La tabla de specs del ticket**, que nombraba **tres** requisitos `MODIFIED` de `ai-gateway-client`
+   cuando la delta tiene **cinco** —faltaban *Gateway configuration is validated at application start*
+   y *Client models cannot drift from the committed contract*, los dos sí anticipados en `proposal.md`—.
+   De paso, el suelo de 8.000 ms estaba atribuido al requisito de degradación en vez de al de
+   configuración.
+7. **El test de §14.4.**
+
+### 14.7 · Lo que esta pasada tampoco verifica
+
+- **Nada de la demo se ejecutó.** Las cifras del §13 —memoria, ráfaga, `credential=assist`, las seis
+  piezas— se auditaron por coherencia interna y contra el código, no reproduciéndolas. Lo que **sí**
+  quedó establecido es que `fd554c9` no toca código, así que lo verificado sobre `d6a740f` vale para lo
+  que se archiva.
+- **No se llamó al proveedor.** La latencia del §9 se acepta como venía.
+- **La lectura corregida de la ráfaga se acepta como correcta** —6 gastadas + 4 servidas = 10, y 429
+  desde la 11.ª, que es exactamente lo que da un `FixedWindow` de 10 por minuto y usuario con la demo
+  sin `RateLimitPermitLimit` configurado—, pero **no se volvió a ejecutar**: se comprobó contra el
+  código de la política, no contra el entorno. Su descripción como «diez generaciones seguidas» sí se
+  corrigió (§14.6).
+- **`update-docs` sigue sin ejecutarse** (tarea 12.5), que es su propio criterio de verificación.

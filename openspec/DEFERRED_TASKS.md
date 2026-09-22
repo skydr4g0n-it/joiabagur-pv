@@ -385,9 +385,9 @@ mitigation is not needed at these numbers. Re-measure if the corpus grows by an 
 magnitude or if a generative route lands.
 
 > **Re-measured on 2026-09-22, with the generative route live (C34).** `docker stats --no-stream`
-> before and after ten consecutive sale assistances:
+> before and after the ten sale assistances the rate window allowed — **6 + 4, not ten in a row**:
 >
-> | Container | Idle | After ten generations | Of its limit |
+> | Container | Idle | After the ten generations | Of its limit |
 > |---|---|---|---|
 > | `jbg-demo-ai` | **269,9 MiB** | **269,9 MiB**, unchanged | **52,7 % of 512 MiB** |
 > | `jbg-demo-api` | 235,2 MiB | 238,6 MiB | — |
@@ -398,10 +398,12 @@ magnitude or if a generative route lands.
 > model runs at the provider. **`t3.small` and the 512 MiB cap remain right-sized.**
 >
 > **And the tokens-per-minute quota is not the operative constraint here**, contrary to what the C32b
-> entry suggests for the agent route: ten consecutive generations all came back `generated`, with no
-> provider degradation. What binds first is the card's own limit — 10 per minute per user, answering
-> 429 from the eleventh request of the window. Reaching the quota would take several operators at
-> once, and that remains unmeasured.
+> entry suggests for the agent route: the ten generations the window allowed all came back `generated`,
+> with no provider degradation. What binds first is the card's own limit — 10 per minute per user,
+> answering 429 from the eleventh request of the window. **They were not ten in a row**: 6 from the
+> piece-by-piece probe plus 4 of a burst of 12, the other 8 refused with 429, and both `docker stats`
+> readings span the two phases. Reaching the quota would take several operators at once, and that
+> remains unmeasured.
 
 ---
 

@@ -1780,7 +1780,7 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 > interceptor de Norton: sobre 80 peticiones, p95 **7,1 s** y máximo **7,9 s**, ninguna por encima
 > de 8 s, así que **`AssistTimeoutMs` se queda en 10 s**. **La demo quedó desplegada y verificada el 2026-09-22** (§6 del informe, §13 del QA):
 > parámetro creado, `credential=assist` en el log, una asistencia real `generated` con precio y stock
-> resueltos en el texto, sustitutos con su embudo completo —60 candidatos, 28 en la tienda, página de
+> resueltos en el texto, sustitutos con tres tramos de su embudo —60 candidatos, 28 en la tienda, página de
 > 5— y `jbg-demo-ai` en **269,9 MiB de 512**, sin moverse al generar. **Y dos hallazgos que no son de
 > C34**: un entorno recién desplegado deja `ai.pos_projection` vacía y **toda** la recuperación responde
 > 503 —arreglado con `sync-pos`—, y el corpus de conocimiento **no viaja en la imagen** de `jbg-ai`, así
