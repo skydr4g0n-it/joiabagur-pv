@@ -294,6 +294,25 @@ describe('ProductCard', () => {
 
 **482 tests, 118 fallos, en 17 de los 40 ficheros.** Duración: 252 s.
 
+> **Re-medido el 2026-09-22, al implementar C36: la línea base da 597 tests, 114 fallos, en 15 de
+> 48 ficheros, y al cierre 726 tests, 113 fallos, en 14 de 54.** Los 129 tests de más son de C36 y
+> están los 129 en verde. La comparación por nombres salió **subconjunto estricto**: **cero nombres
+> nuevos** y **uno que dejó de fallar**.
+>
+> **Y ese uno obliga a matizar el párrafo siguiente.** Es
+> `pages/admin/__tests__/family-review.test.tsx :: should create a family with its members from the
+> review screen`: falló en la línea base y pasó al cierre **sin que nadie tocara ni ese fichero ni su
+> código de producción**. Explica por qué la línea base daba 114 y 15 ficheros donde el 13 de
+> septiembre daba 113 y 14 — no es rojo acumulado, es que la suite creció seis ficheros y eso desplazó
+> el orden de ejecución.
+>
+> Así que **la afirmación de que aquí el conjunto de fallos es estable entre ejecuciones era demasiado
+> fuerte**: hay al menos un test dependiente del orden en el frontend, igual que en el backend, sólo
+> que uno y no un puñado. **El método no cambia** —comparar por nombres sigue dando una respuesta
+> binaria y útil—, pero conviene esperar que el recuento oscile entre **113 y 114** sin que nadie haya
+> roto nada. Detalle en
+> `Documentos/Proyecto Final AIEng/informes/c36-implementation-measurements.md` §2.1.
+
 > **Re-medido el 2026-09-13, al cerrar C28: 595 tests, 113 fallos, en 14 de 48 ficheros.** La suite
 > ha crecido 113 tests en dos semanas y el rojo **no ha crecido con ella**: cae de 118 a 113 y de 17
 > ficheros a 14. La proporción pasa del 24 % al 19 %. El conjunto de nombres fallidos de C28 fue

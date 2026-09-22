@@ -770,6 +770,18 @@ Tras eso, M2 pasó a `generated` con 2 citas. **Pero se pierde con cada imagen n
 línea en el `Dockerfile` —copiar `data/knowledge`— o un montaje en el compose, y lo decide quien pueda
 tocar `ai-service/`. Mientras no se haga, cualquier entorno nuevo nace sin corpus y con M2 retirado.
 
+> **Esta entrada pesa más desde el 2026-09-22, al implementar C36.** Hasta hoy el corpus vacío sólo
+> degradaba respuestas que nadie veía: `/v1/assist/sale` se demostraba con `curl` y con el arnés. C36
+> le pone **pantalla**, y con ella una **caja de pregunta con cinco sugerencias horneadas** que
+> invitan explícitamente a preguntar justo lo que el corpus cubre — mojar la pieza, piel sensible,
+> limpieza en casa, regalo sin saber la talla, playa o piscina.
+>
+> En un entorno sin corpus, **las cinco responden `knowledge_not_covered` sin citas**. La ficha lo
+> dice con palabras del mostrador y no miente, pero el efecto es el peor posible para una
+> demostración: la interfaz enseña cinco preguntas y el sistema contesta a las cinco que la
+> documentación no las cubre. **Hay que sortear esto antes de enseñar la ficha**, con el `docker cp`
+> de arriba; si no, parece un defecto de C36 y no lo es.
+
 ---
 
 ## C22 · un entorno recién desplegado deja `ai.pos_projection` vacía, y la recuperación responde 503
@@ -1077,3 +1089,70 @@ clave de precio.
 etapa, cada una con su modelo y sus tokens. Es **adición pura** sobre un esquema que sólo publica
 esta ruta —`/v1/assist/sale` no se mueve— y no se hace ahora porque, sin consumidor, agrandaría la
 superficie congelada para nadie.
+
+---
+
+## C36 · servir la parte estructural de la ficha sin pagar una generación
+
+**Estado:** identificado el 2026-09-22 al implementar C36, **no hecho y no decidible hoy**.
+**Zona:** `backend/src/JoiabagurPV.Application/` y `API/` — fuera del alcance de C36, cuya zona es
+`frontend/src/`.
+
+**El problema, medido.** Los datos **baratos** de la ficha de venta —el grupo de la familia, los
+cuatro avisos y el estado de existencias— y los **caros** —el argumentario y sus citas— llegan
+**soldados en la misma respuesta**. Los primeros no necesitan ni un token y sólo se obtienen pagando
+una generación completa de **p50 4,42 s / p95 7,13 s** (C34 §4), cuando el reparto real es **4 ms de
+.NET contra 4,4 s de IA**.
+
+**Y no hay camino alternativo desde el frontend.** `GET /api/product-families/{id}` existe y es
+accesible a cualquier autenticado, pero está indexada por **familia**, el objeto de transferencia de
+producto **no lleva `familyId`**, y la ruta no devuelve cantidad por punto de venta. Desde un
+`productId` no se llega: comprobado sobre el árbol en la exploración de C36 (H4).
+
+**Qué haría falta.** Un `generate=false` —o un `?structural=true`— en
+`POST /api/ai/products/{productId}/sales-assist` que devuelva el mismo objeto con `pitchStatus:
+not_generated`, `citations` vacío y el grupo, los avisos y las existencias hidratados igual que ahora.
+Serviría la ficha estructural en **~10 ms**. Es **adición pura**: ningún campo se retira ni cambia de
+tipo, y la ficha ya sabe pintar `not_generated` sin insinuar una caída.
+
+**Por qué no se hizo en C36.** Rompe la zona del change —`backend/` intocable— y reabre un change
+archivado el día anterior.
+
+**Condición de reactivación, y por qué hoy no es observable.** Sería *«que el uso real de la ficha
+muestre aperturas que no leen el argumentario»*. **No se puede comprobar**: la ficha no tiene
+telemetría, que es la entrada siguiente. Mientras no la tenga, esto se decide por argumento o no se
+decide.
+
+---
+
+## C36 · la ficha de venta no deja rastro
+
+**Estado:** identificado el 2026-09-22 al implementar C36, **declarado como limitación**.
+**Zona:** `backend/` (tabla y ruta) y `frontend/src/pages/sales/assist.tsx` (emisión).
+
+A diferencia de la búsqueda asistida, que persiste `ProductSearchEvent` desde C04 y sostiene con él la
+tasa de selección del §11 del diseño, **ninguna de las tres cosas que la ficha decide deja rastro**:
+
+| Acto | ¿Se registra? |
+|---|---|
+| Abrir la ficha de una pieza | **No** |
+| Preguntar algo del cliente | **No** |
+| Elegir una variante de la familia | **No** |
+
+No hay tabla equivalente y C36 no la crea, porque crearla era una migración de EF Core y la zona del
+change es `frontend/src/`. Una consecuencia deliberada y una accidental:
+
+- **Deliberada:** abrir la ficha **desde la fila de resultados no reporta selección** al endpoint de
+  telemetría de búsqueda. Ver una ficha no es elegir la pieza, y contarlo inflaría la tasa de
+  selección que el evento de búsqueda existe para medir. Hay test: `should report no selection when
+  the card is opened from a result row`.
+- **Accidental:** la condición de reactivación de la entrada anterior **no es observable**.
+
+**Qué haría falta cuando se haga.** Una tabla `SalesAssistEvent` con el producto anclado, el punto de
+venta, si hubo pregunta —**nunca su texto**, por la misma razón por la que no viaja en la URL— y el
+miembro elegido si lo hubo; más una ruta de reporte con la forma de la de selección de C04, que se
+llama sin esperarla y cuyo fallo es invisible por diseño. La retención hereda el problema que el §15.11
+del diseño ya declara para `ProductSearchEvent`.
+
+---
+

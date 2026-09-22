@@ -1826,7 +1826,41 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 > `size_label_missing`) más los dos de stock que apila C34, y la regla de etiqueta neutra para
 > un código desconocido sigue siendo necesaria: el vocabulario es cerrado, pero versionado.
 
-**Tests.** `should require variant confirmation when family has multiple members`; `should show substitutes block when selected product is out of stock`; `should render citations when pitch has sources`; **`should mark an establishment claim differently from a general one`**; **`should fall back to a neutral label for an unknown warning code`**. *(`should render complementary block when recommendations exist` no se escribe: su bloque se retiró con C27.)*
+> **Revisada el 2026-09-22, al explorar e implementar C36. Tres correcciones en el sitio, y ninguna
+> de alcance.**
+>
+> - **La tabla de copy cubre cinco códigos, no cuatro, y dos del vocabulario no llevan fila.**
+>   `classify_query` corre **sólo en M1** y las dos rutas de C34 son siempre ancladas, así que
+>   `query_out_of_domain` y `query_not_in_catalogue` **no pueden llegar a esta pantalla** y
+>   `clarification_question` es constante `null`. Escribir su castellano daría dos pruebas verdes
+>   sobre caminos imposibles; en su lugar hay **un test que comprueba que caen en la etiqueta
+>   neutra**. `clarification_question` se lee del contrato y se pinta si llegara, sin bloque ni copy
+>   propios: es un campo del objeto de transferencia, no una funcionalidad. Los cinco con fila son
+>   `family_has_variants`, `stock_critical`, `family_members_out_of_stock`, `knowledge_not_covered` y
+>   `size_label_missing`.
+> - **`size_label_missing` no se pinta como los otros.** Salta en el **58,3 %** de las fichas y está
+>   anticorrelacionado con tener familia —**4,0 %** con ella contra **92,5 %** sin ella—, así que
+>   informa del estado del enriquecimiento y no de la pieza. Va como **línea neutra junto al SKU**,
+>   nunca en el bloque de avisos, y **se pinta siempre**: no se suprime nada que el backend haya
+>   emitido. Como alerta canibalizaría a `stock_critical`, que salta en el 3,9 % y sí puede costar una
+>   venta.
+> - **El test de variantes se precisa.** `should require variant confirmation…` no basta: lo que hay
+>   que sostener es que **ningún miembro está preseleccionado** y que no existe acción de venta que no
+>   nombre a uno. Son dos tests, y la garantía es **estructural** —el bloque no tiene estado de
+>   selección— en vez de una regla que alguien tenga que mantener.
+>
+> **La ruta es propia**: `/sales/new/assist/:productId`, con carga perezosa y **tres entradas** —la
+> fila del panel, el producto elegido en la página de venta y la pieza resuelta tras escanear—, porque
+> la situación que la ficha nombra, *el cliente con la pieza en la mano*, llega por las dos últimas.
+> **Corrección al ticket**: `scan.tsx` **no tiene punto de venta** (cero coincidencias de `pointOfSale`
+> en el fichero), así que esa entrada navega sin estado y la ficha cae en su selector de respaldo por
+> rol.
+>
+> **Implementada el 2026-09-22**: 129 tests nuevos, cero nombres nuevos en rojo contra la línea base,
+> `openapi.json` idéntico byte a byte. Detalle en
+> [c36-implementation-measurements.md](informes/c36-implementation-measurements.md).
+
+**Tests.** `should require variant confirmation when family has multiple members`; **`should preselect no member when the group has several`**; `should show substitutes block when selected product is out of stock`; `should render citations when pitch has sources`; **`should mark an establishment claim differently from a general one`**; **`should fall back to a neutral label for an unknown warning code`**; **`should label a router refusal code with the neutral fallback`**; **`should render size label missing as a piece attribute and not as a warning`**; **`should tell a degraded card from one whose argument was not generated`**. *(`should render complementary block when recommendations exist` no se escribe: su bloque se retiró con C27.)*
 
 ---
 

@@ -69,8 +69,8 @@
 
 ## 9. Documentación
 
-- [ ] 9.1 `Documentos/epicas.md`: EP15 al cierre de C36 y el recuento movido al archivarlo
-- [ ] 9.2 Plan de changes: ficha C36 corregida en el sitio con lo que la exploración refutó
-- [ ] 9.3 Diseño RAG: **§15.12 reescrita** (dos de los tres modos llegan al operario), **§15.13 ampliada** (el rechazo cortés sigue sin pantalla) y **limitación nueva** de telemetría de la ficha
-- [ ] 9.4 `frontend/README.md`: la ruta nueva, sus tres entradas y el módulo de copia
-- [ ] 9.5 `openspec/DEFERRED_TASKS.md`: abrir las dos entradas nuevas —servir la ficha estructural sin generar, y telemetría de la ficha— y anotar que la del corpus que no viaja en la imagen ahora pesa más
+- [x] 9.1 `Documentos/epicas.md`: EP15 al cierre de C36 y el recuento movido al archivarlo
+- [x] 9.2 Plan de changes: ficha C36 corregida en el sitio con lo que la exploración refutó
+- [x] 9.3 Diseño RAG: **§15.12 reescrita** (dos de los tres modos llegan al operario), **§15.13 ampliada** (el rechazo cortés sigue sin pantalla) y **limitación nueva** de telemetría de la ficha
+- [x] 9.4 `frontend/README.md`: la ruta nueva, sus tres entradas y el módulo de copia
+- [x] 9.5 `openspec/DEFERRED_TASKS.md`: abrir las dos entradas nuevas —servir la ficha estructural sin generar, y telemetría de la ficha— y anotar que la del corpus que no viaja en la imagen ahora pesa más
