@@ -1,9 +1,9 @@
 ## 1. Puerta de entrada
 
-- [ ] 1.1 Medir la **línea base de la suite de frontend por nombres de test**: `git stash push -u`, `npm run test` en `frontend/`, `git stash pop`, y guardar el **conjunto de nombres** que fallan. Viene roja de fábrica; el número no sirve de nada
-- [ ] 1.2 Comprobar que `npm run build` está en verde antes de tocar nada
-- [ ] 1.3 Anotar el `sha256` de `ai-service/openapi.json` para comprobar al final que no se ha movido
-- [ ] 1.4 `openspec validate --all --strict` en verde antes de empezar
+- [x] 1.1 Medir la **línea base de la suite de frontend por nombres de test**: `git stash push -u`, `npm run test` en `frontend/`, `git stash pop`, y guardar el **conjunto de nombres** que fallan. Viene roja de fábrica; el número no sirve de nada
+- [x] 1.2 Comprobar que `npm run build` está en verde antes de tocar nada
+- [x] 1.3 Anotar el `sha256` de `ai-service/openapi.json` para comprobar al final que no se ha movido
+- [x] 1.4 `openspec validate --all --strict` en verde antes de empezar
 
 ## 2. Contrato y servicio
 
