@@ -37,6 +37,13 @@ export const ROUTES = {
     NEW_SCAN: '/sales/new/scan',
     NEW_IMAGE: '/sales/new/image',
     NEW_ASSISTED: '/sales/new/assisted',
+    /**
+     * The sale card of one piece (C36). Anchored to a product; the point of sale travels in
+     * navigation state, and the card offers a role-resolved selector when it does not.
+     */
+    ASSIST: (productId: string) => `/sales/new/assist/${productId}`,
+    /** Route pattern of the above, for registering it. */
+    ASSIST_PATTERN: '/sales/new/assist/:productId',
     CART: '/sales/cart',
     HISTORY: '/sales/history',
     DETAIL: (id: string) => `/sales/${id}`,

@@ -29,12 +29,12 @@
 
 ## 5. Página y ruta
 
-- [ ] 5.1 Añadir `SALES.ASSIST(productId)` a `routes.tsx` y registrar la ruta con **carga perezosa** en `app-routing.tsx`
-- [ ] 5.2 Crear `frontend/src/pages/sales/assist.tsx`: punto de venta por estado de navegación, **selector de respaldo por rol** cuando se abre en frío y **ninguna petición hasta elegir uno**
-- [ ] 5.3 Implementar el **episodio por visita** (referencia inicializada de forma perezosa) y la **guarda de respuestas fuera de orden**, copiados de `assisted.tsx`
-- [ ] 5.4 Disparar **una** petición de asistencia al entrar, **sin reintento automático**, con estado de carga desde el primer instante y un botón de reintento explícito
-- [ ] 5.5 La pregunta como **segunda** petición explícita, sin conservarse entre visitas y sin aparecer en la dirección de la página ni en el estado del enrutador
-- [ ] 5.6 Pedir sustitutos **sólo** si el miembro anclado no tiene existencias **y** la IA estaba disponible; si el card degradó, explicar por qué no se ofrecen
+- [x] 5.1 Añadir `SALES.ASSIST(productId)` a `routes.tsx` y registrar la ruta con **carga perezosa** en `app-routing.tsx`
+- [x] 5.2 Crear `frontend/src/pages/sales/assist.tsx`: punto de venta por estado de navegación, **selector de respaldo por rol** cuando se abre en frío y **ninguna petición hasta elegir uno**
+- [x] 5.3 Implementar el **episodio por visita** (referencia inicializada de forma perezosa) y la **guarda de respuestas fuera de orden**, copiados de `assisted.tsx`
+- [x] 5.4 Disparar **una** petición de asistencia al entrar, **sin reintento automático**, con estado de carga desde el primer instante y un botón de reintento explícito
+- [x] 5.5 La pregunta como **segunda** petición explícita, sin conservarse entre visitas y sin aparecer en la dirección de la página ni en el estado del enrutador
+- [x] 5.6 Pedir sustitutos **sólo** si el miembro anclado no tiene existencias **y** la IA estaba disponible; si el card degradó, explicar por qué no se ofrecen
 
 ## 6. Las tres entradas y la salida
 
