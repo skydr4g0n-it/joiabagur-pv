@@ -23,6 +23,12 @@ public static class RateLimitPolicies
 
     /// <summary>Assisted search, partitioned by user.</summary>
     public const string AiSearch = "AiSearchRateLimit";
+
+    /// <summary>
+    /// Sale assistance (C34), partitioned by user. Its own policy because its route calls the
+    /// language model; the substitutes route calls none and uses <see cref="AiSearch"/>.
+    /// </summary>
+    public const string AiSalesAssist = "AiSalesAssistRateLimit";
 }
 
 /// <summary>
@@ -157,6 +163,31 @@ public static class ServiceCollectionExtensions
                     {
                         PermitLimit = permitLimit,
                         Window = TimeSpan.FromSeconds(searchOptions.RateLimitWindowSeconds),
+                        QueueLimit = 0
+                    }));
+
+            // Sale assistance (C34). Same shape as the search policy — partitioned by user, raised
+            // out of the way in testing unless a test sets the limit — with its own allowance,
+            // because every request can cost two paid provider calls and the organisation's
+            // tokens-per-minute quota is what several operators at once run into first. A 429 is
+            // how the caller tells "throttled" from "AI unavailable", which is a 200.
+            var salesAssistOptions = configuration
+                .GetSection(AiSalesAssistOptions.SectionName)
+                .Get<AiSalesAssistOptions>() ?? new AiSalesAssistOptions();
+
+            var salesAssistPermitLimit = configuration
+                .GetValue<int?>($"{AiSalesAssistOptions.SectionName}:{nameof(AiSalesAssistOptions.RateLimitPermitLimit)}")
+                ?? (isTestingEnvironment ? 10_000 : salesAssistOptions.RateLimitPermitLimit);
+
+            options.AddPolicy(RateLimitPolicies.AiSalesAssist, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                                  ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                                  ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = salesAssistPermitLimit,
+                        Window = TimeSpan.FromSeconds(salesAssistOptions.RateLimitWindowSeconds),
                         QueueLimit = 0
                     }));
         });

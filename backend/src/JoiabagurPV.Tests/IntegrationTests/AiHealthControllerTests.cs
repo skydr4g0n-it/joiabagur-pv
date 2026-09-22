@@ -5,6 +5,7 @@ using JoiabagurPV.Application.DTOs.Ai;
 using JoiabagurPV.Application.DTOs.Auth;
 using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Domain.Entities;
+using JoiabagurPV.Tests.TestHelpers;
 using JoiabagurPV.Tests.TestHelpers.Mothers;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -127,28 +128,9 @@ public class AiHealthControllerTests : IAsyncLifetime
     // ---------------------------------------------------------------- helpers
 
     /// <summary>A gateway that answers a healthy report without reaching anything.</summary>
-    private sealed class StubHealthGateway : IAiGatewayClient
+    private sealed class StubHealthGateway : ThrowingAiGatewayClient
     {
-        public Task<AiSearchResponse> SearchAsync(
-            AiSearchRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AiEnrichResponse> EnrichAsync(
-            AiEnrichRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AiFamilyAuditResponse> AuditFamiliesAsync(
-
-            AiFamilyAuditRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-
-            throw new NotSupportedException();
-
-
-        public Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
-            AiFamilySuggestRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
+        public override Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(new AiHealthResponse
             {
                 Status = "OK",

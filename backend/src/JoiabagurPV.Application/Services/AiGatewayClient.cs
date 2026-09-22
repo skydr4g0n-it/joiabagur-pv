@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using JoiabagurPV.Application.Configuration;
 using JoiabagurPV.Application.DTOs.Ai;
 using JoiabagurPV.Application.Exceptions;
@@ -50,6 +51,17 @@ public class AiGatewayClient : IAiGatewayClient
     /// </remarks>
     public const string HealthClientName = "ai-health";
 
+    /// <summary>
+    /// Named client for the generative route (C34), with its own budget and its own breaker state.
+    /// </summary>
+    /// <remarks>
+    /// Separate from retrieval for the reason enrichment is: a slow language model must not open
+    /// the retrieval circuit and push every operator's search onto its lexical fallback for a
+    /// service that is answering retrieval correctly. Its budget is sized for the provider calls
+    /// of one request, and it retries only a connection that never opened.
+    /// </remarks>
+    public const string AssistClientName = "ai-assist";
+
     /// <summary>Correlation header, the only thing that ties a rejected request to its origin.</summary>
     public const string TraceHeaderName = "X-Trace-Id";
 
@@ -58,6 +70,8 @@ public class AiGatewayClient : IAiGatewayClient
     private const string HealthPath = "/health";
     private const string FamilySuggestPath = "/v1/families/suggest";
     private const string FamilyAuditPath = "/v1/families/audit";
+    private const string AssistSalePath = "/v1/assist/sale";
+    private const string SubstitutesPath = "/v1/retrieval/substitutes";
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IAiServiceTokenFactory _tokenFactory;
@@ -630,6 +644,300 @@ public class AiGatewayClient : IAiGatewayClient
         {
             AiGatewayAttemptTracker.End();
         }
+    }
+
+    /// <inheritdoc/>
+    public async Task<AiAssistSaleResponse> AssistSaleAsync(
+        AiAssistSaleRequest request,
+        AiCallScope scope,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(scope);
+
+        // Same closure as SearchAsync: the anchored assistance reads the point of sale from the
+        // token, and a catalog scope carries none.
+        if (scope.Kind != AiCallScopeKind.PointOfSale)
+        {
+            throw new ArgumentException(
+                "Sale assistance requires a point-of-sale scope. A catalog scope carries no pos_id, "
+                + "which the service uses to scope the piece and its family.",
+                nameof(scope));
+        }
+
+        // The contract also serves a free query with no product. This client refuses it: the
+        // placeholders of the generated argument name no product, so with several pieces on the
+        // table there is nothing to resolve them against.
+        if (string.IsNullOrWhiteSpace(request.ProductId))
+        {
+            throw new ArgumentException(
+                "Sale assistance requires an anchored product. Without one the price and stock "
+                + "placeholders of the argument cannot be resolved.",
+                nameof(request));
+        }
+
+        var traceId = _traceContextAccessor.CurrentTraceId;
+
+        using var logScope = _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["trace_id"] = traceId,
+            ["endpoint"] = AssistSalePath
+        });
+
+        // The operator's question is written about a customer. Debug only, like the search query.
+        if (request.Query is not null)
+        {
+            _logger.LogDebug("ai_gateway_assist_query {Query}", request.Query);
+        }
+
+        _logger.LogInformation(
+            "ai_gateway_assist_started {PosId} {Role} {HasQuestion} {QueryLength}",
+            scope.PointOfSaleId,
+            scope.Role,
+            request.Query is not null,
+            request.Query?.Length ?? 0);
+
+        var stopwatch = Stopwatch.StartNew();
+        AiGatewayAttemptTracker.Begin();
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient(AssistClientName);
+
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, AssistSalePath)
+            {
+                Content = JsonContent.Create(request, options: AiGatewaySerialization.Options)
+            };
+
+            httpRequest.Headers.Authorization =
+                new AuthenticationHeaderValue("Bearer", _tokenFactory.Create(scope, traceId));
+            httpRequest.Headers.TryAddWithoutValidation(TraceHeaderName, traceId);
+
+            using var response = await client.SendAsync(httpRequest, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw TranslateAnchoredStatus(response.StatusCode, stopwatch, AssistSalePath);
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<AiAssistSaleResponse>(
+                AiGatewaySerialization.Options,
+                cancellationToken);
+
+            if (payload is null)
+            {
+                throw Fail(AiGatewayOutcome.ServerError, stopwatch,
+                    new AiUnavailableException("The AI service returned an empty sale assistance body."));
+            }
+
+            stopwatch.Stop();
+
+            // The argument is NOT in here, at any level: it is the text whose placeholders the
+            // backend fills with the real price. Its length is diagnostic without being content.
+            _logger.LogInformation(
+                "ai_gateway_assist_completed {StatusCode} {LatencyMs} {Attempts} {Intent} {Groups} {Citations} {Warnings} {PitchLength} {PromptVersion} {Model} {TotalTokens}",
+                (int)response.StatusCode,
+                stopwatch.ElapsedMilliseconds,
+                AiGatewayAttemptTracker.Attempts,
+                payload.Intent,
+                payload.Groups.Count,
+                payload.Citations.Count,
+                payload.Warnings.Count,
+                payload.Pitch.Length,
+                payload.PromptVersion,
+                payload.Usage.Model,
+                payload.Usage.TotalTokens);
+
+            return payload;
+        }
+        catch (AiGatewayException)
+        {
+            throw;
+        }
+        catch (BrokenCircuitException ex)
+        {
+            throw Fail(AiGatewayOutcome.CircuitOpen, stopwatch,
+                new AiUnavailableException("The AI sale assistance circuit is open; no request was issued.", ex));
+        }
+        catch (TimeoutRejectedException ex)
+        {
+            throw Fail(AiGatewayOutcome.Timeout, stopwatch,
+                new AiUnavailableException("The AI service did not answer within the sale assistance time budget.", ex));
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw Fail(AiGatewayOutcome.Timeout, stopwatch,
+                new AiUnavailableException("The AI service did not answer within the sale assistance time budget.", ex));
+        }
+        catch (HttpRequestException ex)
+        {
+            throw Fail(AiGatewayOutcome.Transport, stopwatch,
+                new AiUnavailableException("The AI service could not be reached.", ex));
+        }
+        catch (JsonException ex)
+        {
+            // A body that does not match the contract is the service failing, not the caller: the
+            // card must degrade on it, and a raw serializer exception would escape every catch
+            // the caller writes against the gateway's own failure types.
+            throw Fail(AiGatewayOutcome.ServerError, stopwatch,
+                new AiUnavailableException("The AI service returned a sale assistance body that does not match the contract.", ex));
+        }
+        finally
+        {
+            AiGatewayAttemptTracker.End();
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<AiSubstitutesResponse> SubstitutesAsync(
+        AiSubstitutesRequest request,
+        AiCallScope scope,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(scope);
+
+        if (scope.Kind != AiCallScopeKind.PointOfSale)
+        {
+            throw new ArgumentException(
+                "Substitutes require a point-of-sale scope. A catalog scope carries no pos_id, "
+                + "which the service reads as the availability signal of its ranking.",
+                nameof(scope));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.ProductId))
+        {
+            throw new ArgumentException("Substitutes require a product.", nameof(request));
+        }
+
+        if (request.TopK is < 1 or > AiSubstitutesRequest.MaxTopK)
+        {
+            throw new ArgumentException(
+                $"top_k must be between 1 and {AiSubstitutesRequest.MaxTopK}, which is the range "
+                + "the frozen contract accepts.",
+                nameof(request));
+        }
+
+        var traceId = _traceContextAccessor.CurrentTraceId;
+
+        using var logScope = _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["trace_id"] = traceId,
+            ["endpoint"] = SubstitutesPath
+        });
+
+        _logger.LogInformation(
+            "ai_gateway_substitutes_started {PosId} {Role} {TopK} {Reason}",
+            scope.PointOfSaleId,
+            scope.Role,
+            request.TopK,
+            request.Reason);
+
+        var stopwatch = Stopwatch.StartNew();
+        AiGatewayAttemptTracker.Begin();
+
+        try
+        {
+            // The retrieval client, its budget and its breaker: this route embeds nothing and
+            // calls no model provider, and it fails for the same reasons retrieval does.
+            var client = _httpClientFactory.CreateClient(RetrievalClientName);
+
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, SubstitutesPath)
+            {
+                Content = JsonContent.Create(request, options: AiGatewaySerialization.Options)
+            };
+
+            httpRequest.Headers.Authorization =
+                new AuthenticationHeaderValue("Bearer", _tokenFactory.Create(scope, traceId));
+            httpRequest.Headers.TryAddWithoutValidation(TraceHeaderName, traceId);
+
+            using var response = await client.SendAsync(httpRequest, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw TranslateAnchoredStatus(response.StatusCode, stopwatch, SubstitutesPath);
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<AiSubstitutesResponse>(
+                AiGatewaySerialization.Options,
+                cancellationToken);
+
+            if (payload is null)
+            {
+                throw Fail(AiGatewayOutcome.ServerError, stopwatch,
+                    new AiUnavailableException("The AI service returned an empty substitutes body."));
+            }
+
+            stopwatch.Stop();
+
+            _logger.LogInformation(
+                "ai_gateway_substitutes_completed {StatusCode} {LatencyMs} {Attempts} {CandidatesReturned} {ResultsCount} {LowConfidence}",
+                (int)response.StatusCode,
+                stopwatch.ElapsedMilliseconds,
+                AiGatewayAttemptTracker.Attempts,
+                payload.CandidatesReturned,
+                payload.Results.Count,
+                payload.LowConfidence);
+
+            return payload;
+        }
+        catch (AiGatewayException)
+        {
+            throw;
+        }
+        catch (BrokenCircuitException ex)
+        {
+            throw Fail(AiGatewayOutcome.CircuitOpen, stopwatch,
+                new AiUnavailableException("The AI service circuit is open; no request was issued.", ex));
+        }
+        catch (TimeoutRejectedException ex)
+        {
+            throw Fail(AiGatewayOutcome.Timeout, stopwatch,
+                new AiUnavailableException("The AI service did not answer within the time budget.", ex));
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw Fail(AiGatewayOutcome.Timeout, stopwatch,
+                new AiUnavailableException("The AI service did not answer within the time budget.", ex));
+        }
+        catch (HttpRequestException ex)
+        {
+            throw Fail(AiGatewayOutcome.Transport, stopwatch,
+                new AiUnavailableException("The AI service could not be reached.", ex));
+        }
+        catch (JsonException ex)
+        {
+            throw Fail(AiGatewayOutcome.ServerError, stopwatch,
+                new AiUnavailableException("The AI service returned a substitutes body that does not match the contract.", ex));
+        }
+        finally
+        {
+            AiGatewayAttemptTracker.End();
+        }
+    }
+
+    /// <summary>
+    /// Status translation of the two operations anchored to one product: a 422 is a rejection,
+    /// everything else is translated as for every other operation.
+    /// </summary>
+    /// <remarks>
+    /// Kept apart from <see cref="TranslateStatus"/> on purpose. That translation is shared by the
+    /// whole client, and the other operations must keep reading a 422 as unavailability: their
+    /// routes do not produce one about a product, and narrowing the shared translation for them
+    /// is not what this change is for.
+    /// </remarks>
+    private AiGatewayException TranslateAnchoredStatus(HttpStatusCode statusCode, Stopwatch stopwatch, string path)
+    {
+        if (statusCode == HttpStatusCode.UnprocessableEntity)
+        {
+            return Fail(AiGatewayOutcome.Rejected, stopwatch,
+                new AiRequestRejectedException(
+                    (int)statusCode,
+                    $"The AI service cannot process the product named in the request to {path}: "
+                    + "absent from its index, inactive, or without an embedding."));
+        }
+
+        return TranslateStatus(statusCode, stopwatch, path);
     }
 
     /// <summary>

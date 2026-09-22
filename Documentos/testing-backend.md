@@ -403,7 +403,8 @@ Los dos primeros grupos son **deriva de dependencias**, no lógica rota; los dos
 |---|---|---|
 | «Se esperaba 401 y llegó 200 / 403 / 201» | 16 | El `HttpClient` compartido de la clase de test es el que hace los `login`, así que **arrastra sus cookies**: la llamada «anónima» no lo es. Se arregla pidiendo un cliente nuevo a la factoría |
 | `Cannot create a DbSet for 'TestEntity'` | 4 | `RepositoryTests` usa una entidad que no está en el modelo del contexto |
-| `22001: value too long for character varying(20)` | 4 | Las *object mothers* generan datos con Bogus y el teléfono generado no siempre cabe en `PointOfSale.Phone`. **Es la única familia genuinamente no determinista**, y explica que dos ejecuciones del mismo código den recuentos distintos |
+| `22001: value too long for character varying(20)` | 4 | Las *object mothers* generan datos con Bogus y el teléfono generado no siempre cabe en `PointOfSale.Phone`. Es **no determinista**, y explica que dos ejecuciones del mismo código den recuentos distintos |
+| `UpdatedAt` anterior a `CreatedAt` por microsegundos | 1 | `ProductsControllerTests.Update_WithValidData_ShouldReturnUpdatedProduct`. Los dos sellos se toman del reloj del sistema dentro de la misma operación y el segundo cae **antes** que el primero por una fracción de milisegundo: *«Expected updated.UpdatedAt to be on or after ‹…16.462865›, but found ‹…16.462797›»*. Medido en **0,6 ms** y en **68 µs** en corridas distintas. **Pasa ejecutado aislado.** La **segunda familia no determinista**, anotada al verificar C34 (§10.9 de su QA) |
 | Varios | resto | Concurrencia en venta de última unidad, validaciones de importación, un 500 y un 400 puntuales |
 
 ### Cómo distinguir una regresión propia

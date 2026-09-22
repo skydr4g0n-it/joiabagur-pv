@@ -96,6 +96,21 @@ export AI_DB_PASSWORD="$(read_parameter AI_DB_PASSWORD)"
 export JWT_SIGNING_KEY="$(read_parameter JWT_SIGNING_KEY)"
 export EMBEDDING_API_KEY="$(read_parameter EMBEDDING_API_KEY)"
 
+# C30b · C34. UNLIKE every other secret here, this parameter may NOT exist:
+# without it the generation layer does not run, and the sale assistance route
+# serves its structured response with a 200 — a declared, valid state and the
+# rollback of the generation. Hence `|| true`: `set -e` plus the store's own
+# error would otherwise abort the whole deployment over a credential whose
+# absence is legitimate. And for the same reason there is NO `:?` line for it in
+# the validation block below: empty here means "we do not generate", not "broken".
+export ASSIST_LLM_API_KEY="$(read_parameter ASSIST_LLM_API_KEY || true)"
+# Whether it is there, never what it is: the output of this script is archived.
+if [ -n "${ASSIST_LLM_API_KEY}" ]; then
+  log "Generation credential: present (the sale argument will be generated)"
+else
+  log "Generation credential: absent (the sale card serves no argument; see deploy/demo/README.md)"
+fi
+
 # The two shared credentials. Each is ONE parameter, read ONCE here, and
 # interpolated by the composition file into the TWO services that must agree on
 # it literally:

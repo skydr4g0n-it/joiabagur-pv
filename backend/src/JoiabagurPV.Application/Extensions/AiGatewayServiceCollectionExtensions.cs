@@ -55,6 +55,15 @@ public static class AiGatewayServiceCollectionExtensions
                 o => o.TokenTtlSeconds > 0 && o.RetrievalTimeoutMs > 0 && o.AssistTimeoutMs > 0
                      && o.EnrichTimeoutMs > 0 && o.HealthTimeoutMs > 0,
                 $"{AiGatewayOptions.SectionName} time-to-live and time budgets must be positive.")
+            // The outer budget must cover the worst case the AI service declares inside. Checked
+            // here so that relation is something start-up verifies instead of something somebody
+            // has to remember the day the budget is tuned down.
+            .Validate(
+                o => o.AssistTimeoutMs >= AiGatewayOptions.MinimumAssistTimeoutMs,
+                $"{AiGatewayOptions.SectionName}:AssistTimeoutMs must be at least {AiGatewayOptions.MinimumAssistTimeoutMs} ms: "
+                + "the worst case jbg-ai declares for the provider calls of one sale assistance is "
+                + "MAX_PITCH_PROVIDER_CALLS × PITCH_TIMEOUT_SECONDS = 2 × 4 s (ai-service/src/jbg_ai/assist/constants.py). "
+                + "A shorter budget discards answers the service was still entitled to deliver.")
             // ValidateOnStart is the whole point. Without it the check is lazy and would surface
             // inside a request instead of at boot, which is the failure mode being removed here.
             .ValidateOnStart();
@@ -145,13 +154,62 @@ public static class AiGatewayServiceCollectionExtensions
                 client.Timeout = TimeSpan.FromMilliseconds(options.HealthTimeoutMs);
             });
 
-        // C34 registers its own named client here for the generative route, with a 5 s budget
-        // and its own breaker state. Separate breakers on purpose: a slow language model must
-        // not open the retrieval circuit and push the caller onto its lexical fallback for a
-        // service that is answering correctly.
+        // The generative route (C34). Its own client and its own breaker state, on purpose: a
+        // slow language model must not open the retrieval circuit and push the caller onto its
+        // lexical fallback for a service that is answering correctly. Substitutes do NOT come
+        // here — they are a retrieval route, embed nothing and ride on ai-retrieval.
+        services
+            .AddHttpClient(AiGatewayClient.AssistClientName, client =>
+            {
+                client.BaseAddress = new Uri(options.BaseUrl);
+                client.Timeout = Timeout.InfiniteTimeSpan;
+            })
+            .AddResilienceHandler("ai-assist-pipeline", builder =>
+            {
+                // One retry, and only for a connection that never opened. A timeout is NOT
+                // retried here, unlike retrieval: the service may already have spent its
+                // provider calls, and a second attempt doubles both the wait at the counter —
+                // twenty seconds — and the paid calls. A 5xx is not retried either, for the same
+                // reason. A connection refused is the one failure where the request is known not
+                // to have left, so nothing was spent.
+                builder.AddRetry(new HttpRetryStrategyOptions
+                {
+                    MaxRetryAttempts = 1,
+                    Delay = TimeSpan.FromMilliseconds(100),
+                    BackoffType = DelayBackoffType.Constant,
+                    UseJitter = false,
+                    ShouldHandle = args => ValueTask.FromResult(IsConnectionNeverOpened(args.Outcome)),
+                    OnRetry = _ =>
+                    {
+                        AiGatewayAttemptTracker.RecordRetry();
+                        return default;
+                    }
+                });
+
+                // Counts the same transient conditions as the retrieval breaker. A 200 the
+                // service degraded internally — no argument because the provider failed — is not
+                // a failure: Python degraded, and the breaker protects from Python not answering.
+                builder.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions
+                {
+                    FailureRatio = options.BreakerFailureRatio,
+                    MinimumThroughput = options.BreakerMinimumThroughput,
+                    SamplingDuration = TimeSpan.FromSeconds(options.BreakerSamplingDurationSeconds),
+                    BreakDuration = TimeSpan.FromSeconds(options.BreakerBreakDurationSeconds),
+                    ShouldHandle = args => ValueTask.FromResult(IsRetryable(args.Outcome))
+                });
+
+                builder.AddTimeout(TimeSpan.FromMilliseconds(options.AssistTimeoutMs));
+            });
 
         return services;
     }
+
+    /// <summary>
+    /// The only failure the generative client retries: the connection was never established, so
+    /// the request did not leave and no provider call was spent.
+    /// </summary>
+    private static bool IsConnectionNeverOpened(Outcome<HttpResponseMessage> outcome) =>
+        outcome.Exception is HttpRequestException { HttpRequestError: HttpRequestError.ConnectionError };
 
     /// <summary>
     /// Transient conditions worth one more attempt, and the same set the breaker counts as

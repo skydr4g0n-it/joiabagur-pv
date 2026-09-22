@@ -8,6 +8,7 @@ using JoiabagurPV.Application.Exceptions;
 using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Infrastructure.Data;
+using JoiabagurPV.Tests.TestHelpers;
 using JoiabagurPV.Tests.TestHelpers.Mothers;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -479,27 +480,9 @@ public class FamilySuggestionControllerTests : IAsyncLifetime
     }
 
     /// <summary>Proposes the fixture's own products, so any write would land on rows this test reads.</summary>
-    private sealed class ProposingGateway(Product first, Product second) : IAiGatewayClient
+    private sealed class ProposingGateway(Product first, Product second) : ThrowingAiGatewayClient
     {
-        public Task<AiSearchResponse> SearchAsync(
-            AiSearchRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AiEnrichResponse> EnrichAsync(
-            AiEnrichRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AiHealthResponse> HealthAsync(CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AiFamilyAuditResponse> AuditFamiliesAsync(
-
-            AiFamilyAuditRequest request, AiCallScope scope, CancellationToken cancellationToken = default) =>
-
-            throw new NotSupportedException();
-
-
-        public Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
+        public override Task<AiFamilySuggestResponse> SuggestFamiliesAsync(
             AiFamilySuggestRequest request,
             AiCallScope scope,
             CancellationToken cancellationToken = default) =>

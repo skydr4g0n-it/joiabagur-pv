@@ -164,4 +164,74 @@ public interface IAiGatewayClient
         AiFamilyAuditRequest request,
         AiCallScope scope,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Asks jbg-ai for the sale assistance of one product: its group, warnings, citations and a
+    /// generated argument that still carries the price and stock placeholders.
+    /// </summary>
+    /// <param name="request">
+    /// The anchored product and, optionally, the operator's question. A request without a product
+    /// is refused: this client serves only the modes whose placeholders refer to one product.
+    /// </param>
+    /// <param name="scope">Caller identity and point-of-sale scope, already authorised.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The response as received; nothing is hydrated, filtered or resolved here.</returns>
+    /// <remarks>
+    /// Runs on its own named client, <c>ai-assist</c>, with the generative time budget and its
+    /// own circuit: a slow language model must not open the retrieval circuit. It is retried
+    /// <strong>only</strong> when the connection never opened — any other failure may have
+    /// happened after the service began generating, and a second attempt would double the wait
+    /// at the counter and the paid model calls.
+    /// </remarks>
+    /// <exception cref="Exceptions.AiUnavailableException">
+    /// Timeout, transport failure, open circuit, or a server error other than 501.
+    /// </exception>
+    /// <exception cref="Exceptions.AiRequestRejectedException">
+    /// HTTP 422: the service cannot process the product. Not an outage.
+    /// </exception>
+    /// <exception cref="Exceptions.AiNotImplementedException">
+    /// The route is contracted but has no implementation yet.
+    /// </exception>
+    /// <exception cref="Exceptions.AiGatewayConfigurationException">
+    /// The service rejected the credentials.
+    /// </exception>
+    /// <exception cref="ArgumentException">
+    /// The scope is not a point-of-sale scope, or the request names no product.
+    /// </exception>
+    Task<AiAssistSaleResponse> AssistSaleAsync(
+        AiAssistSaleRequest request,
+        AiCallScope scope,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Asks jbg-ai for the products interchangeable with one product.
+    /// </summary>
+    /// <param name="request">The product, the window size and an optional reason.</param>
+    /// <param name="scope">Caller identity and point-of-sale scope, already authorised.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>
+    /// Every candidate of the over-retrieval window, in the order received. Excluding by stock
+    /// and truncating belong to the caller, which hydrates first.
+    /// </returns>
+    /// <remarks>
+    /// Runs on the retrieval client, its budget and its circuit: the route calls no model
+    /// provider and shares retrieval's failure domain.
+    /// </remarks>
+    /// <exception cref="Exceptions.AiUnavailableException">
+    /// Timeout, transport failure, open circuit, or a server error other than 501.
+    /// </exception>
+    /// <exception cref="Exceptions.AiRequestRejectedException">
+    /// HTTP 422: the service cannot process the product. Not an outage.
+    /// </exception>
+    /// <exception cref="Exceptions.AiNotImplementedException">
+    /// The route is contracted but has no implementation yet.
+    /// </exception>
+    /// <exception cref="Exceptions.AiGatewayConfigurationException">
+    /// The service rejected the credentials.
+    /// </exception>
+    /// <exception cref="ArgumentException">The scope is not a point-of-sale scope.</exception>
+    Task<AiSubstitutesResponse> SubstitutesAsync(
+        AiSubstitutesRequest request,
+        AiCallScope scope,
+        CancellationToken cancellationToken = default);
 }

@@ -32,7 +32,16 @@ public class AiContractSnapshotTests
         { typeof(AiProposedList), "ProposedList" },
         { typeof(AiProposedProfile), "ProposedProfile" },
         { typeof(AiEnrichResponse), "EnrichResponse" },
-        { typeof(AiUsage), "Usage" }
+        { typeof(AiUsage), "Usage" },
+        { typeof(AiAssistSaleRequest), "AssistRequest" },
+        { typeof(AiAssistSaleResponse), "AssistResponse" },
+        { typeof(AiAssistGroup), "AssistGroup" },
+        { typeof(AiAssistGroupMember), "AssistGroupMember" },
+        { typeof(AiCitation), "Citation" },
+        { typeof(AiSubstitutesRequest), "SubstitutesRequest" },
+        { typeof(AiSubstitutesResponse), "SubstitutesResponse" },
+        { typeof(AiSubstituteResult), "SubstituteResult" },
+        { typeof(AiSimilaritySignals), "SimilaritySignals" }
     };
 
     [Theory]
@@ -70,6 +79,44 @@ public class AiContractSnapshotTests
         typeof(AiSearchRequest).GetProperties()
             .Select(p => Wire.PropertyNamingPolicy!.ConvertName(p.Name))
             .Should().NotContain("pos_id");
+    }
+
+    /// <summary>
+    /// The twin of the retrieval guard for sale assistance, asserted on the serialized payload
+    /// rather than on the property list: what matters is what leaves the process.
+    /// </summary>
+    [Fact]
+    public void AssistSaleRequest_Serialization_OmitsPosId()
+    {
+        LoadSchema("AssistRequest").TryGetProperty("pos_id", out _).Should().BeTrue(
+            "the contract still declares it");
+
+        var json = JsonSerializer.Serialize(
+            new AiAssistSaleRequest { ProductId = Guid.NewGuid().ToString(), Query = "¿se puede mojar?" },
+            Wire);
+
+        using var document = JsonDocument.Parse(json);
+        var names = document.RootElement.EnumerateObject().Select(p => p.Name).ToList();
+
+        names.Should().NotContain("pos_id", "the scope travels in the token, never in the body");
+        names.Should().BeEquivalentTo(["product_id", "query"], "the wire names are snake_case");
+    }
+
+    [Fact]
+    public void SubstitutesRequest_Serialization_OmitsPosId()
+    {
+        LoadSchema("SubstitutesRequest").TryGetProperty("pos_id", out _).Should().BeTrue(
+            "the contract still declares it");
+
+        var json = JsonSerializer.Serialize(
+            new AiSubstitutesRequest { ProductId = Guid.NewGuid().ToString(), TopK = 20, Reason = "sin_stock" },
+            Wire);
+
+        using var document = JsonDocument.Parse(json);
+        var names = document.RootElement.EnumerateObject().Select(p => p.Name).ToList();
+
+        names.Should().NotContain("pos_id", "the scope travels in the token, never in the body");
+        names.Should().BeEquivalentTo(["product_id", "top_k", "reason", "filters"]);
     }
 
     /// <summary>

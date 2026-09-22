@@ -53,10 +53,39 @@ public class AiGatewayOptions
     public int RetrievalTimeoutMs { get; set; } = 2500;
 
     /// <summary>
-    /// Time budget for a generative call, in milliseconds. Reserved for the assist client
-    /// that C34 will register with its own circuit breaker.
+    /// Floor of <see cref="AssistTimeoutMs"/>, validated at start-up.
     /// </summary>
-    public int AssistTimeoutMs { get; set; } = 5000;
+    /// <remarks>
+    /// The worst case jbg-ai declares for the provider calls of one sale assistance, with its
+    /// default configuration: <c>MAX_PITCH_PROVIDER_CALLS × PITCH_TIMEOUT_SECONDS = 2 × 4 s</c>
+    /// (<c>ai-service/src/jbg_ai/assist/constants.py</c>). If either constant moves on the Python
+    /// side, this one moves with it.
+    /// </remarks>
+    public const int MinimumAssistTimeoutMs = 8000;
+
+    /// <summary>
+    /// Time budget for a sale assistance call on the <c>ai-assist</c> client, in milliseconds.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// 10 s, raised from the 5 s C03 reserved before anything used it. The outer budget must be
+    /// at least the worst case the service declares inside, or this side discards answers the
+    /// service was still entitled to deliver — already degraded, still useful — and falls back to
+    /// its own degradation, which carries less. Measured on the C30b pass, 7.5 % of requests at
+    /// the width served spent more than 5 s in provider calls alone.
+    /// </para>
+    /// <para>
+    /// 2 × 4 s plus the reads of the piece, its family and the corpus come to about 8.5 s; the
+    /// rest is network margin. It may be lowered, never below <see cref="MinimumAssistTimeoutMs"/>,
+    /// which start-up refuses.
+    /// </para>
+    /// <para>
+    /// Measured end to end on 2026-09-22 (C34 implementation report, §4): 80 requests, M2 and M3,
+    /// through Docker Compose with the real provider — p50 4.4 s, p95 7.1 s, maximum 7.9 s, none
+    /// above 8 s. The maximum sits at the floor, so the budget was <em>not</em> lowered.
+    /// </para>
+    /// </remarks>
+    public int AssistTimeoutMs { get; set; } = 10_000;
 
     /// <summary>
     /// Time budget for a catalog enrichment batch, in milliseconds.

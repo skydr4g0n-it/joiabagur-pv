@@ -238,6 +238,8 @@ The system has two roles:
 | `GET /api/inventory/import-template` | ✅ | ❌ |
 | `POST /api/ai/search` | ✅‡ | ✅* |
 | `POST /api/ai/search-events/{id}/selection` | ✅** | ✅** |
+| `POST /api/ai/products/{productId}/sales-assist` | ✅‡§ | ✅*§ |
+| `GET /api/ai/products/{productId}/substitutes` | ✅‡§ | ✅*§ |
 | `POST /api/ai/catalog/enrich-batch` | ✅ | ❌ |
 | `POST /api/ai/catalog/family-suggestions` | ✅ | ❌ |
 | `POST /api/ai/catalog/family-suggestions/apply` | ✅ | ❌ |
@@ -264,7 +266,38 @@ The system has two roles:
 *Operators see only their assigned points of sale
 † Service API key `X-Index-Feed-Key` only. A user JWT, an `access_token` cookie or a C03 token is **401**.
 ‡ Assisted search requires a concrete point of sale in the body, for every role. Operators are checked against their assignments; administrators hold none, so they may pick any **active** point of sale — an inactive one is **400** for everyone. The request-rate policy is partitioned by user, not by network address.
+§ The sale card (C34) follows the same point-of-sale rule, **and** answers **404** for every role when that point of sale has no active inventory record of an active product with that identifier — quantity zero is still served. Both checks run **before** the AI service is called, so a refused request never costs a paid call.
 **Ownership, not role: only the operator who ran that search may record its selection
+
+### The sale card (C34)
+
+Two routes anchored to one product, for the card of C36. **No figure the operator reads comes from
+the AI**: price, quantity and the stock warnings come from the catalog and the inventory of the
+requested point of sale.
+
+| Route | Body / query | What it returns |
+|---|---|---|
+| `POST /api/ai/products/{productId}/sales-assist` | `{ pointOfSaleId, question? }` — the question **only in the body**: it is free text about a customer, and a URL is logged by the proxy, the browser and any cache | The product's group (its family members the shop carries, in the AI's order, `isAnchor` on the product), warnings, citations with `claimScope`, and the argument with `{{price}}` → «39,90 €» and `{{stock}}` → the whole number, resolved against the anchored product |
+| `GET /api/ai/products/{productId}/substitutes` | `?pointOfSaleId=&pageSize=` (1–20, default 5) | Substitutes the shop can sell **today** (`quantity > 0`), in the AI's order, truncated after filtering; one call with the largest window (`top_k = 20` → 60 candidates) |
+
+- **`pitchStatus`** — `generated`, `not_generated` (the AI ran no generation), `withheld_by_ai`,
+  `withheld_out_of_stock` (no question and 0 units), `withheld_unresolved` (a `{{…}}` survived) or
+  `ai_unavailable`. `pitch` is present only when `generated`; the raw template never reaches the
+  response or a log.
+- **`outcome`** of substitutes — `ok`, `none_in_stock`, `product_not_indexed` (the AI answered 422)
+  or `ai_unavailable`. None of the four is a server error.
+- **Warnings** — the AI's codes, with `family_has_variants` removed when fewer than two members
+  survive hydration (never added on that path), then `stock_critical` (anchored product at 1 to
+  `StockCriticalThreshold` units; zero is `hasStock: false`, not a warning) and
+  `family_members_out_of_stock` (another member at 0), both computed here. Unknown codes pass through.
+- **Degradation** — any gateway failure, or the switch off, answers **200** with `aiAvailable: false`:
+  the anchored product and the members of its family read from `ProductFamily`, hydrated, with the
+  stock and variants warnings computed here, and no argument or citations. A 401 from the AI is
+  logged at error level; a 422 is logged as `reason=product_not_indexed`.
+- **Logs** — one `stage=sales_assist` line and one `stage=substitutes` line per request, correlated by
+  `trace_id`. The argument is **never** logged, resolved or not; the question only at `Debug`.
+- **Rate limits** — `sales-assist` has its own per-user policy (`AiSalesAssistRateLimit`, 10 per
+  minute); `substitutes` calls no model and uses the search policy.
 
 ### Product families
 
@@ -577,12 +610,21 @@ OpenAPI documentation is served with Scalar (not Swagger UI) at `/scalar/v1` whe
 | `AiSearch__EnabledByDefault` | Whether points of sale absent from that list use the AI path | false |
 | `AiSearch__CandidateWindow` | Page size requested from `jbg-ai`, which is the over-retrieval dial. 20 saturates the service's cap of 60 candidates | 20 |
 | `AiSearch__RateLimitPermitLimit` / `AiSearch__RateLimitWindowSeconds` | Requests one user may issue per window | 30 / 60 |
+| `AiGateway__AssistTimeoutMs` | Time budget of the `ai-assist` client (`POST /v1/assist/sale`). **Start-up refuses a value below 8000**: `jbg-ai` declares a worst case of `MAX_PITCH_PROVIDER_CALLS × PITCH_TIMEOUT_SECONDS = 2 × 4 s` for the provider calls of one request, and a shorter outer budget discards answers it was entitled to give. The client retries only a connection that never opened — never a timeout or a 5xx — and has its own circuit | 10000 |
+| `AiSalesAssist__EnabledPointOfSaleIds__0`, `__1`, … | Points of sale where the sale card calls the AI. Governs **both** routes. Reloaded without a redeploy | Empty |
+| `AiSalesAssist__EnabledByDefault` | Whether points of sale absent from that list call the AI | false |
+| `AiSalesAssist__StockCriticalThreshold` | Highest quantity of the anchored product that raises `stock_critical` (min 1) | 2 |
+| `AiSalesAssist__SubstitutesCandidateWindow` | `top_k` sent for substitutes (1–50). 20 reaches the service's cap of 60 candidates | 20 |
+| `AiSalesAssist__SubstitutesDefaultPageSize` / `AiSalesAssist__SubstitutesMaxPageSize` | Substitutes page when none is asked for, and the largest a caller may ask for | 5 / 20 |
+| `AiSalesAssist__RateLimitPermitLimit` / `AiSalesAssist__RateLimitWindowSeconds` | Sale assistance requests one user may issue per window | 10 / 60 |
 
 `AiGateway` is validated at start-up, not on first use: if the base address is missing or is not an absolute http/https URI, or the secret is absent or shorter than 32 characters, **the API does not start** and the error names the offending key. That is deliberate — a mismatched secret makes `jbg-ai` answer 401 without disclosing why, so the fault is caught at boot instead of during a request. Set `AiGateway__Enabled=false` to skip registering the client altogether.
 
 `IndexFeed:ApiKey` is validated the same way: missing or shorter than 32 characters stops the host. An empty `IndexFeed:ApiKeyPrevious` is unset; a short non-empty previous key also fails at start-up. `IndexFeed:SalesAsOf` is optional, but when present it must declare a UTC offset: configuration binds it through `DateTime`'s type converter, which reads a value with no offset as the host's local time, so an ambiguous instant fails at start-up instead of quietly moving every sales window by a timezone.
 
 `AiSearch` is also validated at start-up, and its list of enabled points of sale is read through `IOptionsMonitor` so a shop can be switched on or off without a redeploy — which is the whole reason the switch lives in configuration instead of in a column on `PointOfSale`. It holds no secret, so nothing of it goes to SSM. The default is **not enabled**: turning assisted search on for a shop is an explicit act.
+
+`AiSalesAssist` works the same way, and is a separate switch on purpose: the sale card is its own feature with a generative route and a cost profile search does not have. Switched off, `sales-assist` still answers — with the degraded card read from the catalog — and `substitutes` answers `ai_unavailable`, without calling the AI; the log line says `degraded_reason=switched_off` / `reason=switched_off`, so the switch is never mistaken for an outage.
 
 `POST /api/sales` and each line of `POST /api/sales/bulk` accept an optional `searchEventId`, which attributes the sale to the assisted search it came from and closes the loop that `POST /api/ai/search` opens. The identifier is only stored once the event is verified to exist **and to belong to the user making the sale** — the same ownership rule the selection endpoint applies, and for the same reason. Anything unusable degrades to no attribution: never a validation error, never a failed sale, and nothing else about the sale changes. The check is explicit rather than delegated to the foreign key, whose declared delete behaviour governs deletion of the event and would, on an insert carrying an unknown identifier, abort the whole transaction instead of degrading.
 

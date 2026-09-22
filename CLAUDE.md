@@ -115,7 +115,9 @@ The full inventory — the five root causes and which files each one accounts fo
   exportar el almacén a un PEM y apuntar `SSL_CERT_FILE` (y `REQUESTS_CA_BUNDLE`) a él.
   `ssl.enum_certificates('ROOT'|'CA')` concatenado al `certifi.where()` basta. **Filtrar por la
   bandera de confianza no basta**: la raíz de Norton no la lleva y el bundle sale incompleto.
-  **No afecta a ningún test** — ninguno llama al proveedor.
+  **No afecta a ningún test** — ninguno llama al proveedor. **Tampoco afecta a los contenedores**:
+  desde Docker el TLS del proveedor y de PyPI se verifica con el bundle del sistema y lo firma la CA
+  real (comprobado en C34, §2.8 de su informe), así que medir con `jbg-ai` en Compose no necesita PEM.
 - **Windows: `psycopg` rechaza el `ProactorEventLoop`**, que es el que Python instala por
   defecto. Cualquier script suelto que abra el motor asíncrono necesita
   `asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())`. En los tests eso ya
