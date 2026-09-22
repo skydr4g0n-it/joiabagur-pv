@@ -60,12 +60,12 @@
 
 ## 8. Cierre
 
-- [ ] 8.1 Comparar la suite contra la línea base **por nombres**, no por número
-- [ ] 8.2 `npm run build` en verde; la salida de `tsc --noEmit` filtrada a los ficheros propios
-- [ ] 8.3 Comprobar el `sha256` de `ai-service/openapi.json` y que `git status` no muestra cambios en `backend/` ni en `ai-service/`
-- [ ] 8.4 `openspec validate --all --strict` → **0 failed**
-- [ ] 8.5 Comprobación en la demo: una ficha real con argumentario resuelto, una pregunta con citas y un grupo de familia con varias variantes
-- [ ] 8.6 Escribir el informe de implementación en `Documentos/Proyecto Final AIEng/informes/c36-implementation-measurements.md`
+- [x] 8.1 Comparar la suite contra la línea base **por nombres**, no por número
+- [x] 8.2 `npm run build` en verde; la salida de `tsc --noEmit` filtrada a los ficheros propios
+- [x] 8.3 Comprobar el `sha256` de `ai-service/openapi.json` y que `git status` no muestra cambios en `backend/` ni en `ai-service/`
+- [x] 8.4 `openspec validate --all --strict` → **0 failed**
+- [ ] 8.5 Comprobación en la demo: una ficha real con argumentario resuelto, una pregunta con citas y un grupo de familia con varias variantes — **no ejecutada en esta sesión**: `compose.demo.yaml` pide imágenes de ECR (`${ECR_REGISTRY}/jbg-demo-ai`), `EMBEDDING_API_KEY` y `ASSIST_LLM_API_KEY`, que no están en esta máquina. Pasos y criterio en el §7 del informe de implementación
+- [x] 8.6 Escribir el informe de implementación en `Documentos/Proyecto Final AIEng/informes/c36-implementation-measurements.md`
 
 ## 9. Documentación
 
