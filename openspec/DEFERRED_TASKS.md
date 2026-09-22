@@ -628,7 +628,7 @@ one sheet* · `ai-service/tests/knowledge/test_corpus_rules.py:257`
 **Estado:** **CERRADA el 2026-09-22 por C34.** Los cuatro pasos hechos, el parámetro creado y la demo
 desplegada y verificada: `stage=assist_client … credential=assist` en el log y una asistencia real con
 `pitchStatus: generated` y el precio y el stock resueltos en el texto («disponible por 250,00 € y
-cuenta con 5»). Evidencia en el §13 del [QA de C34](changes/add-dotnet-assist-and-recommendation-endpoints/qa.md).
+cuenta con 5»). Evidencia en el §13 del [QA de C34](changes/archive/2026-09-22-add-dotnet-assist-and-recommendation-endpoints/qa.md).
 · **Abierto el:** 2026-09-14 · **Zona:** `deploy/demo/`, `compose.demo.yaml`
 **No es un fallo:** es el comportamiento declarado, verificado y con test.
 

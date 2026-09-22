@@ -1,7 +1,7 @@
 # C34 — informe de implementación: el card de venta en .NET, y lo que la implementación precisa
 
 **Change:** `add-dotnet-assist-and-recommendation-endpoints` (C34) · **Rama:** `c34-add-dotnet-assist-and-recommendation-endpoints`
-**Fecha:** 2026-09-21 · **Historia:** [HU-AIENG-034](../../Historias/AI-Eng/HU-AIENG-034.md) · **Ticket:** [T-AIENG-034](../../../openspec/changes/add-dotnet-assist-and-recommendation-endpoints/ticket.md) · **Exploración:** [c34-exploration-decisions.md](c34-exploration-decisions.md)
+**Fecha:** 2026-09-21 · **Historia:** [HU-AIENG-034](../../Historias/AI-Eng/HU-AIENG-034.md) · **Ticket:** [T-AIENG-034](../../../openspec/changes/archive/2026-09-22-add-dotnet-assist-and-recommendation-endpoints/ticket.md) · **Exploración:** [c34-exploration-decisions.md](c34-exploration-decisions.md)
 **Capability nueva:** `ai-sales-assist` — 15 requisitos, 45 escenarios · **Modificada:** `ai-gateway-client` — 1 `ADDED` (5 escenarios) y 5 `MODIFIED` (23 escenarios)
 
 C34 entrega **el primer consumidor .NET de `POST /v1/assist/sale` y de `POST /v1/retrieval/substitutes`**:
