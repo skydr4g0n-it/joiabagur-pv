@@ -1,9 +1,9 @@
 # QA — C34 `add-dotnet-assist-and-recommendation-endpoints`
 
 > Registro de las comprobaciones **realmente ejecutadas** sobre la implementación del change, con sus resultados y su evidencia.
-> **Fecha:** implementación del **2026-09-21** al **2026-09-22** · **Rama:** `c34-add-dotnet-assist-and-recommendation-endpoints` · **Artefactos de partida:** `6030aa3`, árbol limpio · **Implementación commiteada en `eb44711`** (51 ficheros, +6.162 / −211). Este `qa.md` y una corrección del informe (§10.6) quedan **sin commitear**.
+> **Fecha:** implementación del **2026-09-21** al **2026-09-22** · **Rama:** `c34-add-dotnet-assist-and-recommendation-endpoints` · **Artefactos de partida:** `6030aa3`, árbol limpio · **Implementación commiteada en `eb44711`** (51 ficheros, +6.162 / −211) y **este QA en `d6a740f`**, que es el commit desplegado en la demo. La ampliación del §13 y sus cambios de documentación quedan por commitear.
 > **Idioma:** cuerpo en español, identificadores técnicos en inglés, por coherencia con [ticket.md](ticket.md) y con la HU.
-> **Alcance:** **48/50 tareas**. Las dos que faltan —11.3 y 11.4— son pasos manuales del desarrollador en la demo y están declaradas en `tasks.md` con su motivo. DoD del ticket: **19 de 20** casillas cumplidas con evidencia (§12); la que no, es la de la demo.
+> **Alcance:** **50/50 tareas**. Las dos últimas —11.3 y 11.4— las ejecutó el desarrollador en el entorno el 2026-09-22, con la evidencia en el §13. DoD del ticket: **20 de 20** casillas cumplidas con evidencia (§12).
 > **Este change NO mueve el contrato:** `ai-service/openapi.json` tiene el mismo `sha256` al empezar y al terminar, y el commit no toca `ai-service/` (§8).
 > **Este change llama a un proveedor real una vez**, para la medición de latencia (§9): 81 peticiones, **262.737 tokens de entrada y 30.903 de salida**, del orden de **0,06 USD** a precio de lista de `gpt-4o-mini`.
 > **Lo que esta pasada encontró:** un doble de test de C03 que **no simula el fallo que su nombre dice**, que `coverlet` **no instrumenta el ensamblado `Application`** en este repositorio, una carrera de reloj no registrada en la suite, que el MITM de Norton **no alcanza a Docker**, y **siete defectos míos** —uno de test, dos de método, dos de herramienta de shell y dos de redacción—, todos corregidos, tres de ellos (§10.6, §10.10 y §10.11) cazados al redactar este mismo QA. Detalle en el §10.
@@ -506,10 +506,9 @@ La primera versión decía «18 de 20» y que la casilla de la demo eran «dos d
 
 ## 11. Lo que esta pasada **no** verifica, dicho aquí
 
-- **La demo.** 11.3 (crear `/jbg-demo/ASSIST_LLM_API_KEY` y desplegar) y 11.4 (memoria de
-  `jbg-demo-ai` frente a 512 MiB y cuota de tokens por minuto) son pasos manuales del desarrollador.
-  Hasta entonces el escenario 12 de la HU no está cubierto, y la configuración sólo está verificada
-  con `docker compose config`, no desplegada.
+- **La demo quedó verificada** (§13), así que este apartado ya no la incluye. Lo que sigue sin medirse es la
+  **cuota del proveedor bajo concurrencia real**: el límite propio corta en 10 peticiones por minuto y
+  usuario, y para alcanzar la cuota harían falta varios operarios a la vez.
 - **La latencia en producción.** La del §9 es de una máquina de desarrollo, n = 80, una franja
   horaria y sin concurrencia. No sustituye la de la demo en eu-west-1.
 - **La concurrencia real** frente a la cuota de tokens por minuto: la pasada fue en serie a propósito.
@@ -544,10 +543,95 @@ La primera versión decía «18 de 20» y que la casilla de la demo eran «dos d
 | 15 | Deltas con el `SHALL`/`MUST` en la primera línea física | ✅ | 21 / 21 (§3.2) |
 | 16 | `openspec validate --all --strict` → 0 failed | ✅ | 60 / 0 |
 | 17 | Latencia de M2 y M3 medida en Docker Compose, con su procedencia | ✅ | §9 |
-| 18 | **Demo**: los cuatro pasos, `credential=assist` en el log, asistencia `generated` y memoria medida | ❌ **parcial** | Pasos 2–4 y la configuración .NET, hechos; **paso 1, verificación en el entorno y memoria, pendientes de 11.3 / 11.4**. La línea `credential=assist` se ha visto **en local** (§9.4), no en la demo |
+| 18 | **Demo**: los cuatro pasos, `credential=assist` en el log, asistencia `generated` y memoria medida | ✅ | §13: parámetro creado, desplegado `sha-d6a740fa…`, `credential=assist` en el log, SKU1051 `generated` con «250,00 €» y «5» en el texto, y 269,9 MiB de 512 medidos antes y después de diez generaciones |
 | 19 | Documentación | ✅ | Los siete documentos de la tarea 12.5, más `CLAUDE.md`, en `eb44711` |
 | 20 | Sin TODO/FIXME sin tarea de seguimiento | ✅ | §5, grupo 12 |
 
-**19 de 20 cumplidas.** La que falta, la 18, depende de pasos manuales y se queda parcial hasta 11.3 y
-11.4: junta «los cuatro pasos hechos», «la línea en el log de la demo», «una asistencia real
-`generated`» y «la memoria medida», y ninguna de las tres últimas se puede dar por hecha desde local.
+**20 de 20 cumplidas** tras la verificación en el entorno del §13, que cierra la casilla 18.
+
+---
+
+## 13 · La demo, desplegada y verificada (tareas 11.3 y 11.4)
+
+Ejecutado el **2026-09-22** por el desarrollador, con asistencia en la sesión. Todo lo de abajo son
+salidas reales, no expectativas.
+
+### 13.1 · La secuencia
+
+| Paso | Evidencia |
+|---|---|
+| Cuenta correcta | `sts get-caller-identity` → **666823181744**, la cuenta de la demo, distinta de la de producción |
+| Parámetro creado | `/jbg-demo/ASSIST_LLM_API_KEY`, **`SecureString`**, versión 1. Verificado **sin descifrarlo** |
+| Código desplegado | `git push origin c34-…:demo` — avance rápido `f5212a7..d6a740f`, **188 commits**, porque la demo corría C17 |
+| Riesgo comprobado antes de empujar | **0 migraciones de EF Core** entre `demo` y la rama; 2 revisiones de Alembic, que `deploy.sh` aplica |
+| Despliegue | `[deploy] Generation credential: present` · `Applying schema revisions` · `Deployed sha-d6a740fa…` |
+| Verificación del despliegue | `verify.sh`: **1.200 documentos indexados**, en verde |
+| Cliente generativo | `stage=assist_client model=openai/gpt-4o-mini timeout_s=4.0 credential=assist` |
+| El enrutador, previsto en §2.4 del informe | `stage=router_client … credential=assist_fallback`, construido y sin uso |
+
+### 13.2 · La asistencia real, y el precio dentro del texto
+
+Seis piezas distintas del punto de venta *Aeroport de Menorca*, modo M2:
+
+```text
+SKU1022  200  2853 ms · generated  citas 2 · precio no · stock no · marcadores no
+SKU611   200  1555 ms · generated  citas 0 · precio no · stock no · marcadores no
+SKU1051  200  2977 ms · generated  citas 2 · precio SÍ · stock SÍ · marcadores no
+SKU490   200  1372 ms · generated  citas 0 · precio SÍ · stock SÍ · marcadores no
+SKU984   200  3849 ms · generated  citas 2 · precio SÍ · stock SÍ · marcadores no
+SKU983   200  2484 ms · generated  citas 2 · precio SÍ · stock SÍ · marcadores no
+```
+
+**6 de 6 `generated`, 0 con marcadores sobrantes, 4 de 6 con el precio y el stock dentro del texto** —
+la proporción que el §4 midió en local (22 de 37). El ejemplo, SKU1051 a 250 € con 5 unidades:
+*«Este anillo está disponible por **250,00 €** y cuenta con **5**.»* Precio en formato es-ES, stock como
+entero: los dos, resueltos por .NET contra la pieza anclada.
+
+Sustitutos de la misma pieza: **`outcome: ok`, 60 candidatos → 28 en la tienda → página de 5**.
+
+### 13.3 · Memoria y cuota (11.4)
+
+| Contenedor | En reposo | Tras diez generaciones seguidas |
+|---|---|---|
+| `jbg-demo-ai` | **269,9 MiB / 512 MiB · 52,7 %** | **269,9 MiB · 52,7 %**, idéntico |
+| `jbg-demo-api` | 235,2 MiB | 238,6 MiB |
+| `jbg-demo-postgres` | 96,6 MiB | 96,8 MiB |
+| Host | 751 MB de 1.909, 836 disponibles, **sin swap** | igual |
+
+Eran **232,5 MiB** en C17 sin generación: los ~37 MiB de más son la construcción de los clientes y el
+corpus, y **generar no mueve la aguja**, porque el modelo vive en el proveedor. El `t3.small` y el tope
+de 512 MiB siguen bien dimensionados.
+
+**La cuota de tokens por minuto no es la restricción operativa, y esto refuta lo que yo esperaba.**
+Diez generaciones consecutivas salieron **todas `generated`**, sin una sola degradación del proveedor.
+Lo que corta es el límite propio de la ruta: **10 por minuto y usuario**, con **429 a partir de la
+11.ª petición de la ventana** — verificado en el entorno real, no sólo en el test de integración. La
+ráfaga de prueba se leyó mal al principio (4 servidas y 8 rechazos en vez de 10 y 2) hasta caer en que
+la fase anterior ya había gastado 6 peticiones **de la misma ventana**: 6 + 4 = 10. El límite estaba
+bien; el guion de medición, no.
+
+### 13.4 · Dos hallazgos del entorno, ninguno de C34
+
+- **`ai.pos_projection` vacía deja la recuperación en 503.** Los primeros sustitutos degradaron a
+  `ai_unavailable`; el log mostró `jbg-ai` respondiendo **503** dos veces (`Attempts: 2`, el reintento
+  del cliente de recuperación) y a .NET degradando con **200**, como está especificado. La causa,
+  `resolve_scope` negándose a abstenerse sobre una proyección vacía — una regla de C22 que la demo,
+  desplegada en C17, nunca había satisfecho. La llaman **las dos** rutas, así que la búsqueda asistida
+  también estaba caída. Resuelto con `sync-pos --full`. §6.1 del informe.
+- **El corpus no viaja en la imagen de `jbg-ai`.** `ai.knowledge_chunk` tenía 0 filas y por eso M2 salía
+  `withheld_by_ai`; `CORPUS_DIR` apunta a `<raíz>/data/knowledge` y el `Dockerfile` copia sólo `src`,
+  `migrations` y `prompts`. Resuelto copiando el corpus desde el paquete de despliegue y ejecutando
+  `sync-knowledge --full`; tras eso, M2 pasó a `generated` con 2 citas. §6.2 del informe.
+
+### 13.5 · Tres cosas que se corrigieron por el camino
+
+- **La contraseña de `demo.admin` no la tenía nadie**, y no está —correctamente— en el repositorio. Se
+  restableció generando el hash **BCrypt con factor 12 en local** y enviando sólo el hash: la
+  contraseña en claro no pasó por el canal de administración remota, que queda archivado.
+- **El runbook dice que las cuentas se crean «por la ruta de registro de la API»**, y los usuarios son
+  `demo.admin` y `demo.operador`, **con punto**, que el validador de la API no admite
+  (`^[a-zA-Z0-9_]+$`). Se crearon por SQL. Corregido en `deploy/demo/README.md`.
+- **Aviso de seguridad levantado y retirado con el dato en la mano.** El sembrador recrea `admin` con
+  `Admin123!` si no existe, y el runbook vacía la tabla de usuarios; parecía una credencial por defecto
+  en un entorno público. La consulta lo desmintió: `admin` existe **desactivado** (`IsActive = f`), y
+  `LoginAsync` rechaza a un usuario desactivado aunque la contraseña sea correcta.

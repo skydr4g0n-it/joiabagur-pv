@@ -384,13 +384,24 @@ does — which is the whole point of D18. No resizing, and the swap file the des
 mitigation is not needed at these numbers. Re-measure if the corpus grows by an order of
 magnitude or if a generative route lands.
 
-> **A generative route landed with C34** (2026-09-21): the demo configuration now passes
-> `JPV_ASSIST_LLM_API_KEY` to `jbg-demo-ai` and switches the sale card on. **The re-measurement is
-> pending** because it needs the parameter created by hand and a deployment (C34 tasks 11.3 and
-> 11.4). What to record here when it is done: `docker stats --no-stream jbg-demo-ai` after a
-> handful of sale assistance requests, against the 512 MiB cap and the 232,5 MiB above; and
-> whether several requests in a row hit the organisation's tokens-per-minute quota before the
-> money does — the constraint C32b measured on the agent route.
+> **Re-measured on 2026-09-22, with the generative route live (C34).** `docker stats --no-stream`
+> before and after ten consecutive sale assistances:
+>
+> | Container | Idle | After ten generations | Of its limit |
+> |---|---|---|---|
+> | `jbg-demo-ai` | **269,9 MiB** | **269,9 MiB**, unchanged | **52,7 % of 512 MiB** |
+> | `jbg-demo-api` | 235,2 MiB | 238,6 MiB | — |
+> | `jbg-demo-postgres` | 96,6 MiB | 96,8 MiB | — |
+>
+> Host: 751 MB of 1909 used, 836 available, still **no swap**. The ~37 MiB above the 232,5 MiB of C17
+> are the generative and router clients plus the corpus; **generating moves nothing**, because the
+> model runs at the provider. **`t3.small` and the 512 MiB cap remain right-sized.**
+>
+> **And the tokens-per-minute quota is not the operative constraint here**, contrary to what the C32b
+> entry suggests for the agent route: ten consecutive generations all came back `generated`, with no
+> provider degradation. What binds first is the card's own limit — 10 per minute per user, answering
+> 429 from the eleventh request of the window. Reaching the quota would take several operators at
+> once, and that remains unmeasured.
 
 ---
 
@@ -612,9 +623,10 @@ one sheet* · `ai-service/tests/knowledge/test_corpus_rules.py:257`
 
 ## C30b — la demo no genera argumentario, y lo que hace falta para que genere
 
-**Estado:** **cerrada en el repositorio por C34** (2026-09-21): los pasos 2, 3 y 4 están hechos, más
-la configuración .NET que el card necesita. **Queda sólo el paso 1 —crear el parámetro— y la
-verificación en el entorno**, que son manuales y del desarrollador (tareas 11.3 y 11.4 de C34).
+**Estado:** **CERRADA el 2026-09-22 por C34.** Los cuatro pasos hechos, el parámetro creado y la demo
+desplegada y verificada: `stage=assist_client … credential=assist` en el log y una asistencia real con
+`pitchStatus: generated` y el precio y el stock resueltos en el texto («disponible por 250,00 € y
+cuenta con 5»). Evidencia en el §13 del [QA de C34](changes/add-dotnet-assist-and-recommendation-endpoints/qa.md).
 · **Abierto el:** 2026-09-14 · **Zona:** `deploy/demo/`, `compose.demo.yaml`
 **No es un fallo:** es el comportamiento declarado, verificado y con test.
 
@@ -622,7 +634,7 @@ verificación en el entorno**, que son manuales y del desarrollador (tareas 11.3
 >
 > | Paso | Estado |
 > |---|---|
-> | 1 · `/jbg-demo/ASSIST_LLM_API_KEY` como `SecureString` | **pendiente, manual** — el comando está abajo y en `deploy/demo/README.md` §3 |
+> | 1 · `/jbg-demo/ASSIST_LLM_API_KEY` como `SecureString` | **hecho el 2026-09-22**, versión 1, verificado sin descifrarlo |
 > | 2 · `deploy.sh` lee el parámetro **sin `:?`** y con `\|\| true` | **hecho**, y además registra `Generation credential: present/absent` —si está, nunca qué es— |
 > | 3 · `JPV_ASSIST_LLM_MODEL` y `JPV_ASSIST_LLM_API_KEY` en `jbg-demo-ai` | **hecho**. La clave se interpola como `${ASSIST_LLM_API_KEY:-}`, con valor por defecto vacío, para que `docker compose config` resuelva también sin el script de despliegue; vacía equivale a no configurada (`blank_assist_llm_key_is_unset`) |
 > | 4 · El parámetro en la lista de secretos manuales del runbook, marcado como el único opcional | **hecho**, con una §5.6b de comprobación del card |
@@ -728,6 +740,66 @@ C30b declara `terraform/`, `.github/workflows/` y `backend/` fuera de alcance, y
 de la demo es trabajo de despliegue, no de la capa. La mitad de Python está entregada, probada
 con **13 tests** y **no es andamio**: en local se separa hoy poniendo `JPV_ASSIST_LLM_API_KEY`
 en `backend/.env`, que es de donde el barrido de C30b lee sus credenciales.
+
+---
+
+## C34 · el corpus de conocimiento no viaja en la imagen de `jbg-ai`
+
+**Estado:** identificado el 2026-09-22 al desplegar la demo, **sorteado a mano y no resuelto**.
+**Zona:** `ai-service/Dockerfile` — fuera del alcance de C34, que declara `ai-service/` intocable.
+
+`CORPUS_DIR` es `<raíz del repo>/data/knowledge` (`knowledge/constants.py`), y el `Dockerfile` del
+servicio copia sólo `src`, `migrations` y `prompts`. **Dentro del contenedor el corpus no existe**, así
+que `python -m jbg_ai.indexing sync-knowledge` no tiene qué indexar y `ai.knowledge_chunk` se queda a
+cero. Con la tabla vacía, `POST /v1/assist/sale` **retira el argumentario en M2** —la puerta de C30b no
+tiene material al que anclarse— y responde `knowledge_not_covered` sin citas en M3. Parece un problema
+del card, y no lo es.
+
+**Cómo se sorteó en la demo** (el corpus sí viaja en el paquete de despliegue, bajo `/opt/jbg-demo`):
+
+```sh
+DEST=$(docker exec -i jbg-demo-ai python -c "from jbg_ai.knowledge.constants import CORPUS_DIR; print(CORPUS_DIR)")
+docker exec -u root -i jbg-demo-ai mkdir -p "$(dirname "$DEST")"
+docker cp /opt/jbg-demo/data/knowledge "jbg-demo-ai:$(dirname "$DEST")/"
+docker exec -i jbg-demo-ai python -m jbg_ai.indexing sync-knowledge --full
+```
+
+Tras eso, M2 pasó a `generated` con 2 citas. **Pero se pierde con cada imagen nueva.** El arreglo es una
+línea en el `Dockerfile` —copiar `data/knowledge`— o un montaje en el compose, y lo decide quien pueda
+tocar `ai-service/`. Mientras no se haga, cualquier entorno nuevo nace sin corpus y con M2 retirado.
+
+---
+
+## C22 · un entorno recién desplegado deja `ai.pos_projection` vacía, y la recuperación responde 503
+
+**Estado:** identificado el 2026-09-22 al desplegar la demo, **resuelto en ese entorno**, sin arreglo
+sistemático. **Zona:** `deploy/demo/` y el runbook.
+
+`resolve_scope` se niega a abstenerse sobre una proyección vacía y lanza `RetrievalDependencyError`,
+que la ruta traduce a **503**:
+
+```python
+size = await search.count_scope(pos_id)
+if size == 0:
+    raise RetrievalDependencyError(EMPTY_PROJECTION_DETAIL)
+```
+
+La llaman **las dos** rutas de recuperación —`/v1/retrieval/products` y `/v1/retrieval/substitutes`—, y
+`jpv_pos_prefilter_enabled` viene activado por defecto. Un entorno que nunca haya drenado el feed de
+disponibilidad responde 503 a **toda** recuperación, y el consumidor .NET degrada correctamente: la
+búsqueda cae a su vía léxica y los sustitutos a `ai_unavailable`, **los dos con 200**, así que desde
+fuera el entorno parece sano. Así estaba la demo, desplegada en C17, cuando C34 llegó.
+
+Se arregla una vez por entorno, y persiste en la base:
+
+```sh
+docker exec -i jbg-demo-ai python -m jbg_ai.indexing sync-pos --full
+```
+
+**Lo que falta decidir:** si `deploy.sh` debe drenarlo cuando la tabla está vacía, o si basta con el
+paso del runbook —que C34 añade— más una comprobación en `verify.sh`, que hoy mira el índice de
+productos pero no la proyección. Lo segundo es más barato y caza el caso: un entorno con índice lleno y
+proyección vacía **pasa hoy** la verificación posterior al despliegue.
 
 ---
 

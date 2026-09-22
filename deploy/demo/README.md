@@ -366,11 +366,23 @@ After restoring, on the demo database:
 ```sql
 -- Keep nothing of the real staff.
 DELETE FROM "Users";
--- Then create exactly two accounts through the API's own registration path,
--- so the password hashing matches what the application expects:
---   demo.admin@joiabagur.example    role Administrator
---   demo.operador@joiabagur.example role Operator, assigned to one point of sale
+-- Then create exactly two accounts, with BCrypt hashes at work factor 12 — the factor the
+-- application itself uses — so the password check matches what it expects:
+--   username demo.admin     e-mail demo.admin@joiabagur.example      role Administrator
+--   username demo.operador  e-mail demo.operador@joiabagur.example   role Operator, assigned to one POS
 ```
+
+> **Sign-in is by `Username`, not by e-mail** (`AuthenticationService.LoginAsync` reads
+> `GetByUsernameAsync`), so these accounts sign in as `demo.admin` and `demo.operador`. Note that both
+> carry a dot, which the API's own `CreateUserRequestValidator` rejects (`^[a-zA-Z0-9_]+$`): they were
+> created by SQL, and an earlier version of this section claimed otherwise. To reset one of these
+> passwords later, generate the hash **off the host** and send only the hash — never the plaintext —
+> then `update "Users" set "PasswordHash" = '<hash>', "UpdatedAt" = now() where "Username" = '…'`.
+>
+> The application's seeder recreates a `admin` / `Admin123!` account on every start **if no user named
+> `admin` exists**, which the `DELETE` above guarantees. Leave that account **deactivated**
+> (`IsActive = false`): `LoginAsync` refuses a deactivated user even with the right password, which is
+> what keeps a default credential out of a publicly reachable environment. Verified on 2026-09-22.
 
 Verify afterwards that **no** real address can authenticate:
 
@@ -427,6 +439,39 @@ unquoted assignment, and the shell eats `$2a` and `$12` as positional
 parameters. The value arrives mangled and produces exactly the same
 `SaltParseException`, which sends you hunting for the wrong bug. Read it with
 command substitution instead: `H=$(grep '^H=' file | cut -d= -f2-)`.
+
+### 5.5c Two drains the restore does not do, and without which the AI looks broken
+
+Both are **once per environment** and survive restarts, because they write to the database. Both were
+missing on this environment until C34 tripped over them on 2026-09-22.
+
+**The point-of-sale availability projection.** `ai.pos_projection` is populated by draining the feed
+the API serves, and **retrieval refuses to work without it**: `resolve_scope` raises rather than
+abstain over an empty projection, and the service answers **503** to `/v1/retrieval/products` **and**
+`/v1/retrieval/substitutes`. The .NET side degrades correctly — the search falls back to its lexical
+path and substitutes report `ai_unavailable`, both with a 200 — so from outside the environment looks
+healthy while the assisted path is dead.
+
+```bash
+docker exec -i jbg-demo-ai python -m jbg_ai.indexing sync-pos --full
+docker exec -i jbg-demo-postgres psql -U postgres -d joiabagur_pv -At -c 'select count(*), count(distinct pos_id) from ai.pos_projection'
+```
+
+**The knowledge corpus.** `ai.knowledge_chunk` starts empty because **the corpus does not ship in the
+AI image**: `CORPUS_DIR` is `<repo>/data/knowledge` and the Dockerfile copies only `src`, `migrations`
+and `prompts`. With it empty, the sale card's argument is withheld in the piece-only mode and
+questions answer `knowledge_not_covered` with no citations. The corpus **does** travel in the
+deployment bundle, so:
+
+```bash
+DEST=$(docker exec -i jbg-demo-ai python -c "from jbg_ai.knowledge.constants import CORPUS_DIR; print(CORPUS_DIR)")
+docker exec -u root -i jbg-demo-ai mkdir -p "$(dirname "$DEST")"
+docker cp /opt/jbg-demo/data/knowledge "jbg-demo-ai:$(dirname "$DEST")/"
+docker exec -i jbg-demo-ai python -m jbg_ai.indexing sync-knowledge --full
+```
+
+> This one is lost on every new image until the corpus ships inside it — tracked in
+> `openspec/DEFERRED_TASKS.md`.
 
 ### 5.6 End-to-end check
 
