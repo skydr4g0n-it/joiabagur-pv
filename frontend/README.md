@@ -39,6 +39,68 @@ The app will be available at [http://localhost:3000](http://localhost:3000)
 npm run build
 ```
 
+## Venta asistida y ficha de venta
+
+Dos pantallas consumen la capa de IA, y las dos siguen la misma regla: **no se enseña nada que el
+sistema no haya afirmado**. El frontend no reordena resultados, no recalcula precio ni existencias, no
+añade avisos y no traduce un código que no conoce inventándose una etiqueta.
+
+| Ruta | Pantalla | Qué consume |
+|---|---|---|
+| `/sales/new/assisted` | Panel de búsqueda asistida (C16) | `POST /api/ai/search` |
+| `/sales/new/assist/:productId` | **Ficha de venta** (C36) | `POST /api/ai/products/{id}/sales-assist` y `GET /api/ai/products/{id}/substitutes` |
+
+### La ficha de venta (`/sales/new/assist/:productId`)
+
+Anclada a **una pieza y un punto de venta**, con carga perezosa. El punto de venta llega por **estado
+de navegación**; abierta en frío ofrece el mismo selector por rol que el panel y **no emite ninguna
+petición hasta que hay uno elegido**.
+
+**Tres entradas**, todas con acción explícita:
+
+| Origen | Acción | Estado que viaja |
+|---|---|---|
+| `components/sales/assisted-search-result-row.tsx` | «Ver ficha de venta», acción **secundaria** de la fila | `{ pointOfSaleId }` del panel |
+| `pages/sales/new.tsx` | Botón junto al producto seleccionado | `{ pointOfSaleId }` del formulario |
+| `pages/sales/scan.tsx` | Tras resolver el código | — *(esta página no tiene punto de venta; la ficha cae en su selector)* |
+
+La salida es el traspaso que ya existía: `navigate(ROUTES.SALES.NEW, { state: { productId } })`, con el
+identificador del **miembro que el operario eligió**.
+
+**Cuatro reglas que es fácil romper sin querer**, y que tienen test:
+
+1. **Una petición de asistencia por visita**, emitida al entrar. Navegar a la ficha *es* el acto
+   explícito. El presupuesto es de **10 peticiones por minuto y usuario** y la respuesta **no se puede
+   cachear**, así que re-renderizar, que llegue la respuesta o que algo falle no pueden producir otra.
+2. **Ningún reintento automático.** El reintento lo pide el operario con un botón.
+3. **La pregunta del cliente es una segunda petición** y viaja **en el cuerpo**, nunca en la dirección
+   de la página ni en el estado del enrutador, que acaban en el historial del navegador. Máximo **500
+   caracteres**, comprobados antes de enviar.
+4. **Los sustitutos se disparan por `hasStock` del miembro anclado**, nunca por `pitchStatus`, y **no
+   se piden** si la IA no estaba disponible para esa ficha.
+
+### La tabla de copia (`src/lib/assist-copy.ts`)
+
+El backend envía **códigos**; el castellano que lee una persona se escribe aquí. Módulo propio, con
+funciones exportadas y **probadas directamente**, siguiendo el patrón de `originLabel` de la fila de
+resultados — no literales repartidos por los componentes.
+
+Cubre los **cinco códigos de aviso alcanzables**, los **cinco mensajes** de los seis estados del
+argumentario, los **cuatro desenlaces** de sustitutos, el alcance de las citas y las **cinco preguntas
+sugeridas** del corpus.
+
+Tres cosas que parecen erratas y no lo son:
+
+- **Dos códigos del vocabulario no tienen fila**: `query_out_of_domain` y `query_not_in_catalogue` los
+  emite sólo el clasificador de intención, que corre en un modo que estas rutas no usan. Caen en la
+  **etiqueta neutra**, y hay un test que lo comprueba en vez de copia muerta sobre caminos imposibles.
+- **`size_label_missing` no entra en el bloque de avisos**: se pinta como atributo junto al SKU. Salta
+  en el 58,3 % de las fichas y describe el enriquecimiento del catálogo, no la pieza. **Se pinta
+  siempre**: no se suprime nada que el backend haya emitido.
+- **`ai_unavailable` y `not_generated` no comparten mensaje**, aunque suenen parecido: en el primero la
+  familia y los materiales vienen del catálogo transaccional y no hay citas; en el segundo vienen del
+  índice. Fundirlos haría que la pantalla mintiera sobre la procedencia de lo que enseña.
+
 ## Testing
 
 ### Unit & Component Tests (Vitest + React Testing Library)

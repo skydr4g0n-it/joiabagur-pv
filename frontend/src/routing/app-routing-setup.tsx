@@ -23,6 +23,7 @@ const ManualSalesPage = lazy(() => import('@/pages/sales/new'));
 const ScanSalesPage = lazy(() => import('@/pages/sales/scan'));
 const ImageRecognitionSalesPage = lazy(() => import('@/pages/sales/new-image'));
 const AssistedSalesSearchPage = lazy(() => import('@/pages/sales/assisted'));
+const SalesAssistCardPage = lazy(() => import('@/pages/sales/assist'));
 const SalesCartPage = lazy(() => import('@/pages/sales/cart'));
 const SalesHistoryPage = lazy(() => import('@/pages/sales/history'));
 const ReturnsPage = lazy(() => import('@/pages/returns'));
@@ -81,6 +82,7 @@ export function AppRoutingSetup() {
             <Route path={ROUTES.SALES.NEW_SCAN} element={<ScanSalesPage />} />
             <Route path={ROUTES.SALES.NEW_IMAGE} element={<ImageRecognitionSalesPage />} />
             <Route path={ROUTES.SALES.NEW_ASSISTED} element={<AssistedSalesSearchPage />} />
+            <Route path={ROUTES.SALES.ASSIST_PATTERN} element={<SalesAssistCardPage />} />
             <Route path={ROUTES.SALES.CART} element={<SalesCartPage />} />
             <Route path={ROUTES.SALES.HISTORY} element={<SalesHistoryPage />} />
             <Route path={ROUTES.RETURNS.ROOT} element={<ReturnsPage />} />

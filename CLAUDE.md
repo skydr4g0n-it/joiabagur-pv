@@ -73,13 +73,18 @@ The full inventory — root causes, and why a tree of 270 tests went unrun for w
 ## Frontend test suite: same story, and it catches people out harder
 
 `npm run test` in `frontend/` **also comes back red before you touch anything**: measured on
-2026-09-13, **113 failures of 595 tests, across 14 of the 48 files** (it was 118 of 482 on
-2026-08-29 — the suite grew and the red did not). The method is identical to the backend's —
-baseline first, then compare the failing **test names**, never the count.
+2026-09-22, **113 or 114 failures of 597 tests, across 14 or 15 of the 48 files** — the same commit
+gives both, which is precisely the point (113 of 595 on 2026-09-13; 118 of 482 on 2026-08-29 — the
+suite grew and the red did not). The method is identical to the backend's
+— baseline first, then compare the failing **test names**, never the count.
 
-Unlike the backend's, **this set of names is stable between runs**: C28 measured an identical
-113 names at baseline and at close. Compare by name here because the *count* moves whenever
-somebody adds tests, not because the set rotates.
+**Expect the count to sit at 113 or 114 without anybody having broken anything.** The frontend was
+documented as having a set of names stable between runs, and C36 refuted that: `family-review.test.tsx
+:: should create a family with its members from the review screen` **failed at baseline and passed at
+close** with nothing touching it or its production code. One order-dependent test, not a handful like
+the backend's — but enough that the count is not a signal. Verifying C36 re-ran that same baseline
+commit and the test **passed there too**, giving 113 in 14 files where the apply had seen 114 in 15:
+same commit, same code, two answers. The one thing that holds either way: **zero new names**.
 
 It catches people out harder than the backend one for two reasons. Nobody expects a frontend
 suite to be red, and `vitest` exits **0** when you pipe it (`npm run test | tail` reports the

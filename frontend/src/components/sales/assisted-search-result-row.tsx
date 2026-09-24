@@ -5,7 +5,7 @@
  * and the family disambiguation, and it should extend this row rather than rewrite the page.
  */
 
-import { Package } from 'lucide-react';
+import { FileText, Package } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -87,9 +87,29 @@ const euro = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR'
 interface AssistedSearchResultRowProps {
   result: AssistedSearchResult;
   onSelect: (result: AssistedSearchResult) => void;
+  /**
+   * Opens the sale card for this product (C36).
+   *
+   * A **secondary** action added to the row rather than a rewrite of it, which is what this
+   * component's own docstring anticipated. It neither replaces, disables nor precedes selecting
+   * the result for sale.
+   *
+   * It deliberately does **not** report a selection to the telemetry endpoint: opening a card is
+   * not choosing the piece to sell, and counting it as one would inflate the selection rate the
+   * search event exists to measure. The selection report stays bound to the act of choosing the
+   * product for the sale flow.
+   *
+   * Optional, so every existing caller and every existing test of this row keeps working
+   * unchanged.
+   */
+  onOpenCard?: (result: AssistedSearchResult) => void;
 }
 
-export function AssistedSearchResultRow({ result, onSelect }: AssistedSearchResultRowProps) {
+export function AssistedSearchResultRow({
+  result,
+  onSelect,
+  onOpenCard,
+}: AssistedSearchResultRowProps) {
   const photoUrl = getImageUrl(result.primaryPhotoUrl ?? undefined);
 
   return (
@@ -153,6 +173,21 @@ export function AssistedSearchResultRow({ result, onSelect }: AssistedSearchResu
           <Button size="sm" onClick={() => onSelect(result)}>
             Seleccionar para venta
           </Button>
+
+          {/* Secondary by variant as well as by position: the primary act of this panel is still
+              choosing the piece for the sale. Opening the card issues no search, changes no
+              result and ends no search episode. */}
+          {onOpenCard ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onOpenCard(result)}
+              data-testid="assisted-search-open-card"
+            >
+              <FileText className="mr-1.5 size-3.5" />
+              Ver ficha de venta
+            </Button>
+          ) : null}
         </div>
       </CardContent>
     </Card>

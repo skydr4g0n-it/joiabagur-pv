@@ -354,6 +354,8 @@ El Frontend está organizado en módulos funcionales, servicios y componentes co
 
 - **Assisted Search Module** (C16): Panel «Buscar con ayuda» en `/sales/new/assisted`, tercera vía de entrada a una venta junto al escaneo y el registro manual. Consulta en lenguaje natural con **envío explícito** —nunca al teclear, porque cada búsqueda no cacheada cuesta un embedding facturado—, consultas de ejemplo, filtros rápidos de material y tipo de pieza sobre el vocabulario cerrado del enriquecimiento, punto de venta resuelto por rol, y resultados **en el orden que dio el backend** con su precio y su stock. Distingue en pantalla los cuatro modos de no encontrar nada —abstención, sin surtido en esa tienda, asistencia no disponible y cuota agotada— y declara la página corta. Embudo de recuperación reservado a administradores. Entrega el producto elegido al flujo de venta manual por estado de navegación, arrastrando el identificador de la búsqueda hasta la caja.
 
+- **Sales Assist Card Module** (C36): Ficha de venta en `/sales/new/assist/:productId`, con carga perezosa y **tres entradas** —la fila del panel de búsqueda asistida, el producto elegido en la venta manual y la pieza resuelta tras escanear—, porque la situación que la ficha nombra, *«el cliente tiene la pieza en la mano»*, no llega por el panel. Es **la única pantalla del proyecto que pone la capa RAG delante de una persona**. Emite **una petición de asistencia por visita y sin reintento automático** —la ruta cuesta una llamada de pago, el límite es de diez por minuto y usuario y la respuesta no se puede cachear—; el reintento lo pide el operario. La pregunta del cliente es una **segunda petición explícita**, acotada a 500 caracteres en el cliente y **siempre en el cuerpo**, nunca en la dirección de la página ni en el estado del enrutador que acaba en el historial, con **cinco preguntas sugeridas horneadas** del propio corpus. Desambigua por familia con **una acción de venta por miembro y ninguna preselección** —el clic es la confirmación—, degradando al SKU el miembro sin etiqueta de variante, y traspasa el miembro elegido a la venta manual por estado de navegación. Pinta los **seis `pitchStatus` como cinco mensajes** sin fundir «la IA no está disponible» con «el argumentario no se generó», porque en el primero la familia, los materiales y las razones de coincidencia salen del catálogo transaccional y no hay citas. Las citas llevan su `claimScope` distinguido —un compromiso de la casa dice que se confirme en tienda— y **se ocultan cuando el argumentario no se entrega**. `size_label_missing` se pinta **como atributo junto al SKU y nunca como aviso**, para no canibalizar a los dos de stock. Los sustitutos se piden cuando la pieza anclada no tiene existencias —**por su stock y no por el estado del argumentario**— y nunca con la IA caída, con los cuatro desenlaces distinguibles y la página corta declarada. El punto de venta llega por estado de navegación y, abierta en frío, ofrece el selector por rol y **no pide nada hasta que haya uno elegido**.
+
 - **Family Review Module** (C18b): Pantalla `/admin/family-review`, solo administrador. Audita las familias persistidas —miembros que el vector no respalda y productos sueltos nominados por margen relativo—, registra el veredicto por par `(producto, familia)` con su cronómetro, hace visible la distancia entre un juicio registrado y la pertenencia que lo honraría, y permite corregir la etiqueta de variante de un miembro. Desde C28 **crea familias a mano** con sus miembros y etiquetas en una sola declaración —la vía que alcanza los tipos de pieza sin familia, que la auditoría por margen no puede nominar porque no hay contra qué comparar— y **opera con teclado**.
 
 - **Profile Review Module** (C28): Pantalla `/admin/profile-review`, solo administrador. Revisa perfiles de IA sobre un lote **estratificado por evidencia** y determinista por semilla, con el **texto de origen del producto al lado de los valores** porque el criterio es la fidelidad a ese texto y no la verdad de la pieza —no hay ni una foto en el sistema—, y la ausencia de descripción **se declara** en vez de dejar un hueco. La pregunta cambia con el estrato: *«¿falta algo?»* donde toda la evidencia está en el texto, *«¿es correcto?»* en los demás. Los seis campos de vocabulario cerrado se editan por **selección** y no por texto libre, porque un valor fuera de vocabulario sería inencontrable por el filtro de recuperación y contaminaría la tasa; lo que el texto nombra y la lista no tiene se anota aparte como **hueco de vocabulario**, que es un hallazgo y no una corrección. La talla queda en texto libre: la produce una regex y su espacio de valores no es cerrado. Cronómetro por ítem que viaja en la petición de guardado, barra de aprobación masiva acotada a un campo dentro de un estrato, vista de rechazados con la pregunta invertida, y tarjeta de métricas con las dos poblaciones de tiempo separadas.
@@ -397,6 +399,10 @@ C4Component
         Component(posModule, "Point of Sale Module", "React/Vue/Angular", "Gestión de puntos de venta")
         Component(userModule, "User Module", "React/Vue/Angular", "Gestión de usuarios")
         Component(reportModule, "Report Module", "React/Vue/Angular", "Consultas y reportes")
+        Component(assistedSearchModule, "Assisted Search Module", "React 19 + TypeScript", "Panel de búsqueda asistida (C16)")
+        Component(salesAssistCardModule, "Sales Assist Card Module", "React 19 + TypeScript", "Ficha de venta con desambiguación por familia (C36)")
+        Component(familyReviewModule, "Family Review Module", "React 19 + TypeScript", "Revisión de familias, solo administrador (C18b)")
+        Component(profileReviewModule, "Profile Review Module", "React 19 + TypeScript", "Revisión de perfiles de IA, solo administrador (C28)")
         
         Component(apiClient, "API Client", "Axios/Fetch", "Cliente HTTP para comunicación con backend")
         Component(mlModelHandler, "ML Model Handler", "TensorFlow.js/ONNX.js", "Gestión y ejecución del modelo de IA")
@@ -417,6 +423,12 @@ C4Component
     Rel(posModule, apiClient, "Usa")
     Rel(userModule, apiClient, "Usa")
     Rel(reportModule, apiClient, "Usa")
+    Rel(assistedSearchModule, apiClient, "Usa")
+    Rel(salesAssistCardModule, apiClient, "Usa")
+    Rel(familyReviewModule, apiClient, "Usa")
+    Rel(profileReviewModule, apiClient, "Usa")
+    Rel(assistedSearchModule, salesAssistCardModule, "Accion secundaria de la fila")
+    Rel(salesAssistCardModule, saleModule, "Traspasa el miembro elegido")
     
     Rel(imageRecognitionModule, mlModelHandler, "Usa")
     Rel(imageRecognitionModule, apiClient, "Usa", "Obtiene fotos de referencia")
@@ -745,7 +757,7 @@ C4Component
 ### EP15: Venta Asistida, Sustitutos y Agentes
 - **AI Service**: Assist Router, Generation Service, Guardrails / Intent Router, Agent Loop
 - **Backend**: Sales Assist Service y Substitutes Service tras `AiSalesAssistController` (C34: `POST /api/ai/products/{id}/sales-assist`, `GET /api/ai/products/{id}/substitutes`), con la familia generativa `ai-assist` del AI Gateway Client. *(Los complementarios salieron con C27.)*
-- **Frontend**: tarjeta de asistencia y desambiguación por familia
+- **Frontend**: Sales Assist Card Module (C36) — ficha de venta en `/sales/new/assist/:productId` con carga perezosa y tres entradas, una petición por visita sin reintento automático, desambiguación por familia **sin preselección** con un botón de venta por miembro, seis `pitchStatus` en cinco mensajes, citas con su alcance y los cuatro desenlaces de sustitutos
 
 ### EP16: Inventario Asistido y Señales de Demanda
 - **AI Service**: Inventory Router, Agent Loop
