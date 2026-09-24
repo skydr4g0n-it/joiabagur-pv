@@ -1,0 +1,50 @@
+namespace JoiabagurPV.Application.DTOs.Ai;
+
+/// <summary>
+/// Which assisted paths are switched on for one point of sale, answered without consulting the
+/// AI service.
+/// </summary>
+/// <remarks>
+/// <para>
+/// This exists because the screen has to state availability <strong>before</strong> a search, and
+/// until now there was nowhere to read it from. <c>aiAvailable</c> travels inside a search
+/// response, which is to say afterwards, and the health route is an administrator's view of
+/// infrastructure rather than of these switches at this shop.
+/// </para>
+/// <para>
+/// The failure it prevents is the one that opened this change: a capability switched off and
+/// presented as available. With this, an operator whose shop has the assisted answer disabled
+/// sees the option disabled with its reason instead of pressing it and getting an error.
+/// </para>
+/// <para>
+/// Two flags rather than one because the two switches are independent and each carries its own
+/// rate limit, time budget and circuit. All four combinations are reachable, including the odd
+/// one where semantic search is off and the assisted answer is on.
+/// </para>
+/// </remarks>
+public class AiSearchAvailabilityResponse
+{
+    /// <summary>Point of sale the answer is about.</summary>
+    public Guid PointOfSaleId { get; set; }
+
+    /// <summary>
+    /// Whether the semantic path is switched on. When false the panel still searches — it
+    /// degrades to the lexical searcher, with the filters applied — so this disables nothing on
+    /// screen; it explains why the results are what they are.
+    /// </summary>
+    public bool SemanticSearchAvailable { get; set; }
+
+    /// <summary>
+    /// Whether the generative path is switched on. When false the assisted option of the route
+    /// toggle is disabled with its reason, rather than failing when pressed.
+    /// </summary>
+    public bool AssistedAnswerAvailable { get; set; }
+
+    /// <summary>
+    /// Why the assisted answer is unavailable, from the same vocabulary the sale card reports, or
+    /// null when it is available. Only <c>switched_off</c> can be known before a call: an outage
+    /// or a rejected credential is discovered by making one, and this route deliberately makes
+    /// none.
+    /// </summary>
+    public string? AssistedAnswerUnavailableReason { get; set; }
+}

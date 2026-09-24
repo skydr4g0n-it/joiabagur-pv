@@ -139,3 +139,51 @@ describe('aiSearchService.reportSelection', () => {
     await expect(aiSearchService.reportSelection('event-1', 'product-1')).resolves.toBeUndefined();
   });
 });
+
+/**
+ * Availability (C40).
+ *
+ * The property worth holding is that this never reports a failure as an outage. The panel works
+ * without knowing the switches, so a read that fails must degrade to "I could not tell" — saying
+ * the assistant is down would be alarming about something that may well be fine.
+ */
+describe('aiSearchService.getAvailability', () => {
+  it('should report both switches when the endpoint answers', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: {
+        pointOfSaleId: 'pos-1',
+        semanticSearchAvailable: true,
+        assistedAnswerAvailable: false,
+        assistedAnswerUnavailableReason: 'switched_off',
+      },
+    } as never);
+
+    const outcome = await aiSearchService.getAvailability('pos-1');
+
+    expect(outcome.kind).toBe('ok');
+    if (outcome.kind !== 'ok') throw new Error('expected ok');
+    expect(outcome.availability.semanticSearchAvailable).toBe(true);
+    expect(outcome.availability.assistedAnswerAvailable).toBe(false);
+    expect(outcome.availability.assistedAnswerUnavailableReason).toBe('switched_off');
+  });
+
+  it('should send the point of sale as a query parameter', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {} } as never);
+
+    await aiSearchService.getAvailability('pos-7');
+
+    expect(apiClient.get).toHaveBeenCalledWith('/ai/search/availability', {
+      params: { pointOfSaleId: 'pos-7' },
+    });
+  });
+
+  it('should return an unknown outcome instead of throwing when the read fails', async () => {
+    vi.mocked(apiClient.get).mockRejectedValue({ statusCode: 500 });
+
+    const outcome = await aiSearchService.getAvailability('pos-1');
+
+    // Not 'error', and not a rejection: the panel searches perfectly well without this, so a
+    // failure here must not become a message the operator cannot act on.
+    expect(outcome).toEqual({ kind: 'unknown' });
+  });
+});

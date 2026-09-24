@@ -133,6 +133,31 @@ describe('pitchMessage', () => {
     expect(degraded?.body).toContain('catálogo');
   });
 
+  it('should tell a piece that is not indexed from an unavailable service', () => {
+    const notIndexed = pitchMessage('ai_unavailable', 'product_not_indexed');
+    const outage = pitchMessage('ai_unavailable', 'ai_unavailable');
+
+    // Same pitch status, opposite situations: one resolves itself with the next index
+    // synchronisation and needs nobody to do anything; the other is a fault. Reading the first
+    // as the second is what sent people looking for a problem that was not there.
+    expect(notIndexed?.title).not.toBe(outage?.title);
+    expect(notIndexed?.title).toContain('todav');
+    expect(notIndexed?.action).toContain('sin que tengas que hacer nada');
+  });
+
+  it('should fall back to the unavailable message for a degraded reason it does not know', () => {
+    const known = pitchMessage('ai_unavailable', 'ai_unavailable');
+    const unknown = pitchMessage('ai_unavailable', 'invented_by_a_later_change');
+
+    // Five of the six reasons mean the same thing at the counter, so an unrecognised one lands
+    // on that message rather than on a blank or on a code the operator cannot read.
+    expect(unknown).toEqual(known);
+  });
+
+  it('should keep the unavailable message when no reason is reported', () => {
+    expect(pitchMessage('ai_unavailable')).toEqual(pitchMessage('ai_unavailable', null));
+  });
+
   it('should share one text between the two withheld states', () => {
     const byAi = pitchMessage('withheld_by_ai');
     const unresolved = pitchMessage('withheld_unresolved');

@@ -41,6 +41,7 @@ import {
   AssistedSearchResultRow,
   searchOrigin,
 } from '@/components/sales/assisted-search-result-row';
+import { AiAvailabilityBadge } from '@/components/sales/ai-availability-badge';
 import { useAuth } from '@/providers/auth-provider';
 import { aiSearchService } from '@/services/ai-search.service';
 import * as pointOfSaleService from '@/services/point-of-sale.service';
@@ -51,6 +52,7 @@ import {
 } from '@/lib/materials-vocabulary';
 import { ROUTES } from '@/routing/routes';
 import type {
+  AiSearchAvailability,
   AssistedSearchResponse,
   AssistedSearchResult,
 } from '@/types/ai-search.types';
@@ -103,6 +105,11 @@ export function AssistedSalesSearchPage() {
   const [state, setState] = useState<PanelState>({ kind: 'idle' });
   const [showFunnel, setShowFunnel] = useState(false);
 
+  // Read before any search, and re-read when the shop changes: the switches are per point of
+  // sale, so the answer is about this shop and not about the installation.
+  const [availability, setAvailability] = useState<AiSearchAvailability | null>(null);
+  const [availabilitySettled, setAvailabilitySettled] = useState(false);
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -122,6 +129,35 @@ export function AssistedSalesSearchPage() {
     };
     load();
   }, []);
+
+  /**
+   * Reads the two switches for the selected shop, before anything is searched.
+   *
+   * This costs no AI call and no quota, which is what makes it safe to do on every shop change.
+   * It is also the only way the panel can tell the operator that a path is off *before* they use
+   * it — the flag inside a search response arrives too late to prevent anything.
+   */
+  useEffect(() => {
+    if (!pointOfSaleId) {
+      setAvailability(null);
+      setAvailabilitySettled(false);
+      return;
+    }
+
+    let current = true;
+    setAvailabilitySettled(false);
+
+    aiSearchService.getAvailability(pointOfSaleId).then((outcome) => {
+      // A stale answer must never overwrite a newer one, the same guard the search itself uses.
+      if (!current) return;
+      setAvailability(outcome.kind === 'ok' ? outcome.availability : null);
+      setAvailabilitySettled(true);
+    });
+
+    return () => {
+      current = false;
+    };
+  }, [pointOfSaleId]);
 
   const runSearch = useCallback(
     async (text: string) => {
@@ -251,6 +287,13 @@ export function AssistedSalesSearchPage() {
           </p>
         </div>
       </div>
+
+      {/*
+        Stated before anything is searched. Until this existed the only way to discover that a
+        path was switched off was to use it, which is how the panel spent the whole project
+        serving from its degraded route while looking exactly as it does when the AI answers.
+      */}
+      <AiAvailabilityBadge availability={availability} settled={availabilitySettled} />
 
       <Card>
         <CardContent className="space-y-4 pt-6">

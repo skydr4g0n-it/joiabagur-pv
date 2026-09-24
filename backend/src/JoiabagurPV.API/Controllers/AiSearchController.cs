@@ -109,4 +109,47 @@ public class AiSearchController : ControllerBase
             _ => Ok(result.Response)
         };
     }
+
+    /// <summary>
+    /// Reports which assisted paths are switched on for a point of sale, before any search.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Makes <strong>no call to the AI service</strong> and consumes no quota: it reads two
+    /// configuration switches. That is the whole point — the screen must be able to say the
+    /// assisted answer is unavailable without spending one of the ten calls a minute it would
+    /// need to find out, and without the operator discovering it by pressing a button that fails.
+    /// </para>
+    /// <para>
+    /// Rate limiting is disabled on this action rather than left to inherit the controller's
+    /// policy. Inheriting it would mean that checking whether you may search costs a search,
+    /// which would let a panel that polls availability exhaust the quota for the thing it was
+    /// checking on.
+    /// </para>
+    /// <para>
+    /// No point-of-sale assignment check: this answers about configuration, not about stock,
+    /// prices or anything else a shop holds. Refusing it for an unassigned shop would leak the
+    /// same bit it is being asked for, and the search itself remains authorised as before.
+    /// </para>
+    /// </remarks>
+    /// <param name="pointOfSaleId">The point of sale to report on.</param>
+    [HttpGet("availability")]
+    [DisableRateLimiting]
+    [ProducesResponseType(typeof(AiSearchAvailabilityResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public IActionResult Availability([FromQuery] Guid pointOfSaleId)
+    {
+        if (!_currentUserService.UserId.HasValue)
+        {
+            return Unauthorized(new { message = "User not authenticated." });
+        }
+
+        if (pointOfSaleId == Guid.Empty)
+        {
+            return BadRequest(new { errors = new[] { "El punto de venta es obligatorio." } });
+        }
+
+        return Ok(_searchService.GetAvailability(pointOfSaleId));
+    }
 }

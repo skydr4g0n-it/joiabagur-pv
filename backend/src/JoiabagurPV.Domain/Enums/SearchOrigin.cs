@@ -40,5 +40,28 @@ public enum SearchOrigin
     /// It is also the control arm: with this value, switching the feature on for some points of
     /// sale and not others is a comparison the database can answer.
     /// </remarks>
-    Disabled = 3
+    Disabled = 3,
+
+    /// <summary>
+    /// Results produced by the AI service for a free-text query, with a routing decision, a corpus
+    /// consultation and a written argument behind them.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately not folded into <see cref="Assisted"/>, and for the same kind of reason the
+    /// third value is not folded into the second. The two are different searches, not two
+    /// renderings of one: the semantic path costs a query embedding, and this one costs an
+    /// embedding plus a classifier plus a corpus lookup plus a generation, against a budget four
+    /// times longer and a rate limit three times tighter. Sharing a value would make the one
+    /// comparison this column exists to enable — what the operator gets for that extra cost —
+    /// impossible to draw from the table.
+    ///
+    /// With it, the ablation of the two routes stops being something to demonstrate on screen and
+    /// becomes a query: the event already carries the filters, the retrieval and total durations
+    /// and the selected rank, so grouping by origin answers it directly.
+    ///
+    /// And a caution worth keeping next to the value: the operator chooses the route, so the two
+    /// populations are selected by whoever chose. This measures an ablation; it is not a
+    /// randomised comparison and must not be reported as one.
+    /// </remarks>
+    AssistedGenerative = 4
 }

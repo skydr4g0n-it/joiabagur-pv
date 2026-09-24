@@ -14,6 +14,7 @@ import { AssistedSalesSearchPage } from '../assisted';
 import { aiSearchService } from '@/services/ai-search.service';
 import * as pointOfSaleService from '@/services/point-of-sale.service';
 import type {
+  AiSearchAvailability,
   AssistedSearchOutcome,
   AssistedSearchResponse,
   AssistedSearchResult,
@@ -22,6 +23,7 @@ import type {
 vi.mock('@/services/ai-search.service', () => ({
   aiSearchService: {
     search: vi.fn(),
+    getAvailability: vi.fn(),
     reportSelection: vi.fn(),
   },
 }));
@@ -101,11 +103,26 @@ async function ready() {
   await waitFor(() => expect(pointOfSaleService.getPointsOfSale).toHaveBeenCalled());
 }
 
+/** Both paths on, which is the state the pre-existing tests of this file assume. */
+function availabilityIs(overrides: Partial<AiSearchAvailability> = {}) {
+  vi.mocked(aiSearchService.getAvailability).mockResolvedValue({
+    kind: 'ok',
+    availability: {
+      pointOfSaleId: 'pos-1',
+      semanticSearchAvailable: true,
+      assistedAnswerAvailable: true,
+      assistedAnswerUnavailableReason: null,
+      ...overrides,
+    },
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   role = 'Operator';
   vi.mocked(pointOfSaleService.getPointsOfSale).mockResolvedValue([POS_ONE]);
   vi.mocked(aiSearchService.reportSelection).mockResolvedValue(undefined);
+  availabilityIs();
   answers(response());
 });
 
@@ -641,5 +658,88 @@ describe('AssistedSalesSearchPage — point of sale and role', () => {
 
     await screen.findByTestId('assisted-search-result');
     expect(screen.queryByTestId('assisted-search-funnel')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Availability, stated before a search (C40).
+ *
+ * The defect these hold is the one that opened the change: for the whole project the panel served
+ * from its degraded route and looked exactly as it does when the AI answers. `aiAvailable` only
+ * arrives inside a response, so the operator could not learn that a path was off without first
+ * using it.
+ */
+describe('AssistedSalesSearchPage — availability before searching', () => {
+  it('should state availability of both paths before any search', async () => {
+    renderPanel();
+    await ready();
+
+    const badge = await screen.findByTestId('ai-availability');
+
+    expect(badge).toHaveTextContent(/Búsqueda inteligente y respuesta asistida disponibles/);
+    // The whole point: this is known without having searched, and without spending a call.
+    expect(aiSearchService.search).not.toHaveBeenCalled();
+    expect(aiSearchService.getAvailability).toHaveBeenCalledWith('pos-1');
+  });
+
+  it('should state the assisted option as unavailable with its reason when the assisted path is off', async () => {
+    availabilityIs({
+      assistedAnswerAvailable: false,
+      assistedAnswerUnavailableReason: 'switched_off',
+    });
+
+    renderPanel();
+    await ready();
+
+    const badge = await screen.findByTestId('ai-availability');
+
+    expect(badge).toHaveTextContent(/desactivada en esta tienda/);
+    // Not presented as a fault: a switch that is off is somebody's decision, and telling an
+    // operator the system is broken would send them looking for a problem that is not there.
+    expect(badge).not.toHaveTextContent(/error|caíd|fallo/i);
+  });
+
+  it('should tell the semantic path apart from the assisted one when only one is off', async () => {
+    availabilityIs({ semanticSearchAvailable: false, assistedAnswerAvailable: true });
+
+    renderPanel();
+    await ready();
+
+    const badge = await screen.findByTestId('ai-availability');
+
+    // The odd quadrant, and reachable: two independent switches. Collapsing them into one "AI"
+    // flag would render this state wrongly.
+    expect(badge).toHaveTextContent(/Búsqueda por texto/);
+    expect(badge).toHaveTextContent(/Respuesta asistida disponible/);
+  });
+
+  it('should say it could not tell when availability cannot be read', async () => {
+    vi.mocked(aiSearchService.getAvailability).mockResolvedValue({ kind: 'unknown' });
+
+    renderPanel();
+    await ready();
+
+    const badge = await screen.findByTestId('ai-availability');
+
+    // Failing to read the switches is not an outage. The panel still searches, so the badge
+    // admits ignorance instead of alarming about something the operator cannot act on.
+    expect(badge).toHaveTextContent(/No he podido comprobar la disponibilidad/);
+  });
+
+  it('should re-read availability when the point of sale changes', async () => {
+    vi.mocked(pointOfSaleService.getPointsOfSale).mockResolvedValue([POS_ONE, POS_TWO]);
+    const user = userEvent.setup();
+    renderPanel();
+    await ready();
+
+    await waitFor(() => expect(aiSearchService.getAvailability).toHaveBeenCalledWith('pos-1'));
+
+    await user.click(screen.getByLabelText('Punto de venta'));
+    await user.click(await screen.findByRole('option', { name: 'Fornells' }));
+
+    // The switches are per shop, so the answer has to be re-read. And it stays free: changing
+    // shop must not cost a model call.
+    await waitFor(() => expect(aiSearchService.getAvailability).toHaveBeenCalledWith('pos-2'));
+    expect(aiSearchService.search).not.toHaveBeenCalled();
   });
 });

@@ -10,6 +10,8 @@
 
 import apiClient from './api.service';
 import type {
+  AiSearchAvailability,
+  AiSearchAvailabilityOutcome,
   AssistedSearchOutcome,
   AssistedSearchRequest,
   AssistedSearchResponse,
@@ -17,6 +19,7 @@ import type {
 import type { ApiError } from '@/types/api.types';
 
 const SEARCH_ENDPOINT = '/ai/search';
+const AVAILABILITY_ENDPOINT = '/ai/search/availability';
 const SEARCH_EVENTS_ENDPOINT = '/ai/search-events';
 
 /**
@@ -77,6 +80,26 @@ export const aiSearchService = {
       return { kind: 'ok', response: response.data };
     } catch (error) {
       return toOutcome(error);
+    }
+  },
+
+  /**
+   * Reads which assisted paths are switched on for a point of sale.
+   *
+   * Never throws, and never reports a failure as an outage: a panel that cannot read the switches
+   * still searches perfectly well, so the badge says it could not tell rather than announcing a
+   * problem the operator can neither verify nor fix.
+   *
+   * Costs no AI call and no quota, which is what makes it safe to ask before every search.
+   */
+  getAvailability: async (pointOfSaleId: string): Promise<AiSearchAvailabilityOutcome> => {
+    try {
+      const response = await apiClient.get<AiSearchAvailability>(AVAILABILITY_ENDPOINT, {
+        params: { pointOfSaleId },
+      });
+      return { kind: 'ok', availability: response.data };
+    } catch {
+      return { kind: 'unknown' };
     }
   },
 

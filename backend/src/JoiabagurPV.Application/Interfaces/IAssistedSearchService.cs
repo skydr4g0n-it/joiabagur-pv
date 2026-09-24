@@ -31,6 +31,17 @@ public interface IAssistedSearchService
         string role,
         bool isAdmin,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reports which assisted paths are switched on for a point of sale.
+    /// </summary>
+    /// <remarks>
+    /// Synchronous, and deliberately so: it reads configuration and touches neither the database
+    /// nor the AI service. Returning a task would invite a later change to put a call behind it,
+    /// and a call is the one thing this must never make — the screen asks this before every
+    /// search, and paying for that would exhaust the quota of the feature it is asking about.
+    /// </remarks>
+    AiSearchAvailabilityResponse GetAvailability(Guid pointOfSaleId);
 }
 
 /// <summary>

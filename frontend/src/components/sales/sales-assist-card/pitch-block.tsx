@@ -93,6 +93,11 @@ interface PitchBlockProps {
    * feature — but it is painted if it ever arrives.
    */
   clarificationQuestion?: string | null;
+  /**
+   * Why the AI path degraded, when it did. Refines the unavailable message so that a piece the
+   * index has not reached yet stops reading as a service that has fallen over.
+   */
+  degradedReason?: string | null;
 }
 
 export function PitchBlock({
@@ -100,8 +105,9 @@ export function PitchBlock({
   pitch,
   citations,
   clarificationQuestion,
+  degradedReason,
 }: PitchBlockProps) {
-  const message = pitchMessage(pitchStatus);
+  const message = pitchMessage(pitchStatus, degradedReason);
 
   return (
     <div className="space-y-3" data-testid="assist-pitch" data-pitch-status={pitchStatus}>

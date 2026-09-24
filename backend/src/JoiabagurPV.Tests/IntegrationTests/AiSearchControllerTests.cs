@@ -299,6 +299,54 @@ public class AiSearchControllerTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    // ---------------------------------------------------------------- availability
+
+    /// <remarks>
+    /// Routing and authorisation are the two things a unit test of the service cannot see, and
+    /// both are easy to get wrong in a way that only shows up in the browser: a mistyped route
+    /// segment answers 404, and inheriting the controller's rate-limiting policy would make the
+    /// availability check spend the quota of the search it is checking on.
+    /// </remarks>
+    [Fact]
+    public async Task Availability_WhenCalled_ReportsBothSwitchesWithoutSearching()
+    {
+        var response = await _operatorClient.GetAsync($"/api/ai/search/availability?pointOfSaleId={_pos.Id}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = (await response.Content.ReadFromJsonAsync<AiSearchAvailabilityResponse>())!;
+
+        body.PointOfSaleId.Should().Be(_pos.Id);
+        body.AssistedAnswerUnavailableReason.Should().Be(
+            body.AssistedAnswerAvailable ? null : "switched_off");
+    }
+
+    [Fact]
+    public async Task Availability_WhenCalledRepeatedly_IsNotRateLimited()
+    {
+        // Comfortably past the search policy's allowance. If this route inherited it, checking
+        // availability would start answering 429 — and the panel asks before every search.
+        for (var i = 0; i < 40; i++)
+        {
+            var response = await _operatorClient.GetAsync(
+                $"/api/ai/search/availability?pointOfSaleId={_pos.Id}");
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK,
+                "the availability check makes no AI call, so rationing it would only ration the "
+                + "screen's ability to tell the truth about what is switched on");
+        }
+    }
+
+    [Fact]
+    public async Task Availability_WhenUnauthenticated_Returns401()
+    {
+        var anonymous = _factory.CreateClient();
+
+        var response = await anonymous.GetAsync($"/api/ai/search/availability?pointOfSaleId={_pos.Id}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private static Task<HttpResponseMessage> SearchAsync(HttpClient client, string query, Guid pointOfSaleId) =>

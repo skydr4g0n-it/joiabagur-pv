@@ -93,7 +93,50 @@ export interface AssistedSearchResponse {
   candidatesReturned: number;
   /** Candidates that survived hydration at this point of sale. */
   survivedHydration: number;
+  /**
+   * Filters the operator selected that this search could not apply at all.
+   *
+   * Empty in every case the endpoint can currently produce — both filters the panel sends are
+   * applied on every path. It is read anyway so that a filter added later which the catalog
+   * cannot answer is announced instead of ignored, which is the failure this whole change exists
+   * to stop making.
+   */
+  unappliedFilters?: string[];
 }
+
+/**
+ * Which assisted paths are switched on for one point of sale, read before any search.
+ *
+ * The panel needs this *before* the operator does anything: `aiAvailable` arrives inside a search
+ * response, which is to say afterwards, and by then they have already pressed a button that may
+ * have had nothing behind it.
+ */
+export interface AiSearchAvailability {
+  pointOfSaleId: string;
+  /**
+   * Whether the semantic path is on. False does not disable anything on screen — the panel still
+   * searches, degrading to the lexical searcher with the filters applied — it explains the
+   * results rather than preventing them.
+   */
+  semanticSearchAvailable: boolean;
+  /** Whether the generative path is on. False disables the assisted route with its reason. */
+  assistedAnswerAvailable: boolean;
+  /**
+   * Why the assisted answer is unavailable, or null when it is available. Only `switched_off` is
+   * knowable without making a call, and this route deliberately makes none.
+   */
+  assistedAnswerUnavailableReason?: string | null;
+}
+
+/**
+ * How reading availability ended.
+ *
+ * `unknown` rather than an error state: failing to read the switches must never stop the panel
+ * from working. The badge says it could not tell, and the search paths behave as they always did.
+ */
+export type AiSearchAvailabilityOutcome =
+  | { kind: 'ok'; availability: AiSearchAvailability }
+  | { kind: 'unknown' };
 
 /**
  * How a search attempt ended, from the panel's point of view.

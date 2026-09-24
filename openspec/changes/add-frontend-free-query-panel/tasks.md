@@ -17,14 +17,14 @@
 
 ## 2. Tramo 1 · lo que hoy miente en silencio (sólo .NET y frontend)
 
-- [ ] 2.1 Ampliar `IAssistedSearchRepository.SearchLexicalAsync` con los filtros y con un punto de venta nullable, y su implementación con el `JOIN` a `ProductAiProfiles` y los dos `AND`. Test de integración con Testcontainers: `SearchLexicalAsync_WithPieceTypeFilter_ReturnsOnlyThatCategory` y `SearchLexicalAsync_WithMaterialFilter_ReturnsOnlyPiecesCarryingIt`
-- [ ] 2.2 Pasar los filtros desde `AssistedSearchService` a la ruta degradada y declarar en la respuesta un filtro que no se haya podido aplicar. Test: `SearchAsync_WhenDegradedAndFilterSelected_AppliesTheFilter` y `SearchAsync_WhenFilterCannotBeApplied_DeclaresIt`
-- [ ] 2.3 Añadir `DegradedReason` a `SalesAssistResponse` reenviando el valor que `SalesAssistService` ya calcula, y comprobar que **coincide con el de su línea de registro** para el mismo `trace_id`. Tests: `SalesAssist_WhenProductNotIndexed_ReportsThatReason`, `SalesAssist_WhenSwitchedOff_ReportsThatReason`, `SalesAssist_WhenHealthy_ReportsNoReason`
-- [ ] 2.4 Añadir `SearchOrigin.AssistedGenerative = 4` con su documentación, y un test que compruebe que **la columna sigue siendo `int` y no hizo falta migración**: `SearchOrigin_AddingTheFourthValue_RequiresNoMigration`
-- [ ] 2.5 Crear `GET /api/ai/search/availability` con los dos interruptores de un punto de venta, **sin llamar a la IA y sin consumir cuota**. Tests: `Availability_WhenCalled_MakesNoAiCall`, `Availability_WhenCalledRepeatedly_ConsumesNoQuota`
-- [ ] 2.6 Pintar el **badge de cuatro estados** en el panel leyendo esa ruta antes de cualquier búsqueda, y **deshabilitar la opción asistida con su motivo** cuando no está disponible. Tests: `should state availability of both paths before any search`, `should disable the assisted option with its reason when the assisted path is off`
-- [ ] 2.7 Pintar `degradedReason` en la ficha de C36 distinguiendo pieza no indexada de caída. Test: `should tell a piece that is not indexed from an unavailable service`
-- [ ] 2.8 **Verificación del tramo**: `dotnet build` y `npm run build` en verde, y comparación de las dos suites **por nombres** contra la línea base — cero nombres nuevos
+- [x] 2.1 Ampliar `IAssistedSearchRepository.SearchLexicalAsync` con los filtros y con un punto de venta nullable, y su implementación con el `JOIN` a `ProductAiProfiles` y los dos `AND`. Test de integración con Testcontainers: `SearchLexicalAsync_WithPieceTypeFilter_ReturnsOnlyThatCategory` y `SearchLexicalAsync_WithMaterialFilter_ReturnsOnlyPiecesCarryingIt`
+- [x] 2.2 Pasar los filtros desde `AssistedSearchService` a la ruta degradada y declarar en la respuesta un filtro que no se haya podido aplicar. Test: `SearchAsync_WhenDegradedAndFilterSelected_AppliesTheFilter` y `SearchAsync_WhenFilterCannotBeApplied_DeclaresIt`
+- [x] 2.3 Añadir `DegradedReason` a `SalesAssistResponse` reenviando el valor que `SalesAssistService` ya calcula, y comprobar que **coincide con el de su línea de registro** para el mismo `trace_id`. Tests: `SalesAssist_WhenProductNotIndexed_ReportsThatReason`, `SalesAssist_WhenSwitchedOff_ReportsThatReason`, `SalesAssist_WhenHealthy_ReportsNoReason`
+- [x] 2.4 Añadir `SearchOrigin.AssistedGenerative = 4` con su documentación, y un test que compruebe que **la columna sigue siendo `int` y no hizo falta migración**: `SearchOrigin_AddingTheFourthValue_RequiresNoMigration`
+- [x] 2.5 Crear `GET /api/ai/search/availability` con los dos interruptores de un punto de venta, **sin llamar a la IA y sin consumir cuota**. Tests: `Availability_WhenCalled_MakesNoAiCall`, `Availability_WhenCalledRepeatedly_ConsumesNoQuota`
+- [x] 2.6 Pintar el **badge de cuatro estados** en el panel leyendo esa ruta antes de cualquier búsqueda, y **deshabilitar la opción asistida con su motivo** cuando no está disponible. Tests: `should state availability of both paths before any search`, `should disable the assisted option with its reason when the assisted path is off`
+- [x] 2.7 Pintar `degradedReason` en la ficha de C36 distinguiendo pieza no indexada de caída. Test: `should tell a piece that is not indexed from an unavailable service`
+- [x] 2.8 **Verificación del tramo**: `dotnet build` y `npm run build` en verde, y comparación de las dos suites **por nombres** contra la línea base — cero nombres nuevos
 
 ## 3. Tramo 2 · el contrato se mueve
 

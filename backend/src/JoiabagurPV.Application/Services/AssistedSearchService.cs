@@ -25,6 +25,7 @@ public class AssistedSearchService : IAssistedSearchService
     private readonly IFileStorageService _fileStorage;
     private readonly ITraceContextAccessor _traceContext;
     private readonly IOptionsMonitor<AiSearchOptions> _options;
+    private readonly IOptionsMonitor<AiSalesAssistOptions> _assistOptions;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<AssistedSearchService> _logger;
 
@@ -37,9 +38,11 @@ public class AssistedSearchService : IAssistedSearchService
         IFileStorageService fileStorage,
         ITraceContextAccessor traceContext,
         IOptionsMonitor<AiSearchOptions> options,
+        IOptionsMonitor<AiSalesAssistOptions> assistOptions,
         TimeProvider timeProvider,
         ILogger<AssistedSearchService> logger)
     {
+        _assistOptions = assistOptions;
         _gateway = gateway;
         _repository = repository;
         _cache = cache;
@@ -97,7 +100,7 @@ public class AssistedSearchService : IAssistedSearchService
             // AI is not answering, which would make the two origins incomparable in exactly the
             // analysis the funnel exists for. The extra rows cost nothing at this catalog size
             // and are truncated away below.
-            rows = await DegradedAsync(request, LexicalWindow(options), cancellationToken);
+            rows = await DegradedAsync(request, filters, LexicalWindow(options), cancellationToken);
             retrieval = retrieval with { RetrievalMs = ElapsedMs(lexicalStartedAt) };
         }
 
@@ -120,8 +123,36 @@ public class AssistedSearchService : IAssistedSearchService
             LowConfidence = retrieval.LowConfidence,
             PointOfSaleId = request.PointOfSaleId,
             CandidatesReturned = retrieval.Candidates.Count,
-            SurvivedHydration = rows.Count
+            SurvivedHydration = rows.Count,
+            // Only the degraded and disabled paths can leave a filter unapplied. The assisted
+            // path hands every filter to the retriever, which honours all of them.
+            UnappliedFilters = retrieval.Origin == SearchOrigin.Assisted
+                ? []
+                : UnappliedFilters(filters)
         });
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Reads two switches and calls nothing. The generative flag currently tracks the sale card's
+    /// switch, which is the one that governs whether the AI service will write prose for this
+    /// shop at all; when the free-query endpoint gains its own section it joins this condition
+    /// rather than replacing it, since both have to be on for the panel's assisted route to work.
+    /// </remarks>
+    public AiSearchAvailabilityResponse GetAvailability(Guid pointOfSaleId)
+    {
+        var assistedAnswer = _assistOptions.CurrentValue.IsEnabledFor(pointOfSaleId);
+
+        return new AiSearchAvailabilityResponse
+        {
+            PointOfSaleId = pointOfSaleId,
+            SemanticSearchAvailable = _options.CurrentValue.IsEnabledFor(pointOfSaleId),
+            AssistedAnswerAvailable = assistedAnswer,
+
+            // Only the switch can be known without calling. An outage or a rejected credential is
+            // discovered by making a call, and making one here would defeat the purpose.
+            AssistedAnswerUnavailableReason = assistedAnswer ? null : "switched_off"
+        };
     }
 
     /// <summary>
@@ -280,6 +311,7 @@ public class AssistedSearchService : IAssistedSearchService
     /// </summary>
     private async Task<IReadOnlyList<AssistedSearchRow>> DegradedAsync(
         AssistedSearchRequest request,
+        AiSearchFilters filters,
         int take,
         CancellationToken cancellationToken)
     {
@@ -290,7 +322,53 @@ public class AssistedSearchService : IAssistedSearchService
         }
 
         return await _repository.SearchLexicalAsync(
-            terms, request.PointOfSaleId, take, cancellationToken);
+            terms, request.PointOfSaleId, ToDomainFilters(filters), take, cancellationToken);
+    }
+
+    /// <summary>
+    /// Maps the gateway's filter shape to the one the catalog understands.
+    /// </summary>
+    /// <remarks>
+    /// The two are kept apart on purpose. <see cref="AiSearchFilters"/> is the body of a frozen
+    /// external contract and carries fields that only the vector index can answer; the domain
+    /// type carries the two the transactional catalog can. Mapping in one place is what makes
+    /// <see cref="UnappliedFilters"/> computable at all — the fields that fall on the floor here
+    /// are exactly the ones the response has to declare.
+    /// </remarks>
+    private static AssistedSearchFilters ToDomainFilters(AiSearchFilters filters) => new()
+    {
+        Materials = filters.Materials,
+        Category = filters.Category
+    };
+
+    /// <summary>
+    /// The filters the operator selected that a degraded search cannot honour.
+    /// </summary>
+    /// <remarks>
+    /// Family and exclusion lists are properties of the vector index, so the lexical searcher has
+    /// nothing to evaluate them against. Category and materials are <strong>not</strong> listed
+    /// here: they are applied, and a piece missing the profile field they read simply fails the
+    /// filter, which is the filter working rather than failing.
+    ///
+    /// This exists so the screen can say so. A control that stays visibly engaged while the
+    /// results ignore it is the one failure of this capability that misleads without announcing
+    /// itself, and it is the defect that opened this change.
+    /// </remarks>
+    private static List<string> UnappliedFilters(AiSearchFilters filters)
+    {
+        var unapplied = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(filters.FamilyId))
+        {
+            unapplied.Add(nameof(AiSearchFilters.FamilyId));
+        }
+
+        if (filters.ExcludeProductIds.Count > 0)
+        {
+            unapplied.Add(nameof(AiSearchFilters.ExcludeProductIds));
+        }
+
+        return unapplied;
     }
 
     /// <summary>

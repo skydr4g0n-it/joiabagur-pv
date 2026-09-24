@@ -471,6 +471,7 @@ export function SalesAssistCardPage() {
               pitch={response.pitch}
               citations={response.citations}
               clarificationQuestion={response.clarificationQuestion}
+              degradedReason={response.degradedReason}
             />
           )}
 

@@ -142,6 +142,30 @@ public class AssistedSearchResponse
 
     /// <summary>Candidates that survived hydration at this point of sale.</summary>
     public int SurvivedHydration { get; set; }
+
+    /// <summary>
+    /// Filters the operator selected that this search could not apply at all, so the screen can
+    /// say so instead of leaving a control visibly engaged over results that ignore it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Empty on the assisted path, which honours every filter. On the degraded and disabled paths
+    /// it names the ones the lexical searcher has nothing to evaluate against. A category or
+    /// material never appears here: those are applied, and a piece whose enriched profile lacks
+    /// the field simply fails the filter — that is the filter working, not failing.
+    /// </para>
+    /// <para>
+    /// <strong>It is empty in every case this endpoint can currently produce</strong>, and that is
+    /// worth stating rather than leaving to be discovered. The panel's request carries exactly two
+    /// filters and the degraded path now applies both, so there is nothing left to declare. The
+    /// channel is kept because the requirement is a safety net rather than a feature: the failure
+    /// it guards against — a pressed control over results that ignore it — is the one that opened
+    /// this change, and it was invisible precisely because there was nowhere to report it. A
+    /// filter added later that the catalog cannot answer has a place to say so, and the screen
+    /// already knows how to render it.
+    /// </para>
+    /// </remarks>
+    public List<string> UnappliedFilters { get; set; } = [];
 }
 
 /// <summary>

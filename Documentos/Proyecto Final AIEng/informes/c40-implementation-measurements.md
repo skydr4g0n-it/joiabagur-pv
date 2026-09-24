@@ -125,3 +125,64 @@ Ninguna de las clases que rotan es de las que C40 toca: el change trabaja sobre
 `AiCallScope`, `SearchOrigin` y el controlador de búsqueda, y añade clases nuevas para el endpoint de
 consulta libre.
 <!-- GRUPO1-CHURN-FIN -->
+
+---
+
+## 2 · Tramo 1 · la verificación del grupo 2
+
+Las dos puertas de compilación en verde —`dotnet build` y `npm run build`— y las dos suites
+comparadas **por nombres** contra la línea base del grupo 1.
+
+| Suite | Línea base | Tras el grupo 2 | Lectura |
+|---|---|---|---|
+| `backend` | 50 y 51 de 1.241 | **51 de 1.269** | **+28 tests, los 28 nuevos pasan** |
+| `frontend` | 113 de 729, 14 ficheros | **113 de 740, 14 ficheros** | **+11 tests, los 11 nuevos pasan** |
+| `openspec validate --all --strict` | 62 passed, 0 failed | **62 passed, 0 failed** | — |
+
+**Frontend: conjunto de nombres idéntico.** Cero nuevos y cero desaparecidos contra la pasada de
+línea base.
+
+**Backend: tres nombres difieren de la unión de las dos pasadas de línea base, y los tres están en
+`InventoryIntegrationTests`** — la clase que el grupo 1 midió rotando catorce de sus quince nombres
+sin que nadie tocara nada. Cero nombres nuevos fuera de ella. Y el dato que cierra la lectura:
+**cero fallos en cualquier clase que C40 toca** —`AssistedSearch*`, `SalesAssist*`, `AiSearch*`,
+`ProductSearchEvent*`, `AiGateway*`, `AiCallScope*`—. Limpio según el criterio del grupo 1.
+
+La pasada tardó **13 m 11 s** contra los 8 m 58 s de la línea base. El grupo añade seis tests de
+integración con Testcontainers y tres que emiten cuarenta peticiones HTTP, así que el coste está
+explicado; se vigila por si sigue creciendo.
+
+### La regresión que la comparación por nombres cazó, y que el recuento habría escondido
+
+La primera pasada de frontend del grupo 2 dio **117 fallos con cuatro nombres nuevos**, los cuatro en
+`assist-entrances.test.tsx`. Causa: ese fichero mockea `aiSearchService` con un objeto literal, así
+que al añadir `getAvailability` al servicio el panel llamaba a `undefined` y la página no llegaba a
+estabilizarse. Corregido, y barrido el resto de ficheros que mockean ese servicio por si tenían el
+mismo agujero.
+
+Es exactamente el caso de uso de la regla: **117 contra 113 sólo dice «has roto algo»**; los nombres
+dijeron qué, dónde y por qué en un minuto. Queda anotado porque el patrón se repetirá en cada grupo
+que añada un método al servicio del frontend — el mock literal no falla al compilar, falla al
+ejecutar.
+
+### Dos detalles menores que el contacto con el código obligó a decidir
+
+Los dos resueltos con la regla por defecto del diseño —la opción más estrecha que no añade
+migración, no cambia la ficha más allá de `degradedReason`, no retira ni cambia de tipo ningún campo
+del contrato y no suprime ningún dato—, y los dos anotados aquí porque no estaban listados.
+
+**1 · El fragmento C# del ticket para `SearchLexicalAsync` no compila.** Propone pasar
+`AiSearchFilters` —de `Application`— a `IAssistedSearchRepository`, que vive en `Domain`. `Domain` no
+referencia ningún proyecto y `Infrastructure`, donde vive la consulta, referencia sólo a `Domain`, así
+que la firma del ticket invierte la dependencia. **Resuelto** con un tipo `AssistedSearchFilters`
+propio del `Domain` que lleva sólo los dos filtros que el catálogo transaccional puede responder, y el
+mapeo en el único sitio donde la capa de aplicación los construye. Sin migración y sin tocar el
+contrato congelado.
+
+**2 · El escenario «un filtro que no se puede aplicar se declara» no es alcanzable.** La petición del
+panel lleva exactamente dos filtros —categoría y materiales— y la ruta degradada ahora **aplica los
+dos**, así que `unappliedFilters` sale vacío en todos los casos que este endpoint puede producir.
+**Resuelto** construyendo el canal igualmente y documentando que está dormido: el requisito es una red
+de seguridad, y la avería que abrió C40 fue invisible precisamente porque no había dónde reportarla.
+El test se nombró por lo que afirma —que una categoría aplicada **no** se declara sin aplicar— en vez
+de fingir que el canal dispara.

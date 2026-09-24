@@ -149,8 +149,32 @@ const PITCH_MESSAGES: Record<Exclude<PitchStatus, 'generated'>, Omit<PitchMessag
  * claiming a text was delivered when the card does not know what happened would be the worse of
  * the two errors.
  */
-export function pitchMessage(status: PitchStatus): PitchMessage | null {
+/**
+ * A piece the AI service could not process, which is not an outage (C40).
+ *
+ * It is the state of a piece added after the last index synchronisation — one the next
+ * synchronisation fixes by itself, with nobody doing anything. Until the backend began reporting
+ * why it degraded, this arrived looking exactly like a service that had fallen over, so the one
+ * useful thing an operator could know — wait, or sell from the catalog and stop worrying — was
+ * the one thing the screen could not say.
+ */
+const PRODUCT_NOT_INDEXED: Omit<PitchMessage, 'status'> = {
+  title: 'Esta pieza todavía no está preparada',
+  body: 'Es una pieza reciente y el asistente aún no la ha procesado. El precio, las unidades y las variantes que ves son reales y vienen del catálogo.',
+  action: 'Puedes vender con estos datos. Estará lista sin que tengas que hacer nada.',
+};
+
+export function pitchMessage(status: PitchStatus, degradedReason?: string | null): PitchMessage | null {
   if (status === 'generated') return null;
+
+  // Only refines the outage message, and only for this one reason. The other five — a switch, a
+  // rejected credential, an unimplemented route, a genuine outage, an unclassified failure — all
+  // mean the same thing to whoever is standing at the counter: the assistant is not answering.
+  // This one does not, because it resolves itself and needs no action at all.
+  if (status === 'ai_unavailable' && degradedReason === 'product_not_indexed') {
+    return { status, ...PRODUCT_NOT_INDEXED };
+  }
+
   const message = PITCH_MESSAGES[status as Exclude<PitchStatus, 'generated'>];
   if (!message) {
     return {
