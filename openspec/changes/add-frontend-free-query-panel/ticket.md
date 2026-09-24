@@ -103,7 +103,7 @@ corregir, hecha por él mismo.
 | `uncovered` | `ai-service/.../assist/orchestrator.py:311-318` | Se calcula **sólo en la rama anclada** |
 | Vocabulario de la puerta | `ai-service/.../assist/constants.py:283-306` | Siete causas, seis duras. **Ninguna relativa a marcadores** |
 | Artefacto de la pasada de 42 | `ai-service/evals/results/` | **No existe ningún `c40-*.json`**: las cifras del informe son reproducibles pero **no re-puntuables** |
-| Suites | `frontend/` · `backend/` | **Las dos rojas de fábrica**: frontend **113 o 114 de 597** en 14 o 15 de 48 ficheros, con un test dependiente del orden; backend con decenas de fallos preexistentes. `vitest` sale con código 0 al pipearlo |
+| Suites | `frontend/` · `backend/` | **Las dos rojas de fábrica**: frontend **113 de 729** en 14 de 54 ficheros y backend **50 de 1.241** en 17 clases, los dos **medidos en el grupo 1 sobre `93115cf`**. La cifra de frontend que este ticket traía —113 o 114 de 597 en 14 o 15 de 48— era la línea base *de apertura* de C36, y el árbol está en su *cierre*. `vitest` sale con código 0 al pipearlo |
 
 ---
 

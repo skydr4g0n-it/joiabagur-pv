@@ -9,11 +9,11 @@
 
 ## 1. Puerta de entrada
 
-- [ ] 1.1 Medir la **línea base de la suite de backend por nombres de test**: `git stash push -u`, `dotnet test`, volcar los nombres que fallan a un fichero de trabajo, `git stash pop`. Viene roja de fábrica; **se compara el conjunto de nombres, nunca el número**
-- [ ] 1.2 Medir la **línea base de la suite de frontend por nombres**, con la misma maniobra y `npm run test`. Leer **la línea de resumen** y no el código de salida, que al pipear siempre es 0. Anotar que **oscila entre 113 y 114** por un test dependiente del orden
-- [ ] 1.3 Medir la línea base de `ai-service`: `uv run pytest`, que **sí viene verde**, y anotar el recuento
-- [ ] 1.4 Anotar el `sha256` de `ai-service/openapi.json` y guardar una copia de la línea base para la verificación hoja a hoja del grupo 3
-- [ ] 1.5 `openspec validate --all --strict` en verde antes de tocar nada, y anotar el total
+- [x] 1.1 Medir la **línea base de la suite de backend por nombres de test**: `git stash push -u`, `dotnet test`, volcar los nombres que fallan a un fichero de trabajo, `git stash pop`. Viene roja de fábrica; **se compara el conjunto de nombres, nunca el número**
+- [x] 1.2 Medir la **línea base de la suite de frontend por nombres**, con la misma maniobra y `npm run test`. Leer **la línea de resumen** y no el código de salida, que al pipear siempre es 0. Anotar que **oscila entre 113 y 114** por un test dependiente del orden
+- [x] 1.3 Medir la línea base de `ai-service`: `uv run pytest`, que **sí viene verde**, y anotar el recuento
+- [x] 1.4 Anotar el `sha256` de `ai-service/openapi.json` y guardar una copia de la línea base para la verificación hoja a hoja del grupo 3
+- [x] 1.5 `openspec validate --all --strict` en verde antes de tocar nada, y anotar el total
 
 ## 2. Tramo 1 · lo que hoy miente en silencio (sólo .NET y frontend)
 

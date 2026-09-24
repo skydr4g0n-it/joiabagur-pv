@@ -51,11 +51,24 @@ never spend a session "fixing" them without being asked — but never wave them 
 
 | Step | Command |
 |---|---|
-| Measure the baseline first | `git stash push -u`, run the suite, `git stash pop` |
-| Compare | your change is clean if the failing **test names** are the same set, not if the number matches |
+| Measure the baseline first | `git stash push -u`, run the suite, `git stash pop` (on a clean tree, measure HEAD directly) |
+| Compare | your change is clean if the failing **test names** fall in the same set, not if the number matches |
 
 The number alone is unreliable: a handful of these failures are genuinely order-dependent, so
-two runs of identical code disagree. Compare names.
+two runs of identical code disagree. Compare names — **but do not expect the name set to be
+identical either.** Measured on 2026-09-24 over `93115cf`, two full runs of the *same commit*
+without recompiling gave 50 and 51 failures and **fifteen differing names** — 8 appearing, 7
+vanishing, 43 stable. Earlier measurements put it at thirteen, and a rerun of the rotating classes
+over the *same binary* with `--no-build` at ten. The churn is always confined to the same classes —
+`InventoryIntegrationTests`, `PaymentMethodsControllerTests`, `ReturnsControllerTests`; on that
+2026-09-24 run all fifteen were in the first two — so the test that actually means something is:
+**do the differing names fall inside those known-unstable classes, and is your change's own area
+clean?** A new red name in a class you touched is a regression; a new red name in
+`InventoryIntegrationTests` is Tuesday.
+
+And measure the summary line, not the exit code: if something holds `bin/Debug` locked — a
+`JoiabagurPV.API.exe` you left running will — the build fails, **zero tests run, and `dotnet test`
+still exits 0**. Same trap as `vitest` piped, opposite cause.
 
 Two of those failures are traps you will fall into yourself the first time you write a test
 here, because they look like application bugs and are not:
@@ -73,10 +86,11 @@ The full inventory — root causes, and why a tree of 270 tests went unrun for w
 ## Frontend test suite: same story, and it catches people out harder
 
 `npm run test` in `frontend/` **also comes back red before you touch anything**: measured on
-2026-09-22, **113 or 114 failures of 597 tests, across 14 or 15 of the 48 files** — the same commit
-gives both, which is precisely the point (113 of 595 on 2026-09-13; 118 of 482 on 2026-08-29 — the
-suite grew and the red did not). The method is identical to the backend's
-— baseline first, then compare the failing **test names**, never the count.
+2026-09-24 at the head of C40, **113 failures of 729 tests, across 14 of the 54 files** (113 or 114
+of 597 across 14 or 15 of 48 on 2026-09-22, which is the figure this file used to quote — it was
+C36's *opening* baseline and the tree has since moved to C36's close; 113 of 595 on 2026-09-13;
+118 of 482 on 2026-08-29 — the suite grew and the red did not). The method is identical to the
+backend's — baseline first, then compare the failing **test names**, never the count.
 
 **Expect the count to sit at 113 or 114 without anybody having broken anything.** The frontend was
 documented as having a set of names stable between runs, and C36 refuted that: `family-review.test.tsx
