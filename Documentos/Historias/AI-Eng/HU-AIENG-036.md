@@ -332,8 +332,14 @@ consciente**: no hay *streaming* (S3), porque la puerta de marcadores de C34 nec
    `pages/sales/__tests__/cart.test.tsx` como plantilla.
 10. **Specs**: capability nueva del card y `## MODIFIED` de `assisted-search-panel`, con
     `openspec validate --all --strict` en verde.
-11. **Comprobación en la demo**: abrir una ficha real, ver el argumentario con precio y stock
+11. **Comprobación con datos reales**: abrir una ficha real, ver el argumentario con precio y stock
     resueltos, una pregunta con citas y un bloque de familia con varias variantes.
+    *(Ejecutada el 2026-09-24 en el **entorno local**, no en el demo desplegado: mismo código,
+    misma base con el mundo de C10 y el índice de C13, y el mismo `jbg-ai` con credencial real y
+    `STUB_MODE=false`. `compose.demo.yaml` tira de imágenes de ECR y de secretos del almacén de
+    parámetros, que no están en la máquina de desarrollo. Los tres criterios y sus cifras, en el
+    §7 del informe de implementación; la comprobación sobre el demo desplegado queda como el
+    §5.6b de `deploy/demo/README.md` para cuando se despliegue.)*
 12. **Documentación**: `Documentos/epicas.md`, plan de changes, diseño (§15.12 reescrita, §15.13
     ampliada y la limitación nueva de telemetría), `frontend/README.md`, `openspec/DEFERRED_TASKS.md`
     con las dos entradas nuevas.

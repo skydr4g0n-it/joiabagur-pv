@@ -20,18 +20,19 @@ y era un defecto propio. Es el undécimo change consecutivo del que se puede dec
 
 | Puerta | Al abrir (`2b49685`) | Al cerrar | Veredicto |
 |---|---|---|---|
-| Suite de frontend | **114 fallos de 597**, 15 de 48 ficheros | **113 fallos de 729**, 14 de 54 ficheros | **Cero nombres nuevos** |
+| Suite de frontend | **113 o 114 fallos de 597** (§2.1) | **113 fallos de 729**, 14 de 54 ficheros | **Cero nombres nuevos** |
 | `npm run build` | verde, 49,59 s | verde, 1 m 17 s | ✅ |
 | `openspec validate --all --strict` | 61 passed, 0 failed | **61 passed, 0 failed** | ✅ |
 | `sha256` de `ai-service/openapi.json` | `d8d48f87…c2b875` | `d8d48f87…c2b875` | **idéntico** |
-| `git status` fuera de `frontend/`, `openspec/`, `Documentos/` | — | vacío | ✅ |
+| Zona, excluyendo los dos ficheros tocados a propósito | — | vacío | ✅ |
+| Cobertura del código nuevo (≥ 70 %) | — | **84–100 % sentencias**, 70–100 % ramas | ✅ |
 
 El contrato congelado: `d8d48f87b279d45d22bce80a67c4fd51caef6e679363c413f5b697c99ec2b875`, el mismo
-al abrir y al cerrar. `git diff --name-only 2b49685..HEAD | grep -v "^frontend/\|^openspec/\|^Documentos/"`
+al abrir y al cerrar. `git diff --name-only 2b49685..HEAD | grep -v "^frontend/\|^openspec/\|^Documentos/\|^CLAUDE.md\|^backend/README.md"`
 no devuelve nada: **`backend/`, `ai-service/`, `terraform/` y `.github/` no se tocan**, y no hay
 migración de EF Core.
 
-La ruta entra con **carga perezosa**: el paquete la emite como `assist-IrexYqQQ.js`, aparte del
+La ruta entra con **carga perezosa**: el paquete la emite como `assist-<hash>.js`, aparte del
 `index`.
 
 ### La comparación válida, que es por nombres
@@ -62,6 +63,31 @@ fichero. Es el tercer caso que este proyecto registra —tras C16 y C18b— y co
 **132 tests nuevos**, todos verdes (597 → 729). Seis ficheros nuevos, ninguno construido sobre uno
 que ya viniera rojo.
 
+### La cobertura, medida al verificar (2026-09-24)
+
+El apply no la midió y el informe salió sin la cifra, que es lo que la verificación reprochó: el
+umbral del proyecto —70 % sentencias, líneas y funciones, 60 % ramas— está en
+[`project.md`](../../../openspec/project.md) y codificado en `frontend/vite.config.ts`. Medida sobre
+los seis ficheros de test nuevos:
+
+| Fichero | Sentencias | Ramas | Funciones | Líneas |
+|---|---|---|---|---|
+| `lib/assist-copy.ts` | **100** | **100** | **100** | **100** |
+| `services/sales-assist.service.ts` | 95,65 | 70,58 | 100 | 100 |
+| `pages/sales/assist.tsx` | 92,72 | 89,77 | 100 | 95,87 |
+| `components/sales/sales-assist-card/` | **91,04** | **82,29** | **95,83** | **95,16** |
+| ├ `warnings-block.tsx` | 100 | 100 | 100 | 100 |
+| ├ `pitch-block.tsx` | 100 | 93,75 | 100 | 100 |
+| ├ `piece-header.tsx` | 100 | 81,25 | 100 | 100 |
+| ├ `question-box.tsx` | 90,47 | 80 | 100 | 100 |
+| ├ `substitutes-block.tsx` | 88,23 | 76,92 | 100 | 87,5 |
+| ├ `family-block.tsx` | 84,61 | 79,16 | 80 | 91,66 |
+| └ `index.ts` | 0 | 0 | 0 | 0 |
+
+Todo lo que lleva lógica pasa el umbral, y la mayoría con holgura. **El único 0 % es el `index.ts` del
+barril**: quince líneas de `export ... from`, que `v8` no cuenta como ejecutadas porque el empaquetador
+las resuelve en tiempo de importación. No es lógica sin probar, y por eso no se persigue.
+
 ---
 
 ## 2 · Las cuatro refutaciones
@@ -83,6 +109,15 @@ base y pasó al cierre**, sin que este change tocara ni ese fichero ni el suyo d
 Es decir: **no es una regresión acumulada, es un test dependiente del orden**. La suite creció en 6
 ficheros y eso desplazó el orden de ejecución, que es exactamente el fenómeno que
 `testing-frontend.md` documenta para `assisted.test.tsx` en C16 y C18b.
+
+**Y la verificación del 2026-09-24 lo confirmó por la vía dura: regeneró la línea base** en un
+worktree sobre `2b49685` y obtuvo **113 fallos en 14 ficheros, no 114 en 15** — el test de
+`family-review` pasó también allí, así que en esa pasada el conjunto de nombres de la línea base y el
+del cierre son **idénticos**, con cero nuevos y cero arreglados. Mismo commit, mismo código, dos
+respuestas: la conclusión de este apartado se refuerza en vez de contradecirse, y la consecuencia
+práctica es más fuerte de lo que estaba escrito — **el recuento no sirve ni siquiera como línea base,
+sólo el conjunto de nombres**. El 114 de 597 de la tabla del §1 es la cifra de la pasada del apply, no
+una propiedad del commit.
 
 **Consecuencia para la documentación.** La afirmación de que *«aquí el conjunto de fallos sí es
 estable entre ejecuciones»* es **demasiado fuerte**: hay al menos un test dependiente del orden en el
@@ -107,9 +142,18 @@ el primero de la lista al recibir el producto—. De las tres entradas, **sólo 
 
 **Cómo se resolvió, y por qué no hizo falta cambiar el diseño.** La entrada de escaneo navega **sin
 estado** y la ficha cae en su selector de respaldo por rol, que es exactamente lo que la Q-6 del
-design manda para una ficha abierta en frío. La spec no se toca: su escenario dice *«se abre para el
-punto de venta de esa venta»*, y en el escaneo esa venta todavía no tiene punto de venta elegido. **El
-ticket sí se corrige**, en el mismo commit que el código.
+design manda para una ficha abierta en frío. **El ticket se corrige**, en el mismo commit que el
+código.
+
+**Y la spec también, al verificar (2026-09-24).** El apply decidió no tocarla, razonando que su
+escenario —*«se abre para el punto de venta de esa venta»*— era vacuo en el escaneo, porque esa venta
+todavía no tiene punto de venta elegido. La verificación lo rechazó, y con razón: archivar convierte
+esa delta en spec viva, y un `THEN` **insatisfacible** se queda como verdad del proyecto — el mismo
+patrón que las tres specs malformadas que sobrevivieron hasta el 2026-08-06. El escenario ahora dice
+que la ficha **abre con el selector por rol, porque el flujo de escaneo aún no ha elegido tienda**, y
+el cuerpo del requisito nombra cuáles de las tres entradas llevan una y cuáles no. Es lo que el test
+afirmaba desde el principio: `expect(navigate).toHaveBeenCalledWith('/sales/new/assist/prod-9')`, sin
+estado, y sin punto de venta.
 
 ### 2.3 · Cambiar de punto de venta con la ficha servida no pedía nada, y dejaba precios de una tienda bajo el nombre de otra
 
@@ -129,7 +173,18 @@ piden nada; que el operario nombre otra tienda es un **acto explícito**, como n
 que pide es otra ficha. Los sustitutos se limpian cuando la pieza nueva sí tiene existencias.
 
 **No contradice la spec**, que prohíbe emitir otra petición *«como consecuencia de re-renderizar, de
-que llegue la respuesta, o de cualquier fallo»*. Un cambio de tienda no es ninguna de las tres.
+que llegue la respuesta, o de cualquier fallo»*. Un cambio de tienda no es ninguna de las tres, y las
+tres se comprobaron una a una sobre el código de la guarda.
+
+**Pero la spec tampoco lo amparaba, y eso se corrigió al verificar (2026-09-24).** No contradecirla no
+es lo mismo que estar en ella: el titular del requisito decía *«exactly one … per visit»*, la pregunta
+del cliente tenía su propio permiso en un requisito aparte, y el cambio de tienda —con test propio,
+`should ask again when the operator names a different point of sale`— no aparecía en ninguno. Archivar
+habría dejado un comportamiento probado y sin requisito que lo describa. El requisito pasa a llamarse
+*«… on entry to the card … and only an explicit act issues another»*, gana el párrafo que nombra el
+cambio de tienda como el segundo de los dos únicos actos que piden otra ficha, y gana el escenario
+*«Naming a different point of sale asks again»*. **La conducta no cambia; lo que cambia es que ahora
+está escrita.**
 
 ### 2.4 · La cabecera de la ficha decía «en esta tienda», y el defecto era mío
 
@@ -166,6 +221,11 @@ Tres tests nuevos, y los tres caen al romper la guarda a mano.
 El commit de los artefactos dice *«tasks: 9 grupos, 45 tareas»*. Contadas: 4 + 3 + 3 + 7 + 6 + 4 + 12
 + 6 + 5 = **50**. No cambia nada del trabajo; se anota porque el recuento se cita en el commit.
 
+**Y un segundo recuento del mismo mensaje, encontrado al verificar:** dice *«11 requisitos y 40
+escenarios para la ficha»*. Contados: **37** —38 tras el escenario que la verificación añadió en el
+§2.3—. El requisito sí son 11. Tampoco cambia nada del trabajo, y se anota por lo mismo: el mensaje
+de un commit no se reescribe, así que la cifra correcta tiene que vivir aquí.
+
 ---
 
 ## 3 · Las mutaciones de control
@@ -191,7 +251,7 @@ piden: el retorno temprano ocurre antes de poner el estado `not-requested`, así
 El test no comprueba sólo que no se pida — comprueba que **se explique por qué**. Callarse leería como
 una pieza sin alternativas, que es una afirmación distinta y falsa.
 
-Tras revertir las tres: **129 de 129 en verde** en los seis ficheros nuevos, y `git status` limpio.
+Tras revertir las tres: **132 de 132 en verde** en los seis ficheros nuevos, y `git status` limpio.
 
 ---
 
@@ -236,7 +296,7 @@ cubría:
 | `routing/routes.tsx` · `app-routing-setup.tsx` | 9 | `SALES.ASSIST(productId)` y la ruta con carga perezosa |
 | `components/sales/assisted-search-result-row.tsx` | +39 | La acción secundaria, **opcional**, sin tocar la firma de `onSelect` |
 | `pages/sales/new.tsx` · `scan.tsx` | +103 | Las otras dos entradas |
-| Tests (6 ficheros) | 2 212 | 129 tests |
+| Tests (6 ficheros) | 2 212 | 132 tests |
 
 **Ningún componente de interfaz nuevo.** `card`, `badge`, `alert`, `collapsible`, `skeleton`,
 `textarea`, `select` y `button` ya estaban en la plantilla, como el ticket anticipaba.
@@ -367,8 +427,13 @@ sha256sum ai-service/openapi.json
 #   → d8d48f87b279d45d22bce80a67c4fd51caef6e679363c413f5b697c99ec2b875
 
 # La zona
-git diff --name-only 2b49685..HEAD | grep -v "^frontend/\|^openspec/\|^Documentos/"
-#   → (vacío)
+git diff --name-only 2b49685..HEAD | grep -v "^frontend/\|^openspec/\|^Documentos/\|^CLAUDE.md\|^backend/README.md"
+#   → (vacío)   ← CLAUDE.md y backend/README.md están tocados a propósito (§2.1 y §7),
+#                 y por eso van excluidos: sin excluirlos el comando devuelve esos dos.
+
+# La cobertura del código nuevo (§1)
+npx vitest run --coverage src/lib/assist-copy.test.ts src/services/sales-assist.service.test.ts src/pages/sales/__tests__/assist.test.tsx src/pages/sales/__tests__/assist-entrances.test.tsx src/pages/sales/__tests__/new-assist-card-entrance.test.tsx src/components/sales/__tests__/assisted-search-row-card-action.test.tsx
+#   → 132 tests, 0 fallando; assist-copy 100 %, assist.tsx 92,72 %, la carpeta del card 91,04 %
 
 # Las specs
 openspec validate --all --strict

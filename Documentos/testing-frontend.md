@@ -295,9 +295,9 @@ describe('ProductCard', () => {
 **482 tests, 118 fallos, en 17 de los 40 ficheros.** Duración: 252 s.
 
 > **Re-medido el 2026-09-22, al implementar C36: la línea base da 597 tests, 114 fallos, en 15 de
-> 48 ficheros, y al cierre 726 tests, 113 fallos, en 14 de 54.** Los 129 tests de más son de C36 y
-> están los 129 en verde. La comparación por nombres salió **subconjunto estricto**: **cero nombres
-> nuevos** y **uno que dejó de fallar**.
+> 48 ficheros, y al cierre **729** tests, 113 fallos, en 14 de 54.** Los **132** tests de más son de
+> C36 y están los 132 en verde. La comparación por nombres salió **subconjunto estricto**: **cero
+> nombres nuevos** y **uno que dejó de fallar**.
 >
 > **Y ese uno obliga a matizar el párrafo siguiente.** Es
 > `pages/admin/__tests__/family-review.test.tsx :: should create a family with its members from the
@@ -310,7 +310,13 @@ describe('ProductCard', () => {
 > fuerte**: hay al menos un test dependiente del orden en el frontend, igual que en el backend, sólo
 > que uno y no un puñado. **El método no cambia** —comparar por nombres sigue dando una respuesta
 > binaria y útil—, pero conviene esperar que el recuento oscile entre **113 y 114** sin que nadie haya
-> roto nada. Detalle en
+> roto nada.
+>
+> **Y la verificación de C36 (2026-09-24) lo volvió a medir sobre el mismo commit de línea base**
+> —regenerado en un worktree sobre `2b49685`— **y dio 113 fallos en 14 ficheros, no 114 en 15**: el
+> test de `family-review` pasó también allí. Mismo commit, mismo código, dos respuestas. Refuerza la
+> conclusión en vez de contradecirla, y es la razón por la que el recuento no sirve ni como línea base.
+> Lo que se mantuvo idéntico en las dos mediciones: **cero nombres nuevos**. Detalle en
 > `Documentos/Proyecto Final AIEng/informes/c36-implementation-measurements.md` §2.1.
 
 > **Re-medido el 2026-09-13, al cerrar C28: 595 tests, 113 fallos, en 14 de 48 ficheros.** La suite

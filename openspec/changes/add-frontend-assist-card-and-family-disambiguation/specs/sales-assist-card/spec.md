@@ -4,7 +4,7 @@
 
 The frontend SHALL expose the sale card on a lazily loaded route of its own under the sales tree, anchored to one product identifier, and MUST reach it from the assisted search result row, from the product chosen on the manual sale page, and from the piece resolved by scanning a code.
 
-The point of sale MUST travel to the card through navigation state, the same mechanism the scanning, image recognition and assisted search pages already use. When the route is opened without it, the card MUST offer the same role-resolved point-of-sale selector the assisted search panel offers, and MUST NOT issue any request until one is chosen.
+The point of sale MUST travel to the card through navigation state, the mechanism the scanning, image recognition and assisted search pages already use to hand a product over. Only the assisted search panel and the manual sale page hold one to pass: the scanning page has never had a point of sale of its own, so nothing travels from it. When the route is opened without one, the card MUST offer the same role-resolved point-of-sale selector the assisted search panel offers, and MUST NOT issue any request until one is chosen.
 
 The card MUST NOT be reachable from the catalog's product detail page, which is an administration screen with no point of sale to scope the request to.
 
@@ -16,7 +16,7 @@ The assisted search result row MUST gain this as a secondary action that neither
 
 #### Scenario: The card is reached from a scanned piece
 - **WHEN** the operator scans a code and activates the sale card action
-- **THEN** the card for the resolved product opens for the point of sale of that sale
+- **THEN** the card for the resolved product opens with the role-resolved point-of-sale selector, because the scan flow has not chosen a point of sale yet
 
 #### Scenario: The card is reached from the manual sale page
 - **WHEN** a product is selected on the manual sale page and the operator activates the sale card action
@@ -27,13 +27,15 @@ The assisted search result row MUST gain this as a secondary action that neither
 - **THEN** a point-of-sale selector is displayed according to the caller's role
 - **AND** no request is issued until one is chosen
 
-### Requirement: Exactly one assist request is issued per visit to the card, and a failed one is never retried automatically
+### Requirement: Exactly one assist request is issued on entry to the card, a failed one is never retried automatically, and only an explicit act issues another
 
-The card SHALL issue exactly one sale assistance request per visit, on entry, and MUST NOT issue another as a consequence of re-rendering, of the response arriving, or of any failure.
+The card SHALL issue exactly one sale assistance request on entry to each visit, and MUST NOT issue another as a consequence of re-rendering, of the response arriving, or of any failure.
 
 A failed request MUST offer the operator an explicit retry and MUST NOT be retried on its own, because the route costs a paid provider call, its budget is limited per user and per minute, and its responses cannot be cached.
 
 Leaving the card and entering again MUST count as another visit and MUST issue another request. A response that is no longer the current one MUST be discarded rather than rendered.
+
+Naming a different point of sale while the card is served MUST issue another request, scoped to the shop just named. It is an explicit act of the operator, like navigating here in the first place, and not one of the three causes above; the card it asks for is a different card, and leaving the previous shop's price, units and variants under the new shop's name would be the screen stating something false. Within one visit, the only acts that MAY issue a further request are this one, the explicit retry of a failed request, and the customer's question that the next requirement governs.
 
 While the request is in flight the card MUST display a loading state rather than an empty screen.
 
@@ -50,6 +52,11 @@ While the request is in flight the card MUST display a loading state rather than
 - **WHEN** a response arrives for a request that is no longer the current one
 - **THEN** it is discarded
 - **AND** the displayed content does not change
+
+#### Scenario: Naming a different point of sale asks again
+- **WHEN** the operator names a different point of sale while the card is served
+- **THEN** another sale assistance request is issued, scoped to the shop just named
+- **AND** the content served for the previous shop is replaced rather than left on screen
 
 ### Requirement: The customer's question is a second explicit request, bounded, and never written into the address of the page
 
