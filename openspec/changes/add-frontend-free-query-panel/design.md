@@ -96,6 +96,14 @@ integridad, activa sólo cuando no hay pieza anclada, lo convierte en garantía.
 la puerta es la garantía: **un guardarraíl es código, no una frase en el prompt**. Y hace la frecuencia
 **medible partida por causa**, que es como este repositorio lee su puerta desde C30b.
 
+> **Medido en el grupo 4.7, y matiza esta decisión sin anularla.** El diagrama de arriba extrapola el
+> 147/213 y el 188/213 de los modos **anclados** al modo libre. Sobre 90 consultas contra el proveedor
+> real, `v3` escribió `{{price}}` **2 veces** y `{{stock}}` **1** — 2 de 90 generaciones, no la mayoría.
+> El eslabón que de verdad impedía la prosa era el **tercero**, el guardia de la pasarela, que rechazaba
+> M1 al 100 %. Las dos piezas siguen haciendo falta —la tasa de rechazo del modo libre cae de **8,9 % a
+> 0 %** y la causa propia hace observable lo que antes era una caída sin explicación—, pero la magnitud
+> del riesgo que evitan era **treinta veces menor** que la predicha.
+
 | Alternativa | Por qué no |
 |---|---|
 | Sólo el prompt, sin puerta | Si el modelo escribe el marcador de todas formas, .NET retira el argumentario y **nadie ve por qué**: no hay causa que partir en el barrido |

@@ -74,6 +74,16 @@ Python**, saltándose esa etapa, así que su «37 respuestas con argumentario» 
 entregaría. **Sin el tramo 2 completo, C40 entrega un panel asistido sin prosa** — la avería que vino a
 corregir, hecha por él mismo.
 
+> **MEDIDO EN EL GRUPO 4.7, Y CORRIGE ESTE PÁRRAFO.** El tercer eslabón —el guardia de la pasarela—
+> es real y **total**: rechazaba M1 al 100 %, y es lo que de verdad impedía la prosa. El primero
+> **no se traslada**: extrapolar el 69 % / 88,3 % de los modos anclados al modo libre predecía que
+> «la mayoría de los argumentarios de M1 se retirarían», y sobre 90 consultas contra el proveedor
+> real `v3` escribió `{{price}}` **2 veces** y `{{stock}}` **1**, en 2 de 90 generaciones. Anclado
+> hay una pieza y se la vende; en libre hay hasta quince y lo que se pide es comparar. La regla lo
+> permitía, la tarea no lo pedía. `v5` y la causa dura siguen valiendo —la tasa de rechazo del modo
+> libre cae de **8,9 % a 0 %**— pero por esa magnitud, no por la predicha. Las dos cifras y sus
+> artefactos, en [c40-implementation-measurements.md](../../../Documentos/Proyecto%20Final%20AIEng/informes/c40-implementation-measurements.md).
+
 ### Estado actual del código, verificado en el repositorio (2026-09-24, `810dd70`)
 
 | Pieza | Fichero | Estado |

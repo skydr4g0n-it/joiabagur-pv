@@ -300,3 +300,111 @@ cuerpo exacto— y el que yo había escrito, ahora
 | Fallos en clases que C40 toca | 0 | **0** |
 
 Limpio según el criterio del grupo 1.
+
+---
+
+## 4 · Tramo 2 · el recuento de marcadores, antes y después de `v5` (grupo 4.7)
+
+**La cifra que decide si M1 tiene prosa**, y la primera de las cinco comprometidas. Medida contra
+el proveedor real, el índice real y el corpus real, desde el contenedor de Compose.
+
+### El método, y por qué es una comparación y no dos anécdotas
+
+`free_query_gate.py` gana `--prompt-version`, que inyecta el texto y la versión en
+`generate_pitch` —que ya los aceptaba **en pareja**, precisamente para que nadie estampe una
+respuesta con un prompt que no llegó al modelo—. Las dos pasadas comparten **código, índice,
+corpus, punto de venta, modelos y consultas**: lo único que cambia es el prompt.
+
+El recuento se hace sobre el **primer intento**, antes de cualquier reparación, y se **cuenta sin
+almacenar**: el argumentario es contenido que la ruta de servicio no puede persistir; un recuento
+no lo es.
+
+**Población: las 90 consultas del conjunto etiquetado que pueden generar** —48 `catalog`, 32
+`knowledge`, 10 `both`—. El ticket habla de «las 42 consultas», que son las 32 `eval_question`
+más las 10 `both`; se miden las 90 porque **excluir `catalog` dejaría fuera la ruta donde el
+precio tiene sentido**, que es justo lo que la medición busca. El desglose por ruta está en los
+artefactos, así que la lectura de 42 sigue siendo derivable.
+
+### Las dos cifras
+
+| | `assist/v3` (antes) | `assist/v5` (después) |
+|---|---|---|
+| Consultas | 90 | 90 |
+| Generaciones | 90 | 89 |
+| **`{{price}}` en el argumentario** | **2** | **0** |
+| **`{{stock}}` en el argumentario** | **1** | **0** |
+| Generaciones con algún marcador | **2 · 2,2 %** | **0** |
+| Retiradas por la puerta | 8 | **0** |
+| Tasa de rechazo del modo libre | **8,9 %** | **0 %** |
+| Degradaciones del enrutador | 0 | 0 |
+| Errores | 0 | 0 |
+
+Artefactos persistidos con `run_id`, `git_sha` y `prompt_version`:
+`evals/results/c40-placeholders-before-v3-ed9ee934e8c6.json` y
+`c40-placeholders-after-v5-53f4759f200f.json`.
+
+**Los dos casos con marcador de `v3` estaban los dos en la ruta `both`** (`b02`, `b04`), ninguno
+en `catalog` ni en `knowledge`.
+
+### Lo que esta medición refuta, y hay que decirlo
+
+El ticket y el diseño razonan así: `v3` ordena escribir los marcadores en **las seis** tareas →
+C30b midió `{{price}}` en **147 de 213 · 69 %** y `{{stock}}` en **188 de 213 · 88,3 %** en los
+modos anclados → luego, sin `v5`, «**la mayoría de los argumentarios de M1 se retirarían**».
+
+**Medido: 2 de 90 y 1 de 90.** La proporción de los modos anclados **no se traslada al modo
+libre**, y no por poco: 69 % contra 2,2 %, un factor de treinta.
+
+La explicación que el propio prompt sugiere: en el modo anclado hay **una** pieza y la tarea
+invita a venderla, así que nombrar su precio es natural y el marcador aparece. En el modo libre
+hay hasta quince piezas agrupadas y la tarea pide **comparar**, no vender una; el modelo
+prácticamente nunca llega a nombrar un precio. La regla invariante lo **permitía**; la tarea no
+lo **pedía**.
+
+**Lo que esto no cambia, y conviene no sobrecorregir:**
+
+- **El guardia de `AiGatewayClient` rechazaba M1 al 100 %.** Eso era real, medible y total, y es
+  lo que de verdad impedía que el argumentario llegara al operario. La cadena tenía tres
+  eslabones y el que mordía era el tercero, no el primero.
+- **`v5` sigue justificado, con otra magnitud.** Dos argumentarios de noventa retirados es
+  pérdida evitable, y la causa dura convierte la frecuencia en algo **partido por causa** en vez
+  de una caída inexplicada. La tasa de rechazo del modo libre cae de **8,9 % a 0 %**.
+- **La cuarta tarea funciona contra el corpus real**: disparó una vez (`b05`, ruta `both`, cero
+  citas) y generó correctamente. Con `v3` esa misma consulta cayó a `free_query_both` —registrado
+  en `task_fallbacks`— y corrió la tarea que dice «apóyate en esos fragmentos» **sin fragmentos**.
+
+**Corrección que esto obliga en los artefactos:** la frase «sin el tramo 2 completo, C40 entrega
+un panel asistido sin prosa» **es cierta**, pero por el guardia de la pasarela, no por la
+frecuencia de marcadores. La predicción de que «la mayoría se retirarían» era una extrapolación
+de una población a otra y **la medición la desmiente**. Queda corregida en `ticket.md`, en
+`design.md` y en la cabecera de `prompts/assist/v5.md`.
+
+### Dos averías del arnés que esta medición destapó
+
+1. **`free_query_gate.py` no podía correr en un contenedor.** Fijaba
+   `asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())` **sin condición**, y ese
+   atributo no existe en Linux. Los otros tres módulos del arnés ya estaban protegidos; éste era
+   el único. Corregido con el guardia de la casa.
+2. **Su `--pos-id` por defecto apunta a un punto de venta de proyección vacía**, lo que aborta
+   cada consulta con `RetrievalDependencyError`. En esta base el poblado es
+   `0388f003-2ffd-4d4c-8d7a-9a7466b36ca4`, con 1.082 productos asignados.
+
+Y una **pasada descartada**: la primera, con `--delay 0.3`, agotó el cupo de `gpt-4o` a partir de
+la consulta 16 y degradó **46 de 90** con `RateLimitError`, todas al *fail-open*. Publicar desde
+ahí habría sido medir el cupo del proveedor y no el prompt. Repetida con `--delay 4`: cero
+degradaciones.
+
+### El PEM del host, montado y verificado
+
+CLAUDE.md dice que `litellm` sale por el bundle de `certifi` y que hay un MITM de Norton cuya
+raíz vive sólo en el almacén de Windows. Verificado, y sin ambigüedad:
+
+```
+certifi          FALLA SSLCertVerificationError: unable to get local issuer certificate
+windows-roots    OK   emisor=Norton Web/Mail Shield Root
+```
+
+El bundle se construye concatenando `certifi` con `LocalMachine` y `CurrentUser` × `ROOT`/`CA`/
+`AuthRoot` —131 certificados únicos— **sin filtrar por bandera de confianza**, porque la raíz de
+Norton no la lleva. Y se confirma la otra mitad del documento: **desde el contenedor los
+embeddings y la generación funcionan sin PEM ninguno**, que es por lo que la medición se hizo ahí.

@@ -41,7 +41,7 @@
 - [x] 4.4 Extender `resolve_task` con la cuarta entrada y su selección. Test: `test_free_query_without_corpus_uses_the_uncovered_task`
 - [x] 4.5 Añadir `CAUSE_PLACEHOLDER_IN_FREE_QUERY` al vocabulario y a las **causas duras**, comprobada **sólo** cuando `product_id is None`. Tests: `test_placeholder_in_free_query_withholds_the_argument`, `test_anchored_mode_placeholder_is_not_a_violation`, `test_sweep_reports_placeholder_cause_apart`
 - [x] 4.6 **Retirar el guardia** de `AiGatewayClient` que rechaza la consulta libre, y dejar el rechazo sólo para una petición **sin ningún ancla**. Tests: `AssistSaleAsync_WithQueryAndNoProduct_IssuesTheRequest`, `AssistSaleAsync_WithNeitherAnchor_ThrowsBeforeAnyRequest`
-- [ ] 4.7 **La medición que decide si M1 tiene prosa**: pasada sobre las 42 consultas del conjunto etiquetado con `STUB_MODE=false`, contando `{{price}}` y `{{stock}}` en el texto generado **antes y después de `v5`**. Publicar las dos cifras y **persistir el artefacto** con `run_id`, `git_sha` y `prompt_version` en `ai-service/evals/results/`
+- [x] 4.7 **La medición que decide si M1 tiene prosa**: pasada sobre las 42 consultas del conjunto etiquetado con `STUB_MODE=false`, contando `{{price}}` y `{{stock}}` en el texto generado **antes y después de `v5`**. Publicar las dos cifras y **persistir el artefacto** con `run_id`, `git_sha` y `prompt_version` en `ai-service/evals/results/`
 
 ## 5. Tramo 2 · el endpoint de la consulta libre
 
