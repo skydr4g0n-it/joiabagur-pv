@@ -355,6 +355,17 @@ async def assist_sale(
                 distance_threshold=threshold,
                 trace_id=principal.trace_id,
             )
+            # **The guardrail M3 has had since C34, finally applied to M1.** Reads the result
+            # already computed — no second search and no provider call — exactly as the
+            # anchored branch does above.
+            #
+            # Only on the two routes that asked the corpus a question. On `catalog` an empty
+            # citation list is the normal and correct state rather than a gap: that route is
+            # answered from pieces, and its own task section already tells the model to return
+            # no citations. Reporting "the documentation does not cover this" for a query that
+            # never asked the documentation anything would be a warning about nothing.
+            if route in ("knowledge", "both"):
+                uncovered = not citations
         if groups:
             # The warnings describe the piece the response leads with. Reading the focus
             # piece costs one primary-key lookup and is the same read the anchored modes
@@ -623,7 +634,10 @@ def _task_of(
     route = routing.route
     if route is None:
         return None
-    return resolve_task(mode, route=route)
+    # `uncovered` travels here too since C40. Before it did not, and a knowledge question with
+    # no fragments ran the task that says "answer using those fragments" with no fragments —
+    # an explicit invitation to answer from memory, in the mode C40 puts on screen.
+    return resolve_task(mode, route=route, uncovered=uncovered)
 
 
 def _cited(

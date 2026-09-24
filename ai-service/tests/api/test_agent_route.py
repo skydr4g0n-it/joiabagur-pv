@@ -383,7 +383,7 @@ def test_the_deterministic_route_answers_exactly_what_it_answered_before(
     for added in ("partial", "stop_reason", "iterations", "tool_calls_used", "trace"):
         assert added not in body
     assert "calls" not in body["usage"], "the shared usage object did not grow a field"
-    assert body["prompt_version"] == PROMPT_VERSION == "assist/v3"
+    assert body["prompt_version"] == PROMPT_VERSION == "assist/v5"
     assert MAX_PROVIDER_CALLS == 3, "the deterministic ceiling is the one C31 published"
 
 

@@ -35,12 +35,12 @@
 
 ## 4. Tramo 2 · el argumentario de M1 (PRERREQUISITO, no se corta)
 
-- [ ] 4.1 Escribir `ai-service/prompts/assist/v5.md`: las tres tareas de consulta libre **prohíben hablar de precio y de disponibilidad** y no piden marcadores; el lenguaje comparativo sin cifra sigue permitido. Fijar la versión al fichero como ya hace `v3`
-- [ ] 4.2 Añadir la **cuarta tarea** de consulta libre, «sin cobertura», con la misma regla que la anclada: no contestar de memoria, no esquivar con una generalidad, no citar nada
-- [ ] 4.3 Calcular `uncovered` también en el modo libre para las rutas de conocimiento y mixta, emitiendo `knowledge_not_covered`, **sin llamada adicional al proveedor**. Tests: `test_free_query_knowledge_without_corpus_declares_it`, `test_free_query_uncovered_costs_no_extra_provider_call`
-- [ ] 4.4 Extender `resolve_task` con la cuarta entrada y su selección. Test: `test_free_query_without_corpus_uses_the_uncovered_task`
-- [ ] 4.5 Añadir `CAUSE_PLACEHOLDER_IN_FREE_QUERY` al vocabulario y a las **causas duras**, comprobada **sólo** cuando `product_id is None`. Tests: `test_placeholder_in_free_query_withholds_the_argument`, `test_anchored_mode_placeholder_is_not_a_violation`, `test_sweep_reports_placeholder_cause_apart`
-- [ ] 4.6 **Retirar el guardia** de `AiGatewayClient` que rechaza la consulta libre, y dejar el rechazo sólo para una petición **sin ningún ancla**. Tests: `AssistSaleAsync_WithQueryAndNoProduct_IssuesTheRequest`, `AssistSaleAsync_WithNeitherAnchor_ThrowsBeforeAnyRequest`
+- [x] 4.1 Escribir `ai-service/prompts/assist/v5.md`: las tres tareas de consulta libre **prohíben hablar de precio y de disponibilidad** y no piden marcadores; el lenguaje comparativo sin cifra sigue permitido. Fijar la versión al fichero como ya hace `v3`
+- [x] 4.2 Añadir la **cuarta tarea** de consulta libre, «sin cobertura», con la misma regla que la anclada: no contestar de memoria, no esquivar con una generalidad, no citar nada
+- [x] 4.3 Calcular `uncovered` también en el modo libre para las rutas de conocimiento y mixta, emitiendo `knowledge_not_covered`, **sin llamada adicional al proveedor**. Tests: `test_free_query_knowledge_without_corpus_declares_it`, `test_free_query_uncovered_costs_no_extra_provider_call`
+- [x] 4.4 Extender `resolve_task` con la cuarta entrada y su selección. Test: `test_free_query_without_corpus_uses_the_uncovered_task`
+- [x] 4.5 Añadir `CAUSE_PLACEHOLDER_IN_FREE_QUERY` al vocabulario y a las **causas duras**, comprobada **sólo** cuando `product_id is None`. Tests: `test_placeholder_in_free_query_withholds_the_argument`, `test_anchored_mode_placeholder_is_not_a_violation`, `test_sweep_reports_placeholder_cause_apart`
+- [x] 4.6 **Retirar el guardia** de `AiGatewayClient` que rechaza la consulta libre, y dejar el rechazo sólo para una petición **sin ningún ancla**. Tests: `AssistSaleAsync_WithQueryAndNoProduct_IssuesTheRequest`, `AssistSaleAsync_WithNeitherAnchor_ThrowsBeforeAnyRequest`
 - [ ] 4.7 **La medición que decide si M1 tiene prosa**: pasada sobre las 42 consultas del conjunto etiquetado con `STUB_MODE=false`, contando `{{price}}` y `{{stock}}` en el texto generado **antes y después de `v5`**. Publicar las dos cifras y **persistir el artefacto** con `run_id`, `git_sha` y `prompt_version` en `ai-service/evals/results/`
 
 ## 5. Tramo 2 · el endpoint de la consulta libre

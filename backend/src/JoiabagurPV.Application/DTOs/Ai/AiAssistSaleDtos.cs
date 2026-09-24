@@ -5,11 +5,15 @@ namespace JoiabagurPV.Application.DTOs.Ai;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Only the two anchored modes are ever sent from here: a product alone (M2) or a product with
-/// the operator's question (M3). The contract also accepts a free query with no product, and
-/// this client refuses to issue one: the placeholders of the generated argument carry no
-/// reference to a product, so with several pieces on the table there is nothing to resolve
-/// them against.
+/// All three modes are sent from here since C40: a product alone (M2), a product with the
+/// operator's question (M3), and a query with no product at all (M1). The client requires
+/// **at least** one anchor, matching the contract, and refuses only a request carrying neither.
+///
+/// M1 was refused until C40, and the reason was sound while it held: the generated argument
+/// carried `{{price}}` and `{{stock}}`, which name no product, so with several pieces on the
+/// table there was nothing to resolve them against. `assist/v5` stops asking for placeholders
+/// in the free-query tasks and a hard cause in the service's integrity gate makes that a
+/// guarantee, so there is no longer anything to protect against.
 /// </para>
 /// <para>
 /// The frozen contract accepts an optional <c>pos_id</c> in the body and ignores it, because

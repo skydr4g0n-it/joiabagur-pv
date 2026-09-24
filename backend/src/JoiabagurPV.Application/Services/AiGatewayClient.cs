@@ -665,14 +665,22 @@ public class AiGatewayClient : IAiGatewayClient
                 nameof(scope));
         }
 
-        // The contract also serves a free query with no product. This client refuses it: the
+        // The contract requires **at least** one anchor, not exactly one, and since C40 this
+        // client matches it: a product, a query, or both.
+        //
+        // It used to refuse the free query, and the reason was sound while it held — the
         // placeholders of the generated argument name no product, so with several pieces on the
-        // table there is nothing to resolve them against.
-        if (string.IsNullOrWhiteSpace(request.ProductId))
+        // table there was nothing to resolve them against, and `PitchPlaceholderResolver`
+        // withholds the whole argument rather than guess. What changed is the other end:
+        // `assist/v5` stops asking for placeholders in the free-query tasks, and the hard cause
+        // `placeholder_in_free_query` in the service's integrity gate makes that a guarantee
+        // instead of a request. With no placeholder to resolve, the refusal protects nothing and
+        // only costs the operator the one mode of the three they could not reach.
+        if (string.IsNullOrWhiteSpace(request.ProductId) && string.IsNullOrWhiteSpace(request.Query))
         {
             throw new ArgumentException(
-                "Sale assistance requires an anchored product. Without one the price and stock "
-                + "placeholders of the argument cannot be resolved.",
+                "Sale assistance requires at least one anchor: a product identifier, a query, or "
+                + "both. A request carrying neither anchors nothing.",
                 nameof(request));
         }
 

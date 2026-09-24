@@ -17,12 +17,15 @@ from jbg_ai.assist.constants import (
     FAMILY_ROSTER_CAP,
     INTENT_PRODUCT_PITCH,
     INTENT_UNCLASSIFIED,
+    WARNING_KNOWLEDGE_NOT_COVERED,
     WARNING_FAMILY_HAS_VARIANTS,
     WARNING_SIZE_LABEL_MISSING,
 )
+from jbg_ai.assist.modes import AssistMode
 from jbg_ai.assist.errors import UnusableAnchorProductError
 from jbg_ai.assist.knowledge_scope import canonical_material_sheets
 from jbg_ai.assist.orchestrator import assist_sale
+from jbg_ai.assist.prompt import PitchTask, resolve_task, task_message
 from jbg_ai.knowledge.constants import CLAIM_SCOPE_GENERAL
 from jbg_ai.knowledge.offline import InMemoryKnowledgeIndex, LocalEmbeddingClient
 from support.assist_world import (
@@ -36,6 +39,7 @@ from support.assist_world import (
     indexed_row,
     run,
 )
+from support.assist_router import decision, scripted_router
 from support.fake_product_search import FakeProductSearch
 from support.settings import build_settings
 
@@ -789,3 +793,100 @@ def test_anchored_mode_ignores_filters(
         str(PIECE),
         str(SIBLING),
     }
+
+
+# --- C40 · the coverage guardrail reaches the free query ----------------------------------
+
+
+def test_free_query_knowledge_without_corpus_declares_it(
+    search, principal
+) -> None:
+    """A knowledge question the corpus cannot answer must say so, not answer from memory.
+
+    M3 has had this guardrail since C34. M1 did not, so a knowledge question with zero
+    fragments ran the task that says «responde apoyándote en esos fragmentos» **with no
+    fragments** — which is not a neutral omission but an explicit invitation to invent, in the
+    one mode C40 puts in front of an operator.
+    """
+    router, _ = scripted_router(decision(index="knowledge"))
+    empty_corpus = InMemoryKnowledgeIndex(chunks=[])
+
+    response = serve(
+        search,
+        empty_corpus,
+        principal,
+        payload={"query": "¿la plata aguanta el agua del mar?"},
+        router_client=router,
+    )
+
+    assert response.citations == []
+    assert WARNING_KNOWLEDGE_NOT_COVERED in response.warnings
+
+
+def test_free_query_catalog_route_does_not_declare_missing_coverage(
+    search, principal
+) -> None:
+    """On `catalog` an empty citation list is correct, not a gap.
+
+    That route is answered from pieces and its own task section tells the model to return no
+    citations at all, so reporting «la documentación no cubre esta pregunta» would be a warning
+    about a question nobody asked the documentation.
+    """
+    router, _ = scripted_router(decision(index="catalog"))
+    empty_corpus = InMemoryKnowledgeIndex(chunks=[])
+
+    response = serve(
+        search,
+        empty_corpus,
+        principal,
+        payload={"query": "anillo de plata"},
+        router_client=router,
+    )
+
+    assert WARNING_KNOWLEDGE_NOT_COVERED not in response.warnings
+
+
+def test_free_query_uncovered_costs_no_extra_provider_call(
+    search, principal
+) -> None:
+    """The guardrail reads a result already computed: no second search, no provider call."""
+    router, _ = scripted_router(decision(index="knowledge"))
+    empty_corpus = InMemoryKnowledgeIndex(chunks=[])
+    embed = LocalEmbeddingClient()
+
+    serve(
+        search,
+        empty_corpus,
+        principal,
+        payload={"query": "¿la plata aguanta el agua del mar?"},
+        router_client=router,
+        embed=embed,
+    )
+
+    # The embeddings are those the query itself needs and nothing more: deciding "uncovered"
+    # is reading `not citations`, which the search above already produced. A guardrail that
+    # cost a second call would be paid on every knowledge question the corpus cannot answer.
+    assert len(embed.calls) <= 2
+
+
+def test_free_query_without_corpus_uses_the_uncovered_task(
+    search, principal
+) -> None:
+    """`resolve_task` picks the fourth free-query task, and the prompt carries its section."""
+    assert (
+        resolve_task(AssistMode.QUERY_ONLY, route="knowledge", uncovered=True)
+        is PitchTask.FREE_QUERY_UNCOVERED
+    )
+    assert (
+        resolve_task(AssistMode.QUERY_ONLY, route="both", uncovered=True)
+        is PitchTask.FREE_QUERY_UNCOVERED
+    )
+    # And `catalog` is deliberately untouched: an empty corpus there is the normal state.
+    assert (
+        resolve_task(AssistMode.QUERY_ONLY, route="catalog", uncovered=True)
+        is PitchTask.FREE_QUERY_CATALOG
+    )
+
+    task = task_message(PitchTask.FREE_QUERY_UNCOVERED).casefold()
+    assert "no finjas haber contestado" in task
+    assert "no respondas de memoria" in task

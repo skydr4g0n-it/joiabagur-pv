@@ -147,7 +147,7 @@ FAMILY_ROSTER_CAP = 24
 #: sections — one per route the router can decide, plus the degraded one for an anchored
 #: question the corpus does not cover. `test_the_previous_prompt_version_is_present_and_intact`
 #: is what keeps v1 from being edited by accident later.
-PROMPT_VERSION = "assist/v3"
+PROMPT_VERSION = "assist/v5"
 
 #: The prompt of the **classifier**, versioned separately because it is a different call with a
 #: different output and a different model setting. A router prompt that shared the argument's
@@ -270,10 +270,28 @@ CAUSE_STOCK_ADJACENT = "stock_adjacent_figure"
 #: the gate forgives nothing — but it is the cause the *prompt* exists to remove, and telling it
 #: apart is what says whether "continuous prose" is working.
 CAUSE_ENUMERATION_FORMAT = "enumeration_format"
+#: The two placeholders the generated argument carries instead of a price and a stock figure.
+#: They live here, in the module that imports nothing, because both the contract schemas and the
+#: integrity gate need them and the dependency only runs one way — towards this file. Declaring
+#: them beside the schemas and reading them from the gate would put `api` inside `assist`.
+PRICE_PLACEHOLDER = "{{price}}"
+STOCK_PLACEHOLDER = "{{stock}}"
+
 #: A figure absent from the context whose digits, with every separator stripped, do match one
 #: that is present: `1.500` against `1500`. A violation too, and the cause that would say a
 #: separator rule needs a measurement rather than an opinion.
 CAUSE_DECIMAL_FORM = "decimal_form"
+#: A price or stock placeholder written in a **free query**, where no piece is anchored. Checked
+#: only when `product_id is None`: with an anchor the placeholder is not merely allowed, it is
+#: what the prompt asks for, and the .NET side substitutes the real figure.
+#:
+#: Without an anchor there is nothing to substitute it against. `PitchPlaceholderResolver`
+#: withholds the **whole** argument the moment it meets one, by design and with a test fixing
+#: it, so a placeholder here does not degrade the prose — it deletes it. The prompt asks the
+#: model not to write them; this is the guardrail that makes the asking a guarantee, and it is
+#: what makes the frequency **measurable partitioned by cause** instead of showing up as an
+#: unexplained drop in delivered arguments.
+CAUSE_PLACEHOLDER_IN_FREE_QUERY = "placeholder_in_free_query"
 
 #: The two causes that are not about figures.
 CAUSE_DANGLING_CITATION = "dangling_citation"
@@ -288,6 +306,7 @@ PITCH_VIOLATION_CAUSES: tuple[str, ...] = (
     CAUSE_STOCK_ADJACENT,
     CAUSE_ENUMERATION_FORMAT,
     CAUSE_DECIMAL_FORM,
+    CAUSE_PLACEHOLDER_IN_FREE_QUERY,
 )
 
 #: The causes whose survival costs the whole argument. Resolution and the numeric gate: a
@@ -302,6 +321,7 @@ HARD_VIOLATION_CAUSES: tuple[str, ...] = (
     CAUSE_STOCK_ADJACENT,
     CAUSE_ENUMERATION_FORMAT,
     CAUSE_DECIMAL_FORM,
+    CAUSE_PLACEHOLDER_IN_FREE_QUERY,
 )
 
 
