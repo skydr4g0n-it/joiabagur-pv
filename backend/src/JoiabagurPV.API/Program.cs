@@ -43,6 +43,7 @@ builder.Services.AddAssistedSearch(builder.Configuration);
 // Sale card routes (C34): sale assistance and substitutes. Same reasoning as assisted search —
 // the per-point-of-sale switch reloads through IOptionsMonitor without a redeploy.
 builder.Services.AddSalesAssist(builder.Configuration);
+builder.Services.AddFreeQuerySearch(builder.Configuration);
 
 // Add API services
 builder.Services.AddApiServices(builder.Configuration);

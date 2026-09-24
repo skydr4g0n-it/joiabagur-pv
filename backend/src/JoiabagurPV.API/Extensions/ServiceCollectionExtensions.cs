@@ -29,6 +29,13 @@ public static class RateLimitPolicies
     /// language model; the substitutes route calls none and uses <see cref="AiSearch"/>.
     /// </summary>
     public const string AiSalesAssist = "AiSalesAssistRateLimit";
+
+    /// <summary>
+    /// Free-query search (C40), partitioned by user. Its own policy because its route calls
+    /// the language model and the panel is used in bursts; sharing the card's allowance would
+    /// leave whichever one the operator reached second unable to work, with no way to know why.
+    /// </summary>
+    public const string AiFreeQuerySearch = "AiFreeQuerySearchRateLimit";
 }
 
 /// <summary>
@@ -188,6 +195,29 @@ public static class ServiceCollectionExtensions
                     {
                         PermitLimit = salesAssistPermitLimit,
                         Window = TimeSpan.FromSeconds(salesAssistOptions.RateLimitWindowSeconds),
+                        QueueLimit = 0
+                    }));
+
+            // Free-query search (C40). Same shape again, and its own allowance for the reason
+            // its configuration section exists: the card is opened once per piece and the panel
+            // is used in bursts, so a shared quota strangles whichever one is reached second.
+            var freeQueryOptions = configuration
+                .GetSection(AiFreeQuerySearchOptions.SectionName)
+                .Get<AiFreeQuerySearchOptions>() ?? new AiFreeQuerySearchOptions();
+
+            var freeQueryPermitLimit = configuration
+                .GetValue<int?>($"{AiFreeQuerySearchOptions.SectionName}:{nameof(AiFreeQuerySearchOptions.RateLimitPermitLimit)}")
+                ?? (isTestingEnvironment ? 10_000 : freeQueryOptions.RateLimitPermitLimit);
+
+            options.AddPolicy(RateLimitPolicies.AiFreeQuerySearch, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                                  ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                                  ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = freeQueryPermitLimit,
+                        Window = TimeSpan.FromSeconds(freeQueryOptions.RateLimitWindowSeconds),
                         QueueLimit = 0
                     }));
         });

@@ -408,3 +408,51 @@ El bundle se construye concatenando `certifi` con `LocalMachine` y `CurrentUser`
 `AuthRoot` —131 certificados únicos— **sin filtrar por bandera de confianza**, porque la raíz de
 Norton no la lleva. Y se confirma la otra mitad del documento: **desde el contenedor los
 embeddings y la generación funcionan sin PEM ninguno**, que es por lo que la medición se hizo ahí.
+
+---
+
+## 5 · Tramo 2 · el endpoint de la consulta libre (grupo 5)
+
+`POST /api/ai/search/assisted`, con interruptor, cupo, presupuesto y circuito **propios**.
+
+| Suite | Antes del grupo | Tras el grupo 5 |
+|---|---|---|
+| `backend` | 46 de 1.271 | **52 de 1.316** (+45 tests, los 45 nuevos pasan) |
+| `openspec validate --all --strict` | 62 passed, 0 failed | **62 passed, 0 failed** |
+| `dotnet build` | verde | **verde** |
+
+Los cuatro nombres que difieren de todo lo visto hasta ahora están en `InventoryIntegrationTests`
+(2) y `ReturnsControllerTests` (2), las dos clases de rotación que el grupo 1 midió. **Cero fallos
+en cualquier clase que C40 toca.**
+
+### Tres decisiones de implementación
+
+**1 · La hidratación se extrae, no se duplica.** `AssistedSearchResultProjector` lo comparten los
+dos servicios. Lo que vive ahí es la regla de **dónde viene cada campo** —precio, stock, SKU,
+nombre y foto del catálogo; puntuación, materiales, razones de coincidencia, familia y variante
+del índice—, que es lo único de esa proyección que es fácil equivocar e imposible notar. Una
+segunda copia habría derivado la primera vez que alguien arreglase una de las dos.
+
+**2 · La disponibilidad exige los dos interruptores.** `GetAvailability` requiere el del endpoint
+nuevo **y** el de la ficha: el primero gobierna si este endpoint responde, el segundo si el
+servicio escribe prosa para esa tienda. Informar sobre uno solo devolvería la pantalla justo a
+donde C40 la encontró — ofreciendo una capacidad apagada.
+
+**3 · El punto de venta es obligatorio en este grupo.** El ámbito «todos los puntos de venta» es
+el grupo 12 y llega **con su frontera de autorización**; darle aquí una versión provisional sería
+la clase de puerta entreabierta que nadie revisa. Declarado en el DTO y en el servicio.
+
+### Lo que la validación al arranque evita, y por qué no se clampa
+
+Dos relaciones que ningún rango por clave puede expresar y que fallan **en silencio** en tiempo de
+petición: una página por defecto mayor que el máximo, y una ventana de candidatos demasiado
+pequeña para llenar una página. Ninguna lanza nada — el endpoint sirve el número equivocado de
+resultados, durante todo el tiempo que nadie los cuente —, así que se rechazan al arrancar
+nombrando la clave. Clampar habría hecho el error permanente e invisible, que es exactamente el
+modo de fallo que este change existe para retirar.
+
+### Una nota de mecánica del repositorio
+
+`perl -0pi -e` sobre los ficheros de este árbol **falla en silencio** por los CRLF: no da error,
+simplemente no sustituye. Costó tres ediciones que parecían aplicadas y no lo estaban. Para
+ediciones multilínea, `node` con el script en un fichero aparte.

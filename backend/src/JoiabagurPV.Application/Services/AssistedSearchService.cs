@@ -25,7 +25,9 @@ public class AssistedSearchService : IAssistedSearchService
     private readonly IFileStorageService _fileStorage;
     private readonly ITraceContextAccessor _traceContext;
     private readonly IOptionsMonitor<AiSearchOptions> _options;
+    private readonly IAssistedSearchResultProjector _projector;
     private readonly IOptionsMonitor<AiSalesAssistOptions> _assistOptions;
+    private readonly IOptionsMonitor<AiFreeQuerySearchOptions> _freeQueryOptions;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<AssistedSearchService> _logger;
 
@@ -38,11 +40,15 @@ public class AssistedSearchService : IAssistedSearchService
         IFileStorageService fileStorage,
         ITraceContextAccessor traceContext,
         IOptionsMonitor<AiSearchOptions> options,
+        IAssistedSearchResultProjector projector,
         IOptionsMonitor<AiSalesAssistOptions> assistOptions,
+        IOptionsMonitor<AiFreeQuerySearchOptions> freeQueryOptions,
         TimeProvider timeProvider,
         ILogger<AssistedSearchService> logger)
     {
+        _projector = projector;
         _assistOptions = assistOptions;
+        _freeQueryOptions = freeQueryOptions;
         _gateway = gateway;
         _repository = repository;
         _cache = cache;
@@ -134,14 +140,19 @@ public class AssistedSearchService : IAssistedSearchService
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Reads two switches and calls nothing. The generative flag currently tracks the sale card's
-    /// switch, which is the one that governs whether the AI service will write prose for this
-    /// shop at all; when the free-query endpoint gains its own section it joins this condition
-    /// rather than replacing it, since both have to be on for the panel's assisted route to work.
+    /// Reads switches and calls nothing.
+    ///
+    /// The generative flag requires <strong>both</strong> the free-query endpoint's own switch and
+    /// the sale card's, because both have to be on for the panel's assisted route to produce
+    /// anything: the first governs whether this endpoint answers at all, and the second whether
+    /// the AI service will write prose for this shop. Reporting availability on one of the two
+    /// would put the screen back where C40 found it — offering a capability that is switched off.
     /// </remarks>
     public AiSearchAvailabilityResponse GetAvailability(Guid pointOfSaleId)
     {
-        var assistedAnswer = _assistOptions.CurrentValue.IsEnabledFor(pointOfSaleId);
+        var assistedAnswer =
+            _freeQueryOptions.CurrentValue.IsEnabledFor(pointOfSaleId)
+            && _assistOptions.CurrentValue.IsEnabledFor(pointOfSaleId);
 
         return new AiSearchAvailabilityResponse
         {
@@ -417,41 +428,13 @@ public class AssistedSearchService : IAssistedSearchService
         var page = ordered.Take(pageSize).ToList();
         var results = new List<AssistedSearchResultDto>(page.Count);
 
+        // The projection moved to a collaborator when C40 gave it a second consumer. The rule it
+        // carries — price, stock, SKU, name and photo from the catalog; score, materials, match
+        // reasons, family and variant from the index — is the one thing here that is easy to get
+        // wrong and impossible to notice, so it exists once.
         foreach (var (row, candidate) in page)
         {
-            if (candidate is not null && !string.Equals(candidate.Sku, row.Sku, StringComparison.Ordinal))
-            {
-                // The catalog wins. A divergence means the index is behind, which is worth
-                // knowing about and is not worth failing a search over.
-                _logger.LogWarning(
-                    "Assisted search found index drift: the index reports SKU {IndexedSku} for product {ProductId}, the catalog holds {CatalogSku}. TraceId={TraceId}",
-                    candidate.Sku,
-                    row.ProductId,
-                    row.Sku,
-                    _traceContext.CurrentTraceId);
-            }
-
-            results.Add(new AssistedSearchResultDto
-            {
-                ProductId = row.ProductId,
-                Sku = row.Sku,
-                Name = row.Name,
-                Price = row.Price,
-                QuantityAtPointOfSale = row.Quantity,
-                HasStock = row.Quantity > 0,
-                PrimaryPhotoUrl = row.PrimaryPhotoFileName is null
-                    ? null
-                    : await _fileStorage.GetUrlAsync(row.PrimaryPhotoFileName, "products"),
-                CollectionName = row.CollectionName,
-                Score = candidate?.Score,
-                // From the candidate, never from hydration: these are index signals that explain
-                // the match, not catalog truth. Empty on the degraded and disabled paths, where
-                // there is no candidate because no retriever ran.
-                Materials = candidate?.Materials ?? [],
-                MatchReasons = candidate?.MatchReasons ?? [],
-                FamilyId = candidate?.FamilyId,
-                VariantLabel = candidate?.VariantLabel
-            });
+            results.Add(await _projector.ProjectAsync(row, candidate));
         }
 
         return results;

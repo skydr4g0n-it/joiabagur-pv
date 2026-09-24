@@ -45,12 +45,12 @@
 
 ## 5. Tramo 2 · el endpoint de la consulta libre
 
-- [ ] 5.1 Crear `AiFreeQuerySearchOptions` con interruptor por punto de venta, límite de peticiones y tamaños de página **propios**, validada al arranque. Test: `FreeQueryOptions_WhenInvalid_FailsAtStartup`
-- [ ] 5.2 Crear `FreeQuerySearchService`: resolución de ámbito, llamada al assist con los filtros, **hidratación reutilizada** de `AssistedSearchService` extraída a un colaborador, y telemetría con el origen nuevo
-- [ ] 5.3 Crear `POST /api/ai/search/assisted` con su política de límite propia. Tests: `FreeQuery_WhenSwitchedOff_MakesNoAiCall`, `FreeQuery_WhenQuotaExhausted_ReportsTooManyRequests`, `FreeQuery_WhenQuotaExhausted_DoesNotReportUnavailable`, `FreeQuery_QuotaIsIndependentOfTheCardQuota`
-- [ ] 5.4 Construir `FreeQuerySearchResponse` con grupos, argumentario y su estado, citas, intención, abstención, avisos **de consulta**, repregunta y motivo de degradación; `usage` y el reparto de tiempos **sólo para administrador**. Tests: `FreeQuery_ForOperator_CarriesNoUsage`, `FreeQuery_DoesNotCarryPieceWarnings`
-- [ ] 5.5 Comprobar que el circuito generativo **no abre el de recuperación**. Test: `FreeQuery_WhenGenerativeBudgetExceeded_LeavesRetrievalCircuitClosed`
-- [ ] 5.6 Persistir el evento con el origen generativo y el texto de la consulta, y que un fallo de telemetría **no rompa la búsqueda**. Tests: `FreeQuery_RecordsTheGenerativeOrigin`, `FreeQuery_WhenTelemetryFails_StillServes`
+- [x] 5.1 Crear `AiFreeQuerySearchOptions` con interruptor por punto de venta, límite de peticiones y tamaños de página **propios**, validada al arranque. Test: `FreeQueryOptions_WhenInvalid_FailsAtStartup`
+- [x] 5.2 Crear `FreeQuerySearchService`: resolución de ámbito, llamada al assist con los filtros, **hidratación reutilizada** de `AssistedSearchService` extraída a un colaborador, y telemetría con el origen nuevo
+- [x] 5.3 Crear `POST /api/ai/search/assisted` con su política de límite propia. Tests: `FreeQuery_WhenSwitchedOff_MakesNoAiCall`, `FreeQuery_WhenQuotaExhausted_ReportsTooManyRequests`, `FreeQuery_WhenQuotaExhausted_DoesNotReportUnavailable`, `FreeQuery_QuotaIsIndependentOfTheCardQuota`
+- [x] 5.4 Construir `FreeQuerySearchResponse` con grupos, argumentario y su estado, citas, intención, abstención, avisos **de consulta**, repregunta y motivo de degradación; `usage` y el reparto de tiempos **sólo para administrador**. Tests: `FreeQuery_ForOperator_CarriesNoUsage`, `FreeQuery_DoesNotCarryPieceWarnings`
+- [x] 5.5 Comprobar que el circuito generativo **no abre el de recuperación**. Test: `FreeQuery_WhenGenerativeBudgetExceeded_LeavesRetrievalCircuitClosed`
+- [x] 5.6 Persistir el evento con el origen generativo y el texto de la consulta, y que un fallo de telemetría **no rompa la búsqueda**. Tests: `FreeQuery_RecordsTheGenerativeOrigin`, `FreeQuery_WhenTelemetryFails_StillServes`
 
 ## 6. Tramo 2 · el toggle y la copia
 

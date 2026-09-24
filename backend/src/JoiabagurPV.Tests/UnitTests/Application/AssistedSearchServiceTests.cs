@@ -46,6 +46,9 @@ public class AssistedSearchServiceTests
     /// <summary>The card's switch, which is the one the availability route reports as the generative path.</summary>
     private readonly AiSalesAssistOptions _assistOptions = new() { EnabledByDefault = true };
 
+    /// <summary>The free-query endpoint's own switch; both must be on for the assisted route.</summary>
+    private readonly AiFreeQuerySearchOptions _freeQueryOptions = new() { EnabledByDefault = true };
+
     private readonly List<RecordSearchRequest> _recorded = [];
 
     public AssistedSearchServiceTests()
@@ -929,9 +932,20 @@ public class AssistedSearchServiceTests
             _fileStorage.Object,
             _traceContext.Object,
             OptionsMonitor(),
+            new AssistedSearchResultProjector(
+                _fileStorage.Object, _traceContext.Object,
+                factory.CreateLogger<AssistedSearchResultProjector>()),
             AssistOptionsMonitor(),
+            FreeQueryOptionsMonitor(),
             _timeProvider,
             factory.CreateLogger<AssistedSearchService>());
+    }
+
+    private IOptionsMonitor<AiFreeQuerySearchOptions> FreeQueryOptionsMonitor()
+    {
+        var monitor = new Mock<IOptionsMonitor<AiFreeQuerySearchOptions>>();
+        monitor.SetupGet(m => m.CurrentValue).Returns(_freeQueryOptions);
+        return monitor.Object;
     }
 
     private IOptionsMonitor<AiSalesAssistOptions> AssistOptionsMonitor()
