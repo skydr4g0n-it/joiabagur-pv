@@ -10,8 +10,9 @@ etiquetas distinguibles— están en
 [`c36-exploration-decisions.md`](c36-exploration-decisions.md) y **no se vuelven a medir aquí**: son
 sobre la base de datos y este change no la toca.
 
-Lo que sí se mide aquí es la suite, las puertas, y **tres puntos en los que la realidad del árbol no
-coincidía con los artefactos**. Es el undécimo change consecutivo del que se puede decir eso.
+Lo que sí se mide aquí es la suite, las puertas, y **cuatro puntos en los que la realidad del árbol no
+coincidía con los artefactos** — el cuarto encontrado el 2026-09-24 al comprobarla con datos reales,
+y era un defecto propio. Es el undécimo change consecutivo del que se puede decir eso.
 
 ---
 
@@ -19,8 +20,8 @@ coincidía con los artefactos**. Es el undécimo change consecutivo del que se p
 
 | Puerta | Al abrir (`2b49685`) | Al cerrar | Veredicto |
 |---|---|---|---|
-| Suite de frontend | **114 fallos de 597**, 15 de 48 ficheros | **113 fallos de 726**, 14 de 54 ficheros | **Cero nombres nuevos** |
-| `npm run build` | verde, 49,59 s | verde, 14,58 s | ✅ |
+| Suite de frontend | **114 fallos de 597**, 15 de 48 ficheros | **113 fallos de 729**, 14 de 54 ficheros | **Cero nombres nuevos** |
+| `npm run build` | verde, 49,59 s | verde, 1 m 17 s | ✅ |
 | `openspec validate --all --strict` | 61 passed, 0 failed | **61 passed, 0 failed** | ✅ |
 | `sha256` de `ai-service/openapi.json` | `d8d48f87…c2b875` | `d8d48f87…c2b875` | **idéntico** |
 | `git status` fuera de `frontend/`, `openspec/`, `Documentos/` | — | vacío | ✅ |
@@ -45,7 +46,7 @@ npx vitest run --reporter=json --outputFile.json=<destino>
 
 ```
 baseline : 114 failing of 597
-close    : 113 failing of 726
+close    : 113 failing of 729
 
 NEW failing names (must be 0): 0
 
@@ -58,12 +59,12 @@ names that STOPPED failing: 1
 fichero. Es el tercer caso que este proyecto registra —tras C16 y C18b— y confirma la regla de
 [testing-frontend.md](../../testing-frontend.md): **el número no sirve, el conjunto de nombres sí**.
 
-**129 tests nuevos**, todos verdes (597 → 726). Seis ficheros nuevos, ninguno construido sobre uno
+**132 tests nuevos**, todos verdes (597 → 729). Seis ficheros nuevos, ninguno construido sobre uno
 que ya viniera rojo.
 
 ---
 
-## 2 · Las tres refutaciones
+## 2 · Las cuatro refutaciones
 
 ### 2.1 · La línea base de la suite no es 113 de 595, y la cifra **oscila por orden de ejecución**
 
@@ -130,7 +131,37 @@ que pide es otra ficha. Los sustitutos se limpian cuando la pieza nueva sí tien
 **No contradice la spec**, que prohíbe emitir otra petición *«como consecuencia de re-renderizar, de
 que llegue la respuesta, o de cualquier fallo»*. Un cambio de tienda no es ninguna de las tres.
 
-### 2.4 · Y una menor: `tasks.md` tiene 50 tareas, no 45
+### 2.4 · La cabecera de la ficha decía «en esta tienda», y el defecto era mío
+
+**Encontrado el 2026-09-24**, al comprobar la ficha con datos reales. La cabecera ya quería pintar
+el nombre de la tienda:
+
+```tsx
+{piece.quantityAtPointOfSale} en {pointOfSaleName || 'esta tienda'}
+```
+
+Pero la página sólo carga la lista de puntos de venta cuando se abre **en frío**:
+
+```tsx
+if (navigatedPointOfSaleId) return;   // ...así que posName se quedaba en ''
+```
+
+Cuando el punto de venta llega por estado de navegación —**el camino normal**, y el de las tres
+entradas— el nombre no se pedía nunca y la etiqueta caía al literal. La pantalla decía *«24 en esta
+tienda»* teniendo el identificador de la tienda en la mano.
+
+**El arreglo** es un efecto que lee esa única tienda con `getPointOfSale(id)`: una lectura, sin IA,
+y **con el fallo invisible a propósito** — el nombre es lo que la frase preferiría decir, no algo de
+lo que la ficha dependa. El selector sigue oculto porque su guarda es `!navigatedPointOfSaleId` y no
+la longitud de la lista, cosa que ahora tiene test propio.
+
+**Por qué importa más de lo que parece:** *«esta tienda»* es ambiguo en cuanto hay más de una en
+juego, y una cifra de existencias ambigua es de las que cuestan una venta. Con «Todos los puntos de
+venta» a la vista en C40, sólo iba a empeorar.
+
+Tres tests nuevos, y los tres caen al romper la guarda a mano.
+
+### 2.5 · Y una menor: `tasks.md` tiene 50 tareas, no 45
 
 El commit de los artefactos dice *«tasks: 9 grupos, 45 tareas»*. Contadas: 4 + 3 + 3 + 7 + 6 + 4 + 12
 + 6 + 5 = **50**. No cambia nada del trabajo; se anota porque el recuento se cita en el commit.
@@ -231,33 +262,74 @@ su literalidad.
 
 ---
 
-## 7 · Lo que **no** se comprobó, y cómo comprobarlo
+## 7 · La comprobación con datos reales, y los dos interruptores que casi la impiden
 
-**La tarea 8.5 —la comprobación en la demo— no se ejecutó en esta sesión.** No es un olvido y no se
-da por hecha.
+**La tarea 8.5 se ejecutó el 2026-09-24**, en el **entorno local** y no en el demo desplegado. Es
+el mismo código, la misma base —el mundo de C10 y el índice de C13—, el mismo `jbg-ai` con
+credencial real y `STUB_MODE=false`, y el mismo prompt `assist/v3`. Lo que no es el mismo es el
+despliegue, y eso se dice en vez de pasarlo por alto: `compose.demo.yaml` tira de imágenes de ECR
+y de secretos del almacén de parámetros, que no están en esta máquina.
 
-`compose.demo.yaml` levanta sus imágenes desde `${ECR_REGISTRY}/jbg-demo-ai:${IMAGE_TAG}` y
-`${ECR_REGISTRY}/jbg-demo-api:${IMAGE_TAG}`, y necesita `INDEX_FEED_SHARED_KEY`,
-`EMBEDDING_API_KEY` y `ASSIST_LLM_API_KEY`. En esta máquina sólo corre `jpv-pv-postgres`; ni el
-registro ni los secretos están disponibles, y un argumentario realmente generado cuesta una llamada de
-pago al proveedor.
+### Los tres criterios
 
-**Qué hay que ver, cuando se haga:**
+| # | Criterio | Resultado |
+|---|---|---|
+| 1 | **Ficha con argumentario resuelto** | `pitchStatus: generated`, `promptVersion: assist/v3`, **7,4 s**. Texto en castellano, **sin `{{price}}` ni `{{stock}}`** |
+| 2 | **Pregunta con citas** | `ai.knowledge_chunk` con **161 fragmentos** indexados. Citas completas con `citationId`, documento, sección, `docType` y `claimScope` — incluida una de `establecimiento` |
+| 3 | **Familia con varias variantes** | `SKU158` en Ciutadella Centre, **4 variantes**, **ninguna preseleccionada**, un botón por miembro nombrando la talla |
 
-1. **Una ficha con argumentario resuelto.** Abrir `/sales/new/assist/:productId` desde la fila de
-   búsqueda asistida sobre una pieza con existencias. Criterio: `pitchStatus` llega `generated` y el
-   texto lleva el precio y las unidades reales sustituidos, no marcadores.
-2. **Una pregunta con citas.** Pulsar *«¿Se puede mojar esta pieza?»*. Criterio: una segunda petición,
-   la pregunta **no** en la barra de direcciones, y al menos una cita desplegable con su documento y
-   su sección. **Aviso**: si el entorno es nuevo, esto responderá `knowledge_not_covered` sin citas —
-   no es un defecto de la ficha, es la tarea diferida *«el corpus no viaja en la imagen de `jbg-ai`»*,
-   y hay que sortearla antes con el `docker cp` que esa entrada documenta.
-3. **Un grupo de familia con varias variantes.** Una pieza de las que la M-1 del informe de
-   exploración cuenta —el 31,2 % de las fichas—. Criterio: una fila y un botón por variante, **ninguna
-   preseleccionada**, y que el botón de una variante que no es el ancla lleve **su** `productId` a la
-   caja.
+La pieza del criterio 1 y 3 es `SKU158` (*Anillo lapislázuli pequeño*, 24 unidades). La petición se
+sirvió con el token de `admin`, lo que comprueba además que **un administrador sin tienda asignada
+puede usar la ficha**: elige una y el backend la autoriza por la excepción que `SalesAssistService`
+le concede.
 
----
+### Y lo que casi impide la comprobación: dos interruptores apagados y sin documentar
+
+Esto es lo que más valor tiene de esta sección, porque **costó una sesión entera** y no estaba
+escrito en ninguna parte.
+
+| Interruptor | Por defecto | En `appsettings` | Síntoma |
+|---|---|---|---|
+| `AiSalesAssist:EnabledByDefault` | `false` | **ausente de todos** | «El asistente no está disponible» |
+| `AiSearch:EnabledByDefault` | `false` | **ausente de todos** | «Búsqueda asistida no disponible» |
+
+Los dos están documentados en su clase de opciones —*«Defaults to false, so enabling a shop is an
+explicit act»*— y **ninguno aparece en `appsettings.json` ni en `appsettings.Development.json`**, de
+modo que un entorno recién arrancado los tiene apagados sin decirlo en ningún sitio que alguien vaya
+a leer.
+
+Con el de la ficha apagado, `SalesAssistService` **ni siquiera llama** al servicio de IA —
+`degradedReason = "switched_off"`— y la pantalla pinta correctamente su estado degradado. Parece un
+defecto de C36 y no lo es.
+
+**Se encienden sin tocar ningún fichero versionado**, con variable de entorno:
+
+```powershell
+cd backend\src\JoiabagurPV.API
+$env:AiSalesAssist__EnabledByDefault = "true"
+$env:AiSearch__EnabledByDefault = "true"
+dotnet run
+```
+
+El doble guion bajo es cómo .NET mapea la sección desde el entorno. Y el servicio de IA hay que
+levantarlo en modo real: el `jbg-ai` de `backend/docker-compose.yml` viene con `STUB_MODE: "true"` y
+sin credenciales, así que sirve fixtures que parecen un sistema funcionando.
+
+**Cómo comprobar que funcionó**, sin depender de lo que se vea en pantalla:
+
+```sh
+docker logs jpv-pv-jbg-ai --tail 20                       # tiene que haber /v1/assist/sale
+docker logs jpv-pv-jbg-ai 2>&1 | grep "stage=assist_client"  # credential=assist, no rag_fallback
+```
+
+### Lo que sigue sin comprobarse
+
+**El demo desplegado.** Cuando se despliegue, la comprobación equivalente es el §5.6b de
+`deploy/demo/README.md` —*«The sale card generates (C34)»*—, ampliado con el bloque de familia y la
+caja de pregunta. Con un aviso que esa misma guía ya documenta: **`ai.knowledge_chunk` nace vacía**
+en un entorno nuevo, porque el corpus no viaja en la imagen, así que las cinco preguntas sugeridas
+responderán todas que la documentación no las cubre hasta que se sortee con el `docker cp` que la
+tarea diferida describe.
 
 ## 8 · Limitaciones que este change declara y no cierra
 
@@ -285,7 +357,7 @@ pago al proveedor.
 # La suite, con el informador que permite comparar por nombres
 cd frontend
 npx vitest run --reporter=json --outputFile.json=/tmp/close.json
-#   → Test Files 14 failed | 40 passed (54) · Tests 113 failed | 613 passed (726)
+#   → Test Files 14 failed | 40 passed (54) · Tests 113 failed | 616 passed (729)
 
 # La puerta real
 npm run build            # ✓ built in 14.58s

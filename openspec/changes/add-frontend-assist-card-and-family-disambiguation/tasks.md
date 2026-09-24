@@ -64,7 +64,7 @@
 - [x] 8.2 `npm run build` en verde; la salida de `tsc --noEmit` filtrada a los ficheros propios
 - [x] 8.3 Comprobar el `sha256` de `ai-service/openapi.json` y que `git status` no muestra cambios en `backend/` ni en `ai-service/`
 - [x] 8.4 `openspec validate --all --strict` → **0 failed**
-- [ ] 8.5 Comprobación en la demo: una ficha real con argumentario resuelto, una pregunta con citas y un grupo de familia con varias variantes — **no ejecutada en esta sesión**: `compose.demo.yaml` pide imágenes de ECR (`${ECR_REGISTRY}/jbg-demo-ai`), `EMBEDDING_API_KEY` y `ASSIST_LLM_API_KEY`, que no están en esta máquina. Pasos y criterio en el §7 del informe de implementación
+- [x] 8.5 Comprobación con datos reales: una ficha real con argumentario resuelto, una pregunta con citas y un grupo de familia con varias variantes — **ejecutada el 2026-09-24 en el entorno local**, no en el demo de ECR: mismo código, misma base con el mundo de C10 y el índice de C13, y el mismo `jbg-ai` con credencial real y `STUB_MODE=false`. Los tres criterios y sus cifras, en el §7 del informe de implementación
 - [x] 8.6 Escribir el informe de implementación en `Documentos/Proyecto Final AIEng/informes/c36-implementation-measurements.md`
 
 ## 9. Documentación

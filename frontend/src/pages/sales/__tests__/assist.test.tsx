@@ -44,6 +44,7 @@ vi.mock('@/services/sales-assist.service', () => ({
 
 vi.mock('@/services/point-of-sale.service', () => ({
   getPointsOfSale: vi.fn(),
+  getPointOfSale: vi.fn(),
 }));
 
 vi.mock('sonner', () => ({
@@ -178,6 +179,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   role = 'Operator';
   vi.mocked(pointOfSaleService.getPointsOfSale).mockResolvedValue([POS_ONE]);
+  vi.mocked(pointOfSaleService.getPointOfSale).mockResolvedValue(POS_ONE);
   vi.mocked(salesAssistService.substitutes).mockResolvedValue({
     kind: 'ok',
     response: substitutesResponse(),
@@ -385,6 +387,40 @@ describe('SalesAssistCardPage — the point of sale', () => {
 
     // A request for a control that is never shown.
     expect(pointOfSaleService.getPointsOfSale).not.toHaveBeenCalled();
+  });
+
+  it('should name the shop in the units line when the point of sale travelled', async () => {
+    renderCard();
+    await served();
+
+    // «24 en esta tienda» is ambiguous the moment more than one shop is in play, and an
+    // ambiguous stock figure is the kind that costs a sale. The list is not loaded on this
+    // path, so the name has to be read on its own.
+    await waitFor(() =>
+      expect(pointOfSaleService.getPointOfSale).toHaveBeenCalledWith(POS_ID),
+    );
+    const header = screen.getByTestId('assist-piece-header');
+    expect(await within(header).findByText(/3 en Ciutadella Centre/)).toBeInTheDocument();
+    expect(within(header).queryByText(/en esta tienda/)).not.toBeInTheDocument();
+  });
+
+  it('should still show the card when the shop name cannot be read', async () => {
+    vi.mocked(pointOfSaleService.getPointOfSale).mockRejectedValue(new Error('nope'));
+    renderCard();
+
+    // The name is what the sentence would rather say, not something the card depends on.
+    await served();
+    expect(screen.getByTestId('assist-piece-header')).toBeInTheDocument();
+  });
+
+  it('should not show the selector when the point of sale travelled', async () => {
+    renderCard();
+    await served();
+
+    // Reading the one shop's name populates the same list the selector renders from, so the
+    // guard that keeps it hidden has to be the navigation state and not the list's length.
+    await waitFor(() => expect(pointOfSaleService.getPointOfSale).toHaveBeenCalled());
+    expect(screen.queryByLabelText('Punto de venta')).not.toBeInTheDocument();
   });
 });
 

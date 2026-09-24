@@ -299,6 +299,35 @@ requested point of sale.
 - **Rate limits** — `sales-assist` has its own per-user policy (`AiSalesAssistRateLimit`, 10 per
   minute); `substitutes` calls no model and uses the search policy.
 
+> **Both AI features are OFF by default, and neither switch appears in any `appsettings`.** This
+> cost a whole session the first time somebody tried the card of C36 on a fresh checkout, so it is
+> written here rather than left to be rediscovered.
+>
+> | Switch | Default | Symptom when off |
+> |---|---|---|
+> | `AiSalesAssist:EnabledByDefault` | `false` | The card answers 200 with `aiAvailable: false` and «El asistente no está disponible» |
+> | `AiSearch:EnabledByDefault` | `false` | The panel falls to the lexical path and says «Búsqueda asistida no disponible» |
+>
+> Both are documented in their own options class — *«Defaults to false, so enabling a shop is an
+> explicit act»* — and that default is right for production. What is missing is any mention where
+> somebody starting the API would read it. With the card's switch off, `SalesAssistService`
+> **never calls the AI service** (`degradedReason = "switched_off"`), so the screen degrades
+> correctly and looks exactly like an outage.
+>
+> Turn them on for a local session without touching a tracked file:
+>
+> ```powershell
+> cd backend\src\JoiabagurPV.API
+> $env:AiSalesAssist__EnabledByDefault = "true"
+> $env:AiSearch__EnabledByDefault = "true"
+> dotnet run
+> ```
+>
+> The double underscore is how .NET binds a configuration section from the environment. And
+> remember the other half: `jbg-ai` in `docker-compose.yml` ships with `STUB_MODE: "true"` and no
+> provider credential, so it serves fixtures that look like a working system. Override it in
+> `docker-compose.override.yml`, which is gitignored.
+
 ### Product families
 
 Variants of one piece — the same ring in sizes S, M and L — grouped as an editable business entity.

@@ -154,6 +154,33 @@ export function SalesAssistCardPage() {
     load();
   }, [navigatedPointOfSaleId]);
 
+  /**
+   * The name of the point of sale that travelled in navigation state.
+   *
+   * The list above is deliberately not loaded on that path — there is nothing to choose — but
+   * without a name the header falls back to «en esta tienda», and that is ambiguous the moment
+   * more than one shop is in play. An ambiguous stock figure is the kind that costs a sale.
+   *
+   * One product read, no AI, and its failure is invisible on purpose: the name is what the
+   * sentence would rather say, not something the card depends on. The selector stays hidden
+   * because its own guard is `!navigatedPointOfSaleId`, not the length of this list.
+   */
+  useEffect(() => {
+    if (!navigatedPointOfSaleId) return;
+
+    let current = true;
+    void pointOfSaleService
+      .getPointOfSale(navigatedPointOfSaleId)
+      .then((pos) => {
+        if (current && pos) setPointsOfSale([pos]);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      current = false;
+    };
+  }, [navigatedPointOfSaleId]);
+
   /** Issues one assist request, with or without the customer's question. */
   const requestAssist = useCallback(
     async (question?: string) => {
