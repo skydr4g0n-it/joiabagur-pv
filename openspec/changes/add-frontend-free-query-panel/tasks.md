@@ -28,10 +28,10 @@
 
 ## 3. Tramo 2 · el contrato se mueve
 
-- [ ] 3.1 Añadir `filters: RetrievalFilters` a `AssistRequest` con defecto vacío, y pasarlos a `retrieve_products` en el modo libre. Tests: `test_free_query_forwards_filters_to_retrieval`, `test_free_query_without_filters_behaves_as_before`, `test_anchored_mode_ignores_filters`
-- [ ] 3.2 Regenerar `ai-service/openapi.json` con el *one-liner* del README y **verificar hoja a hoja** contra la copia del 1.4: **0 hojas retiradas y 0 cambiadas de tipo**. Actualizar `test_openapi_snapshot_is_stable`
-- [ ] 3.3 Añadir `Filters` a `AiAssistSaleRequest` y serializarlo con los nombres del contrato, omitido cuando no hay ninguno. Tests: `AssistSaleAsync_WithFilters_SerializesThemWithContractNames`, `AssistSaleAsync_WithoutFilters_OmitsTheProperty`
-- [ ] 3.4 Poner al día el doble de `assist_sale_stub` para que el modo libre **no emita marcadores**. Test: `test_stub_free_query_carries_no_placeholder`
+- [x] 3.1 Añadir `filters: RetrievalFilters` a `AssistRequest` con defecto vacío, y pasarlos a `retrieve_products` en el modo libre. Tests: `test_free_query_forwards_filters_to_retrieval`, `test_free_query_without_filters_behaves_as_before`, `test_anchored_mode_ignores_filters`
+- [x] 3.2 Regenerar `ai-service/openapi.json` con el *one-liner* del README y **verificar hoja a hoja** contra la copia del 1.4: **0 hojas retiradas y 0 cambiadas de tipo**. Actualizar `test_openapi_snapshot_is_stable`
+- [x] 3.3 Añadir `Filters` a `AiAssistSaleRequest` y serializarlo con los nombres del contrato, omitido cuando no hay ninguno. Tests: `AssistSaleAsync_WithFilters_SerializesThemWithContractNames`, `AssistSaleAsync_WithoutFilters_OmitsTheProperty`
+- [x] 3.4 Poner al día el doble de `assist_sale_stub` para que el modo libre **no emita marcadores**. Test: `test_stub_free_query_carries_no_placeholder`
 
 ## 4. Tramo 2 · el argumentario de M1 (PRERREQUISITO, no se corta)
 

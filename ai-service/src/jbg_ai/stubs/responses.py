@@ -284,9 +284,24 @@ def assist_sale_stub(request: AssistRequest, principal: ServicePrincipal) -> Ass
     anchored = request.product_id is not None and request.query is None
     intent = INTENT_PRODUCT_PITCH if anchored else INTENT_UNCLASSIFIED
     subject = request.query.strip() if request.query else f"la pieza {request.product_id}"
+
+    # **The free-query mode emits no placeholders, and the double has to say so too.**
+    # `PitchPlaceholderResolver` on the .NET side withholds the whole argument whenever a
+    # placeholder reaches it without an anchor to resolve against — by design, and with a test
+    # fixing it. So a stub that wrote them here would hand every client running against stubs an
+    # argument that the real pipeline would suppress: the double would be teaching the wrong
+    # contract, which is the one thing a double must never do.
+    #
+    # Comparative language without a figure stays allowed, and is what the free-query prompt
+    # asks for; there is simply no price and no quantity to name when no piece is anchored.
     pitch = (
         f"Para «{subject}» te encajan {len(groups)} familias. "
         f"Precio {PRICE_PLACEHOLDER} y quedan {STOCK_PLACEHOLDER} unidades en tu punto de venta."
+        if request.product_id is not None
+        else (
+            f"Para «{subject}» te encajan {len(groups)} familias. "
+            "Tienes la lista con precios y existencias delante."
+        )
     )
     citations = [
         _assist_citation(index, group.members[0].product_id)

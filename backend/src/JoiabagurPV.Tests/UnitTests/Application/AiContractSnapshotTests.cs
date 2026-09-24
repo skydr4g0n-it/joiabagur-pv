@@ -99,7 +99,10 @@ public class AiContractSnapshotTests
         var names = document.RootElement.EnumerateObject().Select(p => p.Name).ToList();
 
         names.Should().NotContain("pos_id", "the scope travels in the token, never in the body");
-        names.Should().BeEquivalentTo(["product_id", "query"], "the wire names are snake_case");
+        names.Should().BeEquivalentTo(["product_id", "query", "filters"],
+            "the wire names are snake_case, and `filters` travels like it does on the "
+            + "substitutes request: declared with a default in the contract, so non-nullable "
+            + "here and always serialized rather than omitted");
     }
 
     [Fact]

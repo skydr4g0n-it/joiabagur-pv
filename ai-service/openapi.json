@@ -493,6 +493,10 @@
               }
             ]
           },
+          "filters": {
+            "$ref": "#/components/schemas/RetrievalFilters",
+            "description": "Catalog filters for the free-query mode. Ignored when a piece is anchored: the anchor already determines what is retrieved"
+          },
           "locale": {
             "default": "es-ES",
             "title": "Locale",

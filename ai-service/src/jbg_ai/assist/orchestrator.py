@@ -329,8 +329,13 @@ async def assist_sale(
         route = routing.route
         if route in (None, "catalog", "both"):
             decisions: list[bool] = []
+            # The filters travel only here, in the free-query branch. The anchored branch
+            # retrieves the piece's family by identity, so a catalog filter would have
+            # nothing to narrow and could only contradict the anchor the caller gave.
             retrieved = await retrieve_products(
-                RetrievalRequest(query=question, top_k=payload.top_k),
+                RetrievalRequest(
+                    query=question, top_k=payload.top_k, filters=payload.filters
+                ),
                 principal,
                 settings=settings,
                 embed=embed,

@@ -21,6 +21,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 from jbg_ai.api.schemas.common import ScopedResponse, Usage
+from jbg_ai.api.schemas.retrieval import RetrievalFilters
 from jbg_ai.assist.constants import (
     AGENT_STOP_REASONS,
     ASSIST_INTENTS,
@@ -61,6 +62,13 @@ class AssistRequest(BaseModel):
         description="What the operator asked. Null means the piece itself is the request",
     )
     top_k: int = Field(default=5, ge=1, le=20, description="Families wanted after hydration")
+    filters: RetrievalFilters = Field(
+        default_factory=RetrievalFilters,
+        description=(
+            "Catalog filters for the free-query mode. Ignored when a piece is anchored: "
+            "the anchor already determines what is retrieved"
+        ),
+    )
     context: AssistContext | None = None
     locale: str = Field(default="es-ES")
     pos_id: str | None = Field(

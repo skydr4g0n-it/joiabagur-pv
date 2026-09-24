@@ -32,6 +32,25 @@ public class AiAssistSaleRequest
 
     /// <summary>The operator's question, or null when the piece itself is the request.</summary>
     public string? Query { get; set; }
+
+    /// <summary>
+    /// Catalog filters for the free-query mode. Empty when the operator selected none.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Non-nullable with a default, which is <see cref="AiSubstitutesRequest"/>'s shape for the
+    /// same contract field and for the same reason: the contract declares <c>filters</c> with a
+    /// default rather than as nullable, and <c>AiContractSnapshotTests</c> holds the two in
+    /// parity. An empty filter set and an absent property mean the same thing to the service,
+    /// so sending one costs nothing and keeps the two sibling requests identical in shape.
+    /// </para>
+    /// <para>
+    /// Ignored by the service when a piece is anchored: the anchor already determines what is
+    /// retrieved. Sent anyway, because suppressing it here would put a second, undocumented rule
+    /// in a client whose job is to carry the request faithfully.
+    /// </para>
+    /// </remarks>
+    public AiSearchFilters Filters { get; set; } = new();
 }
 
 /// <summary>

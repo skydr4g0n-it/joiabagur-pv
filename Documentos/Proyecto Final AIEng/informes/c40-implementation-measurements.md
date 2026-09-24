@@ -1,7 +1,7 @@
 # C40 — las mediciones de la implementación
 
 **Change:** `add-frontend-free-query-panel` (C40) · **Rama:** `c40-add-frontend-free-query-panel`
-**Abierto:** 2026-09-24 · **Estado:** en curso, grupo 1 cerrado
+**Abierto:** 2026-09-24 · **Estado:** en curso, grupos 1 a 3 cerrados
 **Complementa:** [c40-exploration-decisions.md](c40-exploration-decisions.md) y
 [c40-m1-panel-states.md](c40-m1-panel-states.md), que son de exploración; éste es de **medición sobre
 el código escrito**.
@@ -186,3 +186,117 @@ dos**, así que `unappliedFilters` sale vacío en todos los casos que este endpo
 de seguridad, y la avería que abrió C40 fue invisible precisamente porque no había dónde reportarla.
 El test se nombró por lo que afirma —que una categoría aplicada **no** se declara sin aplicar— en vez
 de fingir que el canal dispara.
+
+---
+
+## 3 · Tramo 2 · el contrato se mueve, verificado hoja a hoja
+
+`AssistRequest` gana `filters`. Es el movimiento más pequeño que este contrato admite, y la razón
+es que **el modelo al que apunta ya estaba publicado**: `RetrievalFilters` servía desde C14 a
+`RetrievalRequest` y a `SubstitutesRequest`, así que la adición es una referencia y no un esquema.
+
+### La verificación hoja a hoja, que es el criterio del DoD
+
+Los dos documentos aplanados a `ruta -> escalar` y la diferencia partida en cuatro. No es una
+lectura de un diff ni una comparación de claves de primer nivel.
+
+| | Hojas |
+|---|---|
+| Antes (`93115cf`, `sha256 d8d48f87…`) | **1.300** |
+| Después (`sha256 8c1827d3…`) | **1.302** |
+| **Retiradas** | **0** |
+| **Cambiadas de tipo** | **0** |
+| **Con valor distinto** | **0** |
+| Añadidas | **2** |
+
+Las dos añadidas:
+
+```
++ /components/schemas/AssistRequest/properties/filters/$ref
++ /components/schemas/AssistRequest/properties/filters/description
+```
+
+El `git diff` del fichero lo dice igual de corto: **4 inserciones, 0 borrados.**
+
+**Adición pura, y además opcional**: un cliente que no envíe `filters` recibe exactamente el
+comportamiento de antes. El test lo fija en las dos direcciones — que la propiedad no está en
+`required`, y que apunta a `RetrievalFilters` en vez de a un esquema nuevo.
+
+### El fixture de línea base del contrato cambia de dueño
+
+`test_the_published_contract_moved_by_addition_only` comparaba contra
+`fixtures/openapi-c32a-baseline.json`, y su propio docstring decía que **el siguiente change que
+moviera el contrato reemplazaría ese fixture y su lista de adiciones permitidas**. C40 es ese
+change: el fixture pasa a ser `openapi-c40-baseline.json` —el snapshot tal como estaba en
+`93115cf`— y las adiciones permitidas pasan a ser la única propiedad nueva.
+
+### El doble del stub deja de emitir marcadores en el modo libre
+
+Y esto **corrigió dos tests que afirmaban lo contrario**, los dos legítimamente escritos antes de
+que existiera la cadena que C40 documenta:
+
+| Test | Afirmaba | Afirma ahora |
+|---|---|---|
+| `test_assist_sale_groups_by_family` | `{{price}}` **está** en el argumentario de una consulta libre | **no está** |
+| `test_stub_mode_still_serves_the_fixture` | ídem | ídem, y que **sí hay prosa** |
+
+El motivo por el que el doble no puede escribirlos: `PitchPlaceholderResolver` retira el
+argumentario **entero** cuando un marcador le llega sin ancla contra la que resolverlo. Un doble
+que los escribiera estaría enseñando a todo cliente que corre contra *stubs* un contrato que la
+ruta real rechaza, y la prosa desaparecería la primera vez que alguien apuntara al servicio de
+verdad, sin nada en el diff que lo explicara.
+
+**Los modos anclados quedan intactos**, con su propio test que lo fija: ahí el resolutor sí tiene
+una pieza contra la que resolver.
+
+### Suites del grupo 3
+
+| Suite | Línea base | Tras el grupo 3 |
+|---|---|---|
+| `ai-service` | 1.576 pasados, 0 con error | **1.581 pasados, 0 con error** (+5, los 5 nuevos pasan) |
+| `openspec validate --all --strict` | 62 passed, 0 failed | **62 passed, 0 failed** |
+
+El frontend **no se tocó** en este grupo —ni un fichero bajo `frontend/`—, así que su suite no se
+re-ejecuta: la comparación por nombres del grupo 2 sigue siendo la vigente.
+
+### La forma del campo en .NET la decidió un guard, no yo
+
+Escribí `AiAssistSaleRequest.Filters` **anulable con `[JsonIgnore(WhenWritingNull)]`**, para que la
+petición anclada saliera byte a byte igual que antes de C40. `AiContractSnapshotTests` lo rechazó en
+la primera pasada completa:
+
+```
+Expected IsNullableInContract(declared) to be True because nullability of 'filters' must match
+between AiAssistSaleRequest and schema AssistRequest … but found False.
+```
+
+Y tiene razón: el contrato declara `filters` **con defecto**, no como anulable, y ese test existe
+justamente para que una deriva entre los dos lados rompa la compilación en vez de aparecer en
+ejecución como un valor nulo silencioso.
+
+**El precedente de la casa resuelve la duda sin discusión:** `AiSubstitutesRequest.Filters` lleva el
+mismo campo del mismo contrato y es **no anulable con defecto**, y su test de serialización afirma
+que `filters` viaja siempre. Así que `AiAssistSaleRequest` pasa a la misma forma.
+
+**Esto se desvía de la letra de la tarea 3.3**, que pedía el campo *«omitido cuando no hay
+ninguno»*. Se declara aquí en vez de callarse. El argumento por el que no se sigue: un conjunto de
+filtros vacío y una propiedad ausente **significan lo mismo para el servicio**, que rellena el
+defecto en los dos casos; y mantener la paridad que el guard vigila vale más que ahorrar cuatro
+claves en un cuerpo, sobre todo cuando el hermano más cercano del DTO ya las envía. Exención del
+guard descartada: debilitar la única red que convierte una deriva de contrato en una conversación
+explícita, para ganar una frugalidad que el servicio no nota, es mal cambio.
+
+Dos tests se ajustaron a la forma nueva: `AssistSaleRequest_Serialization_OmitsPosId` —que fija el
+cuerpo exacto— y el que yo había escrito, ahora
+`AssistSaleAsync_WithoutFilters_SendsAnEmptyFilterSet`.
+
+### Suite de backend del grupo 3, tras la corrección
+
+| | Antes de corregir | Tras corregir |
+|---|---|---|
+| Con error | 54 de 1.271 | **46 de 1.271** |
+| `AiContractSnapshotTests` en rojo | **sí** (la regresión) | **no** |
+| Nombres nuevos fuera de lo ya visto | 7 | **2**, los dos en `InventoryIntegrationTests` |
+| Fallos en clases que C40 toca | 0 | **0** |
+
+Limpio según el criterio del grupo 1.

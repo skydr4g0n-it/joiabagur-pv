@@ -721,3 +721,71 @@ def test_an_absent_abstention_parameter_falls_back_to_the_configured_default(
     assert enabled.abstained is True
     assert disabled.abstained is False
     assert disabled.groups
+
+
+# --- C40 · the filters the operator pressed reach retrieval in the free-query mode --------
+
+
+def test_free_query_forwards_filters_to_retrieval(
+    search, knowledge: InMemoryKnowledgeIndex, principal
+) -> None:
+    """The chips an operator pressed must narrow what M1 retrieves.
+
+    Without this the free-query mode knew *less* about what was asked than the plain
+    retrieval route did: the panel collected the filters and the assist request had nowhere
+    to carry them, so they were dropped at the boundary while the controls stayed pressed.
+    """
+    serve(
+        search,
+        knowledge,
+        principal,
+        payload={
+            "query": "anillo de plata",
+            "filters": {"materials": ["plata"], "category": "anillo"},
+        },
+    )
+
+    assert search.search_calls, "the free-query mode retrieves, so the port must be reached"
+    forwarded = search.search_calls[-1]["filters"]
+    assert list(forwarded.materials) == ["plata"]
+    assert forwarded.category == "anillo"
+
+
+def test_free_query_without_filters_behaves_as_before(
+    search, knowledge: InMemoryKnowledgeIndex, principal
+) -> None:
+    """Pure addition: a caller that sends no filters gets exactly what it got before."""
+    response = serve(search, knowledge, principal, payload={"query": "anillo de plata"})
+
+    forwarded = search.search_calls[-1]["filters"]
+    assert not forwarded.materials
+    assert forwarded.category is None
+    assert forwarded.family_id is None
+    assert not forwarded.exclude_product_ids
+    assert response.groups
+
+
+def test_anchored_mode_ignores_filters(
+    search, knowledge: InMemoryKnowledgeIndex, principal
+) -> None:
+    """An anchor already says what to retrieve, so a catalog filter can only contradict it.
+
+    Asserted rather than assumed: the field is on the shared request model, so nothing stops
+    a caller sending both. Honouring the filter here could drop the very piece the caller
+    anchored to — answering about a piece by not showing it.
+    """
+    response = serve(
+        search,
+        knowledge,
+        principal,
+        payload={
+            "product_id": str(PIECE),
+            "filters": {"category": "un-tipo-que-no-existe"},
+        },
+    )
+
+    assert len(response.groups) == 1
+    assert {member.product_id for member in response.groups[0].members} == {
+        str(PIECE),
+        str(SIBLING),
+    }

@@ -398,17 +398,23 @@ def test_the_published_contract_moved_by_addition_only(
     route or to one of its new models — an addition somewhere else would be a change to an
     existing surface wearing the clothes of an addition.
 
-    **The «before» is a fixture**: `fixtures/openapi-c32a-baseline.json`, the committed snapshot
-    as C32a left it (git blob `dd8df91d…`; `43f70fda…` in a Windows checkout with CRLF). Until
-    the independent verification of C32b this test compared the committed snapshot against the
-    generated one — which is `test_openapi_snapshot_is_stable` again — and would have passed
-    over a removed field once the snapshot was regenerated. Reading the baseline from git
-    instead would tie the suite to the history being present, which a shallow clone or a
-    container does not guarantee. **The next change that moves the contract replaces this
-    fixture and the allowed additions below, deliberately.**
+    **The «before» is a fixture**: `fixtures/openapi-c40-baseline.json`, the committed snapshot
+    as it stood at `93115cf`, before C40 moved it (`sha256 d8d48f87…`). Until the independent
+    verification of C32b this test compared the committed snapshot against the generated one —
+    which is `test_openapi_snapshot_is_stable` again — and would have passed over a removed
+    field once the snapshot was regenerated. Reading the baseline from git instead would tie the
+    suite to the history being present, which a shallow clone or a container does not guarantee.
+    **The next change that moves the contract replaces this fixture and the allowed additions
+    below, deliberately.**
+
+    **C40 is that next change**, and it replaced the C32a fixture this test used to carry. The
+    move is one property — `AssistRequest.filters` — and it is the smallest kind of move the
+    contract admits: the model it points at, `RetrievalFilters`, was already published, so the
+    difference is two leaves and no new schema. Measured over the whole document: 1300 leaves
+    before, 1302 after, **0 removed, 0 retyped, 0 changed in value**.
     """
     baseline = json.loads(
-        (Path(__file__).parent / "fixtures" / "openapi-c32a-baseline.json").read_text(
+        (Path(__file__).parent / "fixtures" / "openapi-c40-baseline.json").read_text(
             encoding="utf-8"
         )
     )
@@ -425,24 +431,26 @@ def test_the_published_contract_moved_by_addition_only(
     removed = sorted(set(before) - set(after))
     changed = sorted(path for path in set(before) & set(after) if before[path] != after[path])
     added = sorted(set(after) - set(before))
-    new_models = (
-        "AgentAssistRequest",
-        "AgentAssistResponse",
-        "AgentTraceIteration",
-        "AgentTraceTool",
-        "AgentTurn",
-        "AgentUsage",
-    )
-    allowed = ("$.paths./v1/assist/agent.",) + tuple(
-        f"$.components.schemas.{name}." for name in new_models
-    )
+
+    # C40 adds one optional property to one existing request model. No new route and no new
+    # schema: `RetrievalFilters` was already published for the retrieval and substitutes
+    # requests, so the addition is a reference to a model the contract already carried.
+    allowed = ("$.components.schemas.AssistRequest.properties.filters.",)
 
     assert removed == [], removed[:10]
     assert changed == [], changed[:10]
-    assert added, "the change adds a route; an empty difference would mean the fixture is stale"
+    assert added, "the change moves the contract; an empty difference would mean a stale fixture"
     assert [path for path in added if not path.startswith(allowed)] == []
-    for name in new_models:
-        assert any(path.startswith(f"$.components.schemas.{name}.") for path in added), name
+
+    # The property is optional, which is what makes the move safe for the .NET consumer C34
+    # wrote: a client that sends no `filters` gets exactly the behaviour it got before.
+    assert "filters" not in committed["components"]["schemas"]["AssistRequest"].get("required", [])
+
+    # And it points at the model that was already there rather than at a new one, which is the
+    # reason this move costs two leaves instead of a schema.
+    assert committed["components"]["schemas"]["AssistRequest"]["properties"]["filters"][
+        "$ref"
+    ].endswith("/RetrievalFilters")
 
     # And the shape of the deterministic response is pinned as a SET, not as a count.
     assert set(committed["components"]["schemas"]["AssistResponse"]["properties"]) == {
