@@ -142,7 +142,7 @@ están en el [informe](../../Proyecto%20Final%20AIEng/informes/c36-exploration-d
 
 - Change de OpenSpec: `openspec/changes/add-frontend-assist-card-and-family-disambiguation/` (C36),
   rama `c36-add-frontend-assist-card-and-family-disambiguation`
-- Ticket: [T-AIENG-036](../../../openspec/changes/add-frontend-assist-card-and-family-disambiguation/ticket.md)
+- Ticket: [T-AIENG-036](../../../openspec/changes/archive/2026-09-24-add-frontend-assist-card-and-family-disambiguation/ticket.md)
 - Informe de exploración: [`c36-exploration-decisions.md`](../../Proyecto%20Final%20AIEng/informes/c36-exploration-decisions.md)
 - Ficha del plan: [§3 · C36](../../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md)
 - Diseño RAG: [§7.7, §7.8, §15.12, §15.13](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md)
