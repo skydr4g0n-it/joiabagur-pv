@@ -54,10 +54,10 @@
 
 ## 6. Tramo 2 · el toggle y la copia
 
-- [ ] 6.1 Añadir al servicio y a los tipos del frontend la llamada asistida y la de disponibilidad, con **desenlaces tipados que nunca lanzan** y `rate-limited` como miembro propio, siguiendo `ai-search.service.ts`
-- [ ] 6.2 Añadir el **toggle** con la ruta rápida por defecto, el coste dicho antes de pulsar y **sin recordar la elección entre visitas**. Tests: `should default to the fast route`, `should state the cost difference before any search`, `should issue no request when the route changes`, `should not remember the route between visits`
-- [ ] 6.3 Ampliar `lib/assist-copy.ts` con **los dos rechazos como textos distintos**, `filters_too_narrow`, los dos estados de consulta sin ruta y «sin fuente verificable», con sus tests directos. Tests: `should word an out-of-domain refusal differently from a not-in-catalogue one`
-- [ ] 6.4 Implementar la **partición de avisos por sujeto**: los de consulta se pintan, los de pieza no, y un código desconocido cae en la etiqueta neutra. Tests: `should render a query warning`, `should not render a piece warning above the result list`, `should fall back to a neutral label for an unknown query warning`
+- [x] 6.1 Añadir al servicio y a los tipos del frontend la llamada asistida y la de disponibilidad, con **desenlaces tipados que nunca lanzan** y `rate-limited` como miembro propio, siguiendo `ai-search.service.ts`
+- [x] 6.2 Añadir el **toggle** con la ruta rápida por defecto, el coste dicho antes de pulsar y **sin recordar la elección entre visitas**. Tests: `should default to the fast route`, `should state the cost difference before any search`, `should issue no request when the route changes`, `should not remember the route between visits`
+- [x] 6.3 Ampliar `lib/assist-copy.ts` con **los dos rechazos como textos distintos**, `filters_too_narrow`, los dos estados de consulta sin ruta y «sin fuente verificable», con sus tests directos. Tests: `should word an out-of-domain refusal differently from a not-in-catalogue one`
+- [x] 6.4 Implementar la **partición de avisos por sujeto**: los de consulta se pintan, los de pieza no, y un código desconocido cae en la etiqueta neutra. Tests: `should render a query warning`, `should not render a piece warning above the result list`, `should fall back to a neutral label for an unknown query warning`
 
 ## 7. Tramo 2 · los dieciséis estados en pantalla
 

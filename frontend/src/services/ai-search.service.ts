@@ -11,14 +11,19 @@
 import apiClient from './api.service';
 import type {
   AiSearchAvailability,
+  FreeQuerySearchOutcome,
+  FreeQuerySearchRequest,
+  FreeQuerySearchResponse,
   AiSearchAvailabilityOutcome,
   AssistedSearchOutcome,
   AssistedSearchRequest,
   AssistedSearchResponse,
+  SearchFailureOutcome,
 } from '@/types/ai-search.types';
 import type { ApiError } from '@/types/api.types';
 
 const SEARCH_ENDPOINT = '/ai/search';
+const ASSISTED_ENDPOINT = '/ai/search/assisted';
 const AVAILABILITY_ENDPOINT = '/ai/search/availability';
 const SEARCH_EVENTS_ENDPOINT = '/ai/search-events';
 
@@ -35,7 +40,7 @@ function toMessages(errors: ApiError['errors'] | string[] | undefined): string[]
   return Object.values(errors).flat();
 }
 
-function toOutcome(error: unknown): AssistedSearchOutcome {
+function toOutcome(error: unknown): SearchFailureOutcome {
   const apiError = error as ApiError;
 
   switch (apiError?.statusCode) {
@@ -77,6 +82,27 @@ export const aiSearchService = {
   search: async (request: AssistedSearchRequest): Promise<AssistedSearchOutcome> => {
     try {
       const response = await apiClient.post<AssistedSearchResponse>(SEARCH_ENDPOINT, request);
+      return { kind: 'ok', response: response.data };
+    } catch (error) {
+      return toOutcome(error);
+    }
+  },
+
+  /**
+   * Runs the assisted answer: the other route of the panel's toggle. C40.
+   *
+   * Never throws, and maps `rate-limited` to a member of its own for the same reason the semantic
+   * path does: exceeding the allowance and the AI being unavailable have opposite remedies, and
+   * this route's allowance is three times tighter, so the case is three times more reachable.
+   */
+  searchAssisted: async (
+    request: FreeQuerySearchRequest,
+  ): Promise<FreeQuerySearchOutcome> => {
+    try {
+      const response = await apiClient.post<FreeQuerySearchResponse>(
+        ASSISTED_ENDPOINT,
+        request,
+      );
       return { kind: 'ok', response: response.data };
     } catch (error) {
       return toOutcome(error);

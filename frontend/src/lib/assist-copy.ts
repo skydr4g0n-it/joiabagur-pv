@@ -33,13 +33,13 @@ import type { PitchStatus, SubstitutesOutcome } from '@/types/sales-assist.types
 export const SIZE_LABEL_MISSING = 'size_label_missing';
 
 /**
- * The Spanish for each warning code the two routes of C34 can emit.
+ * The Spanish for each warning code the assistance routes can emit.
  *
- * Five entries, and five is the whole reachable vocabulary. The two router refusal codes —
- * `query_out_of_domain` and `query_not_in_catalogue` — deliberately have **no row here**: the AI
- * service's intent classifier runs only in the free-query mode and both of these routes are
- * always anchored, so neither can arrive. Writing their Spanish would buy two green tests over
- * impossible paths; instead they fall to the neutral label, and a test witnesses that.
+ * **The two router refusal codes gained a row in C40, and until then their absence was correct.**
+ * C36 left `query_out_of_domain` and `query_not_in_catalogue` without one on the reasoning that
+ * the intent classifier runs only in the free-query mode, and that mode had no screen — so both
+ * were unreachable, and writing their Spanish would have bought two green tests over impossible
+ * paths. C40 gives that mode a screen, which makes them reachable and makes the copy owed.
  *
  * A lookup rather than a conditional, so a code added by a later version of the service is a new
  * entry here instead of a change to a component.
@@ -50,7 +50,61 @@ const WARNING_LABELS: Record<string, string> = {
   family_members_out_of_stock: 'Alguna variante de la familia está agotada aquí',
   knowledge_not_covered: 'La documentación no cubre esta pregunta',
   [SIZE_LABEL_MISSING]: 'Sin talla declarada',
+
+  // --- the query's own warnings, reachable since C40 -------------------------------------
+
+  // **Two refusals, two texts, and the distinction is the point.** What an operator says to a
+  // customer differs between a trade the shop does not practise and a piece it does not carry,
+  // and the AI service emits two codes precisely so the two rates stay separable. Collapsing
+  // them into one sentence here would throw away on the screen the distinction the service went
+  // to the trouble of making on the wire.
+  query_out_of_domain: 'Esto no es una pregunta de joyería',
+  query_not_in_catalogue: 'No trabajamos ese tipo de pieza',
+
+  // Neither of the two above is an abstention, which means something else: that the catalogue
+  // was searched and nothing matched.
+  filters_too_narrow: 'Hay piezas que encajan con tu descripción, pero ninguna pasa los filtros',
 };
+
+/**
+ * Codes whose subject is **the query** rather than a piece.
+ *
+ * The partition is by subject and not by list, because the AI service stacks both kinds into one
+ * array. A warning about a piece describes the *first member of the first group*, so painting it
+ * above a list of fifteen results would state something false about fourteen of them — measured,
+ * on a set of fifteen pieces carrying `family_has_variants` and `size_label_missing` for a SKU
+ * whose visible group had a single member.
+ *
+ * The backend already filters to these before sending, and the screen filters again. That is
+ * deliberate rather than redundant: the rule is a property of what may be shown, and a screen
+ * that trusted the payload would render whatever a later version of the service decides to stack
+ * into that array.
+ */
+export const QUERY_WARNING_CODES: readonly string[] = [
+  'query_out_of_domain',
+  'query_not_in_catalogue',
+  'knowledge_not_covered',
+  'filters_too_narrow',
+];
+
+/**
+ * Whether a warning code describes the query, and may therefore be shown above the results.
+ *
+ * An **allow-list**, not a deny-list: a code this version does not know is treated as being about
+ * a piece and stays off the screen. The other way round, a code added later would leak onto a
+ * banner by default, and the failure mode of that is a false statement about every result under
+ * it.
+ */
+export function isQueryWarning(code: string): boolean {
+  return QUERY_WARNING_CODES.includes(code);
+}
+
+/**
+ * The warnings a free-query result list may show, from whatever the service sent.
+ */
+export function queryWarnings(warnings: readonly string[]): string[] {
+  return warnings.filter(isQueryWarning);
+}
 
 /**
  * The label for a code this screen does not know.
@@ -218,6 +272,74 @@ export function claimScopeLabel(claimScope: string): string {
 /** The sentence an establishment-scope citation carries, and a general one does not. */
 export const ESTABLISHMENT_CLAIM_NOTE =
   'Conviene confirmarlo en tienda antes de trasladárselo a un cliente.';
+
+/**
+ * What to say when an argument arrived with no citation the gate could verify.
+ *
+ * **A discreet line, never an alert**, and the wording is load-bearing. The integrity gate
+ * withdraws a citation whose supporting span it cannot match — measured in the free-query mode at
+ * 26.4 % of declared citations, leaving 24.3 % of knowledge answers with none at all, roughly
+ * twice the anchored rate. At that frequency an alert would train an operator to ignore it.
+ *
+ * And it must **not insinuate an invention**. The citation existed; what could not be verified is
+ * the span that was supposed to support it. Saying "this may be made up" about a case that is
+ * usually a paraphrase would be both false and corrosive to the one thing the gate is for.
+ */
+export const NO_VERIFIABLE_SOURCE =
+  'Sin fuente verificable para este texto';
+
+/* -------------------------------------------------------------------------------------------
+ * The two states with no route (C40)
+ * ---------------------------------------------------------------------------------------- */
+
+/**
+ * `route=none` is **two states**, and only `intent` tells them apart.
+ *
+ * Both arrive with results and without an argument, and they look identical on the wire except
+ * for that one field — which is exactly why this lives in a named function instead of a ternary
+ * inside a component.
+ *
+ * The distinction is not cosmetic. With `in_domain` the classifier ran and contradicted itself:
+ * it admitted the query and then declined to say which index answers it, so asking the operator
+ * to put it another way is fair. With `unclassified` the classifier **never ran** — no
+ * credential, a two-second timeout with no retry, or a reply that did not parse — and asking
+ * them to rephrase would be blaming them for an absent credential. It is not a theoretical path
+ * either: with the router's credential missing, *every* query lands there.
+ */
+export interface NoRouteMessage {
+  title: string;
+  body: string;
+  /** Null when there is nothing useful for the operator to do. */
+  action: string | null;
+}
+
+export function noRouteMessage(intent: string | null | undefined): NoRouteMessage {
+  if (intent === 'unclassified') {
+    return {
+      title: 'El argumentario no está disponible ahora mismo',
+      body: 'Los resultados son reales y puedes trabajar con ellos; lo que falta es el texto.',
+      // Deliberately null: the operator did nothing wrong and there is nothing they can do.
+      action: null,
+    };
+  }
+
+  return {
+    title: 'No he acabado de entender la consulta',
+    body: 'Te enseño lo que he encontrado, pero no he sabido redactar un argumentario sobre ello.',
+    action: 'Prueba a formularla de otra manera.',
+  };
+}
+
+/**
+ * Whether the operator should be invited to rephrase.
+ *
+ * Exported on its own because it is the assertion a test can make directly, and because the
+ * negative case is the one that matters: inviting a rephrase when the classifier never ran is
+ * the screen blaming a person for a configuration.
+ */
+export function invitesRephrasing(intent: string | null | undefined): boolean {
+  return noRouteMessage(intent).action !== null;
+}
 
 /* -------------------------------------------------------------------------------------------
  * Substitutes

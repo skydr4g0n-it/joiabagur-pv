@@ -719,20 +719,26 @@ describe('SalesAssistCardPage — warnings', () => {
     expect(rows[0]).toHaveTextContent('Quedan pocas unidades');
   });
 
-  it('should fall back to the neutral label for the two router refusal codes', async () => {
+  it('should carry the copy of the two router refusal codes even though this screen cannot reach them', async () => {
     answers(response({ warnings: ['query_out_of_domain', 'query_not_in_catalogue'] }));
     renderCard();
     await served();
 
     const rows = await screen.findAllByTestId('assist-warning');
 
-    // Neither can reach this screen: the intent classifier runs only in the free-query mode and
-    // both of these routes are always anchored. Rather than writing Spanish for an impossible
-    // path, what is tested is that they degrade like any other unknown.
+    // **This test asserted the neutral fallback until C40.** The reasoning was right at the
+    // time: the intent classifier runs only in the free-query mode, that mode had no screen, so
+    // neither code could arrive anywhere and writing their Spanish would have been copy for an
+    // impossible path. C40 gives the mode a screen, the copy table gained both rows, and this
+    // screen picks them up for free.
+    //
+    // Neither can reach *this* card — its two routes are always anchored — so what is held here
+    // is only that the shared table does not leave them unlabelled. The tolerance rule itself is
+    // still witnessed, by the unknown-code test above.
     expect(rows).toHaveLength(2);
     for (const row of rows) {
-      expect(row).toHaveTextContent(UNKNOWN_WARNING_LABEL);
-      expect(row).toHaveAttribute('data-known', 'false');
+      expect(row).not.toHaveTextContent(UNKNOWN_WARNING_LABEL);
+      expect(row).toHaveAttribute('data-known', 'true');
     }
   });
 

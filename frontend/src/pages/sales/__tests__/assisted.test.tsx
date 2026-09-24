@@ -16,6 +16,7 @@ import * as pointOfSaleService from '@/services/point-of-sale.service';
 import type {
   AiSearchAvailability,
   AssistedSearchOutcome,
+  FreeQuerySearchResponse,
   AssistedSearchResponse,
   AssistedSearchResult,
 } from '@/types/ai-search.types';
@@ -23,6 +24,7 @@ import type {
 vi.mock('@/services/ai-search.service', () => ({
   aiSearchService: {
     search: vi.fn(),
+    searchAssisted: vi.fn(),
     getAvailability: vi.fn(),
     reportSelection: vi.fn(),
   },
@@ -117,6 +119,31 @@ function availabilityIs(overrides: Partial<AiSearchAvailability> = {}) {
   });
 }
 
+/** An assisted answer with one family of one member, hydrated. */
+function assistedResponse(
+  overrides: Partial<FreeQuerySearchResponse> = {},
+): FreeQuerySearchResponse {
+  return {
+    groups: [{ familyId: 'fam-1', familyLabel: 'Aro fino', members: [result()] }],
+    pitch: 'Las tres son sobrias y van bien a diario.',
+    pitchStatus: 'generated',
+    citations: [],
+    warnings: [],
+    clarificationQuestion: null,
+    intent: 'in_domain',
+    abstained: false,
+    aiAvailable: true,
+    degradedReason: null,
+    usage: null,
+    searchEventId: 'event-fq',
+    pointOfSaleId: 'pos-1',
+    candidatesReturned: 1,
+    survivedHydration: 1,
+    traceId: 'trace-fq',
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   role = 'Operator';
@@ -124,6 +151,10 @@ beforeEach(() => {
   vi.mocked(aiSearchService.reportSelection).mockResolvedValue(undefined);
   availabilityIs();
   answers(response());
+  vi.mocked(aiSearchService.searchAssisted).mockResolvedValue({
+    kind: 'ok',
+    response: assistedResponse(),
+  });
 });
 
 describe('AssistedSalesSearchPage — cost of a search', () => {
@@ -741,5 +772,153 @@ describe('AssistedSalesSearchPage — availability before searching', () => {
     // shop must not cost a model call.
     await waitFor(() => expect(aiSearchService.getAvailability).toHaveBeenCalledWith('pos-2'));
     expect(aiSearchService.search).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The route toggle (C40).
+ *
+ * Two ways to answer the same query. What these hold is the cost discipline the panel has had
+ * since C16, applied to a route that costs four times the time budget and three times the quota.
+ */
+describe('AssistedSalesSearchPage — the route toggle', () => {
+  it('should default to the fast route', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await ready();
+
+    await user.type(screen.getByLabelText('¿Qué busca el cliente?'), 'anillo');
+    await user.click(screen.getByRole('button', { name: /^Buscar$/ }));
+
+    // The cheap one, on every visit. The expensive face is not what an operator lands on.
+    await waitFor(() => expect(aiSearchService.search).toHaveBeenCalled());
+    expect(aiSearchService.searchAssisted).not.toHaveBeenCalled();
+  });
+
+  it('should state the cost difference before any search', async () => {
+    renderPanel();
+    await ready();
+
+    const toggle = await screen.findByTestId('search-route-toggle');
+
+    // Stated before pressing, not after: an operator who discovers the difference by waiting
+    // seven seconds has already paid it.
+    expect(toggle).toHaveTextContent(/30 búsquedas por minuto/);
+    expect(toggle).toHaveTextContent(/10 búsquedas por minuto/);
+    expect(toggle).toHaveTextContent(/puede tardar unos segundos/i);
+    expect(aiSearchService.search).not.toHaveBeenCalled();
+  });
+
+  it('should issue no request when the route changes', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await ready();
+
+    await user.click(await screen.findByTestId('route-option-assisted'));
+
+    // Changing route picks what the NEXT search will do. The panel's first rule is that a
+    // search happens only when the operator asks for one.
+    expect(aiSearchService.search).not.toHaveBeenCalled();
+    expect(aiSearchService.searchAssisted).not.toHaveBeenCalled();
+  });
+
+  it('should issue exactly one assisted request when that route is chosen', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await ready();
+
+    await user.click(await screen.findByTestId('route-option-assisted'));
+    await user.type(screen.getByLabelText('¿Qué busca el cliente?'), 'se puede mojar la plata');
+    await user.click(screen.getByRole('button', { name: /^Buscar$/ }));
+
+    await waitFor(() => expect(aiSearchService.searchAssisted).toHaveBeenCalledTimes(1));
+    expect(aiSearchService.search).not.toHaveBeenCalled();
+  });
+
+  it('should not remember the route between visits', async () => {
+    const user = userEvent.setup();
+    const first = renderPanel();
+    await ready();
+
+    await user.click(await screen.findByTestId('route-option-assisted'));
+    expect(await screen.findByTestId('route-option-assisted')).toHaveAttribute('aria-checked', 'true');
+
+    // A second visit, as an operator gets by navigating away and back.
+    first.unmount();
+    vi.clearAllMocks();
+    vi.mocked(pointOfSaleService.getPointsOfSale).mockResolvedValue([POS_ONE]);
+    availabilityIs();
+    answers(response());
+
+    renderPanel();
+    await ready();
+
+    // Remembering the expensive face is how it gets spent without anybody deciding to.
+    expect(await screen.findByTestId('route-option-semantic')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId('route-option-assisted')).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('should disable the assisted option with its reason when the assisted path is off', async () => {
+    availabilityIs({
+      assistedAnswerAvailable: false,
+      assistedAnswerUnavailableReason: 'switched_off',
+    });
+
+    renderPanel();
+    await ready();
+
+    const option = await screen.findByTestId('route-option-assisted');
+
+    // Disabled with its reason rather than failing when pressed: an option that throws on click
+    // is the same lie this change exists to remove, moved one step later.
+    expect(option).toBeDisabled();
+    expect(screen.getByTestId('route-unavailable-assisted')).toHaveTextContent(
+      /desactivada en esta tienda/,
+    );
+  });
+
+  it('should render the assisted answer with its argument and its groups', async () => {
+    const user = userEvent.setup();
+    vi.mocked(aiSearchService.searchAssisted).mockResolvedValue({
+      kind: 'ok',
+      response: assistedResponse(),
+    });
+
+    renderPanel();
+    await ready();
+
+    await user.click(await screen.findByTestId('route-option-assisted'));
+    await user.type(screen.getByLabelText('¿Qué busca el cliente?'), 'algo de plata');
+    await user.click(screen.getByRole('button', { name: /^Buscar$/ }));
+
+    expect(await screen.findByTestId('assisted-pitch')).toHaveTextContent(
+      /sobrias y van bien a diario/,
+    );
+    expect(await screen.findByTestId('assisted-search-result')).toBeInTheDocument();
+  });
+
+  it('should not render a piece warning above the result list', async () => {
+    const user = userEvent.setup();
+    vi.mocked(aiSearchService.searchAssisted).mockResolvedValue({
+      kind: 'ok',
+      response: assistedResponse({
+        warnings: ['family_has_variants', 'size_label_missing', 'knowledge_not_covered'],
+      }),
+    });
+
+    renderPanel();
+    await ready();
+
+    await user.click(await screen.findByTestId('route-option-assisted'));
+    await user.type(screen.getByLabelText('¿Qué busca el cliente?'), 'algo de plata');
+    await user.click(screen.getByRole('button', { name: /^Buscar$/ }));
+
+    const banner = await screen.findByTestId('assisted-query-warnings');
+
+    // A warning about a piece describes the first member of the first group, so above a list it
+    // would state something false about every other result.
+    expect(banner).toHaveTextContent(/La documentación no cubre esta pregunta/);
+    expect(banner).not.toHaveTextContent(/otras variantes/);
+    expect(banner).not.toHaveTextContent(/Sin talla declarada/);
   });
 });

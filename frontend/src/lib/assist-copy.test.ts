@@ -22,6 +22,11 @@ import {
   isEstablishmentClaim,
   isKnownWarning,
   pitchMessage,
+  isQueryWarning,
+  queryWarnings,
+  noRouteMessage,
+  invitesRephrasing,
+  NO_VERIFIABLE_SOURCE,
   questionTooLongMessage,
   showsCitations,
   substitutesMessage,
@@ -65,13 +70,15 @@ describe('warningLabel', () => {
     expect(REACHABLE_CODES.filter(isKnownWarning)).toHaveLength(5);
   });
 
-  it('should label a router refusal code with the neutral fallback', () => {
-    // These two are emitted only by the intent classifier, which runs only in the free-query
-    // mode, and both routes of this screen are always anchored — so neither can arrive. Rather
-    // than writing Spanish for an impossible path, the tolerance rule is what gets tested.
+  it('should label a router refusal code now that the free-query mode has a screen', () => {
+    // **This test asserted the opposite until C40, and the reversal is the point of that change
+    // rather than a slip.** C36 left these two without copy on sound reasoning: the intent
+    // classifier runs only in the free-query mode, that mode had no screen, so neither code
+    // could arrive, and writing their Spanish would have bought two green tests over impossible
+    // paths. C40 gives the mode a screen, which makes them reachable and the copy owed.
     for (const code of ROUTER_REFUSAL_CODES) {
-      expect(isKnownWarning(code)).toBe(false);
-      expect(warningLabel(code)).toBe(UNKNOWN_WARNING_LABEL);
+      expect(isKnownWarning(code)).toBe(true);
+      expect(warningLabel(code)).not.toBe(UNKNOWN_WARNING_LABEL);
     }
   });
 
@@ -322,5 +329,116 @@ describe('suggested questions', () => {
 describe('questionTooLongMessage', () => {
   it('should name the limit so the operator knows what to cut to', () => {
     expect(questionTooLongMessage(500)).toContain('500');
+  });
+});
+
+/* -------------------------------------------------------------------------------------------
+ * The query's own copy (C40)
+ * ---------------------------------------------------------------------------------------- */
+
+describe('the two refusals', () => {
+  it('should word an out-of-domain refusal differently from a not-in-catalogue one', () => {
+    const outOfDomain = warningLabel('query_out_of_domain');
+    const notInCatalogue = warningLabel('query_not_in_catalogue');
+
+    // The service emits two codes precisely so the two rates stay separable, and what an
+    // operator says to a customer differs between a trade the shop does not practise and a
+    // piece it does not carry. One sentence for both would throw that away on the screen.
+    expect(outOfDomain).not.toBe(notInCatalogue);
+    expect(outOfDomain).not.toBe(UNKNOWN_WARNING_LABEL);
+    expect(notInCatalogue).not.toBe(UNKNOWN_WARNING_LABEL);
+  });
+
+  it('should not word either refusal like an abstention', () => {
+    // An abstention means the catalogue was searched and nothing matched, which is a different
+    // fact about a different thing.
+    for (const code of ['query_out_of_domain', 'query_not_in_catalogue']) {
+      expect(warningLabel(code)).not.toMatch(/no he encontrado|nada que encaje/i);
+    }
+  });
+
+  it('should show no raw code to the operator', () => {
+    for (const code of ['query_out_of_domain', 'query_not_in_catalogue', 'filters_too_narrow']) {
+      expect(warningLabel(code)).not.toContain('_');
+    }
+  });
+});
+
+describe('the partition of warnings by subject', () => {
+  it('should treat a query warning as showable', () => {
+    expect(isQueryWarning('query_out_of_domain')).toBe(true);
+    expect(isQueryWarning('knowledge_not_covered')).toBe(true);
+    expect(isQueryWarning('filters_too_narrow')).toBe(true);
+  });
+
+  it('should not treat a piece warning as showable', () => {
+    // It describes the FIRST MEMBER OF THE FIRST GROUP, so above a list of fifteen it would
+    // state something false about fourteen of them.
+    expect(isQueryWarning('family_has_variants')).toBe(false);
+    expect(isQueryWarning(SIZE_LABEL_MISSING)).toBe(false);
+    expect(isQueryWarning('stock_critical')).toBe(false);
+  });
+
+  it('should keep an unknown code off the screen rather than on it', () => {
+    // An allow-list and not a deny-list: a code added by a later version of the service leaking
+    // onto a banner would be a false statement about every result under it.
+    expect(isQueryWarning('invented_by_a_later_change')).toBe(false);
+  });
+
+  it('should filter a mixed list down to the query ones, keeping their order', () => {
+    const mixed = [
+      'family_has_variants',
+      'knowledge_not_covered',
+      SIZE_LABEL_MISSING,
+      'query_out_of_domain',
+    ];
+
+    expect(queryWarnings(mixed)).toEqual(['knowledge_not_covered', 'query_out_of_domain']);
+  });
+});
+
+describe('the two states with no route', () => {
+  it('should invite rephrasing when the classifier could not route', () => {
+    // in_domain: the classifier ran and contradicted itself — it admitted the query and then
+    // declined to say which index answers it. Asking for another wording is fair.
+    const message = noRouteMessage('in_domain');
+
+    expect(message.action).not.toBeNull();
+    expect(invitesRephrasing('in_domain')).toBe(true);
+  });
+
+  it('should not invite rephrasing when the classifier did not run', () => {
+    // unclassified: no credential, a two-second timeout with no retry, or a reply that did not
+    // parse. Asking the operator to rephrase would blame them for an absent credential — and it
+    // is not a theoretical path: with the router's credential missing, every query lands here.
+    const message = noRouteMessage('unclassified');
+
+    expect(message.action).toBeNull();
+    expect(invitesRephrasing('unclassified')).toBe(false);
+  });
+
+  it('should word the two states differently', () => {
+    expect(noRouteMessage('in_domain').title).not.toBe(noRouteMessage('unclassified').title);
+  });
+
+  it('should treat an absent intent as the classifier having run', () => {
+    // The conservative side: inviting a rephrase is a mild ask, while withholding it from
+    // somebody who could act would leave them with no next step at all.
+    expect(invitesRephrasing(null)).toBe(true);
+    expect(invitesRephrasing(undefined)).toBe(true);
+  });
+});
+
+describe('a citation the gate could not verify', () => {
+  it('should state it without alarming', () => {
+    // It fires on about a quarter of knowledge answers. At that frequency an alert would train
+    // an operator to ignore it.
+    expect(NO_VERIFIABLE_SOURCE).toMatch(/sin fuente verificable/i);
+  });
+
+  it('should not describe a withdrawn citation as invented', () => {
+    // The citation existed; what could not be verified is the span that supported it. Saying
+    // "this may be made up" would be false and would corrode the one thing the gate is for.
+    expect(NO_VERIFIABLE_SOURCE).not.toMatch(/invent|falso|inventad/i);
   });
 });

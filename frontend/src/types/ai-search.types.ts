@@ -7,6 +7,10 @@
  * price, stock and availability, so every field below that describes a product is catalog truth.
  */
 
+// The two the assisted route shares with the sale card of C36, imported rather than restated:
+// a second declaration of the same wire shape drifts the first time one of them is corrected.
+import type { PitchStatus, SalesAssistCitation } from '@/types/sales-assist.types';
+
 /** What the browser sends to run an assisted search. */
 export interface AssistedSearchRequest {
   /** Natural-language query typed by the operator. */
@@ -145,12 +149,15 @@ export type AiSearchAvailabilityOutcome =
  * distinguishable from the AI service being unavailable: one is a fault, the other is the system
  * protecting itself, and they have opposite remedies.
  */
-export type AssistedSearchOutcome =
-  | { kind: 'ok'; response: AssistedSearchResponse }
+export type SearchFailureOutcome =
   | { kind: 'rate-limited' }
   | { kind: 'forbidden' }
   | { kind: 'invalid'; errors: string[] }
   | { kind: 'error'; message: string };
+
+export type AssistedSearchOutcome =
+  | { kind: 'ok'; response: AssistedSearchResponse }
+  | SearchFailureOutcome;
 
 /** The four ways the panel can end up with nothing to show, plus the normal one. */
 export type AssistedSearchDisplayState =
@@ -159,3 +166,108 @@ export type AssistedSearchDisplayState =
   | 'no-assortment'
   | 'degraded'
   | 'rate-limited';
+
+/* -------------------------------------------------------------------------------------------
+ * The assisted route of the toggle (C40)
+ * ---------------------------------------------------------------------------------------- */
+
+/** One family of the assisted answer, with the members this shop carries. */
+export interface FreeQueryGroup {
+  familyId: string | null;
+  familyLabel: string | null;
+  /**
+   * Members in the order the service ranked them. Never re-sorted on the client: re-sorting
+   * would make the rank measure this code instead of retrieval quality.
+   */
+  members: AssistedSearchResult[];
+}
+
+/**
+ * What the assisted answer cost. Present only for an administrator.
+ *
+ * Inputs of a cost and never the cost: tokens and model, never euros. A tariff written into a
+ * screen is wrong the day the provider moves it.
+ */
+export interface FreeQueryUsage {
+  model: string | null;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  promptVersion: string | null;
+  aiMs: number | null;
+  totalMs: number;
+}
+
+/**
+ * The answer to a free query.
+ *
+ * **Sixteen states are reachable, and they are combinations of these fields rather than values
+ * of any one of them.** The screen gets them wrong in the combinations, so the table that
+ * enumerates them — `Documentos/Proyecto Final AIEng/informes/c40-m1-panel-states.md` — is the
+ * thing to read before changing how any of this renders.
+ */
+export interface FreeQuerySearchResponse {
+  groups: FreeQueryGroup[];
+  pitch?: string | null;
+  pitchStatus: PitchStatus;
+  citations: SalesAssistCitation[];
+  /**
+   * Warning codes about **the query**, never about a piece. The backend filters to these and the
+   * screen filters again, which is deliberate rather than redundant.
+   */
+  warnings: string[];
+  /** The question the service asked back, verbatim. Rendered as it arrives and never rewritten. */
+  clarificationQuestion?: string | null;
+  /**
+   * What the router decided. The **only** thing that tells the two no-route states apart, and
+   * they need different copy.
+   */
+  intent?: string | null;
+  abstained: boolean;
+  aiAvailable: boolean;
+  /** Why the AI path degraded, from the closed vocabulary. Null when it did not. */
+  degradedReason?: string | null;
+  /** Null for anyone but an administrator. */
+  usage?: FreeQueryUsage | null;
+  searchEventId?: string | null;
+  pointOfSaleId?: string | null;
+  candidatesReturned: number;
+  survivedHydration: number;
+  traceId?: string | null;
+}
+
+/**
+ * How an assisted answer ended, from the panel's point of view.
+ *
+ * `rate-limited` is a member of its own for the reason the semantic path already holds it apart:
+ * exceeding the allowance and the AI being unavailable have **opposite remedies** — one resolves
+ * by waiting a few seconds, the other does not resolve by waiting at all — so folding them
+ * together would show an outage message to an operator who only has to pause.
+ */
+export type FreeQuerySearchOutcome =
+  | { kind: 'ok'; response: FreeQuerySearchResponse }
+  | SearchFailureOutcome;
+
+/**
+ * Which route the operator chose for the query they typed.
+ *
+ * Not persisted anywhere. The default is the cheap one on every visit, because remembering the
+ * expensive face is how it gets spent without anybody deciding to.
+ */
+export type SearchRoute = 'semantic' | 'assisted';
+
+/** What the browser sends to run an assisted answer. */
+export interface FreeQuerySearchRequest {
+  /** What the operator typed, in their own words. */
+  query: string;
+  /** The shop to answer about. Required: searching every shop is a scope of its own. */
+  pointOfSaleId: string;
+  /** Families wanted. The server falls back to its configured default. */
+  pageSize?: number;
+  /** The visit this search belongs to, so a rephrasing is not counted as an abandoned query. */
+  searchSessionId?: string;
+  /** Canonical material terms selected in the quick filters. */
+  materials?: string[];
+  /** Optional piece category. */
+  category?: string;
+}

@@ -187,3 +187,51 @@ describe('aiSearchService.getAvailability', () => {
     expect(outcome).toEqual({ kind: 'unknown' });
   });
 });
+
+/**
+ * The assisted route (C40).
+ *
+ * Same discipline as the semantic one — never throws, typed outcomes — and the rate-limit member
+ * matters three times more here: this route's allowance is a third of search's.
+ */
+describe('aiSearchService.searchAssisted', () => {
+  const assistedRequest = {
+    query: '¿la plata se puede mojar?',
+    pointOfSaleId: '22222222-2222-2222-2222-222222222222',
+  };
+
+  it('should post to the assisted endpoint, which is not the semantic one', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { groups: [] } } as never);
+
+    await aiSearchService.searchAssisted(assistedRequest);
+
+    // Two endpoints and not a `mode` field: a rate limit is an attribute of an endpoint, so one
+    // route would have to pick a single allowance for both.
+    expect(apiClient.post).toHaveBeenCalledWith('/ai/search/assisted', assistedRequest);
+  });
+
+  it('should keep a throttle distinguishable from an outage', async () => {
+    vi.mocked(apiClient.post).mockRejectedValue({ statusCode: 429 });
+
+    const outcome = await aiSearchService.searchAssisted(assistedRequest);
+
+    // Opposite remedies: one resolves by waiting a few seconds, the other does not resolve by
+    // waiting at all.
+    expect(outcome).toEqual({ kind: 'rate-limited' });
+    expect(outcome.kind).not.toBe('error');
+  });
+
+  it('should return a typed outcome instead of throwing on any failure', async () => {
+    for (const [statusCode, kind] of [
+      [403, 'forbidden'],
+      [400, 'invalid'],
+      [500, 'error'],
+    ] as const) {
+      vi.mocked(apiClient.post).mockRejectedValue({ statusCode });
+
+      const outcome = await aiSearchService.searchAssisted(assistedRequest);
+
+      expect(outcome.kind).toBe(kind);
+    }
+  });
+});

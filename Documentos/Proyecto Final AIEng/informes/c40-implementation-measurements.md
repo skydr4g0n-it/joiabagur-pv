@@ -456,3 +456,59 @@ modo de fallo que este change existe para retirar.
 `perl -0pi -e` sobre los ficheros de este árbol **falla en silencio** por los CRLF: no da error,
 simplemente no sustituye. Costó tres ediciones que parecían aplicadas y no lo estaban. Para
 ediciones multilínea, `node` con el script en un fichero aparte.
+
+---
+
+## 6 · Tramo 2 · el toggle y la copia (grupo 6)
+
+| Suite | Antes del grupo | Tras el grupo 6 |
+|---|---|---|
+| `frontend` | 113 de 740, 14 ficheros | **113 de 764, 14 ficheros** — conjunto de nombres **idéntico** |
+| `npm run build` | verde | **verde** |
+| `openspec validate --all --strict` | 62 passed, 0 failed | **62 passed, 0 failed** |
+
++24 tests, los 24 nuevos pasan. Cero nombres nuevos y cero desaparecidos.
+
+### Dos tests de C36 afirmaban lo contrario, y los dos eran correctos cuando se escribieron
+
+C36 dejó `query_out_of_domain` y `query_not_in_catalogue` **sin copia**, y lo razonó: el
+clasificador de intención corre **sólo** en el modo libre, ese modo no tenía pantalla, así que
+ninguno de los dos códigos podía llegar a ninguna parte. Escribir su castellano habría sido copia
+para un camino imposible — *«dos tests verdes sobre caminos imposibles»*, en sus palabras.
+
+**C40 le da pantalla al modo libre**, lo que vuelve los códigos alcanzables y la copia debida. Los
+dos tests que fijaban la etiqueta neutra se reescriben:
+
+| Test | Dónde | Qué cambia |
+|---|---|---|
+| `should label a router refusal code…` | `assist-copy.test.ts` | Inversión **total**: ahora son alcanzables y tienen copia |
+| `should carry the copy of the two router refusal codes…` | `assist.test.tsx` | Sólo la etiqueta. **La ficha sigue sin poder alcanzarlos** |
+
+La diferencia entre los dos no se aplana. En la tabla de copia la inversión es completa. En la
+ficha **no**: sus dos rutas siguen siendo ancladas, el clasificador nunca corre y los códigos
+siguen sin poder llegar ahí; lo único que cambió es que la tabla compartida ya no los deja sin
+etiquetar. El test lo dice así en vez de fingir que la ficha ganó un camino que no tiene.
+
+**Y el segundo lo encontró la comparación por nombres, no la búsqueda.** Busqué el patrón en el
+fichero donde vive la tabla y no se me ocurrió que la página de la ficha tuviera su propia
+aserción sobre el mismo hecho. Dos ficheros, la misma propiedad.
+
+### La partición de avisos es una lista de permitidos en los dos lados
+
+Backend y pantalla filtran, y la duplicación es deliberada: la regla es una propiedad de **qué
+puede mostrarse**, y una pantalla que confiara en el payload renderizaría lo que una versión
+posterior del servicio decida apilar en ese array. Con lista de permitidos, un código nuevo se
+queda fuera por defecto; con lista de prohibidos entraría en una banda que afirmaría algo falso
+sobre cada resultado debajo.
+
+### El toggle no recuerda, y eso es la mitad de su diseño
+
+Estado de componente y deliberadamente nada más: ni `localStorage`, ni parámetro de consulta, ni
+campo de perfil. Recordar la cara cara es como se gasta sin que nadie lo decida, y la ruta
+asistida cuesta **cuatro veces** el presupuesto de tiempo y **tres veces** el cupo. El coste se
+dice **antes** de pulsar —30 búsquedas por minuto contra 10, respuesta inmediata contra unos
+segundos— porque quien lo descubre esperando siete segundos ya lo ha pagado.
+
+Con la ruta asistida apagada, su opción se **deshabilita con su motivo** en vez de fallar al
+pulsarla: una opción que revienta al hacer clic es la misma mentira que este change vino a
+retirar, movida un paso más tarde.
