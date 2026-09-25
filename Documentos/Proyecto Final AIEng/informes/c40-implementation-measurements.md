@@ -981,7 +981,7 @@ mira. Son tres comprobaciones y no una:
 |---|---|---|
 | **.NET lo asigna** | el servicio escribe el campo, no sólo lo declara | **38 de 38** |
 | **TypeScript lo declara** | el tipo del frontal lo tiene | **38 de 38** |
-| **La pantalla lo lee** | hay un componente que lo pinta | **31 de 38** |
+| **La pantalla lo lee** | hay un componente que lo pinta | **34 de 38** al auditar · **35 de 38** al cierre |
 
 Y la dirección inversa, que es como un tipo envejece sin que nada falle —un campo en TypeScript que
 el backend no emite se lee siempre como nulo y nadie se entera—:
@@ -1040,7 +1040,19 @@ el backend no emite se lee siempre como nulo y nadie se entera—:
 | `clarificationQuestion` | `pitch-block` |
 | **`intent`** · **`promptVersion`** · **`traceId`** | **no se pintan** — ver abajo |
 
-### Los siete campos sin lector, y por qué
+### Los campos sin lector, y por qué
+
+**Recontado al cierre, y la cifra se movió.** La auditoría se corrió en este grupo, **antes** de
+que el grupo 13 construyera el embudo de administrador — que es precisamente el consumidor de
+`usage`. Así que de los **cuatro** campos raíz sin lector que encontró, al cerrar el change quedan
+**tres**: `SalesAssistResponse.traceId`, `FreeQuerySearchResponse.traceId` y
+`AssistedSearchResponse.unappliedFilters`. Sobre los 82 pares (clase, campo) auditados, los
+nombres sin lector pasan de once a **seis**: `traceId`, `unappliedFilters`, `familyId`,
+`docType`, `score` y `totalTokens`.
+
+Ese último aparece por el embudo y **es correcto que no se pinte**: el requisito pide «the input
+and output token counts», y el total es su suma — enseñarlo sería una tercera cifra que no añade
+nada y que puede contradecir a las otras dos si el proveedor las redondea.
 
 **Ninguno es una supresión involuntaria.** Ése es el resultado de la auditoría, y es lo que había
 que comprobar.
