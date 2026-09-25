@@ -1225,3 +1225,106 @@ cambia la superficie de .NET y la capa de autenticación de Python, no los esque
 Nota de procedencia: la pasada completa de `ai-service` arrancó **antes** de añadir los cuatro
 parámetros de comodín (`*`, `all`, `ALL`, `%`) a `test_no_claim_shape_short_of_a_uuid_is_accepted`;
 ese fichero se volvió a correr aislado después, con 58 en verde.
+
+---
+
+## 13 · Tramos 5 y 6 · la fila y el embudo (grupo 13)
+
+Dos tareas, las dos en frontend, y la segunda **cierra la tercera infracción de completitud** que
+la exploración había encontrado: `usage`, `aiMs`, `totalMs` y `model` se calculaban, se pagaban y se
+devolvían, y la pantalla los tiraba.
+
+### 13.1 · La fila enseña su grupo
+
+La ruta asistida **deduplica por familia** —un grupo toma la posición de su mejor miembro—, así que
+un aro que existe en tres tallas ocupa una fila en vez de tres. Es la forma correcta para una lista,
+y calladamente descarta el hecho que el operario necesita cuando el dedo del cliente es una talla
+mayor.
+
+Lo compone una **función pura** en `lib/family-note.ts` y no el componente, por el mismo motivo que
+`free-query-states.ts`: las dos cosas que pueden salir mal —nombrar un miembro sin etiqueta de
+variante, y rellenar un grupo de uno con una frase vacía— están mal en el **cálculo**, y un test que
+renderizara y buscara una cadena pasaría el día que alguien arreglara la cadena.
+
+| Caso | Qué hace |
+|---|---|
+| Varios miembros | «Aro Menorca también en: 20 mm, 22 mm» |
+| Miembro sin etiqueta | degrada a su **SKU** — «también en: ,» sería peor que el silencio, y el SKU es lo que se lee en la etiqueta del cajón |
+| Grupo de uno | **`null`**, no cadena vacía: el llamador no pinta elemento, y una fila con una línea en blanco se lee como avería de renderizado |
+| Familia sin nombre | «También disponible en: …» — el ~58 % del catálogo no tiene familia, así que la frase tiene que aguantar sin ella |
+| Orden | **el de recuperación**, sin tocar: ordenar aquí haría que el rango midiera este código en vez de la calidad de la recuperación |
+
+**La fila anuncia; la ficha despliega.** Es texto y no acciones, y hay test que lo fija contando los
+botones: una acción por hermano convertiría una lista de resultados en un selector de variantes y
+dejaría a un operario vender una pieza que no ha mirado.
+
+### 13.2 · El embudo de administrador
+
+Tres reglas gobiernan lo que puede enseñar, y cada una es una decisión y no una elección de
+maquetación.
+
+**Dos tiempos y nunca uno.** `aiMs` frente a `totalMs` es la única forma de distinguir «el proveedor
+fue lento» de «fuimos lentos nosotros», y esas dos cosas acaban en trabajos opuestos: una es una
+conversación con un proveedor, la otra es un *profiler*. Una sola cifra de tiempo esconde cuál de
+las dos está pasando. Medido en el grupo 8, además, el sobrecoste de .NET es de 17 ms sobre un p95
+de 7,1 s — así que las dos cifras casi coinciden **cuando todo va bien**, y es justo cuando no va
+bien cuando separarlas vale algo.
+
+**Nada de dinero, nunca.** Los tokens y el modelo son los *insumos* de un coste y sí se enseñan. Una
+tarifa escrita en una pantalla está mal el día que el proveedor la mueve, y el modelo que se reporta
+en una ruta multietapa nombra **sólo su última etapa** — así que multiplicarlo sería falso aquí, e
+invitar a la multiplicación extendería la falsedad a quien lea el número. Hay test, y no comprueba
+un símbolo: comprueba `€`, `EUR`, `$`, «coste» y «precio».
+
+**Ni la consulta ni el argumentario.** El embudo es un panel de coste, no una transcripción. La
+consulta es lo que dijo un cliente y el argumentario se lo devuelve; los dos están ya excluidos de
+los registros por la misma regla, y un panel de diagnóstico no es un agujero en ella.
+
+**Plegado por defecto**, y el rol es lo único que lo abre. Se lee de `isAdmin` y **no** de que
+`usage` venga presente, aunque el backend sólo lo construya para administradores: los contadores
+están en toda respuesta, así que colgar el panel entero de `usage` le enseñaría a un operario un
+embudo sin tiempos en una respuesta degradada, y el requisito es que un operario no lo vea nunca.
+El defecto de la prop es `false`, para que un llamador que la olvide no filtre el panel.
+
+**Una cosa que el embudo dice y que el diseño no pedía**: cuando no hay `searchEventId` y el ámbito
+era global, lo declara —«Sin registrar: búsqueda en todas las tiendas»—. Sin esa línea, el hueco de
+telemetría que el grupo 12 dejó declarado se leería como un fallo de telemetría, que es otra cosa y
+llevaría a buscar una avería que no existe.
+
+### Dos vocabularios sobre un mismo campo, y por qué
+
+`degradedReason` tiene ahora dos traducciones y es deliberado. `pitchMessage` convierte una causa en
+**lo que el operario debe hacer**, y colapsa varias a propósito: «el asistente no está disponible» es
+la frase correcta para una credencial rechazada y para una caída, porque el siguiente movimiento del
+operario es el mismo. `degradedReasonLabel` las mantiene separadas, porque el siguiente movimiento
+del administrador **no** lo es: una es una configuración, otra un proveedor, otra una pieza sin
+indexar. Una causa que la tabla no conoce se muestra **en crudo** en vez de traducirse a la más
+parecida.
+
+### Un fallo del grupo 12 que este grupo destapó
+
+`AssistedSearchResult.quantityAtPointOfSale` y `hasStock` **seguían siendo `number` y `boolean` en
+TypeScript** después de que el grupo 12 los volviera anulables en .NET. El commit de ese grupo salió
+con los dos lados desalineados.
+
+Lo que importa es **por qué no lo cazó nada**: los tests pasaron —`vitest` no comprueba tipos— y
+**`npm run build` pasó también**, porque Vite transpila con esbuild y esbuild descarta los tipos sin
+mirarlos. El `CLAUDE.md` dice que «la puerta real es `npm run build`», y aquí la puerta real estuvo
+verde sobre un error de tipos durante un commit entero. Quien lo encontró fue `tsc --noEmit`
+**filtrado a los ficheros propios**, que el mismo documento describe como «no es la puerta» por sus
+decenas de errores preexistentes de Metronic.
+
+La lectura correcta no es que `tsc` deba ser la puerta, sino que **`npm run build` no es suficiente
+para un cambio de tipos**: verde ahí significa «compila», no «los tipos casan». Anotado en el
+`CLAUDE.md`.
+
+### Qué cambió en el conjunto de tests que falla
+
+| Suite | Resultado | Contra la línea base del grupo 1 |
+|---|---|---|
+| `frontend` | 113 de **826** en 14 ficheros | **conjunto de nombres idéntico**, cero diferencias |
+| `backend` · `ai-service` | sin tocar | — |
+
+**+25 tests nuevos** —10 de `family-note`, 11 del embudo y 4 de la fila— y el diff contra la línea
+base vuelve a salir vacío, como en el grupo 12. `npm run build` en verde y `tsc --noEmit` filtrado a
+los ficheros de C40 sin un solo error, que en este grupo es la comprobación que importa.

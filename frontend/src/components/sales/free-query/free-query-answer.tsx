@@ -27,6 +27,8 @@ import {
   queryWarnings,
   warningLabel,
 } from '@/lib/assist-copy';
+import { FreeQueryFunnel } from '@/components/sales/free-query/free-query-funnel';
+import { familyNote } from '@/lib/family-note';
 import {
   isEmptyResult,
   resolveFreeQueryState,
@@ -46,6 +48,15 @@ interface FreeQueryAnswerProps {
   onClarificationAsked?: () => void;
   /** The shop the answer is about, so each row's stock label can name it. */
   pointOfSaleName?: string | null;
+  /**
+   * Whether the caller is an administrator, which is the only thing that shows the funnel.
+   *
+   * Read from the role and **not** from `usage` being present, even though the backend builds
+   * `usage` only for an administrator. The counters are in every response, so keying the
+   * whole panel on `usage` would show an operator a funnel with no times in it on a degraded
+   * response — and the requirement is that an operator never sees the funnel at all.
+   */
+  isAdmin?: boolean;
 }
 
 export function FreeQueryAnswer({
@@ -54,6 +65,7 @@ export function FreeQueryAnswer({
   onOpenCard,
   onClarificationAsked,
   pointOfSaleName,
+  isAdmin = false,
 }: FreeQueryAnswerProps) {
   const state = resolveFreeQueryState(response);
 
@@ -186,6 +198,7 @@ export function FreeQueryAnswer({
             onSelect={onSelect}
             onOpenCard={onOpenCard}
             pointOfSaleName={pointOfSaleName}
+            familyNote={familyNote(group, member.productId)}
           />
         )),
       )}
@@ -193,6 +206,15 @@ export function FreeQueryAnswer({
       {/* **Emptiness is not `groups.length === 0`.** On the knowledge route the service answers
           from the corpus and returns zero pieces on purpose, and announcing that as "no results"
           would write a failure directly above a correct answer. */}
+      {/* Last, and only for an administrator. A diagnostic panel above the pieces would put
+          the cost of a search between the operator and the answer they asked for. */}
+      {isAdmin ? (
+        <FreeQueryFunnel
+          response={response}
+          displayed={response.groups.reduce((total, group) => total + group.members.length, 0)}
+        />
+      ) : null}
+
       {isEmptyResult(response) && state.kind === 'answered' ? (
         <Alert data-testid="assisted-empty">
           <AlertTitle>Sin resultados</AlertTitle>

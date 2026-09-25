@@ -111,6 +111,15 @@ interface AssistedSearchResultRowProps {
    * next shop along — and says what to do instead.
    */
   pointOfSaleName?: string | null;
+  /**
+   * What else this result's family carries, already composed. `null` or absent renders
+   * nothing at all — a row padded with a blank line reads as a rendering fault.
+   *
+   * **A sentence and not a list of actions.** The row announces; the sale card unfolds. An
+   * action per sibling here would turn a result list into a variant picker and would let an
+   * operator sell a piece they never looked at.
+   */
+  familyNote?: string | null;
 }
 
 export function AssistedSearchResultRow({
@@ -118,6 +127,7 @@ export function AssistedSearchResultRow({
   onSelect,
   onOpenCard,
   pointOfSaleName,
+  familyNote,
 }: AssistedSearchResultRowProps) {
   const photoUrl = getImageUrl(result.primaryPhotoUrl ?? undefined);
 
@@ -147,6 +157,15 @@ export function AssistedSearchResultRow({
           </div>
 
           <p className="text-sm text-muted-foreground">{result.sku}</p>
+
+          {/* What the grouping hid. The assisted route deduplicates by family, so a ring in
+              three sizes takes one row — the right shape for a list, and it drops the fact
+              the customer's finger needs. Text only: the row announces, the card unfolds. */}
+          {familyNote ? (
+            <p className="text-sm text-muted-foreground" data-testid="family-note">
+              {familyNote}
+            </p>
+          ) : null}
 
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge variant="info" appearance="light">

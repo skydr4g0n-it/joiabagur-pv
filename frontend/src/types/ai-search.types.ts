@@ -37,13 +37,23 @@ export interface AssistedSearchResult {
   name: string;
   /** Current catalog price, in EUR. */
   price: number;
-  /** Units at the point of sale of the search, not the sum across points of sale. */
-  quantityAtPointOfSale: number;
+  /**
+   * Units at the point of sale of the search, not the sum across points of sale. `null` when the
+   * search named no shop.
+   *
+   * **Null and zero are different answers.** Zero means the shop carries none; null means nobody
+   * asked about a shop, so there is nothing to count — and a zero there would assert something
+   * false about a piece that may be sitting in the next shop along.
+   */
+  quantityAtPointOfSale: number | null;
   /**
    * False when the product is carried by this shop but has run out. Such a result is kept on
    * purpose: "we carry it, we are out of it" is an answer that can still save a sale.
+   *
+   * `null` with no shop named: whether a piece is in stock is a question about a shop, and
+   * answering false would read as «none left» rather than «nobody asked».
    */
-  hasStock: boolean;
+  hasStock: boolean | null;
   primaryPhotoUrl?: string | null;
   collectionName?: string | null;
   /** Relevance score from the retriever, or null on the degraded path. */

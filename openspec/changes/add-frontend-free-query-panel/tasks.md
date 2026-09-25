@@ -104,8 +104,8 @@
 
 ## 13. Tramos 5 y 6 · la fila y el embudo
 
-- [ ] 13.1 La **fila enseña su grupo**, con degradación al SKU y nada escrito con un solo miembro, sin reordenar ni ofrecer venta de otro miembro. Tests: `should state what else the family carries`, `should name a member by its SKU when the variant label is missing`, `should state nothing for a single-member group`
-- [ ] 13.2 Ampliar el **embudo de administrador**: `ai_ms` frente a `total_ms`, modelo, tokens, motivo de degradación y contadores, plegado por defecto. Tests: `should split the elapsed time in the assisted funnel`, `should show no monetary amount in the funnel`, `should show neither the query nor the argument in the funnel`, `should render no funnel for a non-administrator`
+- [x] 13.1 La **fila enseña su grupo**, con degradación al SKU y nada escrito con un solo miembro, sin reordenar ni ofrecer venta de otro miembro. Tests: `should state what else the family carries`, `should name a member by its SKU when the variant label is missing`, `should state nothing for a single-member group`
+- [x] 13.2 Ampliar el **embudo de administrador**: `ai_ms` frente a `total_ms`, modelo, tokens, motivo de degradación y contadores, plegado por defecto. Tests: `should split the elapsed time in the assisted funnel`, `should show no monetary amount in the funnel`, `should show neither the query nor the argument in the funnel`, `should render no funnel for a non-administrator`
 
 ## 14. Cierre
 

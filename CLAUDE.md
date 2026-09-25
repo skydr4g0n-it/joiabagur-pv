@@ -124,9 +124,14 @@ Three traps, all of which look like your bug and are not:
   `onUnhandledRequest: 'warn'`, so a call with no handler prints a warning and returns nothing.
   A test can pass having asserted nothing at all. Declare handlers explicitly, or mock the
   service module with `vi.mock` — which is what the service tests here already do.
-- **`tsc --noEmit` is not a gate.** It reports dozens of pre-existing errors in the Metronic
-  template files (`lucide-react` missing exports, absent modules, `chart.tsx`). Filter its output
-  to your own files. The real gate is `npm run build`.
+- **`tsc --noEmit` is not a gate — and `npm run build` is not enough on its own.** `tsc` reports
+  dozens of pre-existing errors in the Metronic template files (`lucide-react` missing exports,
+  absent modules, `chart.tsx`), so filter its output to your own files. But do run it: **Vite
+  transpiles with esbuild, which strips types without checking them**, so `npm run build` is green
+  over a type error and `vitest` never sees one either. C40 shipped a whole commit with a DTO
+  nullable on the .NET side and still `number` in `ai-search.types.ts`: tests green, build green,
+  and the filtered `tsc --noEmit` was the only thing that found it. Green on `npm run build` means
+  "it compiles", not "the types match" — so for any change that moves a type, run both.
 
 The full inventory — the five root causes and which files each one accounts for — is under
 *Estado de la suite: fallos conocidos* in [Documentos/testing-frontend.md](Documentos/testing-frontend.md).

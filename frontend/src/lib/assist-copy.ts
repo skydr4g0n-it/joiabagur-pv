@@ -431,3 +431,31 @@ export const SUGGESTED_QUESTIONS: readonly string[] = [
 export function questionTooLongMessage(max: number): string {
   return `La pregunta es demasiado larga: como mucho ${max} caracteres.`;
 }
+
+/**
+ * The six causes of degradation, named for a **diagnostic** reader and never for an operator.
+ *
+ * Two vocabularies over one field, on purpose. `pitchMessage` above turns a cause into what the
+ * operator should *do*, and it deliberately collapses several of them: «el asistente no está
+ * disponible» is the right sentence for a rejected credential and for an outage alike, because
+ * the operator's next move is the same. This table keeps them apart, because the administrator's
+ * next move is not: one is a configuration, one is a provider, one is an unindexed piece.
+ *
+ * Closed, and an unknown code falls back to itself rather than to a guess — a cause this table
+ * has not learnt yet is more useful shown raw than translated into the nearest familiar one.
+ */
+const DEGRADED_REASONS: Record<string, string> = {
+  switched_off: 'interruptor apagado',
+  credential_rejected: 'credencial rechazada',
+  not_implemented: 'ruta no implementada',
+  not_indexed: 'pieza no indexada',
+  ai_unavailable: 'servicio de IA no disponible',
+  unclassified: 'fallo sin clasificar',
+};
+
+export function degradedReasonLabel(reason: string): string {
+  return DEGRADED_REASONS[reason] ?? reason;
+}
+
+/** The causes this screen knows how to name. Read by a test that asserts the list is closed. */
+export const DEGRADED_REASON_CODES = Object.keys(DEGRADED_REASONS);

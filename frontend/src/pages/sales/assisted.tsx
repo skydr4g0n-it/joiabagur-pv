@@ -515,6 +515,7 @@ export function AssistedSalesSearchPage() {
           onOpenCard={handleOpenCard}
           onClarificationAsked={focusQueryBox}
           pointOfSaleName={posName}
+          isAdmin={isAdmin}
         />
       ) : null}
       {response ? (
