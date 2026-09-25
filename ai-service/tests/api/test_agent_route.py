@@ -419,10 +419,18 @@ def test_the_published_contract_moved_by_addition_only(
     `filters_too_narrow` belongs to retrieval, and every path that accepts catalog-side
     filters can reach it.
 
-    Measured over the whole document: 1300 leaves at the C40 baseline, 1306 now, **0 removed
-    and 0 retyped**. Two leaves changed in value and both are `description` prose: the
-    vocabulary the assist warnings enumerate gained a sixth code. They are named one by one
-    below rather than waved through by rule, so a third changed leaf still fails here.
+    Measured over the whole document **with the walk below**: 1289 leaves at the C40 baseline,
+    1295 now, **0 removed and 0 retyped**. Two leaves changed in value and both are
+    `description` prose: the vocabulary the assist warnings enumerate gained a sixth code. They
+    are named one by one below rather than waved through by rule, so a third changed leaf still
+    fails here.
+
+    **«Leaf» is not one concept, so the walk is named.** `_walk` never emits an empty container —
+    an empty dict does not reach its `else` — so the eleven empty `security[0].HTTPBearer`
+    objects are not leaves here. A counter that emitted them would report 1300 and 1306, which
+    is where those two figures in the C40 report come from. Both definitions are correct and the
+    deltas agree in both; the absolute figures do not, so the two assertions below pin the ones
+    this walk produces rather than leaving them to prose that nobody recounts.
     """
     baseline = json.loads(
         (Path(__file__).parent / "fixtures" / "openapi-c40-baseline.json").read_text(
@@ -436,6 +444,12 @@ def test_the_published_contract_moved_by_addition_only(
 
     before = dict(_walk(baseline))
     after = dict(_walk(committed))
+
+    # Pinned, so the figures in the docstring and in the C40 report cannot drift from what this
+    # walk actually counts. A change here is a real movement of the contract's size and should be
+    # read as one, not corrected silently.
+    assert len(before) == 1289, len(before)
+    assert len(after) == 1295, len(after)
 
     assert after == dict(_walk(generated)), "the committed snapshot is the one the app generates"
 

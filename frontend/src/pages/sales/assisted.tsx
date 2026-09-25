@@ -274,8 +274,15 @@ export function AssistedSalesSearchPage() {
   };
 
   const handleSelect = (result: AssistedSearchResult) => {
+    // **Both routes, because both responses carry the identifier and both show rows the operator
+    // can pick.** Reading only `answered` attributed nothing to a free query: the rows are the
+    // same component, the button is the same button, and the event was already persisted — the
+    // identifier was simply dropped on the way back, which is the class of loss this change
+    // exists to remove.
     const searchEventId =
-      state.kind === 'answered' ? state.response.searchEventId ?? undefined : undefined;
+      state.kind === 'answered' || state.kind === 'assisted'
+        ? state.response.searchEventId ?? undefined
+        : undefined;
 
     // Reported at the instant of the click and deliberately not awaited: the server stamps the
     // moment, and a telemetry failure must never block the operator or surface as an error.

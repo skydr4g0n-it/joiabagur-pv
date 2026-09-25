@@ -343,8 +343,25 @@ Artefactos persistidos con `run_id`, `git_sha` y `prompt_version`:
 `evals/results/c40-placeholders-before-v3-ed9ee934e8c6.json` y
 `c40-placeholders-after-v5-53f4759f200f.json`.
 
+> **El `git_sha` de estos dos se escribió `unknown`, y está corregido.** La verificación de C40 lo
+> encontró: la pasada corrió **dentro del contenedor**, donde no hay `.git`, así que
+> `evals/routing.git_sha()` cayó a su rama de excepción — y como toda medición real contra el
+> proveedor corre ahí, la rama sin sha era **el camino normal y no el excepcional**. Dos arreglos:
+> `git_sha()` lee ahora `GIT_SHA` del entorno antes de intentar el subproceso, y los dos artefactos
+> quedan reetiquetados como **`efeedfe+dirty`** — `efeedfe` era `HEAD` a las 21:22 y 21:34 locales,
+> y el árbol estaba sucio porque el flag `--prompt-version` que esta pasada necesitaba no se
+> commiteó hasta `653007e`. El marcador `+dirty` es la convención de `evals/provenance.py`, que
+> existe justamente para esto: un sha desnudo declararía comparable una re-ejecución que daría otros
+> números, que es lo que le pasó a C25.
+
 **Los dos casos con marcador de `v3` estaban los dos en la ruta `both`** (`b02`, `b04`), ninguno
 en `catalog` ni en `knowledge`.
+
+**Nota de nomenclatura.** La tarea 4.5 nombra `test_sweep_reports_placeholder_cause_apart`; el test
+que afirma eso se llama `test_the_cause_is_in_both_vocabularies`
+(`tests/assist/test_verification.py`), porque lo que comprueba son las **dos** tuplas que la causa
+tiene que habitar —`PITCH_VIOLATION_CAUSES`, que es la que parte el barrido por causa, y
+`HARD_VIOLATION_CAUSES`—. Es el único renombrado de este change que no se había declarado.
 
 ### Lo que esta medición refuta, y hay que decirlo
 
@@ -1059,7 +1076,7 @@ que comprobar.
 
 1. **`traceId`** (ficha y consulta libre). Un identificador de correlación con el registro del
    servicio. Un operario no puede actuar sobre él y en una pantalla de mostrador es ruido. *Es el
-   único de los siete que admite discusión*: en un estado de error, enseñarlo permitiría al operario
+   único de los ocho que admite discusión*: en un estado de error, enseñarlo permitiría al operario
    citarlo al pedir ayuda. No se ha añadido porque no lo pide ninguna tarea y la decisión es de
    interfaz, no de contrato; queda anotado como candidato.
 2. **`usage`** (consulta libre). Es la segunda de las tres infracciones de la exploración y **tiene
@@ -1099,6 +1116,35 @@ Es exactamente el mismo tipo de infracción que las tres de la exploración —u
 descartado en la frontera—, encontrado por el mismo procedimiento, y aparecido **dentro** del change
 que vino a corregirlas. Eso dice algo sobre la regla: no es una revisión que se pasa una vez, es una
 que hay que pasar cada vez que un campo cruza una frontera.
+
+### Y una cuarta, que esta auditoría **no** cazó y encontró la verificación
+
+**`FreeQuerySearchResponse.searchEventId` no llegaba a usarse.** La tabla de arriba lo daba por
+pintado —«atribuye la venta a la búsqueda (`handleSelect` → `reportSelection`)»— y era falso:
+`handleSelect` resolvía el identificador con `state.kind === 'answered'`, que es **sólo** la ruta
+semántica. La generativa fija `state.kind === 'assisted'`, así que una pieza encontrada por consulta
+libre llegaba a la caja sin evento detrás: `reportSelection` no se llamaba y la navegación viajaba con
+`searchEventId: undefined`. El backend lo agravaba por el otro lado, persistiendo
+`DisplayedResults = []`, con lo que `SelectedFromRank` habría salido nulo aunque se hubiera llamado.
+
+Lo que se pierde con eso es justo la mitad de lo que el cuarto origen existe para medir: las dos rutas
+seguían comparables en duración y en filtros, y dejaban de serlo en **si el operario eligió algo** —
+que es la pregunta que decide si la prosa sirve de algo. D9 dice que el toggle demuestra la ablación;
+sin rango, la demostraba a medias.
+
+Corregido en los tres sitios: la condición de `handleSelect` acepta las dos rutas,
+`FreeQuerySearchService` persiste los miembros aplanados en el orden en que el panel los pinta, y hay
+dos tests nuevos —`should report the selection when the piece came from a free query` y
+`FreeQuery_RecordsTheRowsTheOperatorSaw_InTheOrderTheyArePainted`—. Con ello el recuento de la tabla
+de arriba, **35 de 38**, pasa a ser cierto; antes del arreglo eran 34.
+
+**Por qué la auditoría no lo vio, que es lo que hay que aprender.** El barrido **empareja por
+nombre**: `searchEventId` tiene lector en la ruta semántica, así que la fila salió marcada y el par
+`(FreeQuerySearchResponse, searchEventId)` nunca se miró por separado. Es la misma limitación que la
+sección ya declaraba para `intent` y `promptVersion` —«un campo leído en una superficie cuenta como
+leído en todas»—, sólo que ahí era inofensiva y aquí escondía una supresión real. **Un barrido por
+nombre no puede cerrar una regla que es por superficie**: lo que hace falta es recorrer los pares
+(clase, campo), que es lo que el propio §11 dice haber auditado y la tabla por respuesta no ejerce.
 
 ---
 
@@ -1341,6 +1387,18 @@ para un cambio de tipos**: verde ahí significa «compila», no «los tipos casa
 base vuelve a salir vacío, como en el grupo 12. `npm run build` en verde y `tsc --noEmit` filtrado a
 los ficheros de C40 sin un solo error, que en este grupo es la comprobación que importa.
 
+> **Ese «sin un solo error» era falso, y lo encontró la verificación.** Quedaban **dos**, los dos en
+> `pages/sales/__tests__/assisted.test.tsx`: `Property 'id' does not exist on type 'never'` y lo mismo
+> con `name`. Las constantes `POS_ONE`/`POS_TWO` venían declaradas `as never` desde C36 —un molde para
+> callar la firma del mock— y el grupo 12 añadió dos líneas que **leen** `.id` y `.name` de ellas, así
+> que estaban rojas desde `3aeacd2` mientras este párrafo las declaraba limpias. El filtro que se usó
+> aquí no alcanzaba los ficheros de test, que también son ficheros de C40.
+>
+> Corregido tipando las tres constantes como `PointOfSale` con una fábrica que rellena los campos
+> obligatorios: se va el `as never`, se van los dos errores, y el mock **y** las lecturas vuelven a
+> comprobarse. Es, una vez más, la misma moraleja de esta sección leída con más cuidado: la puerta no
+> es `npm run build`, y `tsc --noEmit` sólo sirve si el filtro incluye todo lo que el change tocó.
+
 ---
 
 ## 14 · Cierre
@@ -1471,13 +1529,50 @@ operario citarlo al pedir ayuda, pero no lo pide ninguna tarea y la decisión es
 **tres** preexistentes —`ImageRecognitionService`, `ProductService`, `protected-route`—, los tres
 fuera de la zona de este change.
 
+### El contrato congelado, al cierre y no sólo en el grupo 3
+
+El §3 verificó hoja a hoja el **primer** movimiento. El contrato se movió **dos veces** —el grupo 10
+añadió `RetrievalResponse.warnings`— así que la tabla del §3 describe un estado intermedio y no el
+final. El estado de cierre, con el mismo recorrido y el mismo criterio:
+
+| | Hojas |
+|---|---|
+| Antes (`93115cf`, `sha256 d8d48f87…`) | **1.300** |
+| Al cierre (`sha256 8d9060ac…`) | **1.306** |
+| **Retiradas** | **0** |
+| **Cambiadas de tipo** | **0** |
+| Con valor distinto | **2** |
+| Añadidas | **6** |
+
+Las cuatro hojas nuevas del segundo movimiento son `RetrievalResponse.properties.warnings` con su
+`type`, `items.type`, `title` y `description`. **Las dos que cambian de valor son prosa**:
+`AssistResponse.properties.warnings.description` y la misma de `AgentAssistResponse`, porque el
+vocabulario que enumeran ganó su sexto código. Están **nombradas una a una** en
+`test_the_published_contract_moved_by_addition_only`, y no cubiertas por una regla, para que una
+tercera siga fallando ahí.
+
+**El criterio del DoD se cumple en los dos movimientos: 0 retiradas y 0 cambiadas de tipo.**
+
+> **Nota sobre el recuento, porque «hoja» no es un concepto único.** Las cifras de arriba cuentan un
+> objeto vacío como hoja. El `_walk` del propio guardián **no lo hace** —un dict vacío no llega a su
+> rama `else`—, así que con su recorrido salen **1.289** y **1.295**. La diferencia es exactamente
+> **11** en los dos lados, y son los once `security[0].HTTPBearer` vacíos de las rutas. Las dos
+> definiciones son correctas y las **deltas coinciden en ambas**; lo que no vale es comparar una
+> cifra de un recorrido con la de otro.
+
 ### 14.3 · La comparación final de las tres suites
 
 | Suite | Línea base (grupo 1) | Cierre | Veredicto |
 |---|---|---|---|
-| `ai-service` | 1 592 en verde, 0 rojos | **1 625 en verde, 0 rojos** | +33 tests, ninguno rojo |
+| `ai-service` | 1 576 en verde, 0 rojos | **1 625 en verde, 0 rojos** | +49 tests, ninguno rojo |
 | `frontend` | 113 de 729 en 14 ficheros | **113 de 833 en 14 ficheros** | **conjunto de nombres idéntico**, diff vacío |
-| `backend` | 50–51 de 1 328, 43 estables y 15 rotatorios | **47 de 1 328** | 1 nombre nuevo, en una clase rotatoria; **0 en el área de C40** |
+| `backend` | 50–51 de 1 241, 43 estables y 15 rotatorios | **47 de 1 328** | +87 tests · 1 nombre nuevo, en una clase rotatoria; **0 en el área de C40** |
+
+> **Tras los arreglos de la verificación**, que añaden dos tests a los de arriba: `frontend`
+> **113 de 834 en los mismos 14 ficheros** —conjunto idéntico, cero nombres nuevos—, `ai-service`
+> **1 625 en verde, 0 rojos**, y el área de C40 del backend **410 de 410**. `openspec validate
+> --all --strict`: 62 passed, 0 failed. `tsc --noEmit` filtrado a los ficheros de C40: **0 errores**
+> —ahora de verdad—, con el total del proyecto bajando de 178 a 176.
 
 `dotnet build` y `npm run build` en verde. `openspec validate --all --strict`: **62 passed, 0 failed**.
 Y `tsc --noEmit` filtrado a los ficheros de C40 sin un solo error, que desde el grupo 13 es una

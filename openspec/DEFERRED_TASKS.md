@@ -1212,4 +1212,33 @@ tendrían que decidir si cuentan o excluyen las globales—. En `ProductSearchEv
 el `?? throw` que hoy trata un ámbito sin tienda como error de programación. Y la retención hereda
 el problema que el §15.11 del diseño ya declara para esta misma tabla.
 
+### El rechazo del ámbito global en inventario no tiene superficie .NET donde afirmarse
+
+**Estado:** la garantía existe, el test que la tarea 12.2 pedía **no puede escribirse donde lo pedía**.
+
+La tarea 12.2 pide `ForAllPointsOfSale_IsRefusedByInventory`, junto a sus hermanos de la ficha y los
+sustitutos. Los dos hermanos existen; éste no, porque **`IAiGatewayClient` no tiene operación de
+inventario**: `/v1/inventory/propose` existe en jbg-ai y nada en .NET la llama. El requisito viene de
+la spec, que enumera «the sale card, substitutes and inventory» pensando en las rutas del servicio y
+no en los métodos del cliente.
+
+No se ha inventado un test que pase por casualidad. Lo que hay en su lugar son dos cosas:
+
+- **La garantía vive del lado de Python.** La ruta conserva la dependencia estricta del punto de
+  venta y rechaza un token sin la reclamación, en `test_pos_scoped_route_still_rejects_it`
+  (`ai-service/tests/api/test_auth.py`). Es la garantía que importa, porque es la que un cliente
+  cualquiera —no sólo el .NET— encuentra al llamar.
+- **Del lado .NET queda un centinela que afirma que la superficie no existe**, en
+  `AiGatewayClientTests.cs:421`, `ForAllPointsOfSale_IsRefusedByInventory_HasNoClientSurface`. El día
+  que este cliente crezca una llamada de inventario, ese test falla y pide su propio rechazo — que es
+  exactamente el momento en que el test de la tarea 12.2 tendrá dónde aterrizar.
+
+**Qué haría falta cuando se haga.** Añadir la operación de inventario a `IAiGatewayClient` con su
+guarda de ámbito —`scope.Kind != AiCallScopeKind.PointOfSale` lanza antes de emitir petición, como
+`SubstitutesAsync`—, sustituir el centinela por el test que la tarea nombra, y comprobar que el
+rechazo ocurre **antes** de la petición y no por la respuesta del servicio.
+
+Anotado aquí porque el informe de implementación lo declara diferido y la verificación encontró que
+faltaba esta mitad: la entrada estaba en el informe y no en este fichero.
+
 ---

@@ -112,7 +112,7 @@ public class FreeQuerySearchService : IFreeQuerySearchService
         // number starts describing the writer instead of the search.
         var totalMs = ElapsedMs(startedAt);
 
-        var searchEventId = await RecordAsync(request, filters, userId, role, survived, totalMs);
+        var searchEventId = await RecordAsync(request, filters, userId, role, groups, totalMs);
 
         var response = new FreeQuerySearchResponse
         {
@@ -441,7 +441,7 @@ public class FreeQuerySearchService : IFreeQuerySearchService
         AiSearchFilters filters,
         Guid userId,
         string role,
-        int resultCount,
+        List<FreeQueryGroupDto> groups,
         int totalMs)
     {
         // **A search spread over every shop is not recorded, and that is a declared gap.**
@@ -457,6 +457,25 @@ public class FreeQuerySearchService : IFreeQuerySearchService
             return null;
         }
 
+        // **The rows the operator actually saw, flattened in the order the panel paints them.**
+        // Groups are rendered group by group and, inside each, member by member, so that walk is
+        // the rank the operator perceived — which is the only rank a selection can be measured
+        // against. An empty list here would make `SelectedFromRank` null for every generative
+        // search, and the comparison of the two routes would lose the half that says whether the
+        // prose helped: same table, same columns, one population silently unmeasurable.
+        var displayed = groups
+            .SelectMany(group => group.Members)
+            .Select(member => new AiSearchResult
+            {
+                ProductId = member.ProductId.ToString(),
+                Sku = member.Sku,
+                Score = member.Score ?? 0,
+                MatchReasons = member.MatchReasons,
+                FamilyId = member.FamilyId,
+                VariantLabel = member.VariantLabel
+            })
+            .ToList();
+
         try
         {
             return await _searchEventService.RecordSearchAsync(new RecordSearchRequest
@@ -464,7 +483,7 @@ public class FreeQuerySearchService : IFreeQuerySearchService
                 Scope = ScopeOf(request.PointOfSaleId, userId, role),
                 Query = request.Query,
                 Filters = filters,
-                DisplayedResults = [],
+                DisplayedResults = displayed,
                 // The fourth origin, which is what turns the comparison of the two routes into a
                 // query over the telemetry rather than a demonstration on a screen.
                 Origin = SearchOrigin.AssistedGenerative,

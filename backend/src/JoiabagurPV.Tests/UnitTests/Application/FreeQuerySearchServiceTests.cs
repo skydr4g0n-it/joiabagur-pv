@@ -284,6 +284,62 @@ public class FreeQuerySearchServiceTests
     }
 
     [Fact]
+    public async Task FreeQuery_RecordsTheRowsTheOperatorSaw_InTheOrderTheyArePainted()
+    {
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        var third = Guid.NewGuid();
+
+        // Deliberately handed back in another order: the rank must come from what retrieval
+        // ranked, never from what the repository happened to return.
+        HydrationReturns(Row(third, "SKU-3"), Row(first, "SKU-1"), Row(second, "SKU-2"));
+
+        GatewayReturns(new AiAssistSaleResponse
+        {
+            TraceId = "trace-fq-1",
+            EffectivePosId = PosId.ToString(),
+            Intent = "in_domain",
+            Groups =
+            [
+                new AiAssistGroup
+                {
+                    FamilyId = "fam-1",
+                    FamilyLabel = "Aro fino",
+                    Members = [Member(first, "SKU-1"), Member(second, "SKU-2")]
+                },
+                new AiAssistGroup
+                {
+                    FamilyId = null,
+                    FamilyLabel = null,
+                    Members = [Member(third, "SKU-3")]
+                }
+            ],
+            Pitch = "Estas piezas encajan con lo que buscas.",
+            Citations = [],
+            Warnings = [],
+            Usage = new AiUsage
+            {
+                PromptTokens = 1000, CompletionTokens = 280, TotalTokens = 1280, Model = "fake/model"
+            },
+            Abstained = false,
+            PromptVersion = "assist/v5"
+        });
+
+        await SearchAsync();
+
+        var recorded = _recorded.Should().ContainSingle().Subject;
+
+        // An empty list here used to leave `SelectedFromRank` null for every generative search,
+        // which quietly removed half of what the fourth origin exists to measure: the two routes
+        // stayed comparable on duration and filters, and stopped being comparable on whether the
+        // operator picked anything.
+        recorded.DisplayedResults.Select(displayed => displayed.Sku)
+            .Should().Equal(["SKU-1", "SKU-2", "SKU-3"],
+                "the panel paints group by group and, inside each, member by member, so that walk "
+                + "is the rank the operator perceived");
+    }
+
+    [Fact]
     public async Task FreeQuery_WhenTelemetryFails_StillServes()
     {
         GatewayReturns(Ai());

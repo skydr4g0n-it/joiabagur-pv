@@ -1,6 +1,7 @@
 {
   "run_id": "53f4759f200f",
-  "git_sha": "unknown",
+  "git_sha": "efeedfe+dirty",
+  "git_sha_note": "Provenance reconstructed by the C40 verification. The run was taken from inside the container, where there is no `.git`, so the harness recorded `unknown`. HEAD at 2026-09-24T21:22/21:34 local was efeedfe (assist/v5 and the hard cause), and the tree was dirty: the `--prompt-version` flag this run needed landed in the next commit, 653007e. Marked `+dirty` per evals/provenance.py, which exists for exactly this case.",
   "prompt_version": "router/v3",
   "model": "openai/gpt-4o-mini",
   "taken_at": "2026-09-24T19:34:58+00:00",

@@ -20,6 +20,7 @@ import type {
   AssistedSearchResponse,
   AssistedSearchResult,
 } from '@/types/ai-search.types';
+import type { PointOfSale } from '@/types/point-of-sale.types';
 
 vi.mock('@/services/ai-search.service', () => ({
   aiSearchService: {
@@ -49,9 +50,26 @@ vi.mock('@/providers/auth-provider', () => ({
   useAuth: () => ({ user: { userId: 'u-1', role } }),
 }));
 
-const POS_ONE = { id: 'pos-1', name: 'Ciutadella Centre', isActive: true } as never;
-const POS_TWO = { id: 'pos-2', name: 'Fornells', isActive: true } as never;
-const POS_INACTIVE = { id: 'pos-3', name: 'Cerrada', isActive: false } as never;
+// **Typed, not `as never`.** The cast these carried silenced the mock's signature and took the
+// fixtures' own shape down with it: reading `POS_TWO.id` off a `never` is an error `vitest` never
+// sees and `npm run build` transpiles straight past. Filling the required fields costs four keys
+// and makes both the mock and the reads check.
+function pointOfSale(
+  overrides: Partial<PointOfSale> & Pick<PointOfSale, 'id' | 'name'>,
+): PointOfSale {
+  return {
+    code: overrides.id.toUpperCase(),
+    isActive: true,
+    allowManualPriceEdit: false,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+const POS_ONE = pointOfSale({ id: 'pos-1', name: 'Ciutadella Centre' });
+const POS_TWO = pointOfSale({ id: 'pos-2', name: 'Fornells' });
+const POS_INACTIVE = pointOfSale({ id: 'pos-3', name: 'Cerrada', isActive: false });
 
 function result(overrides: Partial<AssistedSearchResult> = {}): AssistedSearchResult {
   return {
@@ -565,6 +583,30 @@ describe('AssistedSalesSearchPage — episode, selection and attribution', () =>
     expect(aiSearchService.reportSelection).not.toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith('/sales/new', {
       state: { productId: 'prod-1', searchEventId: undefined },
+    });
+  });
+
+  it('should report the selection when the piece came from a free query', async () => {
+    const user = userEvent.setup();
+    vi.mocked(aiSearchService.searchAssisted).mockResolvedValue({
+      kind: 'ok',
+      response: assistedResponse(),
+    });
+    renderPanel();
+    await ready();
+
+    await user.click(await screen.findByTestId('route-option-assisted'));
+    await user.type(screen.getByLabelText('¿Qué busca el cliente?'), 'algo sobrio para diario');
+    await user.click(screen.getByRole('button', { name: /^Buscar$/ }));
+    await user.click(await screen.findByRole('button', { name: 'Seleccionar para venta' }));
+
+    // **The generative route attributes too.** It read only the semantic state, so a piece found
+    // by a free query reached the till with no event behind it: `SelectedFromRank` stayed null for
+    // the whole population and the toggle lost the half of its ablation that says whether the
+    // prose helped anyone buy anything.
+    expect(aiSearchService.reportSelection).toHaveBeenCalledWith('event-fq', 'prod-1');
+    expect(navigate).toHaveBeenCalledWith('/sales/new', {
+      state: { productId: 'prod-1', searchEventId: 'event-fq' },
     });
   });
 });

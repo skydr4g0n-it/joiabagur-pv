@@ -429,6 +429,20 @@ uv run evals cag [--dry-run]                           # the context-only measur
 uv run evals provider-latency                          # the provider round trip, cold and warm
 ```
 
+> **Pass `GIT_SHA` when the run happens inside the container, which is the normal case.** Any
+> measurement against the real provider runs in `jpv-pv-jbg-ai`, and there is no `.git` in the
+> image — so `evals/routing.py:git_sha()` falls through to `unknown` and the artefact records a
+> provenance nobody can use. It reads the environment first for exactly this reason:
+>
+> ```bash
+> docker exec -e GIT_SHA="$(git rev-parse --short HEAD)" jpv-pv-jbg-ai \
+>   python -m jbg_ai.evals.free_query_gate --prompt-version assist/v5
+> ```
+>
+> **If the tree is dirty, say so**: `GIT_SHA="$(git rev-parse --short HEAD)+dirty"`. A bare sha on
+> a dirty tree declares a re-run at that commit comparable when it is not — the trap
+> `evals/provenance.py` documents, and the one C40's two placeholder artefacts fell into.
+
 **The calibration runs in two phases, and their order is a constraint rather than a
 preference.** The fusion decides WHICH candidates a query produces; the business signals only
 reorder them — `demote` is a stable sort that removes nothing. So:
