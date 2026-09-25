@@ -43,6 +43,10 @@ import {
 } from '@/components/sales/assisted-search-result-row';
 import { AiAvailabilityBadge } from '@/components/sales/ai-availability-badge';
 import { SearchRouteToggle } from '@/components/sales/search-route-toggle';
+import {
+  FreeQueryAnswer,
+  FreeQueryLoading,
+} from '@/components/sales/free-query/free-query-answer';
 import { useAuth } from '@/providers/auth-provider';
 import { aiSearchService } from '@/services/ai-search.service';
 import * as pointOfSaleService from '@/services/point-of-sale.service';
@@ -51,7 +55,6 @@ import {
   MATERIAL_OPTIONS,
   PIECE_TYPE_OPTIONS,
 } from '@/lib/materials-vocabulary';
-import { NO_VERIFIABLE_SOURCE, queryWarnings, warningLabel } from '@/lib/assist-copy';
 import { ROUTES } from '@/routing/routes';
 import type {
   AiSearchAvailability,
@@ -100,6 +103,18 @@ export function AssistedSalesSearchPage() {
    * response could otherwise land last and overwrite the second.
    */
   const requestSeq = useRef(0);
+
+  /**
+   * The query box, so a clarification can return focus to it.
+   *
+   * The question the service asks back is an instruction to say more, and leaving the caret
+   * wherever it was makes the operator hunt for the field they were just asked to use.
+   */
+  const queryBoxRef = useRef<HTMLInputElement>(null);
+
+  const focusQueryBox = useCallback(() => {
+    queryBoxRef.current?.focus();
+  }, []);
 
   const [query, setQuery] = useState('');
   const [materials, setMaterials] = useState<string[]>([]);
@@ -366,6 +381,7 @@ export function AssistedSalesSearchPage() {
             <div className="flex gap-2">
               <Input
                 id="assisted-query"
+                ref={queryBoxRef}
                 placeholder="Un anillo de plata para regalar..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -446,6 +462,11 @@ export function AssistedSalesSearchPage() {
         </CardContent>
       </Card>
 
+      {/* An expectation from the first instant on the assisted route, never a blank pane: the
+          budget is ten seconds, and seven of undifferentiated waiting with a customer at the
+          counter is where this feature gets abandoned. */}
+      {state.kind === 'loading' && route === 'assisted' ? <FreeQueryLoading /> : null}
+
       {state.kind === 'loading' ? (
         <div className="space-y-3" data-testid="assisted-search-loading">
           {[0, 1, 2].map((i) => (
@@ -487,63 +508,12 @@ export function AssistedSalesSearchPage() {
       ) : null}
 
       {assisted ? (
-        <div className="space-y-4" data-testid="assisted-answer">
-          {/*
-            A first, deliberately plain rendering of the assisted answer. The sixteen states
-            this response can carry — the two no-route ones, the knowledge route with no
-            pieces, a withdrawn citation, a withheld argument — are distinguished in their own
-            piece of work; what matters here is that choosing the route does not lead to a
-            blank screen, and that nothing shown is something the system has not asserted.
-          */}
-          {assisted.warnings.length > 0 ? (
-            <Alert variant="warning" data-testid="assisted-query-warnings">
-              <AlertDescription>
-                {queryWarnings(assisted.warnings).map((code) => (
-                  <span key={code} className="block">
-                    {warningLabel(code)}
-                  </span>
-                ))}
-              </AlertDescription>
-            </Alert>
-          ) : null}
-
-          {assisted.clarificationQuestion ? (
-            <Alert data-testid="assisted-clarification">
-              <AlertTitle>{assisted.clarificationQuestion}</AlertTitle>
-            </Alert>
-          ) : null}
-
-          {assisted.pitch ? (
-            <Card>
-              <CardContent className="space-y-2 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <Sparkles className="size-4" />
-                  Argumentario
-                </div>
-                <p className="whitespace-pre-line" data-testid="assisted-pitch">
-                  {assisted.pitch}
-                </p>
-                {assisted.citations.length === 0 ? (
-                  <p className="text-xs text-muted-foreground" data-testid="assisted-no-source">
-                    {NO_VERIFIABLE_SOURCE}
-                  </p>
-                ) : null}
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {/* Rendered in the order received, group by group. No sort(). */}
-          {assisted.groups.map((group) =>
-            group.members.map((member) => (
-              <AssistedSearchResultRow
-                key={member.productId}
-                result={member}
-                onSelect={handleSelect}
-                onOpenCard={handleOpenCard}
-              />
-            )),
-          )}
-        </div>
+        <FreeQueryAnswer
+          response={assisted}
+          onSelect={handleSelect}
+          onOpenCard={handleOpenCard}
+          onClarificationAsked={focusQueryBox}
+        />
       ) : null}
       {response ? (
         <div className="space-y-4">

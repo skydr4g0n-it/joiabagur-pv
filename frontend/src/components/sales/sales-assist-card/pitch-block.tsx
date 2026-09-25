@@ -40,7 +40,15 @@ interface CitationRowProps {
   citation: SalesAssistCitation;
 }
 
-function CitationRow({ citation }: CitationRowProps) {
+/**
+ * One citation, collapsible, with its claim scope stated in words as well as by colour.
+ *
+ * Exported since C40 so the free-query panel reuses it instead of copying it. The thing worth
+ * not duplicating is the establishment/general distinction: a commitment of the house passed on
+ * as a fact of the world is how a shop ends up owing something it never promised, and a second
+ * copy of that rule would drift the first time one of the two was corrected.
+ */
+export function CitationRow({ citation }: CitationRowProps) {
   const establishment = isEstablishmentClaim(citation.claimScope);
 
   return (

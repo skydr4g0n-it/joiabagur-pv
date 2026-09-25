@@ -61,14 +61,14 @@
 
 ## 7. Tramo 2 · los dieciséis estados en pantalla
 
-- [ ] 7.1 Escribir la **tabla de los dieciséis estados** en `design.md` o en un módulo de copia comentado, con qué trae cada uno y qué acción ofrece, **antes** de tocar el render
-- [ ] 7.2 Pintar el bloque de argumentario con citas desplegables y `claimScope`, reutilizando lo de C36, y **«sin fuente verificable» como línea discreta**. Tests: `should state a withdrawn citation without alarming`, `should not describe a withdrawn citation as invented`
-- [ ] 7.3 Distinguir **el estado de consulta admitida sin ruta del de clasificador degradado**: al segundo **no se le pide reformular**. Tests: `should invite rephrasing when the classifier could not route`, `should not invite rephrasing when the classifier did not run`
-- [ ] 7.4 Que `route=knowledge` con cero piezas **no se anuncie como vacío**. Test: `should not announce an empty result set on the knowledge route`
-- [ ] 7.5 Pintar la **repregunta verbatim** y devolver el foco a la caja. Test: `should render the clarification question and return focus to the query box`
-- [ ] 7.6 No pintar citas cuando no hay prosa. Test: `should render no citation when there is no argument`
-- [ ] 7.7 Estado de carga con la línea de expectativa en la ruta asistida. Test: `should state that the assisted answer may take seconds while in flight`
-- [ ] 7.8 **Verificación del tramo 2**: `npm run build` y `dotnet build` en verde, las tres suites comparadas **por nombres**, y `openspec validate --all --strict` en verde
+- [x] 7.1 Escribir la **tabla de los dieciséis estados** en `design.md` o en un módulo de copia comentado, con qué trae cada uno y qué acción ofrece, **antes** de tocar el render
+- [x] 7.2 Pintar el bloque de argumentario con citas desplegables y `claimScope`, reutilizando lo de C36, y **«sin fuente verificable» como línea discreta**. Tests: `should state a withdrawn citation without alarming`, `should not describe a withdrawn citation as invented`
+- [x] 7.3 Distinguir **el estado de consulta admitida sin ruta del de clasificador degradado**: al segundo **no se le pide reformular**. Tests: `should invite rephrasing when the classifier could not route`, `should not invite rephrasing when the classifier did not run`
+- [x] 7.4 Que `route=knowledge` con cero piezas **no se anuncie como vacío**. Test: `should not announce an empty result set on the knowledge route`
+- [x] 7.5 Pintar la **repregunta verbatim** y devolver el foco a la caja. Test: `should render the clarification question and return focus to the query box`
+- [x] 7.6 No pintar citas cuando no hay prosa. Test: `should render no citation when there is no argument`
+- [x] 7.7 Estado de carga con la línea de expectativa en la ruta asistida. Test: `should state that the assisted answer may take seconds while in flight`
+- [x] 7.8 **Verificación del tramo 2**: `npm run build` y `dotnet build` en verde, las tres suites comparadas **por nombres**, y `openspec validate --all --strict` en verde
 
 ## 8. Tramo 2 · la latencia, medida
 

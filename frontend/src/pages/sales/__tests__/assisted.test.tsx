@@ -922,3 +922,206 @@ describe('AssistedSalesSearchPage — the route toggle', () => {
     expect(banner).not.toHaveTextContent(/Sin talla declarada/);
   });
 });
+
+/**
+ * The sixteen states on screen (C40).
+ *
+ * The classification itself is held in `free-query-states.test.ts`; what these add is that the
+ * screen says the right thing for each, and — for three of them — that it does **not** say the
+ * thing it would say by default.
+ */
+describe('AssistedSalesSearchPage — the sixteen states', () => {
+  async function assistedSearch(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByTestId('route-option-assisted'));
+    await user.type(screen.getByLabelText('¿Qué busca el cliente?'), 'una consulta');
+    await user.click(screen.getByRole('button', { name: /^Buscar$/ }));
+  }
+
+  function assistedAnswers(overrides: Partial<FreeQuerySearchResponse>) {
+    vi.mocked(aiSearchService.searchAssisted).mockResolvedValue({
+      kind: 'ok',
+      response: assistedResponse(overrides),
+    });
+  }
+
+  const citation = {
+    citationId: 'plata#cuidados',
+    documentTitle: 'Plata',
+    sectionTitle: 'Cuidados',
+    docType: 'material',
+    claimScope: 'general',
+    snippet: 'Evitar el agua.',
+    score: 0.7,
+  } as never;
+
+  it('should word an out-of-domain refusal differently from a not-in-catalogue one', async () => {
+    const user = userEvent.setup();
+    assistedAnswers({
+      groups: [],
+      pitch: null,
+      intent: 'out_of_domain',
+      warnings: ['query_out_of_domain'],
+    });
+    renderPanel();
+    await ready();
+    await assistedSearch(user);
+
+    const outOfDomain = (await screen.findByTestId('assisted-refusal')).textContent;
+
+    expect(outOfDomain).toMatch(/no es una pregunta de joyería/i);
+    expect(outOfDomain).not.toMatch(/no trabajamos ese tipo/i);
+  });
+
+  it('should invite rephrasing when the classifier could not route', async () => {
+    const user = userEvent.setup();
+    assistedAnswers({ groups: [], pitch: null, intent: 'in_domain' });
+    renderPanel();
+    await ready();
+    await assistedSearch(user);
+
+    const block = await screen.findByTestId('assisted-no-route');
+
+    expect(block).toHaveAttribute('data-intent', 'in_domain');
+    expect(screen.getByTestId('assisted-rephrase-invitation')).toBeInTheDocument();
+  });
+
+  it('should not invite rephrasing when the classifier did not run', async () => {
+    const user = userEvent.setup();
+    assistedAnswers({ groups: [], pitch: null, intent: 'unclassified' });
+    renderPanel();
+    await ready();
+    await assistedSearch(user);
+
+    const block = await screen.findByTestId('assisted-no-route');
+
+    // The classifier never ran — no credential, a timeout, an unparseable reply. Asking the
+    // operator to rephrase would blame them for a configuration, and with the router credential
+    // missing EVERY query lands here.
+    expect(block).toHaveAttribute('data-intent', 'unclassified');
+    expect(screen.queryByTestId('assisted-rephrase-invitation')).not.toBeInTheDocument();
+  });
+
+  it('should not announce an empty result set on the knowledge route', async () => {
+    const user = userEvent.setup();
+    assistedAnswers({
+      groups: [],
+      citations: [citation],
+      pitch: 'La plata se empaña con el aire y se limpia con un paño suave.',
+    });
+    renderPanel();
+    await ready();
+    await assistedSearch(user);
+
+    await screen.findByTestId('assisted-pitch');
+
+    // Zero pieces and a correct answer. The five branches of emptiness of the C16 panel would
+    // write «Sin resultados» directly above it.
+    expect(screen.queryByTestId('assisted-empty')).not.toBeInTheDocument();
+    expect(screen.queryByText(/sin resultados/i)).not.toBeInTheDocument();
+  });
+
+  it('should render the clarification question and return focus to the query box', async () => {
+    const user = userEvent.setup();
+    assistedAnswers({
+      groups: [],
+      pitch: null,
+      clarificationQuestion: '¿Es para regalo o para ti?',
+    });
+    renderPanel();
+    await ready();
+    await assistedSearch(user);
+
+    // Verbatim: the catalogue of questions is closed and written in code on the service side,
+    // precisely so no model composes a sentence an operator reads out loud.
+    expect(await screen.findByTestId('assisted-clarification')).toHaveTextContent(
+      '¿Es para regalo o para ti?',
+    );
+
+    // Focus goes back to the box, which is the action the question is asking for.
+    await waitFor(() => expect(screen.getByLabelText('¿Qué busca el cliente?')).toHaveFocus());
+  });
+
+  it('should render no citation when there is no argument', async () => {
+    const user = userEvent.setup();
+    assistedAnswers({ pitch: null, pitchStatus: 'withheld_by_ai', citations: [citation] });
+    renderPanel();
+    await ready();
+    await assistedSearch(user);
+
+    await screen.findByTestId('assisted-without-prose');
+
+    // The service keeps them on purpose — a degraded response must not be poorer than the
+    // structured layer produces on its own, which keeps the ablation comparable for the
+    // harness. For an operator a citation with no claim attached attributes nothing.
+    expect(screen.queryByTestId('assist-citation')).not.toBeInTheDocument();
+  });
+
+  it('should state a withdrawn citation without alarming', async () => {
+    const user = userEvent.setup();
+    assistedAnswers({
+      groups: [],
+      citations: [],
+      pitch: 'La plata tolera bien el agua del grifo.',
+    });
+    renderPanel();
+    await ready();
+    await assistedSearch(user);
+
+    const line = await screen.findByTestId('assisted-no-verifiable-source');
+
+    // A discreet line, not an alert: it fires on roughly a quarter of knowledge answers, and at
+    // that frequency an alert trains an operator to ignore it.
+    expect(line).toHaveTextContent(/sin fuente verificable/i);
+    expect(line.tagName.toLowerCase()).toBe('p');
+  });
+
+  it('should not describe a withdrawn citation as invented', async () => {
+    const user = userEvent.setup();
+    assistedAnswers({ groups: [], citations: [], pitch: 'La plata tolera bien el agua.' });
+    renderPanel();
+    await ready();
+    await assistedSearch(user);
+
+    const line = await screen.findByTestId('assisted-no-verifiable-source');
+
+    // The citation existed; what could not be verified is the span that supported it.
+    expect(line.textContent).not.toMatch(/invent|falso/i);
+  });
+
+  it('should state that the assisted answer may take seconds while in flight', async () => {
+    const user = userEvent.setup();
+    let settle: (value: never) => void = () => {};
+    vi.mocked(aiSearchService.searchAssisted).mockReturnValue(
+      new Promise((resolve) => {
+        settle = resolve as never;
+      }),
+    );
+
+    renderPanel();
+    await ready();
+    await assistedSearch(user);
+
+    // From the first instant, never a blank pane: the budget is ten seconds, and seven of
+    // undifferentiated waiting with a customer at the counter is where this gets abandoned.
+    expect(await screen.findByTestId('assisted-loading')).toHaveTextContent(
+      /puede tardar unos segundos/i,
+    );
+
+    settle({ kind: 'ok', response: assistedResponse() } as never);
+  });
+
+  it('should tell a narrow filter from an unanswerable query', async () => {
+    const user = userEvent.setup();
+    assistedAnswers({ warnings: ['filters_too_narrow'] });
+    renderPanel();
+    await ready();
+    await assistedSearch(user);
+
+    const narrow = await screen.findByTestId('assisted-filters-too-narrow');
+
+    // The two end in different actions: remove a filter, or describe it another way.
+    expect(narrow).toHaveTextContent(/ninguna pasa los filtros/i);
+    expect(narrow).toHaveTextContent(/quitar alguno de los filtros/i);
+    expect(screen.queryByTestId('assisted-abstained')).not.toBeInTheDocument();
+  });
+});

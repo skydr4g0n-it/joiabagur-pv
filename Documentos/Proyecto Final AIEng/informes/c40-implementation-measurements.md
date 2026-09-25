@@ -512,3 +512,57 @@ segundos— porque quien lo descubre esperando siete segundos ya lo ha pagado.
 Con la ruta asistida apagada, su opción se **deshabilita con su motivo** en vez de fallar al
 pulsarla: una opción que revienta al hacer clic es la misma mentira que este change vino a
 retirar, movida un paso más tarde.
+
+---
+
+## 7 · Tramo 2 · los dieciséis estados en pantalla (grupo 7)
+
+| Suite | Antes del grupo | Tras el grupo 7 |
+|---|---|---|
+| `frontend` | 113 de 764, 14 ficheros | **113 de 794, 14 ficheros** — conjunto **idéntico** |
+| `backend` | 52 de 1.316 | **sin re-ejecutar**: `git diff` vacío sobre `backend/` desde el grupo 5 |
+| `ai-service` | 1.590 pasados, 0 con error | **sin re-ejecutar**: `git diff` vacío sobre `ai-service/` desde el grupo 4 |
+| `dotnet build` · `npm run build` | verde | **verde** |
+| `openspec validate --all --strict` | 62 passed, 0 failed | **62 passed, 0 failed** |
+
++30 tests, los 30 nuevos pasan. Cero nombres nuevos y cero desaparecidos.
+
+Las dos suites que no se re-ejecutan se declaran en vez de omitirse: los grupos 6 y 7 tocaron
+**sólo** `frontend/`, comprobado con `git diff --name-only` contra el commit del grupo 5, así que
+sus cifras siguen siendo las vigentes. `dotnet build` sí se corre, porque es barato y es lo que
+cazaría una rotura entre capas.
+
+### La decisión que gobierna el grupo
+
+**El render consume un estado resuelto, no una escalera de comprobaciones de campo.** Los
+dieciséis estados son **combinaciones**, y una pantalla que ramifica campo a campo acierta cada
+rama y falla las combinaciones — que es exactamente cómo el panel de C16 acabó con cinco ramas de
+vacío, tres de las cuales pintarían una respuesta correcta como un fallo.
+
+`resolveFreeQueryState` decide y el componente dice. Por eso las aserciones que más pesan viven en
+`free-query-states.test.ts` y no en el DOM: los tres estados que se pintarían mal están mal **en la
+clasificación**, no en el marcado. Un test que renderizara y buscara una cadena pasaría el día que
+alguien arregla la cadena y rompe la rama.
+
+**El orden de las comprobaciones es el de la máquina, no el de conveniencia.** El enrutador corta
+antes de recuperar, así que un rechazo o una repregunta ganan a cualquier condición posterior; la
+abstención va después porque se decide antes de generar. Hay un test que lo fija: un rechazo que
+llega con `abstained: true` y con grupos sigue resolviendo a rechazo.
+
+### Tres reglas de copia que la tabla obliga y que no son obvias
+
+**1 · «Sin fuente verificable» no se dice en la ruta `catalog`.** Ahí el corpus no se consulta y la
+propia tarea ordena no citar, así que una lista de citas vacía es el estado correcto: anunciarlo
+inventaría un hueco. Tampoco se dice cuando ya está `knowledge_not_covered`, que describe la misma
+ausencia con palabras más útiles.
+
+**2 · Sin prosa, sin citas — y el servicio hace lo contrario a propósito.** Cuando la puerta retira
+el argumentario, el servicio **conserva** las citas: una respuesta degradada no debe ser más pobre
+que la que la capa estructurada produce sola, que es lo que mantiene comparable la ablación para el
+arnés. Esa decisión sirve al arnés. La de la pantalla sirve al operario, y para él una cita sin
+afirmación no atribuye nada. Las dos son correctas y apuntan en direcciones opuestas porque sirven
+a consumidores distintos; quien lea una sin la otra intentará unificarlas.
+
+**3 · `CitationRow` de C36 se exporta y se reutiliza, no se copia.** Lo que no había que duplicar es
+la distinción establecimiento/general: un compromiso de la casa pasado como hecho del mundo es como
+una tienda acaba debiendo algo que no prometió.
