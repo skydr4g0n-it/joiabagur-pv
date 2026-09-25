@@ -91,7 +91,7 @@
 
 ## 11. Tramo 3 · verificación de completitud
 
-- [ ] 11.1 Recorrer **campo a campo** `SalesAssistResponse`, `AssistedSearchResponse` y `FreeQuerySearchResponse`, y por cada campo **señalar dónde se pinta o declarar por qué no**. Es la disciplina que habría cazado las tres infracciones que la exploración encontró; el resultado va escrito en el informe de implementación
+- [x] 11.1 Recorrer **campo a campo** `SalesAssistResponse`, `AssistedSearchResponse` y `FreeQuerySearchResponse`, y por cada campo **señalar dónde se pinta o declarar por qué no**. Es la disciplina que habría cazado las tres infracciones que la exploración encontró; el resultado va escrito en el informe de implementación
 
 ## 12. Tramo 4 · «todos los puntos de venta» (primer candidato a corte)
 

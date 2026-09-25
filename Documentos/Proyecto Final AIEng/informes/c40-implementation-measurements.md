@@ -952,3 +952,138 @@ semántica del panel no tenía por dónde llevarlo. Eso es exactamente la supres
 completitud prohíbe, así que se cerró aquí en vez de dejarlo para el grupo 11 — `AiSearchResponse`,
 `AssistedSearchResponse`, el tipo del frontend y un bloque de aviso en la ruta semántica, con la
 copia compartida. Cuatro adiciones, ningún campo retirado ni cambiado de tipo.
+
+---
+
+## 11 · Tramo 3 · verificación de completitud campo a campo (grupo 11)
+
+La regla transversal del §5 de la exploración: **todo lo que una respuesta entrega tiene que llegar
+al frontal, donde le corresponda.** Un campo que el backend calcula, paga y devuelve, y que la
+pantalla descarta, es trabajo tirado y —peor— una pantalla que sabe menos de lo que el sistema sabe.
+
+La exploración encontró **tres infracciones**, ninguna intencionada. Éste es su estado:
+
+| Dato | Estado |
+|---|---|
+| `degradedReason` (6 valores) | **cerrada** · grupos 6 y 7 — `pitchMessage` en la ficha, estado `degraded` y `assisted-degraded` en el panel |
+| `abstained` | **cerrada** · grupo 7 — estado `abstained` y `assisted-abstained`, distinguido del filtro estrecho |
+| `usage`, `aiMs`, `totalMs`, `model` | **pendiente, con tarea** · grupo 13.2, el embudo de administrador |
+
+### Cómo se hizo, y por qué no leyendo los componentes
+
+Un barrido que empieza por los componentes encuentra lo que los componentes mencionan: es
+exactamente el método con el que las tres infracciones pasaron desapercibidas. Éste empieza por el
+**contrato** —los DTO de `Application/DTOs/Ai`— y le pide al resto del código que dé cuenta de cada
+nombre, de modo que un campo sin lector aparece como una fila vacía y no como una ausencia que nadie
+mira. Son tres comprobaciones y no una:
+
+| Eslabón | Qué se comprueba | Resultado |
+|---|---|---|
+| **.NET lo asigna** | el servicio escribe el campo, no sólo lo declara | **38 de 38** |
+| **TypeScript lo declara** | el tipo del frontal lo tiene | **38 de 38** |
+| **La pantalla lo lee** | hay un componente que lo pinta | **31 de 38** |
+
+Y la dirección inversa, que es como un tipo envejece sin que nada falle —un campo en TypeScript que
+el backend no emite se lee siempre como nulo y nadie se entera—:
+
+| Respuesta | Campos .NET | Campos TS | Sólo en TS | Sólo en .NET |
+|---|---|---|---|---|
+| `SalesAssistResponse` | 13 | 13 | ninguno | ninguno |
+| `AssistedSearchResponse` | 9 | 9 | ninguno | ninguno |
+| `FreeQuerySearchResponse` | 16 | 16 | ninguno | ninguno |
+
+### `FreeQuerySearchResponse` — la respuesta que este change crea
+
+| Campo | Dónde se pinta |
+|---|---|
+| `groups` | `FreeQueryAnswer` → una `AssistedSearchResultRow` por miembro |
+| `pitch` | `assisted-pitch`, bajo el rótulo «Argumentario» |
+| `pitchStatus` | `WithoutProseBlock` vía `pitchMessage`, y resuelve los estados 12 · 14 · 15 |
+| `citations` | `CitationRow` de C36, reutilizada, y sólo cuando hay argumentario que sostengan |
+| `warnings` | el rechazo, `filters_too_narrow`, y `assisted-query-warnings` para el resto |
+| `clarificationQuestion` | `ClarificationBlock`, **literal**, y devuelve el foco a la caja |
+| `intent` | `NoRouteBlock` — separa el estado 4 del 5, que necesitan copia opuesta |
+| `abstained` | `assisted-abstained`, distinguido del filtro estrecho |
+| `aiAvailable` | `assisted-degraded`, y la insignia de disponibilidad antes de buscar |
+| `degradedReason` | `pitchMessage`, y el estado `degraded` lo lleva consigo |
+| `searchEventId` | atribuye la venta a la búsqueda (`handleSelect` → `reportSelection`) |
+| `pointOfSaleId` | el ámbito con el que se pidió, eco para la pantalla |
+| `candidatesReturned` | la línea de página corta y el embudo de administrador |
+| `survivedHydration` | el embudo de administrador |
+| **`usage`** | **pendiente · grupo 13.2** |
+| **`traceId`** | **no se pinta** — ver abajo |
+
+### `AssistedSearchResponse` — la ruta semántica
+
+| Campo | Dónde se pinta |
+|---|---|
+| `results` | `AssistedSearchResultRow`, en el orden en que el recuperador los ordenó |
+| `searchEventId` | atribución de la venta |
+| `aiAvailable` | «Búsqueda asistida no disponible» y la insignia |
+| `lowConfidence` | «No he encontrado nada que encaje» y las ramas de vacío |
+| `pointOfSaleId` | eco del ámbito |
+| `candidatesReturned` | línea de página corta y embudo |
+| `survivedHydration` | embudo |
+| `warnings` | `semantic-query-warnings` — **añadido en el grupo 10**, ver abajo |
+| **`unappliedFilters`** | **no se pinta** — ver abajo |
+
+### `SalesAssistResponse` — la ficha de C36
+
+| Campo | Dónde se pinta |
+|---|---|
+| `aiAvailable` · `degradedReason` | el estado degradado de la ficha, con su motivo |
+| `pointOfSaleId` · `productId` | el ancla y su ámbito |
+| `groups` | `family-block`, con la pieza anclada marcada |
+| `pitch` · `pitchStatus` | `pitch-block` |
+| `citations` | `CitationRow`, con su `claimScope` |
+| `warnings` | `warnings-block` y `piece-header` |
+| `clarificationQuestion` | `pitch-block` |
+| **`intent`** · **`promptVersion`** · **`traceId`** | **no se pintan** — ver abajo |
+
+### Los siete campos sin lector, y por qué
+
+**Ninguno es una supresión involuntaria.** Ése es el resultado de la auditoría, y es lo que había
+que comprobar.
+
+1. **`traceId`** (ficha y consulta libre). Un identificador de correlación con el registro del
+   servicio. Un operario no puede actuar sobre él y en una pantalla de mostrador es ruido. *Es el
+   único de los siete que admite discusión*: en un estado de error, enseñarlo permitiría al operario
+   citarlo al pedir ayuda. No se ha añadido porque no lo pide ninguna tarea y la decisión es de
+   interfaz, no de contrato; queda anotado como candidato.
+2. **`usage`** (consulta libre). Es la segunda de las tres infracciones de la exploración y **tiene
+   tarea**: el grupo 13.2. Hoy el servicio sólo lo construye para administradores, así que el campo
+   ya nace con su frontera de autorización puesta.
+3. **`unappliedFilters`** (ruta semántica). El canal que C40 dejó **dormido a propósito** y con su
+   razón escrita en el propio DTO: la petición del panel lleva exactamente dos filtros y la ruta
+   degradada aplica los dos, así que **está vacío en todos los casos que este endpoint puede
+   producir**. Se conserva porque el requisito es una red de seguridad y no una funcionalidad.
+4. **`intent`** (ficha). En M2 vale siempre `product_pitch` y en M3 `unclassified`: no hay nada
+   sobre lo que ramificar. En la consulta libre sí se lee, y ahí separa dos estados que necesitan
+   copia opuesta.
+5. **`promptVersion`** (ficha; y dentro de `usage` en la consulta libre). **Ya está resuelto en
+   servidor**: `StatusOf` lo convierte en `pitchStatus` —`not_generated` cuando falta,
+   `withheld_by_ai` cuando está y la prosa no—. Que la pantalla lo leyera otra vez sería duplicar
+   una decisión que el servicio ya tomó, con la posibilidad de contradecirla.
+6. **`familyId`** (los tres DTO de grupo y resultado). La pantalla nombra la familia por su
+   `familyLabel` y no enlaza a ella desde ninguna pantalla de venta; las filas se llavean por
+   `productId`. El identificador viaja para quien agrupe, no para quien lea.
+7. **`docType`** (la cita, en las dos superficies). La distinción que importa en el mostrador
+   —compromiso de la casa contra hecho del mundo— la lleva **`claimScope`**, que sí se pinta.
+   `docType` es la taxonomía del corpus, y enseñarla al lado sería una segunda etiqueta para la
+   misma pregunta.
+8. **`score`** (el resultado de la ruta semántica). Una similitud cruda en pantalla es falsa
+   precisión: no es comparable entre consultas y no sugiere ninguna acción. Lo que se pinta en su
+   lugar es **`matchReasons`**, que dice de qué rama vino.
+
+### Lo que la disciplina cazó esta vez
+
+Una, y en el grupo anterior: **jbg-ai emitía `warnings` en la respuesta de recuperación y .NET lo
+tiraba**. La ruta semántica del panel no tenía por dónde llevarlo, así que `filters_too_narrow`
+—decidido por recuperación y por tanto alcanzable desde las dos rutas— sólo habría llegado a la
+asistida. Se cerró allí mismo en vez de esperar a este grupo: `AiSearchResponse`,
+`AssistedSearchResponse`, el tipo del frontal y un bloque de aviso con la copia compartida.
+
+Es exactamente el mismo tipo de infracción que las tres de la exploración —un dato calculado y
+descartado en la frontera—, encontrado por el mismo procedimiento, y aparecido **dentro** del change
+que vino a corregirlas. Eso dice algo sobre la regla: no es una revisión que se pasa una vez, es una
+que hay que pasar cada vez que un campo cruza una frontera.
