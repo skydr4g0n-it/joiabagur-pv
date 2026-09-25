@@ -1125,3 +1125,49 @@ describe('AssistedSalesSearchPage — the sixteen states', () => {
     expect(screen.queryByTestId('assisted-abstained')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * C40 · changing shop is a cheap act, and it has to stay cheap.
+ *
+ * The panel reads availability on every shop change, which is what lets it say a path is off
+ * *before* the operator uses it. That read must not be mistaken for a search: it calls no model,
+ * spends no quota and, above all, must not re-run the last query against the new shop.
+ */
+describe('AssistedSalesSearchPage — changing the shop', () => {
+  it('should issue no assisted request when the shop changes', async () => {
+    const user = userEvent.setup();
+    vi.mocked(pointOfSaleService.getPointsOfSale).mockResolvedValue([POS_ONE, POS_TWO]);
+    renderPanel();
+    await ready();
+
+    await user.click(await screen.findByTestId('route-option-assisted'));
+    await user.type(screen.getByLabelText('¿Qué busca el cliente?'), 'anillo de plata');
+    await user.click(screen.getByRole('button', { name: /^Buscar$/ }));
+    await waitFor(() => expect(aiSearchService.searchAssisted).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByLabelText('Punto de venta'));
+    await user.click(await screen.findByRole('option', { name: 'Fornells' }));
+
+    // Availability is read again — that is the point of reading it per shop — and nothing else.
+    await waitFor(() =>
+      expect(aiSearchService.getAvailability).toHaveBeenCalledWith(POS_TWO.id),
+    );
+    expect(aiSearchService.searchAssisted).toHaveBeenCalledTimes(1);
+    expect(aiSearchService.search).not.toHaveBeenCalled();
+  });
+
+  it('should keep reading availability without spending the assisted quota', async () => {
+    const user = userEvent.setup();
+    vi.mocked(pointOfSaleService.getPointsOfSale).mockResolvedValue([POS_ONE, POS_TWO]);
+    renderPanel();
+    await ready();
+
+    await user.click(screen.getByLabelText('Punto de venta'));
+    await user.click(await screen.findByRole('option', { name: 'Fornells' }));
+    await user.click(screen.getByLabelText('Punto de venta'));
+    await user.click(await screen.findByRole('option', { name: POS_ONE.name }));
+
+    expect(aiSearchService.searchAssisted).not.toHaveBeenCalled();
+    expect(aiSearchService.search).not.toHaveBeenCalled();
+  });
+});

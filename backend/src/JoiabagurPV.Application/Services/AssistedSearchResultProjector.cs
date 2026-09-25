@@ -75,7 +75,9 @@ public class AssistedSearchResultProjector : IAssistedSearchResultProjector
             Name = row.Name,
             Price = row.Price,
             QuantityAtPointOfSale = row.Quantity,
-            HasStock = row.Quantity > 0,
+            // `row.Quantity > 0` would be **false** for a null, which reads as «none left»
+            // rather than «nobody asked». The two have to stay apart all the way to the screen.
+            HasStock = row.Quantity is { } quantity ? quantity > 0 : null,
             PrimaryPhotoUrl = row.PrimaryPhotoFileName is null
                 ? null
                 : await _fileStorage.GetUrlAsync(row.PrimaryPhotoFileName, "products"),

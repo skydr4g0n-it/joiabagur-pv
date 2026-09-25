@@ -1156,3 +1156,35 @@ del diseño ya declara para `ProductSearchEvent`.
 
 ---
 
+
+## Active Change: `add-frontend-free-query-panel` (C40)
+
+### Una búsqueda en «todos los puntos de venta» no queda registrada
+
+**Estado:** implementada la búsqueda, **no** su telemetría.
+
+`ProductSearchEvent.PointOfSaleId` es `Guid` no nulo, `IsRequired()` en su configuración de EF Core
+y forma parte del índice `(PointOfSaleId, CreatedAt)`. Registrar una búsqueda sin tienda exige
+volverlo anulable, y eso es **una migración de EF Core**, que es lo único que el encargo de este
+change excluye explícitamente. La spec, por su parte, prohíbe la salida fácil: *«it MUST record the
+search with no point of sale rather than with a placeholder one»*.
+
+Entre una migración y una mentira, la tercera opción es no registrar y decirlo. Es lo que se ha
+hecho: con `PointOfSaleId` nulo el servicio devuelve `searchEventId = null` —exactamente como ya
+hace cuando la telemetría falla—, no se atribuye ninguna venta a esa búsqueda y nada más cambia.
+
+**Qué se pierde, concretamente.** Una consulta libre de ámbito global no aparece en el embudo, no
+cuenta para la tasa de selección y no se puede comparar con las de ámbito de tienda. Como el panel
+por defecto lleva una tienda seleccionada, el hueco afecta sólo a las búsquedas en que el operario
+quita el ámbito a propósito, cuya frecuencia **no se puede medir precisamente porque no se
+registran**. Eso es circular y hay que decirlo: la primera cifra que dará el arreglo es cuánto se
+estaba perdiendo.
+
+**Qué haría falta cuando se haga.** Volver `PointOfSaleId` anulable en `ProductSearchEvent` y en su
+configuración, la migración correspondiente, y revisar el índice —un `(PointOfSaleId, CreatedAt)`
+con nulos sigue sirviendo a las consultas por tienda, pero las agregaciones que hoy asumen no-nulo
+tendrían que decidir si cuentan o excluyen las globales—. En `ProductSearchEventService` desaparece
+el `?? throw` que hoy trata un ámbito sin tienda como error de programación. Y la retención hereda
+el problema que el §15.11 del diseño ya declara para esta misma tabla.
+
+---

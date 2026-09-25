@@ -23,9 +23,15 @@ public interface IAssistedSearchRepository
     /// Order is not meaningful here. The caller re-orders by the relevance the retriever
     /// produced, which this query knows nothing about.
     /// </remarks>
+    /// <param name="pointOfSaleId">
+    /// The shop, or <see langword="null"/> for a search spread over every one of them. With a
+    /// null the inventory restriction is dropped and each product comes back once, with no
+    /// quantity: there is no shop whose units it would be, and reporting one shop's figure for a
+    /// product carried by three would be picking an answer at random.
+    /// </param>
     Task<IReadOnlyList<AssistedSearchRow>> HydrateAsync(
         IReadOnlyList<Guid> productIds,
-        Guid pointOfSaleId,
+        Guid? pointOfSaleId,
         CancellationToken cancellationToken);
 
     /// <summary>
@@ -119,7 +125,11 @@ public sealed class AssistedSearchRow
     /// screen says a shop has to be chosen instead of showing a number that would be true of one
     /// shop and false of the others.
     /// </remarks>
-    public int Quantity { get; init; }
+    /// <remarks>
+    /// <see langword="null"/> when the hydration named no point of sale: there is no shop whose
+    /// units these would be. Distinct from zero, which is a shop that carries none.
+    /// </remarks>
+    public int? Quantity { get; init; }
 
     public string? PrimaryPhotoFileName { get; init; }
 

@@ -87,7 +87,10 @@ public class FreeQuerySearchService : IFreeQuerySearchService
 
         // **Switched off costs no call and no quota.** The reason is recorded so the screen can
         // say a switch did it rather than presenting an outage that is not happening.
-        if (!options.IsEnabledFor(request.PointOfSaleId))
+        // With no shop named there is no per-shop entry to look up, so the default governs.
+        // That is the narrow reading and the safe one: a deployment that enables the feature
+        // shop by shop has not enabled it for «all of them».
+        if (!IsEnabled(options, request.PointOfSaleId))
         {
             degradedReason = "switched_off";
         }
@@ -150,16 +153,32 @@ public class FreeQuerySearchService : IFreeQuerySearchService
     /// Checks that the caller may search on this point of sale, and that it is usable at all.
     /// </summary>
     /// <remarks>
-    /// A point of sale is required. The third scope class — every shop at once — arrives with its
-    /// own authorisation boundary and is deliberately not anticipated here.
+    /// <para>
+    /// <strong>No point of sale is the third scope, and it is open to operators and
+    /// administrators alike.</strong> The reason it discloses nothing new: the stock breakdown
+    /// of a product is already readable across every shop by any authenticated caller, so a
+    /// search that spans them exposes no fact that was not already exposed. What it does not
+    /// do is relax the other boundary — naming a shop the caller is not assigned to is still
+    /// refused, and refused before any call is made.
+    /// </para>
+    /// <para>
+    /// The active-shop check only applies when a shop was named. There is no «every shop is
+    /// active» question to ask, and inventing one would make the answer depend on whichever
+    /// shop happened to be disabled.
+    /// </para>
     /// </remarks>
     private async Task<FreeQuerySearchResult?> AuthoriseAsync(
-        Guid pointOfSaleId,
+        Guid? pointOfSaleId,
         Guid userId,
         bool isAdmin,
         CancellationToken cancellationToken)
     {
-        if (!await _repository.IsPointOfSaleActiveAsync(pointOfSaleId, cancellationToken))
+        if (pointOfSaleId is not { } named)
+        {
+            return null;
+        }
+
+        if (!await _repository.IsPointOfSaleActiveAsync(named, cancellationToken))
         {
             return FreeQuerySearchResult.Unavailable();
         }
@@ -169,7 +188,7 @@ public class FreeQuerySearchService : IFreeQuerySearchService
             return null;
         }
 
-        return await _userPointOfSaleService.HasAccessAsync(userId, pointOfSaleId)
+        return await _userPointOfSaleService.HasAccessAsync(userId, named)
             ? null
             : FreeQuerySearchResult.Forbidden();
     }
@@ -251,7 +270,7 @@ public class FreeQuerySearchService : IFreeQuerySearchService
     /// </remarks>
     private async Task<List<FreeQueryGroupDto>> HydrateAsync(
         AiAssistSaleResponse ai,
-        Guid pointOfSaleId,
+        Guid? pointOfSaleId,
         int pageSize,
         CancellationToken cancellationToken)
     {
@@ -383,15 +402,21 @@ public class FreeQuerySearchService : IFreeQuerySearchService
         };
 
     /// <summary>
-    /// The scope that carries the shop into the service token.
+    /// The scope that carries the shop into the service token, or its deliberate absence.
     /// </summary>
     /// <remarks>
-    /// A point of sale is required here. The third scope class — every shop at once — is a
-    /// separate piece of work with an authorisation boundary of its own, and giving this service
-    /// a provisional version of it would be the kind of half-open door nobody revisits.
+    /// The every-shop scope omits the `pos_id` claim rather than filling it with a sentinel,
+    /// and the service reads an absent claim as «do not apply the availability prefilter».
+    /// A wildcard would instead reach the retriever's only hard filter and match everything.
     /// </remarks>
-    private static AiCallScope ScopeOf(Guid pointOfSaleId, Guid userId, string role) =>
-        AiCallScope.ForPointOfSale(userId, role, pointOfSaleId);
+    private static AiCallScope ScopeOf(Guid? pointOfSaleId, Guid userId, string role) =>
+        pointOfSaleId is { } named
+            ? AiCallScope.ForPointOfSale(userId, role, named)
+            : AiCallScope.ForAllPointsOfSale(userId, role);
+
+    /// <summary>Whether the assisted answer is offered for this request's scope.</summary>
+    private static bool IsEnabled(AiFreeQuerySearchOptions options, Guid? pointOfSaleId) =>
+        pointOfSaleId is { } named ? options.IsEnabledFor(named) : options.EnabledByDefault;
 
     private static AiSearchFilters BuildFilters(FreeQuerySearchRequest request) => new()
     {
@@ -419,6 +444,19 @@ public class FreeQuerySearchService : IFreeQuerySearchService
         int resultCount,
         int totalMs)
     {
+        // **A search spread over every shop is not recorded, and that is a declared gap.**
+        // `ProductSearchEvent.PointOfSaleId` is a required column with an index on it, so
+        // recording one would need an EF Core migration — which this change does not take — and
+        // the alternative the specification explicitly forbids is writing a placeholder shop.
+        // Between a migration and a lie, the third option is to record nothing and say so: the
+        // response comes back with no `searchEventId`, exactly as it already does when
+        // telemetry fails, so no selection is attributed and nothing else changes. Listed for
+        // `openspec/DEFERRED_TASKS.md`.
+        if (request.PointOfSaleId is null)
+        {
+            return null;
+        }
+
         try
         {
             return await _searchEventService.RecordSearchAsync(new RecordSearchRequest

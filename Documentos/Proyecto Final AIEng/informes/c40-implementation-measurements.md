@@ -1087,3 +1087,141 @@ Es exactamente el mismo tipo de infracción que las tres de la exploración —u
 descartado en la frontera—, encontrado por el mismo procedimiento, y aparecido **dentro** del change
 que vino a corregirlas. Eso dice algo sobre la regla: no es una revisión que se pasa una vez, es una
 que hay que pasar cada vez que un campo cruza una frontera.
+
+---
+
+## 12 · Tramo 4 · «todos los puntos de venta» (grupo 12)
+
+El grupo que el encargo señaló como **primer candidato a corte**, y la razón por la que lo señaló se
+confirma al hacerlo: es una frontera de autorización, y una frontera de autorización se rompe de
+formas que no fallan ningún test.
+
+### La tercera clase de ámbito, y por qué no es una relajación de la primera
+
+`AiCallScope` pasa de dos caminos de construcción a **tres**, y `AiCallScopeKind` de dos valores a
+tres. `ForAllPointsOfSale` y `ForCatalog` llevan **exactamente los mismos campos** —ningún punto de
+venta— y siguen siendo dos clases distintas, que es lo único que este diseño no podía ceder:
+colapsarlas haría que el ámbito de enriquecimiento sirviera para buscar.
+
+| Ámbito | Lleva tienda | Recuperación | Assist | Sustitutos |
+|---|---|---|---|---|
+| `PointOfSale` | sí | ✅ | ✅ | ✅ |
+| `AllPointsOfSale` | **no** | ✅ | ✅ | **rechazado** |
+| `Catalog` | no | rechazado | rechazado | rechazado |
+
+Los sustitutos no tienen excepción y el motivo es lo que son: ordenan por lo que una tienda puede
+entregar, así que sin tienda la ordenación no tiene nada que leer y la respuesta contestaría a otra
+pregunta.
+
+**La ausencia nunca es un comodín.** Ésa es la propiedad que hace seguro todo lo demás: un `pos_id`
+ausente hace que el prefiltro de disponibilidad **no se aplique**, y falla cerrado en cualquier ruta
+que exija la reclamación. Un centinela, en cambio, llegaría al único filtro duro del recuperador y
+casaría con todo.
+
+### El agujero que este grupo abrió y cerró en el mismo change
+
+Hacer la reclamación opcional en dos rutas significa que el decodificador deja de exigirla. Y el
+decodificador **descartaba en silencio un valor inservible**, porque hasta ahora un `pos_id` en
+blanco nunca podía pasar del bucle de reclamaciones obligatorias.
+
+Descartado ahí, **un `pos_id` en blanco se habría convertido en «todas las tiendas»**: un token
+emitido para una tienda, ampliado calladamente a todas, sin que nadie lo pidiera. Es exactamente el
+comodín por accidente que toda la reclamación existe para impedir, y habría entrado por la puerta
+que este grupo vino a abrir.
+
+La regla que lo cierra: **ausencia es que la clave no esté en el payload; cualquier otra cosa es un
+valor, y un valor tiene que ser usable.** Hay test propio, `test_a_blank_pos_claim_is_never_read_as
+_its_absence`, y `parse_pos_id` separa ahora las dos ramas que compartía —`None` devuelve `None`,
+una cadena vacía sigue levantando— con la misma distinción escrita en su docstring.
+
+### Cuatro tests que afirmaban lo contrario, y los cuatro eran correctos cuando se escribieron
+
+| Test | Qué afirmaba | Qué afirma ahora |
+|---|---|---|
+| `test_invalid_token_is_rejected[missing-pos-id]` | recuperación rechaza un token sin `pos_id` | sale de la lista; el caso vive en los tres de abajo |
+| `test_catalog_token_is_rejected_on_retrieval` | ídem, con su argumento escrito | `test_retrieval_accepts_a_token_without_pos_claim`, con la inversión declarada |
+| `test_token_without_pos_id_is_401` | 401 en la app real | 200 **y** `effective_pos_id` vacío: la ausencia se devuelve, no se sustituye |
+| `test_no_claim_shape_short_of_a_uuid_is_accepted[None]` | `parse_pos_id(None)` levanta | `None` sale del parámetro y estrena test propio |
+
+Lo que cambió no es el razonamiento sino el caso. La vieja clausura **sigue viva** en los tests que
+la sustituyen: un valor en blanco se sigue rechazando, y toda ruta de una sola tienda —sustitutos,
+inventario, agente— sigue rechazando la omisión, con `test_pos_scoped_route_still_rejects_it`.
+
+### Lo que no se puede saber no se inventa
+
+Con la búsqueda extendida a todas las tiendas no hay existencias que reportar, y **cero sería
+falso**: la pieza puede estar en la tienda de al lado. Así que:
+
+- `AssistedSearchResultDto.QuantityAtPointOfSale` y `HasStock` pasan a anulables. **El DTO de la
+  ficha de C36 no se toca** — me equivoqué de tipo al primer intento y lo corregí: la consulta libre
+  proyecta a `AssistedSearchResultDto`, no a `SalesAssistMemberDto`.
+- La fila tiene ahora **tres estados y no dos**. `hasStock === null` no es «agotado»: caer a la
+  insignia de aviso le diría al operario que la pieza se acabó en todas partes, que es una
+  afirmación que nadie hizo.
+- La etiqueta **nombra la tienda** —«3 en MAO-TALLER»—, que es lo que la hace legible cuando el
+  panel puede abarcar todas.
+- El botón de ficha se **deshabilita** sin tienda: la ficha informa del stock de una tienda y ofrece
+  sustitutos de su surtido, así que sin tienda no tiene nada que contestar.
+
+En la hidratación sin tienda la consulta **agrupa por producto**. No es un detalle de estilo: sin
+agrupar, un producto que tres tiendas llevan vuelve tres veces y el `ToDictionary` del llamador
+revienta por clave duplicada. La cantidad se **descarta** en vez de sumarse o elegirse: un total
+entre tiendas no es lo que la etiqueta significa, y la cifra de una tienda escogida al azar sería
+peor que no decir nada.
+
+Donde la cantidad sí existe por construcción —la ficha, los sustitutos— el código lo dice con un
+`?? throw` y no con un `?? 0`. Un cero sería una afirmación sobre el stock; esto es una afirmación
+sobre el código.
+
+### Una tarea que no se pudo hacer, y por qué
+
+**Una búsqueda de ámbito global no queda registrada.** `ProductSearchEvent.PointOfSaleId` es no nulo,
+`IsRequired()` e indexado: registrarla exige una **migración de EF Core**, que es justo lo único que
+el encargo excluye; y la spec prohíbe la salida fácil —*«it MUST record the search with no point of
+sale rather than with a placeholder one»*—. Entre una migración y una mentira, la tercera opción es
+no registrar y decirlo: `searchEventId` vuelve nulo, como ya hace cuando la telemetría falla.
+
+Queda escrito en `openspec/DEFERRED_TASKS.md` con lo que haría falta. Y con la parte incómoda: la
+frecuencia de esas búsquedas **no se puede medir porque no se registran**, así que la primera cifra
+que dará el arreglo es cuánto se estaba perdiendo.
+
+### El test de inventario que no tiene dónde afirmarse
+
+La tarea 12.2 pide `ForAllPointsOfSale_IsRefusedByInventory`. **`IAiGatewayClient` no tiene
+operación de inventario**: `/v1/inventory/propose` existe en jbg-ai y nada en .NET la llama. El
+requisito viene de la spec, que enumera «the sale card, substitutes and inventory» pensando en las
+rutas del servicio, no en los métodos del cliente.
+
+No se ha inventado un test que pase por casualidad. En su lugar: la garantía equivalente se afirma
+del lado de Python —la ruta conserva la dependencia estricta y rechaza el token, en
+`test_pos_scoped_route_still_rejects_it`—, y del lado .NET queda un test que afirma **que la
+superficie no existe**, de modo que el día que este cliente crezca una llamada de inventario, el
+test falla y pide su propio rechazo. Es la anotación honesta de un requisito que hoy no tiene dónde
+aterrizar, en vez de una casilla marcada.
+
+### Qué cambió en el conjunto de tests que falla
+
+| Suite | Resultado | Contra la línea base del grupo 1 |
+|---|---|---|
+| `ai-service` | **1 621 en verde, 0 rojos** | — |
+| `frontend` | 113 de 801 en 14 ficheros | **conjunto de nombres idéntico**, cero diferencias |
+| `backend` | 47 de 1 328 | 3 nombres nuevos, **los tres en clases rotatorias conocidas** |
+
+El frontend dio por primera vez en todo el change un **diff vacío** contra la línea base: ni un
+nombre nuevo, ni uno desaparecido, ni siquiera los oscilantes de `scan.test.tsx`.
+
+En backend, los tres nombres que no estaban en la unión conocida son dos de
+`InventoryIntegrationTests` y uno de `PaymentMethodsControllerTests` — exactamente dos de las tres
+clases que el `CLAUDE.md` documenta como rotatorias— y otros 19 de la unión dejaron de fallar en
+esta pasada. El criterio que importa: **cero fallos en el área de C40**. Ninguno de los 47 toca
+`AiCallScope`, `AiGateway`, `FreeQuerySearch`, `AssistedSearch`, `SalesAssist`, `Substitutes` ni
+`ProductSearchEvent`, y las tres pasadas dirigidas sobre esa área —341, 13 y 22 tests— salieron
+limpias.
+
+**Sin migración de EF Core, y comprobado por test**: `ProductSearchEventSchemaTests` incluye
+`HasPendingModelChanges().Should().BeFalse()` y pasa. `openapi.json` no se ha movido: este grupo
+cambia la superficie de .NET y la capa de autenticación de Python, no los esquemas de jbg-ai.
+
+Nota de procedencia: la pasada completa de `ai-service` arrancó **antes** de añadir los cuatro
+parámetros de comodín (`*`, `all`, `ALL`, `%`) a `test_no_claim_shape_short_of_a_uuid_is_accepted`;
+ese fichero se volvió a correr aislado después, con 58 en verde.

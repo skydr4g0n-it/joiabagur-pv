@@ -173,9 +173,19 @@ public class AiSearchController : ControllerBase
             });
         }
 
+        // **Absent means every shop; empty is a malformed request.** The distinction is the same
+        // one the token claim draws, and for the same reason: a caller that meant «all of them»
+        // omits the field, and a caller that sent `Guid.Empty` sent a value that identifies no
+        // shop. Reading the second as the first would turn a client bug into a wider search.
         if (request.PointOfSaleId == Guid.Empty)
         {
-            return BadRequest(new { errors = new[] { "El punto de venta es obligatorio." } });
+            return BadRequest(new
+            {
+                errors = new[]
+                {
+                    "El punto de venta no es válido. Omítelo para buscar en todas las tiendas."
+                }
+            });
         }
 
         var result = await _freeQuerySearchService.SearchAsync(

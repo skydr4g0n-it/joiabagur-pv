@@ -485,7 +485,13 @@ public class SalesAssistService : ISalesAssistService
         Name = row.Name,
         VariantLabel = variantLabel,
         Price = row.Price,
-        QuantityAtPointOfSale = row.Quantity,
+        // The row always carries a quantity here: the sale card is refused without a
+        // point of sale, so the hydration that produced this row named one. Stated as a throw
+        // rather than as a `?? 0`, because a zero would be a claim about stock and this is a
+        // claim about the code.
+        QuantityAtPointOfSale = row.Quantity
+            ?? throw new InvalidOperationException(
+                "A sale card hydrated without a point of sale. The card is refused without one."),
         HasStock = row.Quantity > 0,
         PrimaryPhotoUrl = row.PrimaryPhotoFileName is null
             ? null

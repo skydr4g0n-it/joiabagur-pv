@@ -514,6 +514,7 @@ export function AssistedSalesSearchPage() {
           onSelect={handleSelect}
           onOpenCard={handleOpenCard}
           onClarificationAsked={focusQueryBox}
+          pointOfSaleName={posName}
         />
       ) : null}
       {response ? (
@@ -606,6 +607,7 @@ export function AssistedSalesSearchPage() {
               quality, and re-sorting would make it measure this page instead. */}
           {response.results.map((result) => (
             <AssistedSearchResultRow
+              pointOfSaleName={posName}
               key={result.productId}
               result={result}
               onSelect={handleSelect}

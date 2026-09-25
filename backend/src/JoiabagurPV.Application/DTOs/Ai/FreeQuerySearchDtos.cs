@@ -12,13 +12,22 @@ public class FreeQuerySearchRequest
     public string Query { get; set; } = string.Empty;
 
     /// <summary>
-    /// The shop to answer about.
+    /// The shop to answer about, or <see langword="null"/> for every shop at once.
     /// </summary>
     /// <remarks>
-    /// Required. Searching every shop at once is a third scope class with an authorisation
-    /// boundary of its own, and it arrives with that boundary rather than as a null tolerated here.
+    /// <para>
+    /// <strong>Null is the absence of a shop and never a wildcard.</strong> It builds
+    /// `AiCallScope.ForAllPointsOfSale`, whose token omits the `pos_id` claim, and the service
+    /// reads an absent claim as «do not apply the availability prefilter» rather than as «match
+    /// everything». A sentinel here would reach the retriever's only hard filter.
+    /// </para>
+    /// <para>
+    /// It costs the response its stock figures, and that is stated rather than papered over:
+    /// with no shop no quantity is reported, because reporting zero would assert something
+    /// false about every piece in the catalogue.
+    /// </para>
     /// </remarks>
-    public Guid PointOfSaleId { get; set; }
+    public Guid? PointOfSaleId { get; set; }
 
     /// <summary>Groups wanted, bounded by the configured maximum.</summary>
     public int? PageSize { get; set; }

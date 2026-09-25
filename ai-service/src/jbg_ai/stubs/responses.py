@@ -166,7 +166,7 @@ def retrieval_products_stub(
         candidates_returned=count,
         low_confidence=_is_low_confidence(request.query),
         trace_id=principal.trace_id,
-        effective_pos_id=principal.pos_id,
+        effective_pos_id=principal.pos_id or "",
     )
 
 
@@ -193,7 +193,7 @@ def retrieval_substitutes_stub(
         candidates_returned=count,
         low_confidence=False,
         trace_id=principal.trace_id,
-        effective_pos_id=principal.pos_id,
+        effective_pos_id=principal.pos_id or "",
     )
 
 
@@ -323,7 +323,7 @@ def assist_sale_stub(request: AssistRequest, principal: ServicePrincipal) -> Ass
         abstained=False,
         prompt_version=None,
         trace_id=principal.trace_id,
-        effective_pos_id=principal.pos_id,
+        effective_pos_id=principal.pos_id or "",
     )
 
 
@@ -350,7 +350,7 @@ def inventory_propose_stub(
         proposals=proposals,
         horizon_days=request.horizon_days,
         trace_id=principal.trace_id,
-        effective_pos_id=principal.pos_id,
+        effective_pos_id=principal.pos_id or "",
     )
 
 
@@ -670,5 +670,5 @@ def assist_agent_stub(
         trace=[],
         agent_prompt_version=None,
         trace_id=principal.trace_id,
-        effective_pos_id=principal.pos_id,
+        effective_pos_id=principal.pos_id or "",
     )

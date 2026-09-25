@@ -44,6 +44,8 @@ interface FreeQueryAnswerProps {
    * box — which is the action the question itself is asking for.
    */
   onClarificationAsked?: () => void;
+  /** The shop the answer is about, so each row's stock label can name it. */
+  pointOfSaleName?: string | null;
 }
 
 export function FreeQueryAnswer({
@@ -51,6 +53,7 @@ export function FreeQueryAnswer({
   onSelect,
   onOpenCard,
   onClarificationAsked,
+  pointOfSaleName,
 }: FreeQueryAnswerProps) {
   const state = resolveFreeQueryState(response);
 
@@ -182,6 +185,7 @@ export function FreeQueryAnswer({
             result={member}
             onSelect={onSelect}
             onOpenCard={onOpenCard}
+            pointOfSaleName={pointOfSaleName}
           />
         )),
       )}

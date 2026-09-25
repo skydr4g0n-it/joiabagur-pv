@@ -33,7 +33,7 @@ public class AssistedSearchRepository : IAssistedSearchRepository
     /// <inheritdoc/>
     public async Task<IReadOnlyList<AssistedSearchRow>> HydrateAsync(
         IReadOnlyList<Guid> productIds,
-        Guid pointOfSaleId,
+        Guid? pointOfSaleId,
         CancellationToken cancellationToken)
     {
         if (productIds.Count == 0)
@@ -42,13 +42,40 @@ public class AssistedSearchRepository : IAssistedSearchRepository
         }
 
         var ids = productIds.Distinct().ToArray();
+        var carried = Carried(pointOfSaleId)
+            .Where(inventory => ids.Contains(inventory.ProductId));
 
         // One query for the whole candidate window. Order is not requested here: the caller
         // re-orders by the relevance the retriever produced, which this query knows nothing
         // about.
-        return await Carried(pointOfSaleId)
-            .Where(inventory => ids.Contains(inventory.ProductId))
-            .Select(ToRow)
+        if (pointOfSaleId is not null)
+        {
+            return await carried.Select(ToRow).ToListAsync(cancellationToken);
+        }
+
+        // **Grouped, because without a shop the query starts from every inventory row and a
+        // product carried by three shops would come back three times** — and `ToDictionary` on
+        // the caller's side would throw on the duplicate key. The quantity is dropped rather
+        // than summed or picked: a total across shops is not what the label means, and one
+        // shop's figure chosen arbitrarily would be worse than saying nothing.
+        return await carried
+            .GroupBy(inventory => inventory.ProductId)
+            .Select(group => new AssistedSearchRow
+            {
+                ProductId = group.Key,
+                Sku = group.First().Product.SKU,
+                Name = group.First().Product.Name,
+                Price = group.First().Product.Price,
+                Quantity = null,
+                PrimaryPhotoFileName = group.First().Product.Photos
+                    .OrderByDescending(photo => photo.IsPrimary)
+                    .ThenBy(photo => photo.DisplayOrder)
+                    .Select(photo => photo.FileName)
+                    .FirstOrDefault(),
+                CollectionName = group.First().Product.Collection == null
+                    ? null
+                    : group.First().Product.Collection!.Name
+            })
             .ToListAsync(cancellationToken);
     }
 

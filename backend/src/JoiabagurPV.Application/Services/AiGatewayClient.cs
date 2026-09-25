@@ -106,11 +106,16 @@ public class AiGatewayClient : IAiGatewayClient
         // claim is the retriever's only hard filter, so a catalog scope reaching this route
         // would be a cross-POS leak. jbg-ai refuses it too; neither side is trusted to be the
         // only one that remembers.
-        if (scope.Kind != AiCallScopeKind.PointOfSale)
+        // Two kinds are admissible here and the third is not, which is the whole point of the
+        // kinds existing: `AllPointsOfSale` also carries no `pos_id`, but it means «no shop was
+        // chosen» rather than «this route belongs to no shop», and the service treats the absent
+        // claim as «do not apply the prefilter» rather than as «match everything».
+        if (scope.Kind is not (AiCallScopeKind.PointOfSale or AiCallScopeKind.AllPointsOfSale))
         {
             throw new ArgumentException(
-                "Retrieval requires a point-of-sale scope. A catalog scope carries no pos_id, "
-                + "which the retriever uses as its only hard filter between points of sale.",
+                "Retrieval requires a point-of-sale scope or the every-point-of-sale scope. A "
+                + "catalog scope belongs to enrichment, and using it here would search on behalf "
+                + "of a route that has nothing to do with a shop.",
                 nameof(scope));
         }
 
@@ -657,11 +662,15 @@ public class AiGatewayClient : IAiGatewayClient
 
         // Same closure as SearchAsync: the anchored assistance reads the point of sale from the
         // token, and a catalog scope carries none.
-        if (scope.Kind != AiCallScopeKind.PointOfSale)
+        // The anchored modes always arrive with a concrete shop, because a card reports that
+        // shop's stock; the free query need not, and that is the case this admits. The catalog
+        // scope stays refused: it is enrichment's, and it would not mean the same thing.
+        if (scope.Kind is not (AiCallScopeKind.PointOfSale or AiCallScopeKind.AllPointsOfSale))
         {
             throw new ArgumentException(
-                "Sale assistance requires a point-of-sale scope. A catalog scope carries no pos_id, "
-                + "which the service uses to scope the piece and its family.",
+                "Sale assistance requires a point-of-sale scope or the every-point-of-sale scope. "
+                + "A catalog scope belongs to enrichment and says nothing about where a sale is "
+                + "being made.",
                 nameof(scope));
         }
 
@@ -805,11 +814,15 @@ public class AiGatewayClient : IAiGatewayClient
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(scope);
 
+        // **No exception for the every-point-of-sale scope here.** Substitutes rank by what a
+        // shop can actually hand over; with no shop the ranking has nothing to read, and
+        // serving an unranked list would answer a different question from the one asked.
         if (scope.Kind != AiCallScopeKind.PointOfSale)
         {
             throw new ArgumentException(
-                "Substitutes require a point-of-sale scope. A catalog scope carries no pos_id, "
-                + "which the service reads as the availability signal of its ranking.",
+                "Substitutes require a point-of-sale scope. Neither a catalog scope nor the "
+                + "every-point-of-sale scope carries a pos_id, which the service reads as the "
+                + "availability signal of its ranking.",
                 nameof(scope));
         }
 

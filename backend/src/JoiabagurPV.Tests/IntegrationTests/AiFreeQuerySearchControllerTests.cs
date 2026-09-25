@@ -142,6 +142,75 @@ public class AiFreeQuerySearchControllerTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    // ------------------------------------------------- C40 · every point of sale at once
+
+    /// <summary>
+    /// **Operators, not only administrators**, and the reason is that it discloses nothing new:
+    /// the stock breakdown of a product is already readable across every shop by any
+    /// authenticated caller, so a search that spans them exposes no fact that was not exposed.
+    /// </summary>
+    [Fact]
+    public async Task FreeQuery_ForOperatorWithAllPointsOfSale_IsServed()
+    {
+        var response = await _operator.PostAsJsonAsync(
+            "/api/ai/search/assisted",
+            new FreeQuerySearchRequest { Query = "anillo de plata", PointOfSaleId = null });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = (await response.Content.ReadFromJsonAsync<FreeQuerySearchResponse>())!;
+
+        body.PointOfSaleId.Should().BeNull(
+            "the response echoes the absence rather than substituting a shop for it");
+    }
+
+    /// <summary>
+    /// What cannot be known is not invented: no quantity is reported, because a zero would
+    /// assert something false about a piece that may be sitting in the next shop along.
+    /// </summary>
+    [Fact]
+    public async Task FreeQuery_ForAllPointsOfSale_ReportsNoQuantity()
+    {
+        var response = await _operator.PostAsJsonAsync(
+            "/api/ai/search/assisted",
+            new FreeQuerySearchRequest { Query = "anillo de plata", PointOfSaleId = null });
+
+        var body = (await response.Content.ReadFromJsonAsync<FreeQuerySearchResponse>())!;
+        var members = body.Groups.SelectMany(group => group.Members).ToList();
+
+        members.Should().NotBeEmpty("the catalogue answers even with no shop named");
+        members.Should().OnlyContain(member => member.QuantityAtPointOfSale == null);
+        members.Should().OnlyContain(member => member.HasStock == null);
+    }
+
+    /// <summary>
+    /// The third scope does not relax the other boundary. Naming a shop the caller is not
+    /// assigned to is refused exactly as before, and refused before any call is made.
+    /// </summary>
+    [Fact]
+    public async Task FreeQuery_WhenNamingAnUnassignedPointOfSale_IsRefused()
+    {
+        var response = await _operator.PostAsJsonAsync(
+            "/api/ai/search/assisted",
+            new FreeQuerySearchRequest { Query = "anillo", PointOfSaleId = _otherPos.Id });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    /// <summary>
+    /// An empty identifier is a malformed request and never «all of them»: reading it as the
+    /// wider scope would turn a client bug into a wider search.
+    /// </summary>
+    [Fact]
+    public async Task FreeQuery_WithAnEmptyPointOfSale_Returns400()
+    {
+        var response = await _operator.PostAsJsonAsync(
+            "/api/ai/search/assisted",
+            new FreeQuerySearchRequest { Query = "anillo", PointOfSaleId = Guid.Empty });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     // ---------------------------------------------------------------- the quota
 
     [Fact]

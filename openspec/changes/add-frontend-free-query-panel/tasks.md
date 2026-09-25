@@ -95,12 +95,12 @@
 
 ## 12. Tramo 4 · «todos los puntos de venta» (primer candidato a corte)
 
-- [ ] 12.1 Añadir la **tercera clase de ámbito** a `AiCallScope`, sin constructor público y sin centinela. Tests: `ForAllPointsOfSale_CarriesNoPointOfSale`, `AiCallScope_ExposesExactlyThreeConstructionPaths`
-- [ ] 12.2 Aceptarla **sólo** en recuperación y assist, y **rechazarla** en la ficha, los sustitutos y el inventario, antes de emitir petición. Tests: `ForAllPointsOfSale_IsAcceptedByRetrievalAndAssistance`, `ForAllPointsOfSale_IsRefusedBySubstitutes`, `ForAllPointsOfSale_IsRefusedByInventory`
-- [ ] 12.3 Añadir el **tercer perfil de claims** en `auth.py` y `deps.py`, aplicado sólo a recuperación y assist. Tests: `test_retrieval_accepts_a_token_without_pos_claim`, `test_pos_scoped_route_still_rejects_it`, `test_rejection_does_not_reveal_the_missing_claim`
-- [ ] 12.4 Autorizar el ámbito a **operarios y administradores**, con requisito y test que lo nombren, y seguir rechazando un punto de venta concreto no asignado. Tests: `FreeQuery_ForOperatorWithAllPointsOfSale_IsServed`, `FreeQuery_WhenNamingAnUnassignedPointOfSale_IsRefused`
-- [ ] 12.5 La **etiqueta de existencias nombra la tienda**, y sin tienda dice que hay que seleccionar una en vez de mostrar un cero. Tests: `should name the shop in the stock label`, `should not show a zero when no shop is selected`
-- [ ] 12.6 **Deshabilitar el botón de ficha** sin tienda, y que cambiar de tienda **no llame a ningún modelo**. Tests: `should disable the sale card action when no shop is selected`, `should issue no assisted request when the shop changes`
+- [x] 12.1 Añadir la **tercera clase de ámbito** a `AiCallScope`, sin constructor público y sin centinela. Tests: `ForAllPointsOfSale_CarriesNoPointOfSale`, `AiCallScope_ExposesExactlyThreeConstructionPaths`
+- [x] 12.2 Aceptarla **sólo** en recuperación y assist, y **rechazarla** en la ficha, los sustitutos y el inventario, antes de emitir petición. Tests: `ForAllPointsOfSale_IsAcceptedByRetrievalAndAssistance`, `ForAllPointsOfSale_IsRefusedBySubstitutes`, `ForAllPointsOfSale_IsRefusedByInventory`
+- [x] 12.3 Añadir el **tercer perfil de claims** en `auth.py` y `deps.py`, aplicado sólo a recuperación y assist. Tests: `test_retrieval_accepts_a_token_without_pos_claim`, `test_pos_scoped_route_still_rejects_it`, `test_rejection_does_not_reveal_the_missing_claim`
+- [x] 12.4 Autorizar el ámbito a **operarios y administradores**, con requisito y test que lo nombren, y seguir rechazando un punto de venta concreto no asignado. Tests: `FreeQuery_ForOperatorWithAllPointsOfSale_IsServed`, `FreeQuery_WhenNamingAnUnassignedPointOfSale_IsRefused`
+- [x] 12.5 La **etiqueta de existencias nombra la tienda**, y sin tienda dice que hay que seleccionar una en vez de mostrar un cero. Tests: `should name the shop in the stock label`, `should not show a zero when no shop is selected`
+- [x] 12.6 **Deshabilitar el botón de ficha** sin tienda, y que cambiar de tienda **no llame a ningún modelo**. Tests: `should disable the sale card action when no shop is selected`, `should issue no assisted request when the shop changes`
 
 ## 13. Tramos 5 y 6 · la fila y el embudo
 
