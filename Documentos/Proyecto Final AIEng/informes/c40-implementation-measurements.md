@@ -783,3 +783,172 @@ Cero código. La tarea 14.5 vuelve sobre `backend/README.md` junto al resto de l
 contexto, así que aquí sólo se ha escrito lo que hace falta para **arrancar** el sistema sin repetir
 la avería: los tres interruptores, sus defectos, sus síntomas y el comando de PowerShell con las
 tres líneas.
+
+---
+
+## 10 · Tramo 3 · la sonda, la abstención y la contradicción del enrutador (grupo 10)
+
+El grupo más grande del change, y el que más cosas mide. Siete tareas, todas menos la última en
+`ai-service`, y **las dos mediciones que pedía la 10.7 refutan las dos predicciones de la
+exploración**.
+
+### 10.1 · La sonda sin filtro
+
+`retrieve_products` emite ahora **una segunda sentencia vectorial sin filtro de cuerpo**, y sólo
+cuando la petición trae algo que estreche. Las propiedades que la hacen aceptable no son promesas:
+son tests.
+
+| Propiedad | Cómo se comprueba |
+|---|---|
+| Dos sentencias cuando hay filtro, una cuando no | `search_calls` del puerto falso, contadas |
+| **Secuenciales y nunca a la vez** | un contador de peticiones en vuelo sobre el puerto: el máximo es 1 |
+| Cero llamadas extra al proveedor | el contador del cliente de *embeddings*: 1 con filtro y 1 sin él |
+| Nada de lo que encuentra llega a la respuesta | collares más cercanos que todos los anillos, y ninguno aparece |
+
+La sonda **conserva el ámbito del punto de venta**, y eso es una decisión: el ámbito no es un filtro
+del operario, es lo que la tienda tiene. Una sonda que lo ignorase juzgaría la consulta contra un
+catálogo desde el que el mostrador no puede vender.
+
+`SearchFilters.is_empty` cuenta los **cuatro** campos, que es la lectura literal de «no trae filtro
+de cuerpo». Incluye `exclude_product_ids`, cuyo efecto sobre un perfil de distancias es
+despreciable; ningún llamador del orquestador lo usa hoy —`substitutes` compone su propia
+sentencia—, así que la lectura literal no cuesta nada y no puede desviarse del requisito.
+
+### 10.2 · La decisión lee el perfil sin filtro, y el perfil se persiste
+
+La abstención se toma ahora sobre las distancias de la sonda cuando la hay. **Ésta es la avería que
+el grupo corrige**: leída sobre un perfil filtrado, la regla no puede dispararse cuando el filtro es
+estrecho —necesita `min_candidates` dentro de su banda y un filtro estrecho nunca los da—, así que
+el sistema servía un puñado de piezas mediocres y, en la ruta generativa, escribía prosa
+elogiándolas.
+
+Para que `--rescore` siga pudiendo recalcular una pasada filtrada, `CapturedWindow` gana
+`probe_distances` y `Capture` gana la **regla** con la que se capturó. Dos decisiones que conviene
+declarar:
+
+- **`CAPTURE_VERSION` no se mueve.** La spec refusa un *re-score* cuando la regla **altera el
+  conjunto de candidatos**, y ésta no lo altera: lee otro perfil. Las capturas anteriores siguen
+  siendo válidas y un *re-score* de ellas no se rechaza — hay un test que lo fija.
+- **La regla viaja en el fichero y no se lee de `Settings()`.** El primer intento la leía de la
+  configuración y **rompió la propiedad que la fase C promete**: su test corta todos los *sockets*, y
+  `Settings()` exige un entorno. La huella de la fusión ya viajaba en la captura por el mismo
+  motivo; la regla la acompaña.
+
+### Y una cosa que el grupo destapó: el *re-score* calculaba la decisión y la tiraba
+
+`rescore` pasaba `abstained` a `score_case` desde siempre, y `aggregate` no promedia ese campo: no
+salía por ninguna parte. **Una recomputación que nadie puede leer no es una recomputación**, y el
+requisito pide justamente que el *re-score* recalcule en vez de adivinar. Ahora las lecturas llevan
+`abstention_rate`, calculada con la función que ya existía. Es aditivo: ninguna clave existente
+cambia de valor y la métrica que decide el barrido es otra.
+
+### 10.4 · `filters_too_narrow`, y por qué lo emite recuperación
+
+El código es el sexto del vocabulario cerrado, **añadido al final y nunca insertado**, porque el
+orden de esa tupla es lo que un consumidor lee.
+
+Lo emite **recuperación**, no la capa de asistencia, y ésa es la razón de que llegue a las dos rutas
+que aceptan filtros en vez de sólo a la generativa: la decisión necesita la sonda, y la sonda vive
+ahí. `RetrievalResponse` gana `warnings` —aditivo— y el orquestador de asistencia **lo transporta,
+no lo recalcula**, para que las dos rutas no puedan divergir diciendo cosas distintas de una misma
+búsqueda.
+
+Una decisión menor declarada: el código se emite sólo con la **regla de abstención encendida**. Los
+dos umbrales que lo definen —«no amerita abstención» y «menos que el mínimo»— son de la regla, así
+que con la regla apagada el aviso no tendría de dónde salir. Es la opción más estrecha: con la regla
+apagada, ningún comportamiento nuevo.
+
+### 10.5 · La contradicción del enrutador, coercida y observable
+
+`served` + sin eje pendiente + `index=None` afirma a la vez «esta consulta es de esta joyería» y «no
+hay nada que consultar». El código no puede saber a cuál creer, y hasta ahora **no creía a ninguna**:
+no ejecutaba tarea, mientras el *fail-open* del orquestador ya había pagado las dos ramas. Ahora se
+coerce a `both`, que es lo que ese *fail-open* ya consulta, y la contradicción queda **observable por
+causa** en la línea de etapa: `route=both coerced=router_index_absent`, con `index=None` reportado
+igual que antes.
+
+### 10.7 · Las dos mediciones, y las dos refutan a la exploración
+
+#### La tasa de `router_index_absent`: **0 de 42**
+
+| | Predicho (H7) | Medido |
+|---|---|---|
+| Réplicas contradictorias | **5 de 42 · 11,9 %** | **0 de 42 · 0 %** |
+
+Sobre las 42 consultas etiquetadas, pasadas extremo a extremo por .NET con 4 s de espaciado:
+**42 réplicas servidas, 0 degradadas, `coerced=none` en las 42**. Y no es una casualidad de esta
+pasada: en el conjunto de tráfico de la sesión anterior —102 réplicas servidas del enrutador, entre
+las pasadas de 42 y 29 y las descartadas— la forma `verdict=in_domain index=None missing_axis=None`
+**no apareció ni una vez**. Las 29 `index=None` que sí hay son rechazos, donde la ausencia de índice
+es correcta.
+
+**La coerción no se ha retirado.** No cuesta nada, resuelve una contradicción que el esquema admite,
+y su valor es exactamente el que acaba de ejercer: ahora hay una cifra donde antes había una
+predicción. Lo que cambia es cómo se lee el estado 4 de la tabla del panel — no es «el 11,9 % de las
+consultas», es un estado que esta versión del clasificador no produce.
+
+#### El coste de la sonda: **20,9 ms de mediana, y sólo cuando hay filtro**
+
+Doce consultas, cada una servida dos veces —sin filtro y con `materials=[plata]` + `category=anillo`—
+por `POST /api/ai/search`, la ruta **semántica**: ejercita exactamente la recuperación donde vive la
+sonda, acepta los filtros del operario y no hace llamada de generación, así que la medición no la
+marca la cuota del proveedor ni la puede contaminar un enrutador limitado.
+
+| | sin filtro (12) | con filtro (12) |
+|---|---|---|
+| sondas emitidas | **0** | **12** |
+| sentencia servida, p50 | 21,3 ms | **9,3 ms** |
+| sentencia servida, p95 | 24,9 ms | 12,4 ms |
+| **sonda, p50 / p95** | — | **20,9 / 29,3 ms** |
+| extremo a extremo, p50 | 82 ms | 87 ms |
+| extremo a extremo, p95 | 97 ms | 112 ms |
+| `filters_too_narrow` | 0 | 2 |
+
+**Lo que esto refuta.** El ticket justificaba el coste diciendo que *«at 1.168 rows a hard filter
+saves no time»*, y de ahí que el escaneo extra fuese «de un dígito de milisegundos». Medido, las dos
+mitades fallan y en direcciones opuestas: **el filtro sí ahorra tiempo** —más de la mitad: 21,3 ms
+contra 9,3— y **la sonda cuesta dos dígitos**, 20,9 ms, porque es precisamente el escaneo completo
+que el filtro evitaba.
+
+**La conclusión operativa no cambia, y conviene decir por qué.** El tiempo de SQL de una búsqueda
+filtrada pasa de 9,3 a 30,2 ms, que es triplicarlo; pero lo que el operario espera pasa de 82 a
+87 ms, **cinco milisegundos**, porque la ida y vuelta al proveedor de *embeddings* domina el
+recorrido. Contra los 3 404 ms de mediana que el grupo 8 midió para la ruta asistida, la sonda es un
+**0,6 %**. Y sobre una búsqueda sin filtros cuesta exactamente cero, comprobado: **0 líneas
+`stage=probe`** en la pasada de las 42 consultas etiquetadas, que no llevan filtros.
+
+Ese último dato tiene una segunda función. Esa misma pasada dio p50 4 465 ms y p95 8 213 ms, contra
+los 3 404 y 7 160 del grupo 8 — sigue dentro del presupuesto, 0 de 42 fuera, pero es más alta. **La
+sonda no puede explicarlo**, y no hay que argumentarlo: se emitieron cero. La diferencia es varianza
+del proveedor, con 5 argumentarios retirados por la puerta en esta pasada frente a 2 en la anterior.
+
+### Los artefactos
+
+| Fichero | Contenido |
+|---|---|
+| `ai-service/evals/results/c40-probe-cost.json` | `run_id` `2d876f8c67b9` · 24 filas, las latencias de etapa y el reparto del aviso |
+| `ai-service/evals/results/c40-router-index-absent.json` | `run_id` `5e1374166136` · la tasa de coerción y la pasada de la que sale |
+
+### Qué cambió en el conjunto de tests que falla
+
+| Suite | Antes | Ahora |
+|---|---|---|
+| `ai-service` | 1 592 en verde | **1 616 en verde, 0 rojos** (+24 tests nuevos) |
+| `backend` | — | `dotnet build` limpio; 115 de 115 en los ficheros tocados |
+| `frontend` | 113 de 729 en 14 ficheros | **113 / 114 de 794 en 14 ficheros** |
+
+El frontend volvió a dar **dos respuestas distintas sobre el mismo código**, 113 y 114 con minutos
+de diferencia. El nombre discrepante es `scan.test.tsx :: ScanningPage should show manual SKU input
+fallback after initialization`, que **no había fallado en ninguna de las siete pasadas anteriores de
+este change y pasa cuando el fichero se corre solo**. No toca nada de C40 — cero referencias a
+`ai-search`, `assisted` o `warnings`—. Es un tercer nombre rotatorio; el `CLAUDE.md` documentaba uno
+y ahora documenta el criterio útil, que es el del backend: **si el nombre discrepante cae en un
+fichero que ya estaba rojo y tu propia área está limpia, no es tuyo**.
+
+### Una tarea que este grupo hizo y no estaba en su lista
+
+jbg-ai emite `warnings` en la respuesta de recuperación, y .NET lo habría **tirado**: la ruta
+semántica del panel no tenía por dónde llevarlo. Eso es exactamente la supresión que la regla de
+completitud prohíbe, así que se cerró aquí en vez de dejarlo para el grupo 11 — `AiSearchResponse`,
+`AssistedSearchResponse`, el tipo del frontend y un bloque de aviso en la ruta semántica, con la
+copia compartida. Cuatro adiciones, ningún campo retirado ni cambiado de tipo.

@@ -407,11 +407,22 @@ def test_the_published_contract_moved_by_addition_only(
     **The next change that moves the contract replaces this fixture and the allowed additions
     below, deliberately.**
 
-    **C40 is that next change**, and it replaced the C32a fixture this test used to carry. The
-    move is one property — `AssistRequest.filters` — and it is the smallest kind of move the
-    contract admits: the model it points at, `RetrievalFilters`, was already published, so the
-    difference is two leaves and no new schema. Measured over the whole document: 1300 leaves
-    before, 1302 after, **0 removed, 0 retyped, 0 changed in value**.
+    **C40 is that next change**, and it replaced the C32a fixture this test used to carry. It
+    moves the contract twice, and both moves are the smallest kind it admits.
+
+    **Group 2 · `AssistRequest.filters`.** The model it points at, `RetrievalFilters`, was
+    already published, so the difference is two leaves and no new schema.
+
+    **Group 10 · `RetrievalResponse.warnings`.** A list of closed codes, defaulting to empty,
+    so a client that ignores it gets exactly the response it got before. It is on the
+    retrieval response and not only on the assist one because the decision behind
+    `filters_too_narrow` belongs to retrieval, and every path that accepts catalog-side
+    filters can reach it.
+
+    Measured over the whole document: 1300 leaves at the C40 baseline, 1306 now, **0 removed
+    and 0 retyped**. Two leaves changed in value and both are `description` prose: the
+    vocabulary the assist warnings enumerate gained a sixth code. They are named one by one
+    below rather than waved through by rule, so a third changed leaf still fails here.
     """
     baseline = json.loads(
         (Path(__file__).parent / "fixtures" / "openapi-c40-baseline.json").read_text(
@@ -432,13 +443,26 @@ def test_the_published_contract_moved_by_addition_only(
     changed = sorted(path for path in set(before) & set(after) if before[path] != after[path])
     added = sorted(set(after) - set(before))
 
-    # C40 adds one optional property to one existing request model. No new route and no new
-    # schema: `RetrievalFilters` was already published for the retrieval and substitutes
-    # requests, so the addition is a reference to a model the contract already carried.
-    allowed = ("$.components.schemas.AssistRequest.properties.filters.",)
+    # No new route and no new schema in either move: `RetrievalFilters` was already published
+    # for the retrieval and substitutes requests, and `warnings` is a list of strings.
+    allowed = (
+        "$.components.schemas.AssistRequest.properties.filters.",
+        "$.components.schemas.RetrievalResponse.properties.warnings.",
+    )
+
+    # The only leaves whose VALUE may differ, named individually. Both are prose a human
+    # reads and no client parses — the enumeration of the warning vocabulary, which gained
+    # `filters_too_narrow`. Naming them keeps the guard's teeth: any other changed leaf, and
+    # in particular any changed `type` or `$ref`, still fails.
+    allowed_changes = {
+        "$.components.schemas.AssistResponse.properties.warnings.description",
+        "$.components.schemas.AgentAssistResponse.properties.warnings.description",
+    }
 
     assert removed == [], removed[:10]
-    assert changed == [], changed[:10]
+    assert set(changed) <= allowed_changes, sorted(set(changed) - allowed_changes)[:10]
+    for path in changed:
+        assert "filters_too_narrow" in after[path], path
     assert added, "the change moves the contract; an empty difference would mean a stale fixture"
     assert [path for path in added if not path.startswith(allowed)] == []
 
@@ -468,6 +492,13 @@ def test_the_published_contract_moved_by_addition_only(
     }
     assert "calls" not in committed["components"]["schemas"]["Usage"]["properties"]
     assert "/v1/assist/agent" in committed["paths"]
+
+    # The new field is optional on the way out too: absent from `required`, so a consumer
+    # that never reads it is unaffected, and typed as a plain list of strings.
+    retrieval = committed["components"]["schemas"]["RetrievalResponse"]
+    assert "warnings" not in retrieval.get("required", [])
+    assert retrieval["properties"]["warnings"]["type"] == "array"
+    assert retrieval["properties"]["warnings"]["items"]["type"] == "string"
     assert set(committed["paths"]["/v1/assist/agent"]) == {"post"}
 
 

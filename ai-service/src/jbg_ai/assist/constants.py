@@ -38,6 +38,20 @@ WARNING_QUERY_NOT_IN_CATALOGUE = "query_not_in_catalogue"
 #: the whole of this code: the information existed and nobody could read it.
 WARNING_KNOWLEDGE_NOT_COVERED = "knowledge_not_covered"
 
+#: The query is answerable and the operator's own filters are what left almost nothing. C40.
+#:
+#: **A different statement from an abstention, and they must never be confused.** An abstention
+#: says the description found nothing; this says the description found something the filter
+#: excluded. The two end in opposite actions at the counter — describe it another way, or remove
+#: a filter — and asserting this one over an unanswerable query would claim a fit that does not
+#: exist. The decision that separates them is the unfiltered probe of the retrieval orchestrator:
+#: a flat probe abstains, a peaked probe with a thin filtered set emits this.
+#:
+#: Emitted by **retrieval**, not by the assistance layer, which is why it reaches every path that
+#: accepts catalog-side filters rather than only the generative one. `retrieval/orchestrator.py`
+#: reads it from here — this module imports nothing precisely so that it can.
+WARNING_FILTERS_TOO_NARROW = "filters_too_narrow"
+
 #: **Closed, and closed is the point.** The model never sees this tuple and cannot add to it,
 #: which is what makes "warnings are rule-derived" a property a test can witness instead of a
 #: promise a reader has to take on trust. The Spanish a human reads is the frontend's: codes
@@ -54,6 +68,7 @@ ASSIST_WARNING_CODES: tuple[str, ...] = (
     WARNING_QUERY_OUT_OF_DOMAIN,
     WARNING_QUERY_NOT_IN_CATALOGUE,
     WARNING_KNOWLEDGE_NOT_COVERED,
+    WARNING_FILTERS_TOO_NARROW,
 )
 
 #: The two codes that state a **refusal by the router**, as opposed to a fact about a piece.

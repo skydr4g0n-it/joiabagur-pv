@@ -144,6 +144,22 @@ public class AssistedSearchResponse
     public int SurvivedHydration { get; set; }
 
     /// <summary>
+    /// Codes the retriever emitted about the query itself, from the closed vocabulary the
+    /// assisted answer already uses. Today only <c>filters_too_narrow</c>.
+    /// </summary>
+    /// <remarks>
+    /// <strong>A different statement from <see cref="UnappliedFilters"/>, and they must not
+    /// be collapsed.</strong> That one names a filter the search could not evaluate at all;
+    /// this one says every filter was applied and admitted almost nothing, over a query the
+    /// catalogue can answer. The first is a gap in the searcher, the second is a fact about
+    /// the operator's own selection, and they end in different actions.
+    /// </remarks>
+    /// <remarks>
+    /// Empty on the degraded and disabled paths, which never reach the retriever.
+    /// </remarks>
+    public List<string> Warnings { get; set; } = [];
+
+    /// <summary>
     /// Filters the operator selected that this search could not apply at all, so the screen can
     /// say so instead of leaving a control visibly engaged over results that ignore it.
     /// </summary>

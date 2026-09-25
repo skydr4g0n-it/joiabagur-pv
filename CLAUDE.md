@@ -95,10 +95,19 @@ backend's — baseline first, then compare the failing **test names**, never the
 **Expect the count to sit at 113 or 114 without anybody having broken anything.** The frontend was
 documented as having a set of names stable between runs, and C36 refuted that: `family-review.test.tsx
 :: should create a family with its members from the review screen` **failed at baseline and passed at
-close** with nothing touching it or its production code. One order-dependent test, not a handful like
-the backend's — but enough that the count is not a signal. Verifying C36 re-ran that same baseline
+close** with nothing touching it or its production code. Verifying C36 re-ran that same baseline
 commit and the test **passed there too**, giving 113 in 14 files where the apply had seen 114 in 15:
-same commit, same code, two answers. The one thing that holds either way: **zero new names**.
+same commit, same code, two answers.
+
+**It is not one test.** C40 measured two full runs of the *same* commit, minutes apart, at 113 and
+114 — and the differing name was a third file again: `scan.test.tsx :: ScanningPage should show
+manual SKU input fallback after initialization`, which had never failed in any of the seven earlier
+passes of that change and **passes when the file is run on its own**. Its neighbour in the same
+file, `should render loading state initially`, is red at baseline and stays red. So the rotating set
+is at least `family-review.test.tsx`, `assist.test.tsx` and `scan.test.tsx`, and the useful question
+is the backend's: **does the differing name sit in a file that was already red, and is your own area
+clean?** A new red name in a file you touched is a regression; one more red name in `scan.test.tsx`
+is noise. The one thing that holds either way: **zero new names in your own area**.
 
 It catches people out harder than the backend one for two reasons. Nobody expects a frontend
 suite to be red, and `vitest` exits **0** when you pipe it (`npm run test | tail` reports the

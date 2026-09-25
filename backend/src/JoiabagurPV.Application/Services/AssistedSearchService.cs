@@ -130,6 +130,9 @@ public class AssistedSearchService : IAssistedSearchService
             PointOfSaleId = request.PointOfSaleId,
             CandidatesReturned = retrieval.Candidates.Count,
             SurvivedHydration = rows.Count,
+            // Passed through, never recomputed: the decision behind it needed the unfiltered
+            // probe of the retriever, which this side has no way of taking.
+            Warnings = [.. retrieval.Warnings],
             // Only the degraded and disabled paths can leave a filter unapplied. The assisted
             // path hands every filter to the retriever, which honours all of them.
             UnappliedFilters = retrieval.Origin == SearchOrigin.Assisted
@@ -563,17 +566,23 @@ public class AssistedSearchService : IAssistedSearchService
         SearchOrigin Origin,
         IReadOnlyList<AiSearchResult> Candidates,
         bool LowConfidence,
-        int? RetrievalMs)
+        int? RetrievalMs,
+        IReadOnlyList<string> Warnings)
     {
         public static Retrieval Assisted(AiSearchResponse response, int retrievalMs) =>
-            new(SearchOrigin.Assisted, response.Results, response.LowConfidence, retrievalMs);
+            new(
+                SearchOrigin.Assisted,
+                response.Results,
+                response.LowConfidence,
+                retrievalMs,
+                response.Warnings);
 
         /// <summary>The AI service was consulted and could not answer.</summary>
         public static Retrieval Degraded() =>
-            new(SearchOrigin.LexicalFallback, [], false, null);
+            new(SearchOrigin.LexicalFallback, [], false, null, []);
 
         /// <summary>The AI service was never consulted, because the feature is switched off.</summary>
         public static Retrieval Disabled() =>
-            new(SearchOrigin.Disabled, [], false, null);
+            new(SearchOrigin.Disabled, [], false, null, []);
     }
 }

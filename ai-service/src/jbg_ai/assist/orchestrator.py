@@ -264,6 +264,10 @@ async def assist_sale(
     focus_source: SourceDocument | None = None
     roster: list[FamilyMember] = []
     uncovered = False
+    #: What retrieval said about the query. Empty on every path that retrieves nothing — a
+    #: refusal, a clarification, the anchored modes — which is correct: with no search there is
+    #: no filter to have been too narrow.
+    retrieval_warnings: list[str] = []
 
     # --- C31 · the entry guardrail -----------------------------------------------------
     #
@@ -344,6 +348,11 @@ async def assist_sale(
                 on_abstention=decisions.append,
             )
             abstained = bool(decisions and decisions[-1])
+            # Retrieval's own codes about the QUERY, which is where the narrow-filter
+            # statement is decided: it needs the unfiltered probe, and the probe lives
+            # there. Carried rather than recomputed, so the generative route and the plain
+            # one cannot drift into saying different things about the same search.
+            retrieval_warnings = list(retrieved.warnings)
             if not abstained:
                 groups = _group_results(retrieved.results)
         if not abstained and route in (None, "knowledge", "both"):
@@ -391,6 +400,7 @@ async def assist_sale(
     # says to a customer differs between a trade the shop does not practise and a piece the
     # shop does not carry.
     warnings += list(routing.refusal_codes)
+    warnings += retrieval_warnings
     if uncovered:
         warnings.append(WARNING_KNOWLEDGE_NOT_COVERED)
     anchored_id = str(payload.product_id) if mode.is_anchored else None

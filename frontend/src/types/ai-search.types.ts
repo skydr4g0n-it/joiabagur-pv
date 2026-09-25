@@ -106,6 +106,16 @@ export interface AssistedSearchResponse {
    * to stop making.
    */
   unappliedFilters?: string[];
+  /**
+   * Codes the retriever emitted about the query itself, from the same closed vocabulary the
+   * assisted answer uses. Today only `filters_too_narrow`.
+   *
+   * **Not the same thing as `unappliedFilters`.** That one names a filter the search could
+   * not evaluate at all; this one says every filter was applied and admitted almost nothing,
+   * over a query the catalogue can answer. A gap in the searcher against a fact about the
+   * operator's own selection, and they end in different actions.
+   */
+  warnings?: string[];
 }
 
 /**

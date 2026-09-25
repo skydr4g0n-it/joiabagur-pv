@@ -17,6 +17,7 @@ from jbg_ai.assist.constants import (
     FAMILY_ROSTER_CAP,
     INTENT_PRODUCT_PITCH,
     INTENT_UNCLASSIFIED,
+    WARNING_FILTERS_TOO_NARROW,
     WARNING_KNOWLEDGE_NOT_COVERED,
     WARNING_FAMILY_HAS_VARIANTS,
     WARNING_SIZE_LABEL_MISSING,
@@ -750,9 +751,67 @@ def test_free_query_forwards_filters_to_retrieval(
     )
 
     assert search.search_calls, "the free-query mode retrieves, so the port must be reached"
-    forwarded = search.search_calls[-1]["filters"]
-    assert list(forwarded.materials) == ["plata"]
-    assert forwarded.category == "anillo"
+    # **The first statement, not the last.** Since C40 a filtered request issues two: the served
+    # one, which carries the filters, and the abstention probe, which deliberately carries none.
+    # Reading the last call here would assert the opposite of what this test is about.
+    served = search.search_calls[0]["filters"]
+    assert list(served.materials) == ["plata"]
+    assert served.category == "anillo"
+
+    probe = search.search_calls[-1]["filters"]
+    assert probe.is_empty, "the probe judges the query, so no filter of the operator's may reach it"
+
+
+def test_a_narrow_filter_is_declared_on_the_generative_route_too(
+    search, knowledge: InMemoryKnowledgeIndex, principal
+) -> None:
+    """The code reaches M1, because the decision belongs to retrieval and M1 retrieves.
+
+    The requirement is that it be available on **every** consuming path that accepts
+    catalog-side filters and not only on the generative one. This is the generative one; the
+    plain retrieval route is covered in `tests/retrieval/test_probe.py`. It is **carried** and
+    not recomputed here, so the two cannot drift into saying different things about one
+    search.
+    """
+    response = serve(
+        search,
+        knowledge,
+        principal,
+        payload={
+            "query": "anillo de plata",
+            "filters": {"materials": ["oro"]},
+        },
+    )
+
+    assert WARNING_FILTERS_TOO_NARROW in response.warnings
+    assert not response.abstained, (
+        "the unfiltered profile is not flat, so the description is not what failed"
+    )
+
+
+def test_a_refused_query_carries_no_narrow_filter_code(
+    search, knowledge: InMemoryKnowledgeIndex, principal
+) -> None:
+    """Nothing was retrieved, so there is no filter that could have been too narrow.
+
+    The router cuts before retrieval. A code about the filters over a query this shop does not
+    serve would send the operator to loosen a filter that never ran.
+    """
+    router, _ = scripted_router(decision(served="out_of_domain", index=None))
+
+    response = serve(
+        search,
+        knowledge,
+        principal,
+        payload={
+            "query": "un reloj sumergible",
+            "filters": {"materials": ["oro"]},
+        },
+        router_client=router,
+    )
+
+    assert WARNING_FILTERS_TOO_NARROW not in response.warnings
+    assert not search.search_calls, "the refusal cuts before retrieval, so no statement runs at all"
 
 
 def test_free_query_without_filters_behaves_as_before(

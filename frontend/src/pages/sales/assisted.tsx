@@ -50,6 +50,7 @@ import {
 import { useAuth } from '@/providers/auth-provider';
 import { aiSearchService } from '@/services/ai-search.service';
 import * as pointOfSaleService from '@/services/point-of-sale.service';
+import { queryWarnings, warningLabel } from "@/lib/assist-copy";
 import {
   EXAMPLE_QUERIES,
   MATERIAL_OPTIONS,
@@ -538,6 +539,23 @@ export function AssistedSalesSearchPage() {
               <AlertDescription>
                 Estos resultados vienen de la búsqueda por texto. Prueba a describir la pieza
                 con las palabras del catálogo.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          {/* What the retriever said about the QUERY, on the semantic route too. The
+              decision behind `filters_too_narrow` belongs to retrieval, so it reaches both
+              routes; showing it only on the assisted one would leave an operator who never
+              touches the toggle staring at three results and no explanation. Same copy on
+              both, from the shared table. */}
+          {queryWarnings(response.warnings ?? []).length > 0 ? (
+            <Alert variant="warning" data-testid="semantic-query-warnings">
+              <AlertDescription>
+                {queryWarnings(response.warnings ?? []).map((code) => (
+                  <span key={code} className="block">
+                    {warningLabel(code)}
+                  </span>
+                ))}
               </AlertDescription>
             </Alert>
           ) : null}

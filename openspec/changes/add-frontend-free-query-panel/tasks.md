@@ -81,13 +81,13 @@
 
 ## 10. Tramo 3 · la abstención y los vacíos
 
-- [ ] 10.1 Implementar la **sonda vectorial sin filtro** en `retrieval/orchestrator.py`, **secuencial**, reutilizando el vector y **sólo cuando la petición trae filtros**. Tests: `test_filtered_request_issues_two_statements`, `test_unfiltered_request_issues_one_statement`, `test_probe_costs_no_provider_call`, `test_probe_never_reaches_the_response`
-- [ ] 10.2 Pasar las distancias de la sonda a `should_abstain` y **persistirlas** junto a la ventana, para que `--rescore` siga pudiendo recalcular una pasada filtrada. Tests: `test_abstention_reads_the_unfiltered_profile`, `test_rescore_recomputes_the_decision_from_the_persisted_probe`
-- [ ] 10.3 Añadir la traza de la sonda al registro de etapa, **sin vector y sin texto de consulta**. Test: `test_probe_log_carries_no_vector_and_no_query`
-- [ ] 10.4 Añadir `filters_too_narrow` al vocabulario cerrado y emitirlo cuando el perfil sin filtro tiene pico y el filtrado es escaso, **en las dos rutas**. Tests: `test_narrow_filter_over_answerable_query_is_declared`, `test_unanswerable_query_abstains_instead_of_blaming_the_filter`
-- [ ] 10.5 Implementar la **coerción a `both`** cuando el veredicto es servido, sin eje pendiente y sin índice, con la causa `router_index_absent` en el registro. Tests: `test_served_verdict_without_index_is_routed_to_both`, `test_coercion_is_recorded_with_its_own_cause`
-- [ ] 10.6 Pintar los dos mensajes del filtro estrecho y de la abstención distinguidos. Tests: `should tell a narrow filter from an unanswerable query`
-- [ ] 10.7 Medir la **tasa de `router_index_absent`** tras la coerción y el **efecto de la sonda sobre la latencia de una búsqueda filtrada**, y publicar las dos
+- [x] 10.1 Implementar la **sonda vectorial sin filtro** en `retrieval/orchestrator.py`, **secuencial**, reutilizando el vector y **sólo cuando la petición trae filtros**. Tests: `test_filtered_request_issues_two_statements`, `test_unfiltered_request_issues_one_statement`, `test_probe_costs_no_provider_call`, `test_probe_never_reaches_the_response`
+- [x] 10.2 Pasar las distancias de la sonda a `should_abstain` y **persistirlas** junto a la ventana, para que `--rescore` siga pudiendo recalcular una pasada filtrada. Tests: `test_abstention_reads_the_unfiltered_profile`, `test_rescore_recomputes_the_decision_from_the_persisted_probe`
+- [x] 10.3 Añadir la traza de la sonda al registro de etapa, **sin vector y sin texto de consulta**. Test: `test_probe_log_carries_no_vector_and_no_query`
+- [x] 10.4 Añadir `filters_too_narrow` al vocabulario cerrado y emitirlo cuando el perfil sin filtro tiene pico y el filtrado es escaso, **en las dos rutas**. Tests: `test_narrow_filter_over_answerable_query_is_declared`, `test_unanswerable_query_abstains_instead_of_blaming_the_filter`
+- [x] 10.5 Implementar la **coerción a `both`** cuando el veredicto es servido, sin eje pendiente y sin índice, con la causa `router_index_absent` en el registro. Tests: `test_served_verdict_without_index_is_routed_to_both`, `test_coercion_is_recorded_with_its_own_cause`
+- [x] 10.6 Pintar los dos mensajes del filtro estrecho y de la abstención distinguidos. Tests: `should tell a narrow filter from an unanswerable query`
+- [x] 10.7 Medir la **tasa de `router_index_absent`** tras la coerción y el **efecto de la sonda sobre la latencia de una búsqueda filtrada**, y publicar las dos
 
 ## 11. Tramo 3 · verificación de completitud
 
