@@ -72,8 +72,8 @@
 
 ## 8. Tramo 2 · la latencia, medida
 
-- [ ] 8.1 Medir **p50 y p95 extremo a extremo por .NET** sobre las 42 consultas, como hizo C34 para los modos anclados, y publicarlo. Si el p95 no cabe en el presupuesto de 10 s, **disparar el corte pre-autorizado**: no generar en la ruta `catalog` de M1, y **declararlo**
-- [ ] 8.2 Publicar el **reparto de los dieciséis estados** sobre esas 42 consultas, partiendo `route=none` por `intent`, y persistir el artefacto
+- [x] 8.1 Medir **p50 y p95 extremo a extremo por .NET** sobre las 42 consultas, como hizo C34 para los modos anclados, y publicarlo. Si el p95 no cabe en el presupuesto de 10 s, **disparar el corte pre-autorizado**: no generar en la ruta `catalog` de M1, y **declararlo**
+- [x] 8.2 Publicar el **reparto de los dieciséis estados** sobre esas 42 consultas, partiendo `route=none` por `intent`, y persistir el artefacto
 
 ## 9. Tramo 2 · documentación mínima para que no se repita la avería
 

@@ -566,3 +566,167 @@ a consumidores distintos; quien lea una sin la otra intentará unificarlas.
 **3 · `CitationRow` de C36 se exporta y se reutiliza, no se copia.** Lo que no había que duplicar es
 la distinción establecimiento/general: un compromiso de la casa pasado como hecho del mundo es como
 una tienda acaba debiendo algo que no prometió.
+
+---
+
+## 8 · Tramo 2 · la latencia y el reparto de estados, medidos por .NET (grupo 8)
+
+Ésta es la segunda de las dos mediciones que el encargo pide como **entregable y no como
+diagnóstico**. La pregunta que responde es si M1 cabe en el presupuesto de 10 s extremo a extremo
+—el que no se puede subir— y, si no cabe, disparar el corte pre-autorizado.
+
+**No hace falta disparar el corte.** El p95 medido es **7 160 ms** sobre un presupuesto de 10 000 y
+**ninguna de las 42 consultas** lo excede.
+
+### El montaje, porque la cifra no significa nada sin él
+
+| Pieza | Qué |
+|---|---|
+| Superficie | `POST /api/ai/search/assisted`, que es la que usa el panel |
+| Cliente | sesión por cookie, una petición cada vez, sin concurrencia — como un mostrador |
+| API .NET | `localhost:5056`, los tres interruptores encendidos, cupo elevado para no medirlo a él |
+| `jbg-ai` | contenedor en `backend_jpv-network`, **`STUB_MODE=false` y claves reales**, 1 168 documentos indexados |
+| Punto de venta | `0388f003-…a4` (MAO-TALLER) |
+| Conjunto | las **42 consultas etiquetadas** (32 `knowledge`, 10 `both`) |
+| Procedencia | `git_sha` `1c315a9`, `prompt_version` `assist/v5`, enrutador `router/v3` |
+
+### 8.1 · Las cifras
+
+| | 42 consultas atendidas | ruta `knowledge` (32) | ruta `both` (10) |
+|---|---|---|---|
+| **p50** | **3 404 ms** | 3 772 ms | 2 846 ms |
+| **p95** | **7 160 ms** | 7 700 ms | 7 160 ms |
+| máximo | 7 759 ms | | |
+| mínimo | 776 ms | | |
+| **fuera de presupuesto** | **0 de 42** | | |
+| enrutador degradado | **0 de 43 llamadas** | | |
+| marcadores `{{price}}` / `{{stock}}` | **0 / 0** | | |
+
+**El corte pre-autorizado —no generar en la ruta `catalog`— no se dispara**, y el margen no es de
+décimas: sobran **2,8 s** en el p95.
+
+### Dónde se gasta el presupuesto, que no es donde se temía
+
+| Tramo | p50 | p95 |
+|---|---|---|
+| llamada a IA (`usage.aiMs`) | 3 388 ms | 7 142 ms |
+| total del servidor (`usage.totalMs`) | 3 390 ms | 7 147 ms |
+| **.NET + red, por diferencia** | **13 ms** | **17 ms** |
+
+La capa que C40 añade cuesta **diecisiete milisegundos en el p95**. Todo el presupuesto se gasta
+dentro de `jbg-ai`, y dentro de él, en el proveedor. Esto importa para quien venga después:
+optimizar el lado .NET de esta ruta no tiene nada que ganar.
+
+### Lo que esta medición refuta
+
+El `design.md` razonaba que M1 suma el enrutador a lo ya medido por C34 —**p95 7,1 s sin
+enrutador**— y que los «~2 s» adicionales lo pondrían al borde de los 10 s. Medido, **el p95 con
+enrutador es 7 160 ms**: prácticamente el mismo. La predicción trataba el enrutador como un coste
+que se suma; en la práctica **el enrutador se paga con trabajo que se ahorra**, porque las consultas
+que corta no llegan a recuperar ni a generar.
+
+Eso sale muy claro en la pasada complementaria:
+
+| | consultas **cortadas** por el enrutador (30) | consultas **respondidas** (39) |
+|---|---|---|
+| p50 | **686 ms** | 3 404 ms |
+| p95 | **1 292 ms** | 7 700 ms |
+
+**Un rechazo cuesta la quinta parte que una respuesta.** El operario recibe la negativa en menos de
+un segundo, que es justo el caso en el que esperar siete sería más irritante.
+
+### Cuatro manipulaciones del entorno, declaradas
+
+1. **Una petición de calentamiento, descartada.** La primera llamada del proceso paga el TLS y un
+   pool frío en los dos saltos: medida, costó 8,8 s contra 0,9–3 s en caliente. Meterla en un p95
+   que describe régimen permanente sería describir un arranque. La razón está en el código del
+   arnés, no sólo aquí.
+2. **La proyección del punto de venta se refrescó.** Llegaba con 19,7 días y el servicio la
+   declaraba `degraded=unscoped`, con lo que se habría medido otra cosa. Se actualizaron
+   `refreshed_at` y `computed_as_of` en 1 176 filas. Es manipulación de datos locales y no toca
+   ningún código.
+3. **Dos pasadas enteras se descartaron por cuota del proveedor**, y es la misma trampa dos veces:
+   46 de 90 en el grupo 4 con `--delay 0.3`, y 17 de 42 aquí sin espaciado. Una llamada limitada por
+   cuota vuelve en ~150 ms, así que **arrastra el p95 hacia abajo** y empuja la consulta a un estado
+   que no es el suyo. La razón está escrita en `DELAY_MS` del arnés, no sólo en este informe,
+   precisamente porque ya me había pasado una vez.
+4. **Una consulta se volvió a medir sola.** En la pasada complementaria, `q54` volvió con
+   `intent=unclassified`, `prompt_version=null` y 1 236 ms: la forma exacta de un enrutador que no
+   llegó a llamarse. El log del contenedor lo confirma —05:46:22, `cause=RateLimitError`,
+   `groups=2`, el mismo recuento de grupos que la fila—. Repetida en aislamiento, `q54` es una
+   **repregunta**, que es lo que le toca a una consulta ambigua. La fila sustituida se conserva en
+   el artefacto bajo `superseded_rows`; no se borró.
+
+### 8.2 · El reparto de los dieciséis estados
+
+Las 42 consultas etiquetadas **no pueden**, por construcción, ejercitar la mayoría de los estados:
+todas son de dominio y respondibles, así que cubren tres. Publicar «3 de 16» describiría el conjunto
+de consultas, no el sistema. Se añadió una **pasada complementaria de 29 consultas** sobre las clases
+de rechazo y ambigüedad; el reparto es sobre las **71**.
+
+| # | Estado | n | % |
+|---|---|---|---|
+| 1 | rechazo · fuera de dominio | 5 | 7,0 |
+| 2 | rechazo · no en catálogo | 21 | 29,6 |
+| 3 | **repregunta** | 4 | 5,6 |
+| 4 | admitida sin índice (`route=none`, `intent=in_domain`) | **0** | — |
+| 5 | enrutador degradado (`route=none`, `intent=unclassified`) | **0** | — |
+| 6 | abstención · perfil plano | 0 | — |
+| 7 | filtro estrecho | 0 | — |
+| 8 | ruta `catalog` con prosa | 4 | 5,6 |
+| 9 | ruta `knowledge` con prosa | 18 | 25,4 |
+| 10 | ruta `both` con prosa | 7 | 9,9 |
+| 11 | la puerta retiró **alguna** cita | 5 | 7,0 |
+| 12 | la puerta retiró **el argumentario** | 2 | 2,8 |
+| 13 | sin cita que sobreviva | 5 | 7,0 |
+| 14 | sin credencial de generación | 0 | — |
+| 15 | **marcador en el argumentario de M1** | **0** | — |
+| 16 | degradado · .NET no obtuvo respuesta | 0 | — |
+
+**Nueve de dieciséis sobre tráfico real.**
+
+### El estado 11 no se distingue desde la respuesta, y eso es un hallazgo
+
+Los estados 8, 9, 10 y 11 llegan a la pantalla con la misma forma: prosa, piezas y una lista de
+citas. Que la puerta haya retirado alguna **no viaja en la respuesta**; sólo el campo `withdrawn=`
+del log del servicio lo dice. Como la pasada es estrictamente secuencial, las 43 líneas
+`stage=assist` de la ventana se correlacionaron por orden con las 43 peticiones —cuadran
+exactamente— y ésa es la única razón por la que el 11 puede separarse aquí. Un arnés futuro debería
+guardar el `traceId`.
+
+De esas 10 retiradas, en **5 la puerta se llevó todas las citas**, y ésas son las que pintan la línea
+discreta «sin fuente verificable» que el grupo 7 añadió: **5 de 39 respuestas con prosa, un 12,8 %**.
+El diseño la calibró como línea y no como alerta suponiendo «aproximadamente una cuarta parte»;
+medido es la mitad de eso, lo que **refuerza** la decisión, pero la cifra del diseño era pesimista.
+
+### La partición de `route=none` sale vacía, y hay que decir qué significa
+
+La tarea 8.2 pide partir `route=none` por `intent`, que es la distinción entre los estados 4 y 5.
+**Los dos salen a cero en las pasadas limpias**, y eso no dice que sean inalcanzables: dice que no
+son propiedades de una consulta, sino de un fallo del clasificador. La evidencia de que el 5 es real
+está en esta misma sesión: **19 llamadas con `router_degraded=True`** —18 por `RateLimitError` y 1
+por `timeout`—, todas con `intent=unclassified`, `route=none` y piezas recuperadas. Es exactamente
+el estado 5, observado 19 veces; lo que no está es **dentro** de una pasada limpia, porque cuando
+aparece la pasada deja de serlo.
+
+Los estados 4, 6, 7, 14 y 16 quedan cubiertos por los 20 tests de `free-query-states.test.ts`, que
+es donde deben estar: el 16 exige apagar un interruptor, el 14 retirar una credencial, y el 7 es el
+canal que el grupo 2 dejó **dormido** porque la forma de la petición del panel no permite alcanzarlo.
+
+### El estado 15 a cero cierra el grupo 4 por la vía larga
+
+El grupo 4.7 midió los marcadores **dentro de `jbg-ai`**. Aquí se miden **al otro extremo del
+recorrido**, después de `PitchPlaceholderResolver`, del `AiGatewayClient` y de la serialización a
+`FreeQuerySearchResponse`: **0 `{{price}}` y 0 `{{stock}}` en 71 respuestas**, con 39 argumentarios
+generados. `v5` aguanta todo el camino, no sólo el de dentro.
+
+### Los artefactos
+
+| Fichero | Contenido |
+|---|---|
+| `ai-service/evals/results/c40-dotnet-latency-42.json` | `run_id` `84afe7037180` · 42 filas con estado numerado, `withdrawn` atribuido y las tres latencias |
+| `ai-service/evals/results/c40-dotnet-states-refusals-29.json` | `run_id` `8f2c76386325` · 29 filas de rechazo y ambigüedad, con `superseded_rows` |
+
+Los dos llevan `git_sha` `1c315a9`, `prompt_version` `assist/v5` y `router_prompt_version`
+`router/v3`. La pasada de la exploración no se guardó, y por eso el encargo pedía explícitamente que
+éstas sí.
