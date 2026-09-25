@@ -770,6 +770,31 @@ Tras eso, M2 pasó a `generated` con 2 citas. **Pero se pierde con cada imagen n
 línea en el `Dockerfile` —copiar `data/knowledge`— o un montaje en el compose, y lo decide quien pueda
 tocar `ai-service/`. Mientras no se haga, cualquier entorno nuevo nace sin corpus y con M2 retirado.
 
+> **Comprobado y agravado el 2026-09-25, en la tarea 14.2 de C40.** La entrada sigue abierta, y el
+> arreglo **no es una línea**. Dos cosas que conviene dejar escritas porque las dos engañan:
+>
+> **1 · Hay ocho Markdown en la imagen que parecen el corpus y no lo son.** `/app/prompts/knowledge/v1`
+> existe —lo copia `COPY prompts ./prompts`— y contiene `01-materiales-frecuentes.md` y siete más. Son
+> los **encargos de producción del corpus**, no el corpus: éste son **33 documentos** en
+> `data/knowledge/`. Es un falso positivo fácil de dar por bueno, y lo di por bueno en la primera
+> lectura de esta comprobación.
+>
+> **2 · Copiar `data/knowledge` a `/app/data/knowledge` tampoco lo encontraría.** Medido desde dentro
+> del contenedor:
+>
+> ```text
+> CORPUS_DIR = /app/.venv/lib/data/knowledge     existe: False
+> ```
+>
+> `CORPUS_DIR` es `REPO_ROOT / "data" / "knowledge"` y `REPO_ROOT` se calcula subiendo desde el módulo,
+> que en el contenedor vive en `site-packages` — así que resuelve a `/app/.venv/lib`. El arreglo
+> necesita **dos** cosas: copiar o montar el corpus, **y** que la ruta deje de derivarse de la posición
+> del paquete (una variable de entorno, como el resto de la configuración del servicio).
+>
+> **Que esta máquina tenga 32 documentos y 161 fragmentos con vector en la base no lo contradice:** el
+> indexado corrió **desde el host**, donde `data/knowledge` sí existe. Un contenedor recién creado no
+> puede indexar nada.
+
 > **Esta entrada pesa más desde el 2026-09-22, al implementar C36.** Hasta hoy el corpus vacío sólo
 > degradaba respuestas que nadie veía: `/v1/assist/sale` se demostraba con `curl` y con el arnés. C36
 > le pone **pantalla**, y con ella una **caja de pregunta con cinco sugerencias horneadas** que

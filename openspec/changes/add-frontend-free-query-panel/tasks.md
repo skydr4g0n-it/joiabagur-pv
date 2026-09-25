@@ -109,9 +109,9 @@
 
 ## 14. Cierre
 
-- [ ] 14.1 **Declarar aplazado con su motivo** todo tramo que no haya entrado, en el informe de implementación y en `openspec/DEFERRED_TASKS.md`. Cortar el tramo 3 deja el filtro estrecho **más grave que antes de C40**, porque M1 añade el párrafo que hoy no existe: eso se escribe
-- [ ] 14.2 **Comprobación con datos reales** en local, con `STUB_MODE=false` y credencial real: una consulta de catálogo, una de conocimiento, una mixta, los dos rechazos, una repregunta, un filtro estrecho y el ámbito «todos». Comprobar de paso si el **corpus viaja en la imagen** —tarea diferida de C34, que pesa más aquí: sin corpus, M1 responde siempre sin citas— y declararlo si no
-- [ ] 14.3 Comparación final de las **tres suites por nombres** contra la línea base del grupo 1 — cero nombres desaparecidos y cero nuevos en rojo—, `dotnet build` y `npm run build` en verde, y `openspec validate --all --strict` en **0 failed**
-- [ ] 14.4 Escribir `Documentos/Proyecto Final AIEng/informes/c40-implementation-measurements.md` con las cinco cifras: marcadores antes y después de `v5`, reparto de los dieciséis estados, latencia p50/p95 por .NET, tasa de `router_index_absent` y efecto de la sonda
-- [ ] 14.5 Actualizar la documentación de contexto: `Documentos/epicas.md`, la ficha del plan, el diseño (**§15.12 y §15.13 cerradas**, §15.14 matizada), `frontend/README.md`, `backend/README.md`, `ai-service/README.md` y `openspec/DEFERRED_TASKS.md`
-- [ ] 14.6 Comprobar que **no queda ningún TODO ni FIXME** sin tarea de seguimiento asociada
+- [x] 14.1 **Declarar aplazado con su motivo** todo tramo que no haya entrado, en el informe de implementación y en `openspec/DEFERRED_TASKS.md`. Cortar el tramo 3 deja el filtro estrecho **más grave que antes de C40**, porque M1 añade el párrafo que hoy no existe: eso se escribe
+- [x] 14.2 **Comprobación con datos reales** en local, con `STUB_MODE=false` y credencial real: una consulta de catálogo, una de conocimiento, una mixta, los dos rechazos, una repregunta, un filtro estrecho y el ámbito «todos». Comprobar de paso si el **corpus viaja en la imagen** —tarea diferida de C34, que pesa más aquí: sin corpus, M1 responde siempre sin citas— y declararlo si no
+- [x] 14.3 Comparación final de las **tres suites por nombres** contra la línea base del grupo 1 — cero nombres desaparecidos y cero nuevos en rojo—, `dotnet build` y `npm run build` en verde, y `openspec validate --all --strict` en **0 failed**
+- [x] 14.4 Escribir `Documentos/Proyecto Final AIEng/informes/c40-implementation-measurements.md` con las cinco cifras: marcadores antes y después de `v5`, reparto de los dieciséis estados, latencia p50/p95 por .NET, tasa de `router_index_absent` y efecto de la sonda
+- [x] 14.5 Actualizar la documentación de contexto: `Documentos/epicas.md`, la ficha del plan, el diseño (**§15.12 y §15.13 cerradas**, §15.14 matizada), `frontend/README.md`, `backend/README.md`, `ai-service/README.md` y `openspec/DEFERRED_TASKS.md`
+- [x] 14.6 Comprobar que **no queda ningún TODO ni FIXME** sin tarea de seguimiento asociada

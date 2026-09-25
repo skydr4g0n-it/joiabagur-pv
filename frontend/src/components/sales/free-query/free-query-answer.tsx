@@ -23,7 +23,7 @@ import { AssistedSearchResultRow } from '@/components/sales/assisted-search-resu
 import {
   NO_VERIFIABLE_SOURCE,
   noRouteMessage,
-  pitchMessage,
+  freeQueryPitchMessage,
   queryWarnings,
   warningLabel,
 } from '@/lib/assist-copy';
@@ -289,7 +289,9 @@ function NoRouteBlock({ intent }: { intent?: string | null }) {
  * than restated.
  */
 function WithoutProseBlock({ response }: { response: FreeQuerySearchResponse }) {
-  const message = pitchMessage(response.pitchStatus, response.degradedReason);
+  // The panels do not share this copy: the card says «la ficha» and «esta pieza», and this
+  // screen has neither. Found by the real-data check of C40 rather than by a test.
+  const message = freeQueryPitchMessage(response.pitchStatus, response.degradedReason);
 
   if (!message) {
     return null;
@@ -300,7 +302,10 @@ function WithoutProseBlock({ response }: { response: FreeQuerySearchResponse }) 
       <AlertTitle>{message.title}</AlertTitle>
       <AlertDescription>
         {message.body}
-        <span className="mt-1 block">{message.action}</span>
+        {/* Empty for `not_generated`, and that is the prescription rather than an oversight:
+            the classifier timed out or was never configured, and asking the operator to act
+            on that would blame them for an outage. */}
+        {message.action ? <span className="mt-1 block">{message.action}</span> : null}
       </AlertDescription>
     </Alert>
   );

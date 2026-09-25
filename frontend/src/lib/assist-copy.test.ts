@@ -11,6 +11,7 @@
 import { describe, it, expect } from 'vitest';
 
 import {
+  freeQueryPitchMessage,
   ESTABLISHMENT_CLAIM_NOTE,
   ESTABLISHMENT_SCOPE,
   SIZE_LABEL_MISSING,
@@ -440,5 +441,61 @@ describe('a citation the gate could not verify', () => {
     // The citation existed; what could not be verified is the span that supported it. Saying
     // "this may be made up" would be false and would corrode the one thing the gate is for.
     expect(NO_VERIFIABLE_SOURCE).not.toMatch(/invent|falso|inventad/i);
+  });
+});
+
+/**
+ * C40 · the same states, on the free-query panel.
+ *
+ * Found by the real-data check of task 14.2 and not by a test, which is why the tests exist now:
+ * the card's table names «la ficha» and «esta pieza», and the assisted panel has neither.
+ */
+describe('freeQueryPitchMessage', () => {
+  it('should never name the sale card on the free-query panel', () => {
+    for (const status of [
+      'ai_unavailable',
+      'not_generated',
+      'withheld_by_ai',
+    ] as const) {
+      const message = freeQueryPitchMessage(status);
+      const text = `${message?.title} ${message?.body} ${message?.action}`;
+
+      expect(text).not.toMatch(/la ficha/i);
+    }
+  });
+
+  it('should never speak of a single piece, because this route returns several', () => {
+    const message = freeQueryPitchMessage('withheld_by_ai');
+    const text = `${message?.title} ${message?.body} ${message?.action}`;
+
+    expect(text).not.toMatch(/esta pieza/i);
+  });
+
+  it('should ask the operator for nothing when the argument was never generated', () => {
+    // The sixteen-state table prescribes «ninguna acción del operario» for the degraded router:
+    // it timed out or was never configured, and asking the operator to act blames them for it.
+    expect(freeQueryPitchMessage('not_generated')?.action).toBe('');
+  });
+
+  it('should say nothing at all for the two anchored-mode statuses', () => {
+    // They need a piece on the screen and this route has none, so no request of this panel can
+    // produce them. Null renders nothing rather than a paragraph about a piece that is not there.
+    expect(freeQueryPitchMessage('withheld_unresolved')).toBeNull();
+    expect(freeQueryPitchMessage('withheld_out_of_stock')).toBeNull();
+  });
+
+  it('should return nothing when there is an argument to paint', () => {
+    expect(freeQueryPitchMessage('generated')).toBeNull();
+  });
+
+  it('should point at the fast search when the assistant is unavailable', () => {
+    expect(freeQueryPitchMessage('ai_unavailable')?.action).toMatch(/búsqueda rápida/i);
+  });
+
+  it('should keep the card table untouched, because C36 worded it for its own surface', () => {
+    expect(pitchMessage('not_generated')?.action).toMatch(/la ficha/i);
+    expect(pitchMessage('not_generated')?.action).not.toBe(
+      freeQueryPitchMessage('not_generated')?.action,
+    );
   });
 });

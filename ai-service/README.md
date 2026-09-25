@@ -1106,6 +1106,23 @@ untouched** and keeps serving the deterministic route. A piece the loop pivoted 
 also handed over as a match, and when the cap of eight pieces binds, further matches are dropped
 before the substitutes.
 
+> **C40 moves the deterministic route to `assist/v5`, and that was a prerequisite rather than an
+> improvement.** `v3` ordered the model to write `{{price}}` and `{{stock}}` in **every** task,
+> including the three free-query ones — where there is no anchored piece for `PitchPlaceholderResolver`
+> to resolve them against, so the .NET gateway withdrew the argument and M1 would have shipped with
+> no prose at all. `v5` removes price and availability from the free-query tasks, adds an uncovered
+> task for a knowledge question the corpus cannot answer, and the integrity gate gains the hard
+> cause `placeholder_in_free_query`, so a placeholder there withholds the argument instead of
+> reaching a screen.
+>
+> **The measurement refuted the prediction that justified it, and the change stands anyway.** C30b
+> counted `{{price}}` in 147 of 213 arguments and `{{stock}}` in 188 of 213, and the ticket
+> extrapolated that most of M1's arguments would be withheld. Measured over 90 free-query
+> generations on `v3`: **2 of 90 and 1 of 90** — a factor of thirty. What actually blocked M1 was
+> not the placeholder rate but the gateway guard, which refused it **100 %** of the time. On `v5`
+> the counts are 0 and 0, and 0 again over 71 responses driven end to end through .NET. Both
+> artefacts are in `evals/results/c40-placeholders-*.json`.
+
 **The wall-clock budget bounds the whole request.** The loop runs against 15 s minus the
 argument's reserve (its two calls at their timeout, 8 s by default) and the turn in flight is cut
 when that runs out; the bound is 15 s plus, at most, the tool calls of that turn, which are not

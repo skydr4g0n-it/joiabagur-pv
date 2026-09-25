@@ -47,8 +47,41 @@ añade avisos y no traduce un código que no conoce inventándose una etiqueta.
 
 | Ruta | Pantalla | Qué consume |
 |---|---|---|
-| `/sales/new/assisted` | Panel de búsqueda asistida (C16) | `POST /api/ai/search` |
+| `/sales/new/assisted` | Panel de búsqueda asistida (C16), con **dos rutas** desde C40 | `POST /api/ai/search` · `POST /api/ai/search/assisted` · `GET /api/ai/search/availability` |
 | `/sales/new/assist/:productId` | **Ficha de venta** (C36) | `POST /api/ai/products/{id}/sales-assist` y `GET /api/ai/products/{id}/substitutes` |
+
+### Las dos rutas del panel (C40)
+
+El mismo panel sirve **una búsqueda rápida** y **una respuesta asistida**, y un toggle elige. El
+toggle **no recuerda** la elección y por defecto vale la semántica: la asistida cuesta una llamada
+generativa, y un panel que recordara la cara acabaría gastándola sin que nadie la pidiera.
+
+**La disponibilidad se lee antes de buscar.** `aiAvailable` viaja *dentro* de una respuesta, así que
+hasta C40 la única forma de saber que una vía estaba apagada era usarla — y así es como el panel
+sirvió por su ruta degradada durante todo el proyecto sin que nadie lo notara. `GET
+/api/ai/search/availability` no cuesta cuota ni llama al servicio de IA, y alimenta una insignia de
+cuatro estados y la opción deshabilitada del toggle, con su motivo al lado.
+
+**La respuesta asistida puede llegar de dieciséis maneras** y las dieciséis se distinguen en
+pantalla. No es una lista de mensajes: es una **unión discriminada** resuelta en
+[`lib/free-query-states.ts`](src/lib/free-query-states.ts), porque los estados son combinaciones de
+campos y una pantalla que ramificara campo a campo acertaría cada rama y fallaría las
+combinaciones — que es exactamente cómo este panel llegó a tener cinco ramas de vacío, tres de
+ellas capaces de pintar una respuesta correcta como un fallo. La tabla con la medición detrás de
+cada estado está en
+[`c40-m1-panel-states.md`](../Documentos/Proyecto%20Final%20AIEng/informes/c40-m1-panel-states.md).
+
+Tres decisiones de copia que no son obvias:
+
+- **«Sin resultados» no es `groups.length === 0`.** En la ruta de conocimiento el servicio responde
+  desde el corpus y devuelve cero piezas a propósito; anunciar un vacío ahí escribiría un fallo
+  justo encima de una respuesta correcta.
+- **Los dos rechazos llevan textos distintos.** «No es una pregunta de joyería» y «no trabajamos ese
+  tipo de pieza» son dos cosas distintas que decirle a un cliente, y el servicio se molesta en
+  emitir dos códigos: colapsarlos aquí tiraría esa distinción en el último paso.
+- **El estado sin ruta no siempre invita a reformular.** Con `intent=in_domain` el clasificador se
+  contradijo y pedir otra redacción es justo; con `unclassified` no llegó a correr, y pedírselo al
+  operario sería culparle de una configuración.
 
 ### La ficha de venta (`/sales/new/assist/:productId`)
 

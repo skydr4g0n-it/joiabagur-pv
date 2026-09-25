@@ -1328,3 +1328,165 @@ para un cambio de tipos**: verde ahí significa «compila», no «los tipos casa
 **+25 tests nuevos** —10 de `family-note`, 11 del embudo y 4 de la fila— y el diff contra la línea
 base vuelve a salir vacío, como en el grupo 12. `npm run build` en verde y `tsc --noEmit` filtrado a
 los ficheros de C40 sin un solo error, que en este grupo es la comprobación que importa.
+
+---
+
+## 14 · Cierre
+
+### Las cinco cifras
+
+Son las que el encargo pide como entregable, y **tres de las cinco contradicen lo que la exploración
+predijo**. Eso no es un accidente de este change: es la duodécima vez seguida que la medición
+refuta a la exploración en este proyecto, y por eso las dos mediciones del encargo eran entregables
+y no diagnósticos.
+
+| # | Medición | Predicho | Medido | Artefacto |
+|---|---|---|---|---|
+| 1 | Marcadores en el argumentario de M1, antes y después de `v5` | «la mayoría se retirarían» | **2 de 90** (`{{price}}`) y **1 de 90** (`{{stock}}`) en `v3`; **0 y 0** en `v5` | `c40-placeholders-before-v3-*.json` · `c40-placeholders-after-v5-*.json` |
+| 2 | Reparto de los dieciséis estados | — | **9 observados** sobre 71 consultas | `c40-dotnet-latency-42.json` · `c40-dotnet-states-refusals-29.json` |
+| 3 | Latencia p50/p95 extremo a extremo por .NET | p95 al borde de los 10 s | **p50 3 404 ms · p95 7 160 ms**, 0 de 42 fuera de presupuesto | `c40-dotnet-latency-42.json` |
+| 4 | Tasa de `router_index_absent` tras la coerción | **5 de 42 · 11,9 %** | **0 de 42** | `c40-router-index-absent.json` |
+| 5 | Efecto de la sonda sobre una búsqueda filtrada | «un dígito de milisegundos» | **p50 20,9 ms · p95 29,3 ms**, y **0** sin filtro | `c40-probe-cost.json` |
+
+Las tres refutaciones, con lo que cada una cambia:
+
+**La cifra 1 tumba el argumento que ordenaba el change, y el orden era correcto igual.** El tramo 2
+se declaró prerrequisito porque `assist/v3` llenaría de marcadores el argumentario de M1 — 147 de
+213 y 188 de 213 en C30b. Medido sobre 90 generaciones de consulta libre: **2 y 1**, un factor de
+treinta. Lo que bloqueaba M1 al **100 %** era el tercer eslabón, el guard del *gateway*. Así que
+`assist/v5` sigue siendo necesario y la razón escrita en el ticket no lo era; corregidos el ticket,
+el `design.md` y el propio `v5.md`.
+
+**La cifra 3 tumba el riesgo que justificaba un corte pre-autorizado.** El diseño sumaba el
+enrutador a los 7,1 s de C34 y temía rozar los 10 s. Medido, el p95 es el mismo: el enrutador **se
+paga con el trabajo que ahorra**, porque lo que corta no llega a recuperar ni a generar — un rechazo
+cuesta la quinta parte que una respuesta (p50 686 ms contra 3 404). El corte no se disparó.
+
+**La cifra 4 vacía un estado de la tabla.** H7 midió la contradicción del clasificador en el 11,9 %;
+en esta sesión no apareció ni una vez en 144 réplicas servidas. La coerción se mantiene —no cuesta
+nada y resuelve una contradicción que el esquema admite—, pero el estado 4 de la tabla del panel no
+es «el 11,9 % de las consultas»: es un estado que **esta versión del clasificador no produce**.
+
+La cifra 5 refuta en las dos direcciones a la vez: el filtro **sí** ahorra tiempo (21,3 → 9,3 ms) y
+la sonda cuesta **dos** dígitos, porque es justamente el escaneo completo que el filtro evitaba. La
+conclusión operativa aguanta: el SQL de una búsqueda filtrada se triplica y lo que el operario
+espera sube **5 ms sobre 87**, porque manda la ida y vuelta al proveedor de *embeddings*.
+
+### 14.2 · La comprobación con datos reales
+
+Ocho casos contra datos reales y proveedor real, `STUB_MODE=false`, espaciados 4 s: **8 de 8
+correctos y 0 marcadores**. Artefacto en `ai-service/evals/results/c40-real-data-check.json`.
+
+| Caso | Estado resuelto |
+|---|---|
+| catálogo | `answered` · 5 piezas, con prosa |
+| conocimiento | `answered` · 1 cita, con prosa |
+| mixta | `answered` · 7 piezas, con prosa |
+| rechazo fuera de dominio | `refused-out-of-domain` · sin piezas, sin prosa |
+| rechazo no en catálogo | `refused-not-in-catalogue` · sin piezas, sin prosa |
+| repregunta | `clarification` |
+| filtro estrecho | `filters-too-narrow` |
+| ámbito «todos» | `answered` · 5 piezas, **cantidad nula en todas** y **sin evento** |
+
+**La primera pasada dio 6 de 8, y las dos que fallaron eran de entorno, no de código.** Una fue un
+`timeout` del enrutador —tres en esa ventana—, que dejó la consulta fuera de dominio en `unclassified`
+con el *fail-open* recuperando piezas. La otra fue más instructiva: **el contenedor era de antes del
+grupo 12**, así que `/v1/assist/sale` todavía exigía `pos_id` y el ámbito global volvía
+`credential_rejected` en 56 ms. Reconstruida la imagen, 8 de 8. Es exactamente lo que una
+comprobación con datos reales existe para cazar: **los dos lados se despliegan juntos o no se
+despliegan**.
+
+### El corpus **no** viaja en la imagen, y la tarea diferida de C34 sigue abierta
+
+Me equivoqué al primer mirado y conviene decirlo, porque el error es fácil de repetir: dentro del
+contenedor hay **ocho ficheros Markdown** en `/app/prompts/knowledge/v1` que parecen el corpus y no
+lo son. Son los **encargos de producción del corpus** —los *prompts* del lado de generación—, y están
+ahí porque el `Dockerfile` copia `prompts`.
+
+El corpus de verdad son **33 documentos** en `data/knowledge/`, y ése no se copia. Comprobado desde
+dentro:
+
+```text
+CORPUS_DIR = /app/.venv/lib/data/knowledge     existe: False
+```
+
+**Y hay un detalle que agrava la entrada de C34 en vez de sólo confirmarla.** `CORPUS_DIR` es
+`REPO_ROOT / "data" / "knowledge"`, y dentro del contenedor `REPO_ROOT` resuelve a
+`/app/.venv/lib`, porque el paquete está instalado en `site-packages` y la constante se calcula
+subiendo desde el módulo. Así que **copiar el corpus a `/app/data/knowledge` tampoco lo encontraría**:
+el arreglo no es sólo una línea en el `Dockerfile`, hace falta además que la ruta deje de derivarse
+de la posición del paquete.
+
+Que esta máquina tenga 32 documentos y 161 fragmentos **con vector** en la base no lo contradice: el
+indexado corrió **desde el host**, donde `data/knowledge` sí existe. Un contenedor recién creado no
+puede indexar nada, y en ese estado M1 responde siempre sin citas — que es exactamente el motivo por
+el que esta tarea diferida pesa más aquí que en C34.
+
+### Un defecto que sólo apareció con datos reales
+
+La copia del argumentario ausente estaba escrita **para la ficha** y el panel la reutilizaba: sus
+cinco entradas dicen «volver a pedir *la ficha*», «*esta pieza*», «te propongo alternativas». En la
+consulta libre no hay ficha —nadie pidió una— y no hay *una* pieza: hay varias agrupadas por
+familia. Reutilizarla nombraba dos cosas que no existen en la pantalla que la enseñaba.
+
+Se añadió una tabla propia para esa superficie y **la de C36 se dejó intacta**: una frase compartida
+que tiene que servir a dos superficies acaba sin servir a ninguna. Con una prescripción de la tabla
+de estados respetada al pie: `not_generated` **no lleva acción**, porque el clasificador se agotó o
+nunca se configuró y pedirle algo al operario sería culparle de una avería.
+
+### 14.1 · Qué queda aplazado
+
+**Ningún tramo se cortó.** Los catorce grupos entraron, incluido el tramo 3 — así que el aviso del
+encargo («cortar el tramo 3 deja el filtro estrecho más grave que antes de C40, porque M1 añade el
+párrafo que hoy no existe») **no aplica**: el filtro estrecho se declara, con su propio código y su
+propia copia, distinguido de la abstención.
+
+Dos cosas quedan diferidas, las dos escritas en `openspec/DEFERRED_TASKS.md`:
+
+1. **Una consulta libre de ámbito global no se registra.** Exigiría una migración de EF Core, lo
+   único que el encargo excluía, y la spec prohíbe el marcador de posición. La parte incómoda
+   incluida: su frecuencia no se puede medir *porque* no se registran.
+2. **El test `ForAllPointsOfSale_IsRefusedByInventory` no tiene superficie .NET donde afirmarse.**
+   La garantía vive del lado de Python; del lado .NET queda un test que afirma que la operación no
+   existe, para que falle el día que crezca.
+
+Y un candidato anotado sin cerrar: **`traceId` no se pinta**. En un estado de error permitiría al
+operario citarlo al pedir ayuda, pero no lo pide ninguna tarea y la decisión es de interfaz.
+
+### 14.6 · TODO y FIXME
+
+**Cero añadidos por C40** sobre los 93 ficheros de código que tocó. En todo el repositorio quedan
+**tres** preexistentes —`ImageRecognitionService`, `ProductService`, `protected-route`—, los tres
+fuera de la zona de este change.
+
+### 14.3 · La comparación final de las tres suites
+
+| Suite | Línea base (grupo 1) | Cierre | Veredicto |
+|---|---|---|---|
+| `ai-service` | 1 592 en verde, 0 rojos | **1 625 en verde, 0 rojos** | +33 tests, ninguno rojo |
+| `frontend` | 113 de 729 en 14 ficheros | **113 de 833 en 14 ficheros** | **conjunto de nombres idéntico**, diff vacío |
+| `backend` | 50–51 de 1 328, 43 estables y 15 rotatorios | **47 de 1 328** | 1 nombre nuevo, en una clase rotatoria; **0 en el área de C40** |
+
+`dotnet build` y `npm run build` en verde. `openspec validate --all --strict`: **62 passed, 0 failed**.
+Y `tsc --noEmit` filtrado a los ficheros de C40 sin un solo error, que desde el grupo 13 es una
+comprobación aparte y no un extra.
+
+El único nombre nuevo del backend es
+`InventoryIntegrationTests.Operator_ViewStock_ForAssignedPOS_ShouldSucceed`, una de las tres clases
+que el `CLAUDE.md` documenta como rotatorias. El criterio que decide no es el recuento: **ninguno de
+los 47 toca `AiCallScope`, `AiGateway`, `FreeQuerySearch`, `AssistedSearch`, `SalesAssist`,
+`Substitutes`, `ProductSearchEvent` ni `AiContract`**, y las pasadas dirigidas sobre esa área a lo
+largo del change —341, 115, 22 y 13 tests— salieron todas limpias.
+
+### Una nota de higiene de medición que cuesta una pasada aprender
+
+La primera pasada de backend de este grupo dio **484 fallos de 1 328 en 2 minutos**, contra 47 en 20.
+No era una regresión: eran `System.TimeoutException` en masa, porque se lanzaron **las tres suites a
+la vez** y además una reconstrucción de la imagen de `jbg-ai`, y Testcontainers no pudo levantar sus
+contenedores. **La duración es el síntoma que lo delata**: una suite que normalmente tarda veinte
+minutos y termina en dos no ha corrido, ha fallado. Repetida en solitario, 47 — la misma cifra que la
+pasada limpia del grupo 12.
+
+Es la tercera vez en este change que una medición sale mal por saturar un recurso compartido —dos por
+la cuota del proveedor, una por Docker— y las tres se detectan igual: **una cifra que mejora o
+empeora demasiado, con un tiempo que no cuadra**.

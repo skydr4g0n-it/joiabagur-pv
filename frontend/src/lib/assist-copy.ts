@@ -459,3 +459,68 @@ export function degradedReasonLabel(reason: string): string {
 
 /** The causes this screen knows how to name. Read by a test that asserts the list is closed. */
 export const DEGRADED_REASON_CODES = Object.keys(DEGRADED_REASONS);
+
+/* -------------------------------------------------------------------------------------------
+ * The same states, on the free-query panel
+ * ---------------------------------------------------------------------------------------- */
+
+/**
+ * What to say about a missing argument **on the free-query panel**, which is not the card.
+ *
+ * **Found by the real-data check of C40, not by a test.** `PITCH_MESSAGES` above is written for
+ * the sale card and every one of its five entries says so: «volver a pedir *la ficha*», «*esta
+ * pieza*», «te propongo alternativas». On the assisted panel there is no ficha — nobody asked for
+ * one — and there is no single piece: there are several results grouped by family. Reusing the
+ * card's copy there named two things that do not exist on the screen showing it.
+ *
+ * The card's table is left exactly as it is. C36 measured and worded it for its own surface, and
+ * a shared sentence that has to serve two surfaces ends up serving neither.
+ *
+ * **`not_generated` carries no action, deliberately.** The sixteen-state table prescribes for the
+ * degraded-router state *«ninguna acción del operario — no se le pide reformular»*: the classifier
+ * timed out or was never configured, and asking the operator to do something about it would blame
+ * them for an outage. The two states share this status and neither admits an action.
+ */
+const FREE_QUERY_PITCH_MESSAGES: Record<
+  Exclude<PitchStatus, 'generated'>,
+  Omit<PitchMessage, 'status'> | null
+> = {
+  ai_unavailable: {
+    title: 'La respuesta asistida no está disponible',
+    body: 'Los precios, las unidades y las variantes que ves son reales; lo que falta es el texto y sus fuentes.',
+    action: 'Puedes usar la búsqueda rápida, que no necesita el asistente.',
+  },
+  not_generated: {
+    title: 'No he podido preparar el texto',
+    body: 'Las piezas y sus datos son los del índice y están completos; sólo falta el argumentario.',
+    action: '',
+  },
+  withheld_by_ai: {
+    title: 'Sin argumentario para esta búsqueda',
+    body: 'No he podido redactar algo que pueda sostener con las fuentes que tengo.',
+    action: 'Las piezas de abajo son reales; prueba a preguntar algo más concreto.',
+  },
+  // Anchored-mode statuses. They need a piece on the screen, and this route has none — no request
+  // of this panel can produce them. Mapped to null rather than to a plausible sentence, so that if
+  // one ever arrives it renders nothing instead of a paragraph about a piece that is not there.
+  withheld_unresolved: null,
+  withheld_out_of_stock: null,
+};
+
+export function freeQueryPitchMessage(
+  status: PitchStatus,
+  degradedReason?: string | null,
+): PitchMessage | null {
+  if (status === 'generated') return null;
+
+  const message = FREE_QUERY_PITCH_MESSAGES[status as Exclude<PitchStatus, 'generated'>];
+  if (!message) return null;
+
+  // The one reason that refines the outage message, kept in step with the card's rule: it
+  // resolves itself and needs no action, so it must not read as a failure of the assistant.
+  if (status === 'ai_unavailable' && degradedReason === 'product_not_indexed') {
+    return { status, ...PRODUCT_NOT_INDEXED };
+  }
+
+  return { status, ...message };
+}
