@@ -219,7 +219,7 @@ alternativas descartadas de cada una están en el
 
 - Change de OpenSpec: `openspec/changes/add-frontend-free-query-panel/` (C40), rama
   `c40-add-frontend-free-query-panel`
-- Ticket: [T-AIENG-040](../../../openspec/changes/add-frontend-free-query-panel/ticket.md)
+- Ticket: [T-AIENG-040](../../../openspec/changes/archive/2026-09-25-add-frontend-free-query-panel/ticket.md)
 - Informes de exploración:
   [`c40-exploration-decisions.md`](../../Proyecto%20Final%20AIEng/informes/c40-exploration-decisions.md)
   · [`c40-m1-panel-states.md`](../../Proyecto%20Final%20AIEng/informes/c40-m1-panel-states.md)

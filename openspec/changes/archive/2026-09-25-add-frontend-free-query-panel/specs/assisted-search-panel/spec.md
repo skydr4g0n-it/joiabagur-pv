@@ -6,6 +6,8 @@ The panel SHALL expose the retrieval funnel only to callers whose role is admini
 
 On the assisted route it MUST additionally show what the response carries about the cost and the timing of that request: the elapsed time of the AI call and of the whole request as two separate figures, the model, the input and output token counts, and the reason the path degraded when it degraded.
 
+It MUST also show the identifier of the recorded search event when the response returned one, on both routes. That identifier, and not the correlation identifier of the call, is what the block can show: the response deliberately does not carry a correlation identifier — it exists only in the structured funnel log of the backend — whereas the search event identifier is the key that joins what the administrator is looking at to what telemetry persisted about it. On the assisted route its absence is itself informative, because a search spread over every point of sale is not recorded at all, and the funnel says so rather than leaving the gap to be read as a telemetry failure.
+
 It MUST NOT show any monetary amount. Token counts and the model name are the inputs of a cost; a tariff written into the screen is wrong the day the provider moves it, and the model reported for a multi-stage route names only its last stage, so multiplying it would be false there and inviting the multiplication here would spread it.
 
 It MUST NOT show the operator's query nor the generated argument inside the funnel.
@@ -19,6 +21,12 @@ An operator whose role is not administrator MUST NOT see the funnel at all.
 #### Scenario: An operator never sees the funnel
 - **WHEN** a caller whose role is not administrator receives a response
 - **THEN** no funnel is rendered
+
+#### Scenario: The funnel carries the search event identifier
+- **WHEN** an administrator expands the funnel of a response that returned a search event identifier
+- **THEN** that identifier is shown
+- **WHEN** the response returned none because the search covered every point of sale
+- **THEN** the funnel states that the search was not recorded, rather than showing nothing
 
 #### Scenario: The assisted funnel splits the elapsed time
 - **WHEN** an administrator expands the funnel of an assisted response
