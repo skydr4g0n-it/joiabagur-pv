@@ -8,9 +8,15 @@ modelo `openai/gpt-4o-mini`, clasificador `openai/gpt-4o`
 
 Este informe recoge lo que se **midió contra el servicio real** durante una sesión que empezó
 siendo la verificación manual de C36 y acabó destapando que el panel de búsqueda asistida llevaba
-todo el proyecto corriendo en su ruta degradada. Contiene **siete hallazgos medidos**, **diez
-decisiones de diseño**, **una regla transversal de completitud** y **cuatro preguntas cerradas**, y
-termina proponiendo **qué se cierra en C36, qué abre C40 y qué sale como change propio**.
+todo el proyecto corriendo en su ruta degradada. Los §1 a §9 contienen **siete hallazgos medidos**,
+**diez decisiones de diseño**, **una regla transversal de completitud** y **cuatro preguntas
+cerradas**, y proponen **qué se cierra en C36, qué abre C40 y qué sale como change propio**.
+
+> **El §10 es una segunda pasada del mismo día, contra el código y no contra el servicio.** Añade
+> **cuatro hallazgos** —uno de ellos bloquea el tramo 2—, **siete decisiones más (D11 a D17)**,
+> **corrige la Q3** y resuelve **dos contradicciones internas de los §1 a §9**. La línea de corte
+> del §4 queda **sustituida por la del §10.10**, y la tabla de estados de la pantalla vive aparte,
+> en [c40-m1-panel-states.md](c40-m1-panel-states.md).
 
 **Tres limitaciones declaradas del §15 del diseño se cierran con C40**, una de ellas —que una pieza
 no indexada no se distingue de una caída— con un solo campo que .NET ya calcula y descarta. La
@@ -809,6 +815,10 @@ p50 4,4 s en las fichas que sólo se abren para mirar precio y existencias.
 **No queda ninguna pregunta abierta de la exploración.** Las tres que lo estaban se cerraron con
 medición:
 
+> **Matizado por el §10** *(mismo día, contra el código)*: no quedan preguntas **de diseño**, y sí
+> quedan **cinco cifras por publicar** — las B1 a B5 del §10.12. La primera, los marcadores en el
+> argumentario de M1, decide si M1 tiene prosa.
+
 | # | Pregunta | Estado |
 |---|---|---|
 | ~~A1~~ | ~~¿Cuántas citas se retiran en M1, y por qué causa?~~ | **Resuelta con la pasada de 42** (H6): 26,4 % de las declaradas, **24,3 % de las respuestas sin ninguna fuente** —el doble que en los modos anclados— y la reaparición de `dangling_citation`, que allí era cero |
@@ -867,3 +877,496 @@ psql -c 'select count("PieceType"), count(*) from "ProductAiProfiles"'
 
 El JWT se firma HS256 con `JWT_SECRET` y las cuatro claims congeladas —`user_id`, `role`,
 `pos_id`, `trace_id`—, como documenta `ai-service/README.md`.
+
+---
+
+# 10 · Segunda pasada: la exploración contra el código de las tres capas
+
+**Fecha:** 2026-09-24, el mismo día · **Método:** verificación de las diez decisiones contra
+`ai-service/src/jbg_ai/`, `backend/src/` y `frontend/src/`, más los apuntes de las sesiones S4, S9,
+S11 y S16 del máster
+
+Todo lo de arriba se midió contra el servicio en marcha. Lo que sigue se ha verificado **contra el
+código**, que es una pregunta distinta: no *«qué devuelve el sistema»* sino *«qué deja hacer el
+sistema»*. **Ocho de las diez decisiones se sostienen tal cual.** Dos chocan con invariantes fijadas
+y con test detrás, y aparecen **cuatro huecos** que cambian la línea de corte.
+
+La tabla de estados completa vive aparte, en
+[c40-m1-panel-states.md](c40-m1-panel-states.md), porque es un entregable y no un párrafo.
+
+---
+
+## 10.1 · F1 · .NET rechaza M1 hoy, por construcción, y el motivo es el que C40 tiene que resolver
+
+**Es el hallazgo que gobierna la línea de corte.** No es una pieza que falte: es un guardia
+explícito, con su razón escrita, repetida en tres sitios.
+
+```csharp
+// AiGatewayClient.cs:668-677
+// The contract also serves a free query with no product. This client refuses it: the
+// placeholders of the generated argument name no product, so with several pieces on the
+// table there is nothing to resolve them against.
+if (string.IsNullOrWhiteSpace(request.ProductId))
+    throw new ArgumentException(
+        "Sale assistance requires an anchored product. Without one the price and stock "
+        + "placeholders of the argument cannot be resolved.", nameof(request));
+```
+
+| Sitio | Qué dice |
+|---|---|
+| `AiGatewayClient.cs:671` | lanza `ArgumentException` si no hay `product_id` |
+| `AiAssistSaleDtos.cs:28` | *«the client refuses to issue one»* |
+| `PitchPlaceholderResolver.cs:37` | *«No anchor, no resolution … Called without an anchor, this withholds, **always**»* |
+
+Y la cadena completa:
+
+```
+prompt assist/v3, regla invariante (línea 47):
+   «El precio y la disponibilidad son SIEMPRE marcadores. Escribe {{price}} … {{stock}}»
+   ← aplica a las SEIS secciones de tarea, incluidas las tres de consulta libre
+                              │
+   medido en C30b (modos anclados):  {{price}} en 147/213 · 69 %
+                                     {{stock}} en 188/213 · 88,3 %
+                              │
+              M1 no tiene ancla, por definición
+                              ▼
+   PitchPlaceholderResolver.Resolve(pitch, null) → Withheld, siempre
+                              ▼
+        PitchStatus.WithheldUnresolved → la pantalla no enseña argumentario
+```
+
+**Y por qué la medición de arriba no lo vio.** Las 42 consultas del H6 se ejecutaron con `curl`
+contra `localhost:8001`, o sea contra Python, **saltándose la etapa de resolución de .NET**. Cuando
+el §2 dice «37 respuestas con argumentario», eso es cierto *del servicio* y **no dice nada de lo que
+el operario vería**. Con la tasa de C30b, la mayoría de los argumentarios de las rutas `catalog` y
+`both` morirían en la frontera.
+
+Es, otra vez, exactamente la avería del §1: **una capacidad que la pantalla presentaría como
+encendida y estaría apagada.** Sólo que esta vez la crearía C40.
+
+**Consecuencia sobre la línea de corte: el tramo 2 tal como estaba escrito —`filters` en
+`AssistRequest` más el toggle— entregaría un panel cuyo modo asistido casi nunca tiene prosa.** Hay
+que cerrarlo *dentro* del tramo 2.
+
+### D11 · El argumentario de la consulta libre no habla de precio ni de disponibilidad (cerrada)
+
+**Dos piezas, y las dos hacen falta.**
+
+1. **`assist/v5`**: las tres tareas de consulta libre dejan de pedir marcadores y **prohíben hablar
+   de precio y de existencias**. El lenguaje comparativo sigue permitido —*«el más asequible de los
+   tres es el colgante»*— porque no lleva cifra y no toca la lista negra de marcadores.
+2. **Una causa dura en la puerta**, `placeholder_in_free_query`, activa **sólo** cuando
+   `product_id is None`.
+
+Y en consecuencia, el guardia de `AiGatewayClient.cs:671` **se retira**, porque su motivo queda
+resuelto y no simplemente asumido.
+
+**Por qué las dos y no sólo el prompt.** Es la doctrina del propio proyecto y la del máster:
+*«un guardrail es código, no una frase en el prompt»* (S16). El prompt es la petición; la puerta es
+la garantía. Con `v5` funcionando, la causa dispara casi nunca y no cuesta nada: **silenciosa
+cuando el prompt se porta, ruidosa cuando no** — y, sobre todo, **medible partida por causa**, que
+es como este repositorio lee su puerta desde C30b.
+
+**Alternativas consideradas:**
+
+| Alternativa | Por qué no |
+|---|---|
+| **.NET neutraliza los marcadores** («disponible por {{price}}» → «disponible por») | Castellano roto, o .NET escribiendo prosa. Es literalmente el *«normalising spellings would be guessing what the model meant»* que el resolutor ya rechaza |
+| **Resolver contra un miembro representativo** (el primero del primer grupo, que es lo que `_focus_of` ya hace para los avisos) | Es el fallo que el docstring del resolutor nombra — *«would put the price of one piece next to the description of another»*. Y **D8 ya rechazó el movimiento análogo para los avisos**: aceptarlo para precios sería incoherente, y una cifra de precio equivocada en el mostrador es peor que un aviso equivocado |
+| **No generar en la ruta `catalog` de M1** | **La mejor descartada, y queda nombrada como corte.** Ahorraría cerca del 40 % de las generaciones de M1 —`catalog` es la ruta más frecuente, 15 de 42— y eliminaría el riesgo donde aparecen los precios. Se descarta porque quita lo principal que el toggle compra sobre una consulta de piezas —*qué tienen en común, cuál encaja*— y adelgaza la ablación de D3. **Si la latencia del §10.5 no cabe, éste es el corte** |
+
+**Verificación exigible:** recuento de `{{price}}` y `{{stock}}` sobre el texto generado de las 42
+consultas, antes y después de `v5`. Es la cifra que hoy no existe y la que decide si M1 tiene prosa.
+
+---
+
+## 10.2 · F2 · M1 no tiene la salvaguarda de cobertura que M3 sí tiene
+
+En M3, cero citas tras el umbral **significa** que el corpus no cubre la pregunta, y eso se
+convierte en una sección de prompt distinta y en un código de aviso:
+
+```python
+# assist/orchestrator.py:311-318  — SÓLO en la rama anclada
+uncovered = not citations          # → WARNING_KNOWLEDGE_NOT_COVERED
+# → resolve_task(...) → PitchTask.PIECE_AND_QUERY_UNCOVERED
+#   «no finjas haber contestado la pregunta … no la respondas de memoria»
+```
+
+En M1 no existe. `resolve_task` para `QUERY_ONLY` elige **sólo por ruta**, y `FREE_QUERY_TASKS`
+tiene tres entradas sin variante «sin cobertura» (`prompt.py:139-145`). Así que una consulta de
+conocimiento en M1 con cero fragmentos ejecuta la tarea que dice *«Responde a la pregunta
+apoyándote en esos fragmentos»* **sin fragmentos**. Es una invitación explícita a contestar de
+memoria, en el modo que C40 saca a pantalla, sin la red que M3 tiene desde C34.
+
+**Y el caso está medido arriba, leído como otra cosa.** En el H5:
+
+| Consulta | Ruta | Piezas | Citas |
+|---|---|---|---|
+| un anillo que se pueda mojar en la piscina | `both` | 15 | **0** ⚠ |
+
+El ⚠ se interpretó como *«las citas dependen de la ruta»*. Lo que es en realidad: **la tarea
+equivocada corriendo sobre un contexto vacío.**
+
+### D12 · `uncovered` se calcula también en M1, con su cuarta tarea de consulta libre (cerrada)
+
+Tres cosas, todas en Python:
+
+1. `uncovered` se calcula para `route in ("knowledge", "both")` en el modo libre, igual que en M3.
+2. Una cuarta entrada en `FREE_QUERY_TASKS` —consulta libre sin cobertura— con la misma regla que
+   la de M3: *no finjas haber contestado.*
+3. `WARNING_KNOWLEDGE_NOT_COVERED` pasa a ser emitible en M1.
+
+**La copia castellana ya existe** —`knowledge_not_covered: 'La documentación no cubre esta pregunta'`
+en `frontend/src/lib/assist-copy.ts:51`, escrita por C36—, así que el coste de pantalla es cero.
+
+---
+
+## 10.3 · F3 · «Todos los puntos de venta» es una frontera de autorización, no un desplegable
+
+D6 choca de frente con una invariante fijada, razonada y con test:
+
+```
+AiCallScope.cs:13   «There are EXACTLY TWO construction paths and no third.»
+                    ForPointOfSale exige un POS concreto: «a sentinel value such as "*" or
+                    "system" reaching it would be a cross-POS leak wearing a
+                    convenience-parameter costume»
+                    ForCatalog «is REFUSED by every point-of-sale operation of the client»
+AiCallScopeTests    AiCallScope_ExposesNoPublicConstructor  ← la fija
+auth.py:21          REQUIRED_CLAIMS = (user_id, role, trace_id, pos_id)
+                    «Retrieval, sale assistance and inventory: the caller is always somewhere»
+```
+
+**La medición que D6 usa es correcta y verificada:** `GET /api/inventory/product/{productId}` lleva
+sólo `[Authorize]` de clase, **sin restricción de rol**, y devuelve el desglose de las tres tiendas
+a cualquier operario autenticado (`InventoryController.cs:222`). La casa ya es inconsistente.
+
+Lo que D6 no decía es **cuánto cuesta cerrarla**: no es un desplegable, son cinco cosas.
+
+### D13 · Una tercera clase de ámbito, explícita, y abierta a operarios (cerrada)
+
+- Un `AiCallScope.ForAllPointsOfSale`, token **sin** claim `pos_id`, y un **tercer perfil de
+  claims** en la ruta de recuperación y de assist.
+- **Amplitud: operarios y administradores**, que es lo que D6 decidió. Va con **requisito y test
+  que nombren quién puede**, no como efecto colateral de un desplegable.
+
+**Por qué esta forma y no otra.** Es el patrón que el propio código declara —*«not a relaxation of
+the first: it is a different scope»*—, es greppable y testeable, y el rechazo de `Catalog` queda
+intacto. **El lado Python ya lo tolera**: `auth.py:44` dice *«Which claims are required is a
+property of the route, not of the token»*, así que es un perfil más y no un agujero.
+
+**Y el argumento que hay que escribir para defenderlo**, porque el comentario de `AiCallScope`
+parece prohibirlo: lo que ese comentario teme es **un valor centinela llegando al filtro duro**. Una
+claim **ausente** hace que el prefiltro **no se aplique**, no que «case con todo», y **falla
+cerrado** en cualquier ruta que la exija —ficha, inventario—. Mismo resultado para la recuperación,
+mecanismo distinto, y un test por cada operación que debe seguir rechazando el ámbito nuevo.
+
+**Alternativas consideradas:**
+
+| Alternativa | Por qué no |
+|---|---|
+| **N búsquedas, una por tienda** | N embeddings y N generaciones. Descartada sin discusión |
+| **Sólo administrador en C40** | El delta de autorización más pequeño —los administradores ya reciben una excepción explícita en `AuthoriseAsync` y no tienen asignaciones— y suficiente para la demo. Se descarta porque no sirve el caso que D6 nombra. **Queda como la variante conservadora si el tramo 4 aprieta** |
+
+**Y una precisión honesta sobre la fuerza del caso de uso:** la incoherencia medida es sobre
+*mirar un producto que ya tienes*, no sobre *descubrir a lo largo de la cadena*, que es otra forma.
+Y la consecuencia 3 de D6 deshabilita la ficha sin tienda, así que el operario no puede actuar sobre
+el resultado sin cambiar de tienda. El caso se sostiene; no es tan fuerte como la incoherencia
+sugiere.
+
+---
+
+## 10.4 · F4 · Dos interruptores, y un tercer eje que ningún interruptor ve
+
+Cuatro propiedades operativas **ya difieren** y **ya están modeladas por feature**:
+
+| | semántica (panel de hoy) | asistida (M1) |
+|---|---|---|
+| Interruptor | `AiSearch:EnabledByDefault` | `AiSalesAssist:EnabledByDefault` |
+| Límite de tasa | **30/min** | **10/min** |
+| Presupuesto .NET | **2.500 ms** | **10.000 ms** (mínimo 8.000) |
+| Cliente HTTP y circuito | `ai-retrieval` | `ai-assist` |
+| Método de gateway | `SearchAsync` | `AssistSaleAsync` |
+| Forma de la respuesta | `results` — lista plana | `groups` — agrupado |
+
+### D14 · M1 vive en un segundo endpoint de .NET, no en un campo `mode` (cerrada)
+
+`POST /api/ai/search/assisted`, reutilizando hidratación y telemetría por composición.
+
+- **Pros.** Cada ruta conserva su interruptor, su límite, su presupuesto y su circuito — los cuatro
+  ya distintos. Los DTO se quedan honestos, sin un tipo unión `results ∪ groups`. Y **el precedente
+  está escrito en el propio código**: `AiSalesAssistOptions` existe como sección propia y no como
+  «más claves bajo `AiSearchOptions`» por este mismo motivo, razonado en su docstring — *«the card
+  is a different feature … and its generative route has a cost profile search does not»*.
+- **Contras.** Dos endpoints y fontanería compartida. Mitigable extrayendo hidratación más
+  telemetría a un colaborador, que es casi lo que `AssistedSearchService` ya es.
+
+**Alternativa considerada: un campo `mode` en `POST /api/ai/search`.** Más limpio de contar y
+honesto como representación de «dos configuraciones de una búsqueda». Se descarta por una razón
+mecánica y no estética: **el límite de tasa es un atributo de endpoint en ASP.NET**, así que
+habría que elegir un único valor —30/min deja quemar treinta generaciones, 10/min estrangula la
+ruta barata sin motivo— y el presupuesto de tiempo tiene el mismo problema: o la ruta de 0,9 s
+espera diez segundos antes de fallar, o la de 7 s se corta.
+
+### D15 · `SearchOrigin` gana un cuarto valor, y la ablación pasa a ser una consulta SQL (cerrada)
+
+`SearchOrigin` se persiste con `HasConversion<int>()`
+(`ProductSearchEventConfiguration.cs:57`), así que **un cuarto valor no abre migración**. Con
+`AssistedGenerative = 4`, la ablación de D3 deja de ser una demo y pasa a ser **una consulta**:
+misma consulta, dos rutas, dos poblaciones, con `RetrievalMs` y `TotalMs` ya en la tabla y
+`FiltersJson` también.
+
+El comentario del propio enum ya dice que su tercer valor existe para ser *«el brazo de control»*.
+Coste: un valor de enum y su documentación. Es materia de rúbrica por lo que abajo se matiza.
+
+### D16 · El badge tiene cuatro estados y necesita una ruta de lectura que no existe (cerrada)
+
+Con dos interruptores independientes hay cuatro combinaciones, y la que importa es la segunda:
+**búsqueda encendida y assist apagado ⇒ la opción asistida del toggle se deshabilita con su motivo,
+no cae en silencio.**
+
+**Y D4 pide el badge *antes* de buscar, cuando hoy no hay de dónde leerlo:** `aiAvailable` viaja
+**dentro** de la respuesta, o sea después. `AiHealthResponse` existe pero es de administrador y
+describe infraestructura, no los interruptores por punto de venta. **C40 necesita una ruta de
+lectura nueva, barata y sin IA**, que reporte los dos interruptores para un POS. No estaba en la
+línea de corte.
+
+**Y hay un tercer eje que ningún interruptor puede ver: el enrutador.** El estado 5 de la tabla de
+estados —la IA respondió y el clasificador no corrió— no lo anuncia ningún interruptor; sólo
+`intent=unclassified`. Así que el badge cubre la disponibilidad *antes* y ese estado cubre la
+degradación *durante*: **son dos avisos, no uno.**
+
+---
+
+## 10.5 · Latencia: el número que decide si esto se usa
+
+```
+M1, ruta `both`, extremo a extremo:
+  enrutador gpt-4o        ~2.000 ms   (timeout_s=2.0, DEFERRED_TASKS)
++ embedding + vector + léxico
++ recuperación de corpus
++ generación gpt-4o-mini   p50 2.277 · p95 2.739 · máx 10.082 ms   (C30b)
++ ¿pasada de reparación?    una segunda llamada  (MAX_PROVIDER_CALLS = 3)
++ hidratación .NET
+──────────────────────────────────────────────────────────────────
+  presupuesto:  AssistTimeoutMs = 10.000, MinimumAssistTimeoutMs = 8.000
+                                          ↑ ya está en su techo documentado
+```
+
+**El dato que hay que poner al lado de los 2,7 s de p50 del §2:** C34 midió **p95 7,1 s · máx
+7,9 s** extremo a extremo por .NET **para los modos anclados, que no llaman al enrutador**. M1 le
+suma ~2 s. El p95 de M1 se sienta plausiblemente en **~9 s contra un presupuesto de 10**, y el
+presupuesto no se puede subir: diez segundos es el máximo declarado y ocho el mínimo validado al
+arranque.
+
+Los 2,7 s del §2 son de Python directo y con muestra pequeña. **No son el número del mostrador.**
+
+Tres consecuencias:
+
+1. **El toggle es la mitigación, y ahora tiene cifras.** D3 dice «un matiz que la interfaz debe
+   decir»; el matiz es **2.500 ms contra 10.000 ms** de presupuesto y **30/min contra 10/min** de
+   cupo. Un 4× de reloj y un 3× de cupo.
+2. **Un spinner indiferenciado de siete segundos con un cliente delante es donde esta función se
+   abandona.** Recomendación: la versión barata —esqueleto más una línea de expectativa— y
+   **dejar el *streaming* / SSE explícitamente fuera de C40**, porque es una capa arquitectónica
+   entera y no un detalle de presentación.
+3. **Medirlo es tarea de C40, no de C38:** p50 y p95 extremo a extremo por .NET sobre las mismas 42
+   consultas, como hizo C34. Es una pasada, no un desarrollo.
+
+---
+
+## 10.6 · D9 confirmada, con el mecanismo elegido y un requisito que faltaba
+
+**Primero, una corrección que desactiva el riesgo que D9 se atribuía.** El conjunto dorado **no
+contiene consultas filtradas**. Así que **ninguna cifra publicada se mueve** con ninguna de las
+variantes: ni la tasa del 10 %, ni «2 de 20 fuera de dominio y 0 de 43 contestables». La diferencia
+aparece sólo en consultas filtradas, que la calibración nunca vio. El argumento de D9 —*«moverlo
+restaura la calibración»*— es cierto y, a la vez, **no observable sobre el conjunto dorado**. Eso
+baja mucho el riesgo de tocarlo, en las dos direcciones.
+
+### D17 · La abstención lee una sonda sin filtro, ejecutada sólo cuando hay filtros (cerrada)
+
+Una segunda sentencia vectorial sin filtros, **reutilizando el embedding ya calculado** — no hay
+segunda llamada al proveedor. Secuencial y no concurrente, para respetar la propiedad *«one pool
+connection held at any moment (D10)»*. **Sin filtros las dos sentencias son idénticas, así que la
+segunda se salta**: el coste se paga sólo cuando el operario ha filtrado, que es la minoría.
+
+```
+            ┌─ perfil SIN FILTRO plano ──▶ «No tengo nada que encaje con lo que describes»
+sonda sin   │                              (el filtro es irrelevante)
+filtro  ────┤
+            └─ perfil con pico ──┬─ conjunto filtrado poblado ──▶ resultados + argumentario
+                                 └─ conjunto filtrado escaso ──▶ «Hay piezas que encajan con tu
+                                                                  descripción, pero ninguna es
+                                                                  una diadema de oro»
+```
+
+**El coste no estorba** y el módulo de filtros ya lo midió: *«At 1.168 rows a hard filter saves no
+time»*, o sea que el escaneo extra es de un dígito de milisegundos sobre las mismas 1.168 filas.
+
+**Alternativas consideradas:**
+
+| Alternativa | Por qué no |
+|---|---|
+| **Una sola sentencia sin filtro y filtrar en Python** | Convierte el prefiltro en **post-filtro**, que es lo que el H2 alaba y lo que los apuntes de S9 advierten en seco: *«El riesgo de post-filtering es perder recall cuando el filtro es muy selectivo»*. Medido aquí: `tipo=diadema` da **7 candidatos sobre el índice entero**, así que post-filtrar una ventana sin filtro de 30 daría casi ninguna diadema. Destriparía en silencio los filtros estrechos. **Descartarla es lo que hace necesaria la segunda sentencia** |
+| **No mover la abstención; añadir sólo una señal de «filtro estrecho»** | Mucho más barato —un contador y una rama— y **no toca la regla calibrada**. Se descarta por una razón concreta: el mensaje *«hay piezas que encajan, pero ninguna es una diadema de oro»* **presupone que las piezas sin filtrar encajan**, y sin la sonda no se puede afirmar. Con una consulta incontestable y un filtro estrecho, **escribiría una frase falsa.** Con la sonda, el perfil sin filtro decide primero cuál de las dos frases se ha ganado |
+
+**Y un requisito que nadie había escrito y que esta forma obliga a escribir.** La spec de
+`retrieval-abstention` dice que la regla *«runs after the fusion and does not alter the candidate
+set, which is what lets the calibration re-score persisted windows»*. Si el insumo de la regla pasa
+a ser una lista de distancias **distinta** de la ventana persistida, `--rescore` deja de poder
+recalcular la decisión **en las pasadas filtradas**. En las sin filtrar —todo el conjunto dorado—
+nada cambia. Así que la spec tiene que decir dos cosas: **que la sonda es sin filtro y por qué**, y
+**que sus distancias se persisten** si alguna vez va a re-puntuarse una pasada filtrada.
+
+**Y el argumento de encaje que D9 no usaba y es el mejor que tiene:** la gravedad de esto **la crea
+M1**. Antes de M1, un filtro estrecho enseñaba siete piezas mediocres. Con M1, enseña siete piezas
+mediocres **y escribe un párrafo hablando bien de ellas**. Eso convierte a D9 en trabajo de C40 y no
+en un change aparte, aunque toque una spec viva con tres consumidores — el panel, los sustitutos y
+la tool `buscar_catalogo` del agente.
+
+---
+
+## 10.7 · Q3 se corrige: `route=none` son dos estados, y uno se arregla en el enrutado
+
+El detalle está en [c40-m1-panel-states.md](c40-m1-panel-states.md) §1 y §4. El resumen:
+
+**`route=none` no es un estado, son dos**, y sólo `intent` los separa:
+
+| `intent` | Qué pasó | Copia correcta |
+|---|---|---|
+| `in_domain` | el clasificador corrió y **se contradijo**: devolvió `in_domain` con `index` nulo | «No he acabado de entender la consulta; prueba a formularla de otra manera» |
+| `unclassified` | el clasificador **no corrió** — sin credencial, *timeout* de 2 s sin reintento, o respuesta no parseable | «El argumentario no está disponible ahora mismo» — **y no se le pide reformular** |
+
+**Pedirle al operario que reformule en el segundo caso es echarle la culpa de una credencial
+ausente**, que es la avería del §1 con otro disfraz. Las cinco consultas medidas en el H7 eran todas
+del primer tipo (`router_degraded=False`), así que la copia de Q3 es correcta **para lo que midió**;
+el otro camino existe y es el que dispara en un despliegue sin la credencial del enrutador.
+
+**Y el primero admite un arreglo mejor que la copia: coerción a `both`** cuando el veredicto es
+`in_domain`, `missing_axis` es nulo e `index` es nulo.
+
+- El esquema dice de `index`: *«Null cuando **no se atiende**»*. Un veredicto `in_domain` **es**
+  atender, así que la respuesta es internamente contradictoria y el código no puede saber a cuál de
+  las dos mitades creer.
+- **Los datos que la tarea necesita ya se están recuperando**: con `route=None` el *fail-open*
+  consulta las dos ramas, recupera quince piezas y hasta cinco fragmentos, **y después tira la
+  capacidad de escribir sobre ellos**. Es el trabajo tirado que la regla del §5 condena, dentro del
+  servicio.
+- Elimina el **11,9 %** de un estado degenerado en lugar de documentarlo, y es más fiel a la propia
+  regla de desempate del prompt del enrutador: *«Ante la duda, `in_domain`»*.
+- **La contradicción sigue siendo observable**: una causa propia en el registro
+  (`router_index_absent`) y su recuento, sin tocar la respuesta.
+
+**Alternativa descartada: un `model_validator` que rechace la combinación.** Haría fallar el parseo
+→ *fail-open* → **el estado con la peor copia posible**. Mueve el 11,9 %, no lo arregla.
+
+---
+
+## 10.8 · Dos contradicciones internas de este informe, resueltas
+
+1. **D8 se come los dos códigos de rechazo.** D8 dice *«los avisos no se pintan en el listado»*
+   porque `warnings` describe una sola pieza. Pero `routing.refusal_codes` **se apila en esa misma
+   lista** (`orchestrator.py:387`), así que D8 aplicado literalmente suprimiría
+   `query_out_of_domain` y `query_not_in_catalogue`, que son justo los dos para los que §15.13
+   obliga a escribir castellano. **La partición correcta es por sujeto del aviso:**
+
+   | Sujeto | Códigos | En M1 |
+   |---|---|---|
+   | **una pieza** | `family_has_variants`, `size_label_missing`, y los dos de stock que apila .NET | **no se pintan** — D8, y sigue siendo correcto |
+   | **la consulta** | `query_out_of_domain`, `query_not_in_catalogue`, `knowledge_not_covered`, y el nuevo `filters_too_narrow` | **sí se pintan** |
+
+2. **El toggle no es un A/B test, y conviene no decir que lo es.** D3 dice que el toggle *«es la
+   ablación, en pantalla»*. Lo elige el usuario y no un reparto de tráfico, así que sus dos
+   poblaciones están sesgadas por quién elige qué: es una **demostración** de la ablación, no una
+   medición. Lo que la convierte en medición es el cuarto valor de `SearchOrigin` (D15) más la
+   telemetría de búsqueda que ya existe desde C04. **C39 debe decirlo así y no de más**, que es
+   exactamente lo que S16 separa entre optimizar y demostrar que no has roto nada.
+
+---
+
+## 10.9 · Encaje con los apuntes del máster
+
+| Nota | Qué respalda, y qué matiza |
+|---|---|
+| **S4 · De interfaz conversacional a interfaz de producto** | El respaldo más fuerte a D1 y D3. El panel no es un chat: es **«chat con parámetros»** —consulta, chips, selector de modo—, el mismo cuadrante que Perplexity con su selector *Search / Academic*. *«La información sobre qué pedir se puede hornear en la interfaz»* es literalmente D4, las consultas de ejemplo y los chips. Y *«¿dónde vive el prompt?»* ya está bien resuelto aquí: vive versionado en el backend, no en el textarea — que es precisamente lo que permite el `v5` de D11 |
+| **S9 · Retrieval que no es sólo cosine** | Es el que **descarta el post-filtrado** de D17, con su propia frase. Y da el marco que faltaba: aquí los filtros van de baja selectividad (`pendientes`: 30 de 30) a alta (`diadema`: 7 de todo el índice). **Ni pre ni post sirven para todos**, de ahí la sonda separada |
+| **S16 · Un sistema debe saber decir «No lo sé»** | Los tres caminos —responder, **abstenerse con honestidad** (*safe-completion*: «no puedo, y esto es lo que haría falta»), escalar a un humano— son la tabla de estados. El estado del filtro estrecho y el `route=none` son *safe-completion* de libro: **dicen qué haría falta** (quita el filtro, reformula). Y su tesis central —*«un guardrail es código, no una frase en el prompt»*— es la segunda mitad de D11 |
+| **S11 · Citación y atribución verificable** | Respalda Q2 y el H6 |
+| **S16 · Coste, latencia y A/B testing** | **Matiza D3**, y está en el §10.8 |
+
+---
+
+## 10.10 · La línea de corte, revisada
+
+Sustituye a la del §4. El criterio de ordenación no cambia —*cuánto engaña hoy la pantalla*— y lo
+que cambia es qué cae en cada tramo.
+
+```
+┌─ TRAMO 1 ─ lo que hoy miente en silencio · sólo .NET + frontend · archivable solo ────┐
+│ D5   filtros en la ruta degradada  (JOIN + 2 AND — PieceType 97,7 %)                  │
+│ D4   badge — CUATRO estados, no dos                                    ← D16          │
+│      └── ruta de lectura nueva de los dos interruptores por POS. Sin IA ← NUEVO       │
+│ L3   degraded_reason (6 valores) al DTO → cierra la limitación 3 de C34               │
+│ D15  SearchOrigin = 4 → la ablación pasa a ser SQL. Sin migración       ← NUEVO       │
+├─ TRAMO 2 ─ el contrato se mueve · y con tres prerrequisitos que no estaban ───────────┤
+│ D2   filters en AssistRequest + openapi.json + AiAssistSaleRequest + stub              │
+│ D11  assist/v5 · las tareas libres no hablan de precio ni disponibilidad ← PRERREQ.   │
+│      + causa dura placeholder_in_free_query (product_id null)           ← PRERREQ.    │
+│      + retirar el guard de AiGatewayClient:671, con su motivo resuelto   ← PRERREQ.    │
+│ D12  uncovered en M1 + cuarta tarea «consulta libre sin cobertura»       ← NUEVO       │
+│ D14  segundo endpoint .NET, con su interruptor, límite, presupuesto y circuito         │
+│ D3   el toggle · §15.13 castellano de los dos rechazos                                 │
+│ ★    LA TABLA DE ESTADOS, antes de una línea de código                  ← NUEVO       │
+│ ★    medición de latencia p50/p95 extremo a extremo por .NET, 42 consultas ← NUEVO     │
+├─ TRAMO 3 ─ toca retrieval-abstention, spec viva con tres consumidores ────────────────┤
+│ D17  sonda sin filtro, sólo cuando hay filtros · los dos mensajes                      │
+│      + requisito de persistencia para --rescore                         ← NUEVO       │
+│      + filters_too_narrow como código del vocabulario cerrado           ← NUEVO       │
+│ Q3′  route=none son dos estados · coerción a both · router_index_absent  ← CORREGIDO   │
+│      + clarification_question, que en M1 SÍ llega                       ← NUEVO       │
+├─ TRAMO 4 ─ D6 «todos los POS» — frontera de autorización ─────────────────────────────┤
+│ D13  tercera clase de ámbito + tercer perfil de claims + tests de rechazo              │
+│ D7   la etiqueta nombra la tienda · ficha deshabilitada sin tienda                     │
+├─ TRAMO 5 ─ D10 la fila enseña su grupo ──────────────────────────────────────────────┤
+├─ TRAMO 6 ─ embudo de observabilidad para administrador ──────────────────────────────┘
+```
+
+**Los dos movimientos que importan:**
+
+1. **El tramo 2 crece con tres prerrequisitos.** Sin ellos no entrega un panel asistido: entrega un
+   panel asistido sin prosa.
+2. **D6 sube de «decisión de producto» a «frontera de autorización»**, lo que lo convierte en el
+   mejor candidato a salir si la sesión aprieta — **por delante del embudo**, porque el embudo no
+   arriesga nada y esto sí. La variante conservadora, si sale a medias, es sólo administrador.
+
+Los tramos que no entren **se declaran aplazados con su motivo**, no se callan.
+
+---
+
+## 10.11 · Dos cosas de planificación
+
+1. **C40 nace en el plan maestro con esta pasada.** Hasta hoy el plan llegaba a C39 y C40 sólo
+   existía en este informe.
+2. **El orden C38 ↔ C40 importa, y nadie lo había decidido.** C40 sube el prompt a `assist/v5` y
+   mueve la fase de la abstención. Si C38 corriera primero, **sus cifras del modo libre describirían
+   un prompt que C40 sustituye** y una fase de abstención que C40 mueve. **C40 va antes de C38**, y
+   C38 mide `v5`. Queda anotado en las dos fichas.
+
+---
+
+## 10.12 · Lo que sigue sin medir después de esta pasada
+
+No son preguntas abiertas de diseño: son cifras que la implementación tiene que publicar.
+
+| # | Qué | Por qué importa |
+|---|---|---|
+| **B1** | **Marcadores en el argumentario de M1**, antes y después de `v5` | Decide si M1 tiene prosa. Es la cifra que F1 deja al descubierto y que no existe |
+| **B2** | Reparto de los 16 estados sobre las 42 consultas | Es la única forma de saber cuál de las copias nuevas se va a ver y cuál casi nunca |
+| **B3** | Latencia p50/p95 de M1 **extremo a extremo por .NET** | Los 2,7 s del §2 son de Python directo. El presupuesto está en su techo |
+| **B4** | Tasa de `router_index_absent` tras la coerción a `both` | Convierte un estado degenerado del 11,9 % en una cifra de calidad del clasificador |
+| **B5** | Efecto de la sonda sin filtro sobre la latencia de una búsqueda filtrada | El módulo de filtros predice un dígito de milisegundos. Conviene confirmarlo y no citarlo |
+
+Y una nota de higiene: **la pasada de 42 consultas del H6 no quedó persistida** en
+`ai-service/evals/results/` — no hay ningún `c40-*.json`. Sus cifras son reproducibles pero no
+re-puntuables. La pasada de verificación de C40 sí debe persistirse con `run_id`, `git_sha` y
+`prompt_version`, como hicieron C30b, C31 y C32b.

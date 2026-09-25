@@ -22,7 +22,7 @@ import { productService } from '@/services/product.service';
 import type { AssistedSearchResponse, AssistedSearchResult } from '@/types/ai-search.types';
 
 vi.mock('@/services/ai-search.service', () => ({
-  aiSearchService: { search: vi.fn(), reportSelection: vi.fn() },
+  aiSearchService: { search: vi.fn(), getAvailability: vi.fn(), reportSelection: vi.fn() },
 }));
 
 vi.mock('@/services/point-of-sale.service', () => ({
@@ -94,6 +94,17 @@ function response(overrides: Partial<AssistedSearchResponse> = {}): AssistedSear
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(pointOfSaleService.getPointsOfSale).mockResolvedValue([POS_ONE]);
+  // The panel reads the switches before any search. Without this the effect rejects and the
+  // page never settles, which looks like a routing failure and is not one.
+  vi.mocked(aiSearchService.getAvailability).mockResolvedValue({
+    kind: 'ok',
+    availability: {
+      pointOfSaleId: 'pos-1',
+      semanticSearchAvailable: true,
+      assistedAnswerAvailable: true,
+      assistedAnswerUnavailableReason: null,
+    },
+  });
   vi.mocked(aiSearchService.reportSelection).mockResolvedValue(undefined);
   vi.mocked(aiSearchService.search).mockResolvedValue({ kind: 'ok', response: response() });
 });

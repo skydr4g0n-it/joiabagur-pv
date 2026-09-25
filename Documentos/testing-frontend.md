@@ -319,6 +319,32 @@ describe('ProductCard', () => {
 > Lo que se mantuvo idéntico en las dos mediciones: **cero nombres nuevos**. Detalle en
 > `Documentos/Proyecto Final AIEng/informes/c36-implementation-measurements.md` §2.1.
 
+> **Actualización del 2026-09-24, sobre `c40-add-frontend-free-query-panel`.** La suite tiene ahora
+> **833 tests** —834 tras los arreglos de su verificación—: C40 añade **104**. La línea base dio
+> **113 fallos de 729 en 14 de 54 ficheros**; al cierre, **113 de 833 en 14 de 57**, con el conjunto
+> de nombres **idéntico** y el diff vacío. Los 104 tests nuevos están los 104 en verde.
+>
+> **Y no es un test dependiente del orden, son al menos tres ficheros.** La entrada anterior cerraba
+> con `family-review.test.tsx` como el único caso conocido. C40 midió dos pasadas del **mismo
+> commit** minutos aparte, a **113 y 114**, y el nombre discrepante fue un tercer fichero:
+> `pages/sales/__tests__/scan.test.tsx :: ScanningPage should show manual SKU input fallback after
+> initialization`, que **no había fallado en ninguna de las siete pasadas anteriores del change** y
+> **pasa cuando el fichero se corre solo**. No toca nada de C40 —cero referencias a `ai-search`,
+> `assisted` o `warnings`—. Su vecino del mismo fichero, `should render loading state initially`, es
+> rojo en la línea base y **sigue rojo**, así que el fichero aporta un fallo fijo y uno oscilante.
+>
+> **El conjunto rotatorio conocido es, por tanto, `family-review.test.tsx`, `assist.test.tsx` y
+> `scan.test.tsx`** — la tabla de inventario de más abajo los lista, pero como fallos sin más; lo que
+> esta entrada añade es que **oscilan**. Y con ello el criterio útil deja de ser el del frontend y pasa
+> a ser el del backend, que es el mismo en los dos árboles: **si el nombre discrepante cae en un
+> fichero que ya estaba rojo y tu propia área está limpia, no es tuyo.** Un nombre nuevo en un fichero
+> que tú tocas es una regresión; uno más en `scan.test.tsx` es martes.
+>
+> **La verificación de C40 lo reprodujo dos veces más** (2026-09-25), antes y después de sus arreglos:
+> **113 de 833** y **113 de 834**, los mismos 14 ficheros las dos veces, y los **nueve** ficheros de
+> test que C40 añade o toca en verde. Detalle en
+> `Documentos/Proyecto Final AIEng/informes/c40-implementation-measurements.md` §10 y §14.3.
+
 > **Re-medido el 2026-09-13, al cerrar C28: 595 tests, 113 fallos, en 14 de 48 ficheros.** La suite
 > ha crecido 113 tests en dos semanas y el rojo **no ha crecido con ella**: cae de 118 a 113 y de 17
 > ficheros a 14. La proporción pasa del 24 % al 19 %. El conjunto de nombres fallidos de C28 fue

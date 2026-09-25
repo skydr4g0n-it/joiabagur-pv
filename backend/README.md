@@ -299,27 +299,48 @@ requested point of sale.
 - **Rate limits** — `sales-assist` has its own per-user policy (`AiSalesAssistRateLimit`, 10 per
   minute); `substitutes` calls no model and uses the search policy.
 
-> **Both AI features are OFF by default, and neither switch appears in any `appsettings`.** This
-> cost a whole session the first time somebody tried the card of C36 on a fresh checkout, so it is
-> written here rather than left to be rediscovered.
+> **The three AI features are OFF by default, and not one of the switches appears in any
+> `appsettings`.** This cost a whole session the first time somebody tried the card of C36 on a
+> fresh checkout, so it is written here rather than left to be rediscovered.
 >
-> | Switch | Default | Symptom when off |
-> |---|---|---|
-> | `AiSalesAssist:EnabledByDefault` | `false` | The card answers 200 with `aiAvailable: false` and «El asistente no está disponible» |
-> | `AiSearch:EnabledByDefault` | `false` | The panel falls to the lexical path and says «Búsqueda asistida no disponible» |
+> | Switch | Default | Symptom when off | Announced before use? |
+> |---|---|---|---|
+> | `AiSearch:EnabledByDefault` | `false` | The panel falls to the lexical path; the badge reads «Búsqueda por texto» and the result rows carry the degraded origin | **Yes**, since C40 |
+> | `AiSalesAssist:EnabledByDefault` | `false` | The card answers 200 with `aiAvailable: false` and «El asistente no está disponible»; `substitutes` answers `ai_unavailable` | **No** — only by opening a card |
+> | `AiFreeQuerySearch:EnabledByDefault` | `false` | The assisted option of the route toggle is **disabled with its reason beside it** — «La respuesta asistida está desactivada en esta tienda» — and `GET /api/ai/search/availability` answers `assistedAnswerAvailable: false`, `switched_off` | **Yes**, since C40 |
 >
-> Both are documented in their own options class — *«Defaults to false, so enabling a shop is an
-> explicit act»* — and that default is right for production. What is missing is any mention where
-> somebody starting the API would read it. With the card's switch off, `SalesAssistService`
-> **never calls the AI service** (`degradedReason = "switched_off"`), so the screen degrades
-> correctly and looks exactly like an outage.
+> All three are documented in their own options class — *«Defaults to false, so enabling a shop is
+> an explicit act»* — and that default is right for production. What was missing is any mention
+> where somebody starting the API would read it.
+>
+> **The fourth column is the whole point, and it is why C40 exists.** `aiAvailable` travels
+> *inside* a search response, so until C40 the only way to learn that a path was switched off was
+> to use it: the screen presented a capability that was off as though it were on, and nothing said
+> otherwise. That is how assisted search served from its degraded path for the whole project
+> without anybody noticing. `GET /api/ai/search/availability` is the read that closes it, and it costs
+> no quota and makes no call to `jbg-ai` — only the switch can be known without calling, so an
+> outage or a rejected credential is still discovered by making a request.
+>
+> **The sale card still has no pre-flight read.** With its switch off `SalesAssistService` never
+> calls the AI service (`degradedReason = "switched_off"`), the card degrades correctly, and it
+> looks exactly like an outage. Check this switch before diagnosing one.
+>
+> **The assisted answer needs two switches on, not one, and the two endpoints do not agree on
+> which.** `GET availability` reports it available only when `AiFreeQuerySearch` **and**
+> `AiSalesAssist` are both enabled for that point of sale — the generative half of the answer is
+> the card's feature and carries the card's cost profile. `POST /api/ai/search/assisted` checks
+> only `AiFreeQuerySearch`. So enabling the free-query switch alone leaves an endpoint that
+> answers perfectly and an assisted option the operator cannot press, reported as
+> `switched_off`: accurate, but it names neither of the two switches, and the one actually
+> missing is the card's. Check both before concluding the configuration was ignored.
 >
 > Turn them on for a local session without touching a tracked file:
 >
 > ```powershell
 > cd backend\src\JoiabagurPV.API
-> $env:AiSalesAssist__EnabledByDefault = "true"
 > $env:AiSearch__EnabledByDefault = "true"
+> $env:AiSalesAssist__EnabledByDefault = "true"
+> $env:AiFreeQuerySearch__EnabledByDefault = "true"
 > dotnet run
 > ```
 >
@@ -646,6 +667,11 @@ OpenAPI documentation is served with Scalar (not Swagger UI) at `/scalar/v1` whe
 | `AiSalesAssist__SubstitutesCandidateWindow` | `top_k` sent for substitutes (1–50). 20 reaches the service's cap of 60 candidates | 20 |
 | `AiSalesAssist__SubstitutesDefaultPageSize` / `AiSalesAssist__SubstitutesMaxPageSize` | Substitutes page when none is asked for, and the largest a caller may ask for | 5 / 20 |
 | `AiSalesAssist__RateLimitPermitLimit` / `AiSalesAssist__RateLimitWindowSeconds` | Sale assistance requests one user may issue per window | 10 / 60 |
+| `AiFreeQuerySearch__EnabledPointOfSaleIds__0`, `__1`, … | Points of sale where the route toggle offers the assisted answer. Reloaded without a redeploy | Empty |
+| `AiFreeQuerySearch__EnabledByDefault` | Whether points of sale absent from that list are offered it. **`GET availability` also requires `AiSalesAssist`**; this one alone is not enough to make the toggle appear | false |
+| `AiFreeQuerySearch__RateLimitPermitLimit` / `AiFreeQuerySearch__RateLimitWindowSeconds` | Free-query searches one user may issue per window. Its **own** allowance, not the card's: the card is opened once per piece and the panel is used in bursts, so a shared quota would leave whichever one the operator reached second unable to work, with no way to know why. The figure is stated on screen before the operator presses, so it is part of the interface | 10 / 60 |
+| `AiFreeQuerySearch__CandidateWindow` | Families requested from `jbg-ai`, which is the over-retrieval dial. 5 is what the frozen contract caps `top_k` at on the assist route; more is refused by the contract | 5 |
+| `AiFreeQuerySearch__DefaultPageSize` / `AiFreeQuerySearch__MaxPageSize` | Groups shown when none is asked for, and the largest a caller may ask for | 5 / 20 |
 
 `AiGateway` is validated at start-up, not on first use: if the base address is missing or is not an absolute http/https URI, or the secret is absent or shorter than 32 characters, **the API does not start** and the error names the offending key. That is deliberate — a mismatched secret makes `jbg-ai` answer 401 without disclosing why, so the fault is caught at boot instead of during a request. Set `AiGateway__Enabled=false` to skip registering the client altogether.
 
@@ -654,6 +680,8 @@ OpenAPI documentation is served with Scalar (not Swagger UI) at `/scalar/v1` whe
 `AiSearch` is also validated at start-up, and its list of enabled points of sale is read through `IOptionsMonitor` so a shop can be switched on or off without a redeploy — which is the whole reason the switch lives in configuration instead of in a column on `PointOfSale`. It holds no secret, so nothing of it goes to SSM. The default is **not enabled**: turning assisted search on for a shop is an explicit act.
 
 `AiSalesAssist` works the same way, and is a separate switch on purpose: the sale card is its own feature with a generative route and a cost profile search does not have. Switched off, `sales-assist` still answers — with the degraded card read from the catalog — and `substitutes` answers `ai_unavailable`, without calling the AI; the log line says `degraded_reason=switched_off` / `reason=switched_off`, so the switch is never mistaken for an outage.
+
+`AiFreeQuerySearch` is the third, and it is a section of its own for a mechanical reason rather than a tidy one: **a rate limit is an attribute of an endpoint in ASP.NET**, so serving the assisted answer as a mode of `POST /api/ai/search` would force both to share one allowance — 30/min lets an operator burn thirty generations, 10/min strangles the cheap path — and the time budget has the same problem. That is why there are two endpoints rather than one with a `mode` field. Switched off, `POST /api/ai/search/assisted` **costs no call and no quota**: it records `degradedReason = "switched_off"` and the log line `stage=free_query_search … ai_available=False degraded_reason=switched_off` says so. Its start-up validation refuses a `DefaultPageSize` above `MaxPageSize`, and a `CandidateWindow` below `DefaultPageSize` — the window is what the hydrator draws a page from, so a smaller one can never fill it. Both are refused at boot rather than clamped at request time, because a clamp would make the misconfiguration permanent and invisible.
 
 `POST /api/sales` and each line of `POST /api/sales/bulk` accept an optional `searchEventId`, which attributes the sale to the assisted search it came from and closes the loop that `POST /api/ai/search` opens. The identifier is only stored once the event is verified to exist **and to belong to the user making the sale** — the same ownership rule the selection endpoint applies, and for the same reason. Anything unusable degrades to no attribution: never a validation error, never a failed sale, and nothing else about the sale changes. The check is explicit rather than delegated to the foreign key, whose declared delete behaviour governs deletion of the event and would, on an insert carrying an unknown identifier, abort the whole transaction instead of degrading.
 

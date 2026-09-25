@@ -375,6 +375,44 @@ Sobre los dos primeros conviene una precisión que ahorra tests engañosos. Al p
 > El detalle está en
 > `Documentos/Proyecto Final AIEng/informes/c28-implementation-measurements.md`.
 
+> **Actualización del 2026-09-24, sobre `c40-add-frontend-free-query-panel`.** La suite tiene ahora
+> **1.328 tests**: C40 añade **87**. La línea base dio **50 fallos de 1.241**; al cierre, **47 de
+> 1.328**. **Cero fallos en el área del change** —`AiCallScope`, `AiGateway`, `FreeQuerySearch`,
+> `AssistedSearch`, `SalesAssist`, `Substitutes`, `ProductSearchEvent` y `AiContract`—, comprobado
+> con cuatro pasadas dirigidas a lo largo del change y una más en la verificación, con 410 de 410.
+>
+> **Y ésta es la medición que convierte «compara nombres» en un criterio utilizable**, porque pone
+> número a la rotación que las entradas anteriores describían de oído. Dos pasadas completas del
+> **mismo commit** `93115cf`, mismo árbol, **sin recompilar entre medias**:
+>
+> | | Pasada 1 | Pasada 2 |
+> |---|---|---|
+> | Con error | **50** | **51** |
+> | Total | 1.241 | 1.241 |
+> | Duración | 8 m 58 s | 8 m 1 s |
+>
+> Comparadas **por nombre**: **43 estables**, **8 que aparecen sólo en la segunda**, **7 que
+> desaparecen tras la primera** — **rotación total de quince nombres**. Y el dato que la hace
+> utilizable: **los quince están confinados a dos clases**, 14 en `InventoryIntegrationTests` y 1 en
+> `ReturnsControllerTests`. **Cero rotación fuera de ellas.** `PaymentMethodsControllerTests`, la
+> tercera del trío histórico, no rotó ese día pero mantiene su fallo fijo.
+>
+> **Cómo se lee el DoD con esta tabla al lado.** El criterio literal «cero nombres desaparecidos y
+> cero nuevos en rojo» **no es alcanzable** en este backend, y exigirlo lleva a perseguir ruido. La
+> lectura correcta es: **los nombres que difieran deben caer dentro de las clases inestables
+> conocidas, y ninguno en una clase que el change toque.** El único nombre nuevo del cierre de C40 es
+> `InventoryIntegrationTests.Operator_ViewStock_ForAssignedPOS_ShouldSucceed`, dentro de ellas.
+>
+> **La regla de la duración volvió a morder, y de otra forma.** La primera pasada del grupo de cierre
+> dio **484 fallos de 1.328 en 2 minutos**, contra 47 en 20. No era una regresión: eran
+> `System.TimeoutException` en masa, porque se lanzaron **las tres suites a la vez** y además una
+> reconstrucción de la imagen de `jbg-ai`, y Testcontainers no pudo levantar sus contenedores.
+> Confirma la regla de la entrada anterior y le añade una causa: **no sólo «mira la duración», sino
+> corre la suite del backend en solitario**, sin otra suite ni un build de imagen en paralelo.
+>
+> El detalle está en
+> `Documentos/Proyecto Final AIEng/informes/c40-implementation-measurements.md` §1 y §14.3.
+
 ### Por qué se acumularon sin que nadie los viera
 
 Los dos árboles se comportan de forma muy distinta, y esa es la clave:

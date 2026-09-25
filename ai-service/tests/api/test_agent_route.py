@@ -383,7 +383,7 @@ def test_the_deterministic_route_answers_exactly_what_it_answered_before(
     for added in ("partial", "stop_reason", "iterations", "tool_calls_used", "trace"):
         assert added not in body
     assert "calls" not in body["usage"], "the shared usage object did not grow a field"
-    assert body["prompt_version"] == PROMPT_VERSION == "assist/v3"
+    assert body["prompt_version"] == PROMPT_VERSION == "assist/v5"
     assert MAX_PROVIDER_CALLS == 3, "the deterministic ceiling is the one C31 published"
 
 
@@ -398,17 +398,42 @@ def test_the_published_contract_moved_by_addition_only(
     route or to one of its new models — an addition somewhere else would be a change to an
     existing surface wearing the clothes of an addition.
 
-    **The «before» is a fixture**: `fixtures/openapi-c32a-baseline.json`, the committed snapshot
-    as C32a left it (git blob `dd8df91d…`; `43f70fda…` in a Windows checkout with CRLF). Until
-    the independent verification of C32b this test compared the committed snapshot against the
-    generated one — which is `test_openapi_snapshot_is_stable` again — and would have passed
-    over a removed field once the snapshot was regenerated. Reading the baseline from git
-    instead would tie the suite to the history being present, which a shallow clone or a
-    container does not guarantee. **The next change that moves the contract replaces this
-    fixture and the allowed additions below, deliberately.**
+    **The «before» is a fixture**: `fixtures/openapi-c40-baseline.json`, the committed snapshot
+    as it stood at `93115cf`, before C40 moved it (`sha256 d8d48f87…`). Until the independent
+    verification of C32b this test compared the committed snapshot against the generated one —
+    which is `test_openapi_snapshot_is_stable` again — and would have passed over a removed
+    field once the snapshot was regenerated. Reading the baseline from git instead would tie the
+    suite to the history being present, which a shallow clone or a container does not guarantee.
+    **The next change that moves the contract replaces this fixture and the allowed additions
+    below, deliberately.**
+
+    **C40 is that next change**, and it replaced the C32a fixture this test used to carry. It
+    moves the contract twice, and both moves are the smallest kind it admits.
+
+    **Group 2 · `AssistRequest.filters`.** The model it points at, `RetrievalFilters`, was
+    already published, so the difference is two leaves and no new schema.
+
+    **Group 10 · `RetrievalResponse.warnings`.** A list of closed codes, defaulting to empty,
+    so a client that ignores it gets exactly the response it got before. It is on the
+    retrieval response and not only on the assist one because the decision behind
+    `filters_too_narrow` belongs to retrieval, and every path that accepts catalog-side
+    filters can reach it.
+
+    Measured over the whole document **with the walk below**: 1289 leaves at the C40 baseline,
+    1295 now, **0 removed and 0 retyped**. Two leaves changed in value and both are
+    `description` prose: the vocabulary the assist warnings enumerate gained a sixth code. They
+    are named one by one below rather than waved through by rule, so a third changed leaf still
+    fails here.
+
+    **«Leaf» is not one concept, so the walk is named.** `_walk` never emits an empty container —
+    an empty dict does not reach its `else` — so the eleven empty `security[0].HTTPBearer`
+    objects are not leaves here. A counter that emitted them would report 1300 and 1306, which
+    is where those two figures in the C40 report come from. Both definitions are correct and the
+    deltas agree in both; the absolute figures do not, so the two assertions below pin the ones
+    this walk produces rather than leaving them to prose that nobody recounts.
     """
     baseline = json.loads(
-        (Path(__file__).parent / "fixtures" / "openapi-c32a-baseline.json").read_text(
+        (Path(__file__).parent / "fixtures" / "openapi-c40-baseline.json").read_text(
             encoding="utf-8"
         )
     )
@@ -420,29 +445,50 @@ def test_the_published_contract_moved_by_addition_only(
     before = dict(_walk(baseline))
     after = dict(_walk(committed))
 
+    # Pinned, so the figures in the docstring and in the C40 report cannot drift from what this
+    # walk actually counts. A change here is a real movement of the contract's size and should be
+    # read as one, not corrected silently.
+    assert len(before) == 1289, len(before)
+    assert len(after) == 1295, len(after)
+
     assert after == dict(_walk(generated)), "the committed snapshot is the one the app generates"
 
     removed = sorted(set(before) - set(after))
     changed = sorted(path for path in set(before) & set(after) if before[path] != after[path])
     added = sorted(set(after) - set(before))
-    new_models = (
-        "AgentAssistRequest",
-        "AgentAssistResponse",
-        "AgentTraceIteration",
-        "AgentTraceTool",
-        "AgentTurn",
-        "AgentUsage",
-    )
-    allowed = ("$.paths./v1/assist/agent.",) + tuple(
-        f"$.components.schemas.{name}." for name in new_models
+
+    # No new route and no new schema in either move: `RetrievalFilters` was already published
+    # for the retrieval and substitutes requests, and `warnings` is a list of strings.
+    allowed = (
+        "$.components.schemas.AssistRequest.properties.filters.",
+        "$.components.schemas.RetrievalResponse.properties.warnings.",
     )
 
+    # The only leaves whose VALUE may differ, named individually. Both are prose a human
+    # reads and no client parses — the enumeration of the warning vocabulary, which gained
+    # `filters_too_narrow`. Naming them keeps the guard's teeth: any other changed leaf, and
+    # in particular any changed `type` or `$ref`, still fails.
+    allowed_changes = {
+        "$.components.schemas.AssistResponse.properties.warnings.description",
+        "$.components.schemas.AgentAssistResponse.properties.warnings.description",
+    }
+
     assert removed == [], removed[:10]
-    assert changed == [], changed[:10]
-    assert added, "the change adds a route; an empty difference would mean the fixture is stale"
+    assert set(changed) <= allowed_changes, sorted(set(changed) - allowed_changes)[:10]
+    for path in changed:
+        assert "filters_too_narrow" in after[path], path
+    assert added, "the change moves the contract; an empty difference would mean a stale fixture"
     assert [path for path in added if not path.startswith(allowed)] == []
-    for name in new_models:
-        assert any(path.startswith(f"$.components.schemas.{name}.") for path in added), name
+
+    # The property is optional, which is what makes the move safe for the .NET consumer C34
+    # wrote: a client that sends no `filters` gets exactly the behaviour it got before.
+    assert "filters" not in committed["components"]["schemas"]["AssistRequest"].get("required", [])
+
+    # And it points at the model that was already there rather than at a new one, which is the
+    # reason this move costs two leaves instead of a schema.
+    assert committed["components"]["schemas"]["AssistRequest"]["properties"]["filters"][
+        "$ref"
+    ].endswith("/RetrievalFilters")
 
     # And the shape of the deterministic response is pinned as a SET, not as a count.
     assert set(committed["components"]["schemas"]["AssistResponse"]["properties"]) == {
@@ -460,6 +506,13 @@ def test_the_published_contract_moved_by_addition_only(
     }
     assert "calls" not in committed["components"]["schemas"]["Usage"]["properties"]
     assert "/v1/assist/agent" in committed["paths"]
+
+    # The new field is optional on the way out too: absent from `required`, so a consumer
+    # that never reads it is unaffected, and typed as a plain list of strings.
+    retrieval = committed["components"]["schemas"]["RetrievalResponse"]
+    assert "warnings" not in retrieval.get("required", [])
+    assert retrieval["properties"]["warnings"]["type"] == "array"
+    assert retrieval["properties"]["warnings"]["items"]["type"] == "string"
     assert set(committed["paths"]["/v1/assist/agent"]) == {"post"}
 
 

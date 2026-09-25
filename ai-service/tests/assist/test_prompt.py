@@ -69,7 +69,7 @@ def test_prompt_version_matches_the_loaded_prompt_file() -> None:
     public = AI_SERVICE_ROOT / "prompts" / f"{PROMPT_VERSION}.md"
     prompt = load_prompt()
 
-    assert PROMPT_VERSION == "assist/v3"
+    assert PROMPT_VERSION == "assist/v5"
     assert public.is_file()
     assert prompt == public.read_text(encoding="utf-8")
     assert prompt.splitlines()[0].strip() == f"# {PROMPT_VERSION}"
@@ -118,8 +118,8 @@ def test_every_assist_prompt_version_is_preserved_with_its_measurement() -> None
     directory = AI_SERVICE_ROOT / "prompts" / "assist"
     versions = sorted(path.name for path in directory.glob("*.md"))
 
-    assert versions == ["v1.md", "v2.md", "v3.md", "v4.md"]
-    assert PROMPT_VERSION == "assist/v3", "the version the DETERMINISTIC route actually runs"
+    assert versions == ["v1.md", "v2.md", "v3.md", "v4.md", "v5.md"]
+    assert PROMPT_VERSION == "assist/v5", "the version the DETERMINISTIC route actually runs"
     for name in versions:
         text = (directory / name).read_text(encoding="utf-8")
         assert text.splitlines()[0].strip() == f"# assist/{name[:-3]}"
@@ -130,13 +130,21 @@ def test_every_assist_prompt_version_is_preserved_with_its_measurement() -> None
 
 
 def test_the_new_version_keeps_the_invariant_rules_of_the_previous_one() -> None:
-    """The ticket's promise, checked rather than asserted: what v2 adds are TASK sections.
+    """Every invariant rule survives byte for byte **except the one C40 deliberately replaced**.
 
-    The rules — no figure outside the data, price and stock as placeholders, only the citation
-    identifiers handed over, the span copied literally, the query block as data, continuous
-    prose, nothing added that the data does not declare — are the same bullets, byte for byte.
-    Only the framing sentence differs, because v2 also writes over several candidates and not
-    only over one named piece.
+    Until C40 this test read "all eight bullets, unchanged", and that was the right shape while
+    it was true: what v2 and v3 added were task sections, and a rule quietly edited between
+    versions would make every figure measured against an earlier one unreadable.
+
+    **v5 changes one bullet, and the change is the whole point of the change.** v3 said price
+    and stock are *always* placeholders — in all six tasks, the three free-query ones included.
+    But a placeholder only means something when there is one piece to resolve it against:
+    `PitchPlaceholderResolver` withholds the entire argument the moment it meets one with no
+    anchor, so that rule made prose in the free-query mode impossible **by construction**.
+
+    So the test keeps its guard and narrows its claim: the other seven bullets are still byte
+    for byte, and the replacement is named here so that a later edit to any of the seven still
+    fails, and so that nobody reads this as licence to rewrite the rules freely.
     """
     previous = (AI_SERVICE_ROOT / "prompts" / "assist" / "v1.md").read_text(encoding="utf-8")
     old_rules = system_message(previous)
@@ -144,8 +152,24 @@ def test_the_new_version_keeps_the_invariant_rules_of_the_previous_one() -> None
 
     bullets = [line for line in old_rules.splitlines() if line.startswith("- ")]
     assert len(bullets) == 8
-    for bullet in bullets:
+
+    replaced = "- **El precio y la disponibilidad son siempre marcadores.**"
+    survivors = [bullet for bullet in bullets if not bullet.startswith(replaced)]
+
+    assert len(survivors) == 7, "exactly one bullet was replaced, and it is the named one"
+    for bullet in survivors:
         assert bullet in new_rules, bullet
+
+    assert replaced not in new_rules, (
+        "the unconditional placeholder rule is what made a free-query argument impossible to "
+        "deliver, so v5 must not still carry it"
+    )
+
+    # And what replaced it says both halves: with an anchor the placeholders are required, and
+    # without one they are forbidden. A version that dropped either half would be worse than v3.
+    assert "Cuando hay UNA pieza anclada" in new_rules
+    assert "Cuando NO hay pieza anclada" in new_rules
+
     assert old_rules.splitlines()[-1] == new_rules.splitlines()[-1]
 
 

@@ -429,6 +429,20 @@ uv run evals cag [--dry-run]                           # the context-only measur
 uv run evals provider-latency                          # the provider round trip, cold and warm
 ```
 
+> **Pass `GIT_SHA` when the run happens inside the container, which is the normal case.** Any
+> measurement against the real provider runs in `jpv-pv-jbg-ai`, and there is no `.git` in the
+> image — so `evals/routing.py:git_sha()` falls through to `unknown` and the artefact records a
+> provenance nobody can use. It reads the environment first for exactly this reason:
+>
+> ```bash
+> docker exec -e GIT_SHA="$(git rev-parse --short HEAD)" jpv-pv-jbg-ai \
+>   python -m jbg_ai.evals.free_query_gate --prompt-version assist/v5
+> ```
+>
+> **If the tree is dirty, say so**: `GIT_SHA="$(git rev-parse --short HEAD)+dirty"`. A bare sha on
+> a dirty tree declares a re-run at that commit comparable when it is not — the trap
+> `evals/provenance.py` documents, and the one C40's two placeholder artefacts fell into.
+
 **The calibration runs in two phases, and their order is a constraint rather than a
 preference.** The fusion decides WHICH candidates a query produces; the business signals only
 reorder them — `demote` is a stable sort that removes nothing. So:
@@ -1105,6 +1119,23 @@ matches — which is why the argument prompt moves to `assist/v4` while **`assis
 untouched** and keeps serving the deterministic route. A piece the loop pivoted away from is not
 also handed over as a match, and when the cap of eight pieces binds, further matches are dropped
 before the substitutes.
+
+> **C40 moves the deterministic route to `assist/v5`, and that was a prerequisite rather than an
+> improvement.** `v3` ordered the model to write `{{price}}` and `{{stock}}` in **every** task,
+> including the three free-query ones — where there is no anchored piece for `PitchPlaceholderResolver`
+> to resolve them against, so the .NET gateway withdrew the argument and M1 would have shipped with
+> no prose at all. `v5` removes price and availability from the free-query tasks, adds an uncovered
+> task for a knowledge question the corpus cannot answer, and the integrity gate gains the hard
+> cause `placeholder_in_free_query`, so a placeholder there withholds the argument instead of
+> reaching a screen.
+>
+> **The measurement refuted the prediction that justified it, and the change stands anyway.** C30b
+> counted `{{price}}` in 147 of 213 arguments and `{{stock}}` in 188 of 213, and the ticket
+> extrapolated that most of M1's arguments would be withheld. Measured over 90 free-query
+> generations on `v3`: **2 of 90 and 1 of 90** — a factor of thirty. What actually blocked M1 was
+> not the placeholder rate but the gateway guard, which refused it **100 %** of the time. On `v5`
+> the counts are 0 and 0, and 0 again over 71 responses driven end to end through .NET. Both
+> artefacts are in `evals/results/c40-placeholders-*.json`.
 
 **The wall-clock budget bounds the whole request.** The loop runs against 15 s minus the
 argument's reserve (its two calls at their timeout, 8 s by default) and the turn in flight is cut

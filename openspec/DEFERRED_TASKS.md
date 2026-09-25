@@ -770,6 +770,31 @@ Tras eso, M2 pasó a `generated` con 2 citas. **Pero se pierde con cada imagen n
 línea en el `Dockerfile` —copiar `data/knowledge`— o un montaje en el compose, y lo decide quien pueda
 tocar `ai-service/`. Mientras no se haga, cualquier entorno nuevo nace sin corpus y con M2 retirado.
 
+> **Comprobado y agravado el 2026-09-25, en la tarea 14.2 de C40.** La entrada sigue abierta, y el
+> arreglo **no es una línea**. Dos cosas que conviene dejar escritas porque las dos engañan:
+>
+> **1 · Hay ocho Markdown en la imagen que parecen el corpus y no lo son.** `/app/prompts/knowledge/v1`
+> existe —lo copia `COPY prompts ./prompts`— y contiene `01-materiales-frecuentes.md` y siete más. Son
+> los **encargos de producción del corpus**, no el corpus: éste son **33 documentos** en
+> `data/knowledge/`. Es un falso positivo fácil de dar por bueno, y lo di por bueno en la primera
+> lectura de esta comprobación.
+>
+> **2 · Copiar `data/knowledge` a `/app/data/knowledge` tampoco lo encontraría.** Medido desde dentro
+> del contenedor:
+>
+> ```text
+> CORPUS_DIR = /app/.venv/lib/data/knowledge     existe: False
+> ```
+>
+> `CORPUS_DIR` es `REPO_ROOT / "data" / "knowledge"` y `REPO_ROOT` se calcula subiendo desde el módulo,
+> que en el contenedor vive en `site-packages` — así que resuelve a `/app/.venv/lib`. El arreglo
+> necesita **dos** cosas: copiar o montar el corpus, **y** que la ruta deje de derivarse de la posición
+> del paquete (una variable de entorno, como el resto de la configuración del servicio).
+>
+> **Que esta máquina tenga 32 documentos y 161 fragmentos con vector en la base no lo contradice:** el
+> indexado corrió **desde el host**, donde `data/knowledge` sí existe. Un contenedor recién creado no
+> puede indexar nada.
+
 > **Esta entrada pesa más desde el 2026-09-22, al implementar C36.** Hasta hoy el corpus vacío sólo
 > degradaba respuestas que nadie veía: `/v1/assist/sale` se demostraba con `curl` y con el arnés. C36
 > le pone **pantalla**, y con ella una **caja de pregunta con cinco sugerencias horneadas** que
@@ -1156,3 +1181,64 @@ del diseño ya declara para `ProductSearchEvent`.
 
 ---
 
+
+## Active Change: `add-frontend-free-query-panel` (C40)
+
+### Una búsqueda en «todos los puntos de venta» no queda registrada
+
+**Estado:** implementada la búsqueda, **no** su telemetría.
+
+`ProductSearchEvent.PointOfSaleId` es `Guid` no nulo, `IsRequired()` en su configuración de EF Core
+y forma parte del índice `(PointOfSaleId, CreatedAt)`. Registrar una búsqueda sin tienda exige
+volverlo anulable, y eso es **una migración de EF Core**, que es lo único que el encargo de este
+change excluye explícitamente. La spec, por su parte, prohíbe la salida fácil: *«it MUST record the
+search with no point of sale rather than with a placeholder one»*.
+
+Entre una migración y una mentira, la tercera opción es no registrar y decirlo. Es lo que se ha
+hecho: con `PointOfSaleId` nulo el servicio devuelve `searchEventId = null` —exactamente como ya
+hace cuando la telemetría falla—, no se atribuye ninguna venta a esa búsqueda y nada más cambia.
+
+**Qué se pierde, concretamente.** Una consulta libre de ámbito global no aparece en el embudo, no
+cuenta para la tasa de selección y no se puede comparar con las de ámbito de tienda. Como el panel
+por defecto lleva una tienda seleccionada, el hueco afecta sólo a las búsquedas en que el operario
+quita el ámbito a propósito, cuya frecuencia **no se puede medir precisamente porque no se
+registran**. Eso es circular y hay que decirlo: la primera cifra que dará el arreglo es cuánto se
+estaba perdiendo.
+
+**Qué haría falta cuando se haga.** Volver `PointOfSaleId` anulable en `ProductSearchEvent` y en su
+configuración, la migración correspondiente, y revisar el índice —un `(PointOfSaleId, CreatedAt)`
+con nulos sigue sirviendo a las consultas por tienda, pero las agregaciones que hoy asumen no-nulo
+tendrían que decidir si cuentan o excluyen las globales—. En `ProductSearchEventService` desaparece
+el `?? throw` que hoy trata un ámbito sin tienda como error de programación. Y la retención hereda
+el problema que el §15.11 del diseño ya declara para esta misma tabla.
+
+### El rechazo del ámbito global en inventario no tiene superficie .NET donde afirmarse
+
+**Estado:** la garantía existe, el test que la tarea 12.2 pedía **no puede escribirse donde lo pedía**.
+
+La tarea 12.2 pide `ForAllPointsOfSale_IsRefusedByInventory`, junto a sus hermanos de la ficha y los
+sustitutos. Los dos hermanos existen; éste no, porque **`IAiGatewayClient` no tiene operación de
+inventario**: `/v1/inventory/propose` existe en jbg-ai y nada en .NET la llama. El requisito viene de
+la spec, que enumera «the sale card, substitutes and inventory» pensando en las rutas del servicio y
+no en los métodos del cliente.
+
+No se ha inventado un test que pase por casualidad. Lo que hay en su lugar son dos cosas:
+
+- **La garantía vive del lado de Python.** La ruta conserva la dependencia estricta del punto de
+  venta y rechaza un token sin la reclamación, en `test_pos_scoped_route_still_rejects_it`
+  (`ai-service/tests/api/test_auth.py`). Es la garantía que importa, porque es la que un cliente
+  cualquiera —no sólo el .NET— encuentra al llamar.
+- **Del lado .NET queda un centinela que afirma que la superficie no existe**, en
+  `AiGatewayClientTests.cs:421`, `ForAllPointsOfSale_IsRefusedByInventory_HasNoClientSurface`. El día
+  que este cliente crezca una llamada de inventario, ese test falla y pide su propio rechazo — que es
+  exactamente el momento en que el test de la tarea 12.2 tendrá dónde aterrizar.
+
+**Qué haría falta cuando se haga.** Añadir la operación de inventario a `IAiGatewayClient` con su
+guarda de ámbito —`scope.Kind != AiCallScopeKind.PointOfSale` lanza antes de emitir petición, como
+`SubstitutesAsync`—, sustituir el centinela por el test que la tarea nombra, y comprobar que el
+rechazo ocurre **antes** de la petición y no por la respuesta del servicio.
+
+Anotado aquí porque el informe de implementación lo declara diferido y la verificación encontró que
+faltaba esta mitad: la entrada estaba en el informe y no en este fichero.
+
+---

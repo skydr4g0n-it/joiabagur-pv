@@ -23,6 +23,7 @@ from jbg_ai.api.deps import (
     V1_RESPONSES,
     get_app_settings,
     get_service_principal,
+    get_unscoped_principal,
 )
 from jbg_ai.api.schemas.assist import (
     AgentAssistRequest,
@@ -225,7 +226,10 @@ def _resolve_router_client(request: Request, settings: Settings) -> RouterLlm | 
 async def assist_sale(
     payload: AssistRequest,
     request: Request,
-    principal: ServicePrincipal = Depends(get_service_principal),
+    # C40: the free-query mode may be scoped to every shop, so `pos_id` is accepted and no
+    # longer demanded. The anchored modes still send one, because a card reports that shop's
+    # stock. The agent route below keeps the strict dependency.
+    principal: ServicePrincipal = Depends(get_unscoped_principal),
     settings: Settings = Depends(get_app_settings),
 ) -> AssistResponse:
     """Group candidates by family; the pitch keeps price and stock as placeholders."""

@@ -168,7 +168,7 @@
             "$ref": "#/components/schemas/AgentUsage"
           },
           "warnings": {
-            "description": "Rule-derived codes, from the closed vocabulary of the assistance capability: family_has_variants, size_label_missing, query_out_of_domain, query_not_in_catalogue, knowledge_not_covered. Never a sentence: the Spanish a human reads belongs to the frontend. The two refusal codes are distinct on purpose — a trade this shop does not practise and a piece it does not carry are two different things to say to a customer — and `knowledge_not_covered` states that an anchored question produced no citation after the corpus distance threshold, so the argument describes the piece without claiming to have answered",
+            "description": "Rule-derived codes, from the closed vocabulary of the assistance capability: family_has_variants, size_label_missing, query_out_of_domain, query_not_in_catalogue, knowledge_not_covered, filters_too_narrow. Never a sentence: the Spanish a human reads belongs to the frontend. The two refusal codes are distinct on purpose — a trade this shop does not practise and a piece it does not carry are two different things to say to a customer — and `knowledge_not_covered` states that an anchored question produced no citation after the corpus distance threshold, so the argument describes the piece without claiming to have answered",
             "items": {
               "type": "string"
             },
@@ -493,6 +493,10 @@
               }
             ]
           },
+          "filters": {
+            "$ref": "#/components/schemas/RetrievalFilters",
+            "description": "Catalog filters for the free-query mode. Ignored when a piece is anchored: the anchor already determines what is retrieved"
+          },
           "locale": {
             "default": "es-ES",
             "title": "Locale",
@@ -618,7 +622,7 @@
             "$ref": "#/components/schemas/Usage"
           },
           "warnings": {
-            "description": "Rule-derived codes, from the closed vocabulary of the assistance capability: family_has_variants, size_label_missing, query_out_of_domain, query_not_in_catalogue, knowledge_not_covered. Never a sentence: the Spanish a human reads belongs to the frontend. The two refusal codes are distinct on purpose — a trade this shop does not practise and a piece it does not carry are two different things to say to a customer — and `knowledge_not_covered` states that an anchored question produced no citation after the corpus distance threshold, so the argument describes the piece without claiming to have answered",
+            "description": "Rule-derived codes, from the closed vocabulary of the assistance capability: family_has_variants, size_label_missing, query_out_of_domain, query_not_in_catalogue, knowledge_not_covered, filters_too_narrow. Never a sentence: the Spanish a human reads belongs to the frontend. The two refusal codes are distinct on purpose — a trade this shop does not practise and a piece it does not carry are two different things to say to a customer — and `knowledge_not_covered` states that an anchored question produced no citation after the corpus distance threshold, so the argument describes the piece without claiming to have answered",
             "items": {
               "type": "string"
             },
@@ -2155,6 +2159,14 @@
             "description": "Correlation id, from the token claim when present",
             "title": "Trace Id",
             "type": "string"
+          },
+          "warnings": {
+            "description": "Codes of the closed warning vocabulary that describe the QUERY rather than a piece. Today only `filters_too_narrow`: the query is answerable and the caller's own catalog-side filters are what left almost nothing. It is emitted here and not only on the generative route because the decision belongs to retrieval, and every path that accepts filters can hit it. An abstention is a different statement and never carries it: that one says the description found nothing.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
           }
         },
         "required": [

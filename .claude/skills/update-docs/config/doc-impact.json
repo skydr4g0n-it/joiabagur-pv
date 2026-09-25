@@ -258,9 +258,9 @@
     },
     {
       "name": "frontend-tests",
-      "globs": ["frontend/e2e/**", "frontend/src/test/**", "frontend/playwright.config.ts", "frontend/vite.config.ts"],
+      "globs": ["frontend/e2e/**", "frontend/src/test/**", "frontend/src/**/__tests__/**", "frontend/src/**/*.test.ts", "frontend/src/**/*.test.tsx", "frontend/src/**/*.spec.ts", "frontend/src/**/*.spec.tsx", "frontend/playwright.config.ts", "frontend/vite.config.ts"],
       "docs": ["doc-testing-frontend", "readme-frontend"],
-      "reason": "Tests o configuracion de test del frontend: stack, estructura y convenciones documentadas."
+      "reason": "Tests o configuracion de test del frontend: stack, estructura y convenciones documentadas. Los tests unitarios y de componente estan COLOCADOS junto al codigo (component.test.tsx, __tests__/), no en una carpeta aparte como los del backend: sin esos globs caian en frontend-app y Documentos/testing-frontend.md nunca salia como candidato, que es el hueco que la verificacion de C40 encontro."
     },
     {
       "name": "frontend-services",

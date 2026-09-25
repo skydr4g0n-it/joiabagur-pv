@@ -109,6 +109,15 @@ export interface SalesAssistCitation {
 export interface SalesAssistResponse {
   /** Whether the AI service served this card. False on every degraded path. */
   aiAvailable: boolean;
+  /**
+   * Why the AI path degraded, or null when it did not.
+   *
+   * Six values the backend already computed for its own log and, until C40, discarded:
+   * `switched_off`, `credential_rejected`, `not_implemented`, `product_not_indexed`,
+   * `ai_unavailable` and `unclassified`. Only one of them changes what the card says — a piece
+   * the index has not reached yet fixes itself, so it must not read as an outage.
+   */
+  degradedReason?: string | null;
   pointOfSaleId: string;
   productId: string;
   /** The AI service's intent, passed through. Null on the degraded path. */

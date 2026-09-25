@@ -901,6 +901,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 | ~~**C37**~~ | ~~`add-frontend-inventory-review-and-print`~~ | Frontend | C29, C35 | ⛔ | **rev. dec. 6** · **anulado el 31 ago** |
 | **C38** | `add-generation-and-agent-evals` | Python + .NET | C24, **C30b**, **C32b**, C34 | 🔴 | — · *sin escenarios de inventario* · **la excepción de persistencia del arnés la declara C30b** · **de C31 hereda el conjunto de enrutado ya cableado** (119 casos, seis clases, carga que falla si los recuentos no cuadran) y **una cifra que contradice lo esperado**: la puerta numérica de la consulta libre rechaza **0 por cifras** con una lista blanca de ~13 numerales, así que el riesgo que quedaba abierto ahí **no era el numérico** sino `dangling_citation`. Los casos adversarios y de inyección sistemáticos siguen siendo suyos · **y de C32b hereda cinco cosas escritas**: (1) el **golden set está intacto y comprobado** — dos tests cruzan sus 72 consultas contra los dos conjuntos del agente en las dos direcciones, así que puede arbitrar la ablación sin reservas; (2) `evals/agent/calibration.yaml` está declarado **`calibration-only`** y contra él se iteraron DOS prompts, así que C38 escribe los suyos aparte y comprueba el no solape, que es la razón de que la etiqueta exista; (3) la ablación ya tiene una de sus dos filas medida — **×3,0 el agente contra el pipeline, 0,0274 frente a ~0,0092 USD/petición, cada etapa tarifada con su propio modelo** *(corregido el 21 sep: la primera cifra, ×7,6, tarifaba el clasificador con un coste sin fuente)* — y la fila del brazo barato **descartada por comportamiento y no por precio**; (4) el hallazgo abierto que C38 tiene que medir sobre el golden set: **se retira el 13,1 % de los argumentarios del agente en `gpt-4o` —9,5 puntos por `dangling_citation`— contra el 2,2 % de la ruta determinista**, seis veces más, con `assist/v4` ya mejorado una vez y sin cerrar; y (5) **dos cosas que la verificación independiente le deja por medir**: si el argumento menciona disponibilidad —nada lo impide, y el arnés ya lo cuenta por fila (`pitch_availability_terms`)— y la calidad del argumento tras un pivote, cuyo *payload* cambió (la pieza abandonada ya no llega como coincidencia) sin que la pasada lo midiera; `agent_sweep --rescore` recalcula cualquier artefacto sin proveedor. Y un aviso operativo: la cuota de **tokens por minuto de la organización** fija el reloj de cualquier pasada — 204 peticiones costaron 3,4 h a 25.000 TPM |
 | **C39** | `finalize-pf-readme-and-evidence` | Docs | todos los vivos | 🔴 | — |
+| **C40** | `add-frontend-free-query-panel` | Python + .NET + Frontend | C16, C31, C34, **C36** | 🔴 | **nace el 24 sep**, durante la comprobación en demo de C36 (tarea 8.5) y **no estaba en el plan**: la sesión destapó que el panel de búsqueda asistida llevaba todo el proyecto sirviendo por su ruta degradada, con los filtros **descartándose en silencio**. Explorado en dos pasadas ([informe](informes/c40-exploration-decisions.md) · [tabla de estados](informes/c40-m1-panel-states.md)): **once hallazgos, diecisiete decisiones y una regla transversal de completitud**. Saca a pantalla **M1**, la pregunta libre sin pieza, convirtiendo el panel de C16 en su superficie, y **cierra tres limitaciones del §15** —la 12, la 13 y la 3 de C34—. **Mueve `openapi.json`** (`filters` en `AssistRequest`, adición pura) y **toca `retrieval-abstention`, spec viva con tres consumidores**. **Va antes de C38**: sube el prompt a `assist/v5` y mueve la fase de la abstención, así que unas cifras tomadas antes describirían un prompt sustituido. **El hallazgo que gobierna su línea de corte:** `AiGatewayClient` **rechaza M1 hoy por construcción** —`PitchPlaceholderResolver` retira el argumentario siempre que no hay ancla, y `v3` ordena escribir los marcadores de precio y stock también en las tareas de consulta libre, medido en **147 de 213**—, así que sin el tramo 2 completo entregaría **un panel asistido sin prosa** |
 
 **Origen** indica de dónde sale el change: en **negrita**, los que existen por la revisión del compañero.
 
@@ -908,7 +909,7 @@ Dos marcas de la v3 quedaron sin objeto el 2026-08-31 y ya no se usan: **👥** 
 
 **⛔ Cortado el 2026-09-12 (1):** **C27**, complementarios — el corte nº 1 del §6, disparado **con medición y no por juicio de plazo**. Sus dos señales están vacías (co-ocurrencia: 98,6 % de los pares vistos **una sola vez** y ninguno tres veces, sobre un generador que **diversifica las cestas a propósito**; etiquetas de color/estilo: **1 de 404** productos reales con estilo) y el proyecto nunca le reservó categoría en el golden set. Ficha conservada con el sello y la condición de reactivación; detalle en el §0 y en [`c27-cut-measurements.md`](informes/c27-cut-measurements.md).
 
-**Vivos: 39** (37 numerados más `FIX1` y `C25bis`) *(C32 partido en **C32a** y **C32b** el 2026-09-20, §0)*. Archivados **37** (C01–C18b, C20, C21, C22, C23, C24, C25, `FIX1`, `C25bis`, **C26**, **C28**, **C30a**, **C30b**, **C31**, **C32a**, **C32b**, **C34** y **C36**). Pendientes **2**: C38 y C39. *(Recuento puesto al día el 2026-09-24, al archivar C36: arrastraba el 35 · 4 desde el archivo de C32b, porque ni C34 ni C36 lo movieron en su momento. Contado contra `openspec/changes/archive/`, que es la única base fiable.)* **C23 se archivó el 2026-09-06** y su corte pre-autorizado —bajar a 15 documentos— se refutó por su propia unidad de medida: el diseño fija el tamaño en fragmentos y quince documentos dan la mitad del mínimo, con lo que la abstención dejaba de poder demostrarse. **C21 se archivó el 2026-09-02**, y con él caen los prerrequisitos de C24 y C30, o sea las dos mitades del proyecto que estaban esperando a la fusión. **C22 y `FIX1` se archivaron el 2026-09-05**, con lo que la ventana que `FIX1` tenía que respetar —entrar antes de que C24 etiquete su línea base— queda cumplida. **C24 se archivó el 2026-09-11 y C25 el 2026-09-12**, con lo que la cadena crítica `C21 → C24 → C25 → C26 → C34 → C36` arranca ahora en **C26**. C25 se archiva habiendo **refutado tres puntos de su propia ficha con mediciones** — la penalización de variante ambigua, la calibración de `1-2` frente a `3+` y la rotación como criterio de orden — y habiendo corregido un defecto que no estaba en su alcance: la fusión de C21 **concatenaba en vez de fusionar**. Deja **tres brechas declaradas y no cerradas** (`Recall@5` 0,758 contra 0,85, abstención 0,150 contra 0,80, y `v3` sin batir a `v2b` por el margen) y **desbloquea C25bis** (`clean-plain-fusion`), que retira el andamio de la fusión plana. **`C25bis` y C26 se archivaron el 2026-09-12**, y con ellos la cadena crítica deja de arrancar en C26 y pasa a arrancar en ~~**C34**~~ → **C30a** *(corregido el 13 sep: C34 lleva C30 de prerrequisito, así que nunca pudo ser el eslabón de arranque; era un error de la frase y no un cambio de plan)*. C26 se archiva habiendo cerrado el **último 501 cerrable** del contrato congelado —`/v1/inventory/propose` sigue en 501, pero por una rama anulada y ya declarada como limitación— y habiendo **refutado tres puntos de su propia ficha con mediciones**: «misma familia primero» estaba invertida, la exclusión por stock no le correspondía y `style_similarity` no tiene dato sobre catálogo real. Deja **dos limitaciones medidas y declaradas**, y anotada en la ficha de C34 la exclusión por stock que sí es suya. **C28 se archivó el 2026-09-13**, entregando las dos cifras del §16 que no existían —**20,9 % ponderado** y **32,1 s de media** sobre 204 perfiles, **204 cronometrados**— y publicándolas partidas, porque los **10,4 %** de los campos sensibles y los **42,3 %** de las etiquetas comerciales no miden lo mismo: aquéllas llegaban vacías y el revisor las rellenó con su criterio. Es el **noveno change consecutivo cuya exploración refuta lo escrito antes**, y el primero que además se refuta a sí mismo **durante la revisión**: la marca «pendiente de revisión» por campo resultó constante en seis de los siete campos y se retiró enmendando la spec. Confirma media predicción —las retiradas se concentran en el estrato B, 8 de 9— y refuta la otra mitad. **Deja tres cosas declaradas sin medir** (el A/B de teclado, la tesis de ceguera del span y la comparación de versiones de prompt) y **un hallazgo que ninguna consulta podía encontrar**: `vidrio` falta en el vocabulario de `materials` y alcanza 67 productos, el 5,6 % del catálogo.
+**Vivos: 40** (38 numerados más `FIX1` y `C25bis`) *(C32 partido en **C32a** y **C32b** el 2026-09-20, §0; **C40 añadido el 2026-09-24**, nacido durante la comprobación en demo de C36 y no previsto en ninguna ola)*. Archivados **37** (C01–C18b, C20, C21, C22, C23, C24, C25, `FIX1`, `C25bis`, **C26**, **C28**, **C30a**, **C30b**, **C31**, **C32a**, **C32b**, **C34** y **C36**). Pendientes **3**: **C40**, C38 y C39 — **en ese orden**, porque C40 sube el prompt a `assist/v5` y mueve la fase de la abstención, así que unas cifras de C38 tomadas antes describirían un prompt sustituido. *(Recuento puesto al día el 2026-09-24, al archivar C36: arrastraba el 35 · 4 desde el archivo de C32b, porque ni C34 ni C36 lo movieron en su momento. Contado contra `openspec/changes/archive/`, que es la única base fiable.)* **C23 se archivó el 2026-09-06** y su corte pre-autorizado —bajar a 15 documentos— se refutó por su propia unidad de medida: el diseño fija el tamaño en fragmentos y quince documentos dan la mitad del mínimo, con lo que la abstención dejaba de poder demostrarse. **C21 se archivó el 2026-09-02**, y con él caen los prerrequisitos de C24 y C30, o sea las dos mitades del proyecto que estaban esperando a la fusión. **C22 y `FIX1` se archivaron el 2026-09-05**, con lo que la ventana que `FIX1` tenía que respetar —entrar antes de que C24 etiquete su línea base— queda cumplida. **C24 se archivó el 2026-09-11 y C25 el 2026-09-12**, con lo que la cadena crítica `C21 → C24 → C25 → C26 → C34 → C36` arranca ahora en **C26**. C25 se archiva habiendo **refutado tres puntos de su propia ficha con mediciones** — la penalización de variante ambigua, la calibración de `1-2` frente a `3+` y la rotación como criterio de orden — y habiendo corregido un defecto que no estaba en su alcance: la fusión de C21 **concatenaba en vez de fusionar**. Deja **tres brechas declaradas y no cerradas** (`Recall@5` 0,758 contra 0,85, abstención 0,150 contra 0,80, y `v3` sin batir a `v2b` por el margen) y **desbloquea C25bis** (`clean-plain-fusion`), que retira el andamio de la fusión plana. **`C25bis` y C26 se archivaron el 2026-09-12**, y con ellos la cadena crítica deja de arrancar en C26 y pasa a arrancar en ~~**C34**~~ → **C30a** *(corregido el 13 sep: C34 lleva C30 de prerrequisito, así que nunca pudo ser el eslabón de arranque; era un error de la frase y no un cambio de plan)*. C26 se archiva habiendo cerrado el **último 501 cerrable** del contrato congelado —`/v1/inventory/propose` sigue en 501, pero por una rama anulada y ya declarada como limitación— y habiendo **refutado tres puntos de su propia ficha con mediciones**: «misma familia primero» estaba invertida, la exclusión por stock no le correspondía y `style_similarity` no tiene dato sobre catálogo real. Deja **dos limitaciones medidas y declaradas**, y anotada en la ficha de C34 la exclusión por stock que sí es suya. **C28 se archivó el 2026-09-13**, entregando las dos cifras del §16 que no existían —**20,9 % ponderado** y **32,1 s de media** sobre 204 perfiles, **204 cronometrados**— y publicándolas partidas, porque los **10,4 %** de los campos sensibles y los **42,3 %** de las etiquetas comerciales no miden lo mismo: aquéllas llegaban vacías y el revisor las rellenó con su criterio. Es el **noveno change consecutivo cuya exploración refuta lo escrito antes**, y el primero que además se refuta a sí mismo **durante la revisión**: la marca «pendiente de revisión» por campo resultó constante en seis de los siete campos y se retiró enmendando la spec. Confirma media predicción —las retiradas se concentran en el estrato B, 8 de 9— y refuta la otra mitad. **Deja tres cosas declaradas sin medir** (el A/B de teclado, la tesis de ceguera del span y la comparación de versiones de prompt) y **un hallazgo que ninguna consulta podía encontrar**: `vidrio` falta en el vocabulario de `materials` y alcanza 67 productos, el 5,6 % del catálogo.
 
 ---
 
@@ -1904,6 +1905,70 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 
 ---
 
+#### C40 · `add-frontend-free-query-panel` 🔴
+
+> **Nace el 2026-09-24**, durante la comprobación en demo de C36 (tarea 8.5). No estaba en el plan:
+> la sesión iba a verificar la ficha de venta y destapó que **el panel de búsqueda asistida llevaba
+> todo el proyecto sirviendo por su ruta degradada**, con los filtros descartándose en silencio.
+> Exploración en dos pasadas: [c40-exploration-decisions.md](informes/c40-exploration-decisions.md)
+> —§1-§9 contra el servicio real, §10 contra el código— y la tabla de estados de la pantalla en
+> [c40-m1-panel-states.md](informes/c40-m1-panel-states.md).
+
+**Objetivo.** Que el **tercer modo de la venta asistida —la pregunta libre sin pieza, M1— llegue al operario**, convirtiendo el panel de búsqueda de C16 en su superficie en vez de construir una pantalla nueva. Con ello se cierran **tres limitaciones declaradas del §15** del diseño.
+**Prereq.** C16, C31, C34, C36 · **Zona.** `ai-service/src/jbg_ai/`, `backend/src/`, `frontend/src/` — **tres capas, y el contrato se mueve**, que es lo que lo separa de C36 sin discusión.
+**Va antes de C38**, y no es indiferente: C40 sube el prompt a `assist/v5` y mueve la fase de la abstención, así que unas cifras de C38 tomadas antes describirían un prompt sustituido y una fase movida.
+
+**Alcance, en seis tramos con línea de corte fijada de antemano** (§10.10 del informe; sustituye a la del §4). El criterio de ordenación es **cuánto engaña hoy la pantalla**, no cuánto cuesta:
+
+1. **Lo que hoy miente en silencio, y no toca el contrato** — sólo .NET y frontend, **archivable solo**: los **filtros en la ruta degradada** (D5: `PieceType` al 97,7 %, un `JOIN` y dos `AND`), el **badge de disponibilidad** con sus **cuatro estados** y su **ruta de lectura nueva** de los dos interruptores por POS (D16), **`degraded_reason` al DTO** —seis valores que `SalesAssistService` ya calcula y descarta— y **`SearchOrigin = 4`**, que no abre migración y convierte la ablación del toggle en una consulta SQL (D15).
+2. **El contrato se mueve, con tres prerrequisitos**: `filters` en `AssistRequest` (D2, adición pura, cuatro sitios); **`assist/v5` para que las tareas de consulta libre no hablen de precio ni disponibilidad, más la causa dura `placeholder_in_free_query`** (D11); **`uncovered` en M1 y una cuarta tarea de consulta libre sin cobertura** (D12); el **segundo endpoint** `POST /api/ai/search/assisted` con su interruptor, su límite, su presupuesto y su circuito (D14); el **toggle** (D3) y el **castellano de los dos rechazos** (§15.13). Y dos entregables que no son código: **la tabla de estados** y la **medición de latencia extremo a extremo por .NET**.
+3. **La abstención lee una sonda sin filtro** (D17), sólo cuando hay filtros, con `filters_too_narrow` como código nuevo del vocabulario cerrado y el requisito de persistencia para `--rescore`. **Toca `retrieval-abstention`, spec viva con tres consumidores** — el panel, los sustitutos y la tool `buscar_catalogo` del agente. Y la **Q3 corregida**: `route=none` son dos estados.
+4. **«Todos los puntos de venta»** (D6 y D13), con la etiqueta que nombra la tienda (D7) y la ficha deshabilitada sin tienda.
+5. **La fila enseña su grupo** (D10): *«también en XS, S, M, L y 4 tallas más»*, con el 19,2 % de filas que el agrupado ya ahorra.
+6. **El embudo de observabilidad** para administrador: latencia partida, modelo, tokens, contadores. **Va el último porque es el único que no arregla nada que hoy engañe.**
+
+**Fuera de alcance, declarado:** la **telemetría de uso** y el panel de administrador sobre todas las consultas, que son **una cuarta zona** —migración de EF Core— y salen como change propio (§7 del informe); el ***streaming* / SSE** del argumentario; el **consumidor del agente**, que arrastra dos tareas diferidas de C32b; y el `v5` de `dangling_citation` en la ruta `both`, que es trabajo de prompt y no de pantalla.
+
+> **El hallazgo que gobierna la línea de corte** *(§10.1 del informe)*. **.NET rechaza M1 hoy, por
+> construcción**: `AiGatewayClient.cs:671` lanza `ArgumentException` sin `product_id`, porque
+> `PitchPlaceholderResolver` **retira el argumentario siempre que no hay ancla** y el prompt `v3`
+> ordena escribir `{{price}}` y `{{stock}}` **también en las tres tareas de consulta libre**. Medido
+> en C30b sobre los modos anclados: `{{price}}` en **147 de 213** y `{{stock}}` en **188 de 213**.
+> Las 42 consultas del informe se midieron con `curl` **contra Python**, saltándose esa etapa, así
+> que su «37 respuestas con argumentario» **no dice nada de lo que el operario vería**. Sin el tramo
+> 2 completo, C40 entregaría **un panel asistido sin prosa** — la misma avería que vino a corregir.
+
+> **Dos limitaciones declaradas que C40 cierra, y una que no.** Cierra la **§15.12** —los tres modos
+> llegan al operario— y la **§15.13** —el rechazo cortés tiene pantalla, y con él los dos códigos
+> que C36 se negó a traducir con razón, porque desde la ficha eran caminos imposibles y desde el
+> panel son caminos reales—. Y cierra, **casi gratis y sin estar en la lista**, la **limitación 3 de
+> C34 / D12 de C36**: una pieza no indexada deja de verse igual que una caída, con un campo que .NET
+> ya calcula. **No cierra** el consumidor del agente. La **§15.14**, la telemetría, la cierra el
+> change que sale de aquí.
+
+> **Lo que la segunda pasada corrige de la primera** *(§10.7 y §10.8)*. **`route=none` son dos
+> estados** y sólo `intent` los separa: con `in_domain` el clasificador corrió y se contradijo
+> —devolvió veredicto servido con `index` nulo, 11,9 % medido— y se arregla **coercionando a
+> `both`**, porque el *fail-open* ya recupera las dos ramas y luego tira la prosa; con
+> `unclassified` **el clasificador no corrió**, y ahí pedirle al operario que reformule es echarle
+> la culpa de una credencial ausente. **D8 estaba demasiado ancho**: `refusal_codes` se apila en el
+> mismo `warnings[]`, así que la partición es **por sujeto del aviso** —los de pieza no se pintan en
+> M1, los de consulta sí—. Y **el toggle no es un A/B test**: es una demostración de la ablación; lo
+> que la hace medición es `SearchOrigin = 4` más la telemetría de C04.
+
+> **El presupuesto de tiempo está en su techo y hay que medirlo.** `AssistTimeoutMs` es 10.000 con
+> mínimo validado de 8.000. C34 midió **p95 7,1 s** extremo a extremo para los modos anclados, que
+> **no llaman al enrutador**; M1 le suma ~2 s. La mitigación es el toggle, y la interfaz tiene que
+> decir el coste **antes** de pulsarse: **2.500 ms contra 10.000 ms** de presupuesto y **30/min
+> contra 10/min** de cupo. Si no cabe, el corte es **no generar en la ruta `catalog` de M1** —el 40 %
+> de las generaciones— y queda nombrado en D11 por eso.
+
+**Cinco cifras que la implementación tiene que publicar** *(§10.12)*: marcadores en el argumentario de M1 antes y después de `v5` —**la que decide si M1 tiene prosa**—, reparto de los 16 estados sobre las 42 consultas, latencia p50/p95 por .NET, tasa de `router_index_absent` tras la coerción, y el efecto de la sonda sin filtro sobre una búsqueda filtrada. **Y el artefacto se persiste** con `run_id`, `git_sha` y `prompt_version`: la pasada de 42 del informe no quedó guardada en `evals/results/`, así que es reproducible pero no re-puntuable.
+
+**Tests.** `should disable the assisted mode when the sale assist switch is off for the point of sale`; `should apply piece type and material filters on the degraded path`; `should tell a router refusal from an abstention`; `should tell an unrouted query from a degraded classifier`; `should not announce an empty result set on the knowledge route`; `should render the clarification question and return focus to the query box`; `should label a withdrawn citation without alarming`; **`test_free_query_pitch_carries_no_placeholder`**; **`test_free_query_without_corpus_uses_the_uncovered_task`**; **`test_abstention_reads_the_unfiltered_profile`**; **`test_served_verdict_without_index_is_routed_to_both`**; y el de ámbito: `ForAllPointsOfSale_IsRefusedByEveryPointOfSaleOperation`.
+
+---
+
 ### Ola 5 — Entrega
 
 ---
@@ -1955,14 +2020,17 @@ flowchart LR
     C32a --> C32b
     C32b --> C38
     C34 --> C36 & C38
+    C36 --> C40
+    C31 --> C40
+    C40 --> C38
 
     C27["C27 · complementarios<br/>CORTADO 12 sep"]
 
     classDef hecho fill:#d9ead3,stroke:#38761d,color:#274e13
     classDef ahora fill:#fce5cd,stroke:#b45f06,color:#7f3f00,stroke-width:3px
     classDef corte fill:#f4cccc,stroke:#a61c00,color:#660000,stroke-dasharray:4 3
-    class C01,C02,C03,C05,C06a,C06b,C07,C08,C09,C10,C11,C12,C13,C14,C15,C16,C17,C18a,C18b,C20,C21,FIX1,C22,C23,C24,C25,C26 hecho
-    class C30a ahora
+    class C01,C02,C03,C05,C06a,C06b,C07,C08,C09,C10,C11,C12,C13,C14,C15,C16,C17,C18a,C18b,C20,C21,FIX1,C22,C23,C24,C25,C26,C28,C30a,C30b,C31,C32a,C32b,C34,C36 hecho
+    class C40 ahora
     class C27 corte
 ```
 
@@ -1974,6 +2042,12 @@ flowchart LR
 > C31 y C38, que son los dos que sí necesitan una salida generada. **C30a pasa a 🟧** y **C26 a 🟩**.
 >
 > `C25bis` se queda **sin color a propósito**: está implementado pero **no archivado**, y el verde significa archivado.
+
+> **Puesto al día el 2026-09-24, al explorar C40.** El verde recoge ahora **todo lo archivado contra
+> `openspec/changes/archive/`** —se habían quedado sin color C28, C30a, C30b, C31, C32a, C32b, C34 y
+> C36—, y **🟧 pasa a C40**, que es el único nodo libre que abre una arista: `C40 → C38`. Sus dos
+> prerrequisitos nuevos son `C36 → C40` y `C31 → C40`, el segundo porque M1 sólo tiene enrutador desde
+> C31 y es el enrutador el que hace que los dos rechazos corteses puedan llegar a una pantalla.
 
 **Fuera del dibujo, a propósito:** **C04** no tiene prerrequisitos ni dependientes *(está archivado)*, y **C39** depende de todos los vivos, así que ninguna de las dos arista añade información.
 
@@ -1993,6 +2067,13 @@ flowchart LR
 
 **Cadena crítica que queda** *(reescrita el 13 sep al partir C30)*: **`C30a → C34 → C36`**, con `C30a → C30b → C31 → C32a → C32b → C38 → C39` cerrando por el otro lado *(C32 partido el 20 sep)*. `C20`, `C22`, `C23`, `C24`, `C25`, `C25bis` y `C26` ya están dentro. El nodo de arranque es **C30a** y no C34: C34 lleva C30 de prerrequisito, y ésa es exactamente la razón por la que la mitad estructurada se entrega primero.
 
+> **Reescrita el 2026-09-24, al explorar C40.** Con C36 archivado la cadena se ha consumido por
+> completo y lo que queda es **`C40 → C38 → C39`**, con **C40 como nodo de arranque**. El orden no es
+> arbitrario: C40 sube el prompt a `assist/v5` y mueve la fase de la abstención, así que C38 medido
+> antes describiría un prompt sustituido y una fase movida. **Y C40 no estaba en ninguna ola**: nace
+> el 24 de septiembre durante la comprobación en demo de C36, al descubrir que el panel de búsqueda
+> asistida llevaba todo el proyecto sirviendo por su ruta degradada.
+
 **Y el hueco que el corte de C27 deja a la vista, que conviene no perder de vista al elegir el siguiente:** `ai-service/src/jbg_ai/assist/` **no existe**. C30a, C30b, C31 y C32 están a cero, y son lo que el rubro del PF nombra por su nombre —*«escala desde un prototipo CAG hasta un sistema RAG **con agentes**»*—. Ésa, y no complementarios, es la deuda grande que queda.
 
 **Un segundo hueco, descubierto el 13 sep al explorar C30 y que tampoco es de C30:** el corpus de conocimiento de C23 —32 documentos, 161 fragmentos, indexado y calibrado desde el 6 de septiembre— **no tiene ninguna ruta hasta la pantalla del joyero**. C34 exponía sólo rutas por pieza y C36 sólo un card. Se cierra con un `question` en C34 —en el cuerpo de un `POST`, no en la URL *(corregido el 21 sep)*— y una caja de pregunta en C36, las dos anotadas en sus fichas. Sin eso, una capacidad que costó una sesión entera sólo se demostraría en el arnés.
@@ -2010,7 +2091,7 @@ flowchart LR
 | **O4** | 27-31 ago | C30-C38 (11, tras partir C30 y C32) | C30a → C30b → C31 → C32a → C32b, C30a → C34 → C36, C38 |
 | **O5** | 1-3 sep | C39 (1) | C39 |
 
-> **Este calendario es registro, no plan** *(desde el 2026-08-31)*. Con prórroga abierta y un solo desarrollador ya no hay fechas que cumplir ni carga por persona y semana que repartir: las olas describen cómo se ejecutó C01–C18a y en qué orden estaba previsto lo demás. **Lo que decide qué se abre a continuación es el grafo del §4**, no esta tabla. Las olas 3 y 4 tal como están dibujadas ya no existen: la 3 pierde C29 y la 4 pierde C33, C35 y C37.
+> **Este calendario es registro, no plan** *(desde el 2026-08-31)*. Con prórroga abierta y un solo desarrollador ya no hay fechas que cumplir ni carga por persona y semana que repartir: las olas describen cómo se ejecutó C01–C18a y en qué orden estaba previsto lo demás. **Lo que decide qué se abre a continuación es el grafo del §4**, no esta tabla. Las olas 3 y 4 tal como están dibujadas ya no existen: la 3 pierde C29 y la 4 pierde C33, C35 y C37. **Y desde el 2026-09-24 la 4 gana uno que no estaba previsto**: **C40**, nacido durante la comprobación en demo de C36 — la prueba más limpia de que esta tabla es registro, porque un change que aparece al verificar otro no cabe en ninguna ola dibujada de antemano.
 
 ### Pares que NO deben ejecutarse a la vez
 
@@ -2019,12 +2100,13 @@ Con un solo desarrollador esto deja de ser coordinación y pasa a ser disciplina
 | Par | Motivo |
 |---|---|
 | C15 ‖ C34 | ~~Mismo controlador `AiController.cs`~~ → **mismo servicio de búsqueda**. `AiController.cs` no existe: el patrón real es un controlador por capacidad *(corregido el 2026-08-28)* |
-| C16 ‖ C36 | Misma página y servicio del frontend |
+| C16 ‖ C36 ‖ **C40** | Misma página y servicio del frontend. **C40 amplía `assisted.tsx`**, que es el fichero de C16, y reutiliza la tabla de copy de avisos de C36 *(añadido el 24 sep)* |
 | Cualquier par de 🗄️ (C04, C07, C08, **C18b**, C27) | Dos migraciones EF Core simultáneas colisionan en el orden. **De seis planificadas quedaban cuatro** —C19 y C29 anulados, las tres primeras archivadas— y **C18b abre una quinta el 31 de agosto**: la contención que la impedía desapareció con la rama de C19. **Y acabaron siendo tres**, las tres del mismo change sobre su propia tabla, aplicadas en serie *(ver la nota de cierre de su ficha)*. **Vivas: las de C18b y la de C27**, que además lleva corte pre-autorizado. No se abren a la vez |
 | C13 ‖ C11 | C13 depende del cliente de embeddings congelado en C11 |
-| C21 ‖ C22 ‖ C25 | Los tres tocan el pipeline de ranking en `retrieval/` |
+| C21 ‖ C22 ‖ C25 ‖ **C40** | Los cuatro tocan el pipeline de ranking en `retrieval/`. **C40 mueve la fase de la abstención**, que es spec viva con tres consumidores: el panel, los sustitutos y la tool `buscar_catalogo` del agente *(añadido el 24 sep)* |
 | C13 ‖ C23 | Zona `indexing/` compartida: separados por fichero, pero no solapar si hay dudas |
 | **C30a ‖ C30b ‖ C31 ‖ C32a ‖ C32b** | *(añadido el 13 sep; ampliado el 20 sep al partir C32)* Los **cinco** son `ai-service/src/jbg_ai/assist/`, y además son **estrictamente secuenciales** por dependencia: `C30a → C30b → C31 → C32a → C32b`. No es sólo disciplina de rama, es el orden obligado |
+| **C40 ‖ C38** | *(añadido el 24 sep)* Tampoco es disciplina de rama: es **orden obligado**. C40 sube el prompt a `assist/v5` —las tareas de consulta libre dejan de pedir marcadores de precio y stock— y **mueve la fase de la abstención**, así que un C38 medido antes o en paralelo publicaría cifras de un prompt sustituido y de una fase movida. **C40 primero, y C38 mide `v5`** |
 
 ---
 
@@ -2036,6 +2118,7 @@ Con un solo desarrollador esto deja de ser coordinación y pasa a ser disciplina
 2. **C23** corpus 30-45 → **15 documentos**, manteniendo las citas verificables, que es lo que el PF evalúa
 3. **RAGAS dentro de C38** → se conservan validador anti-alucinación, escenarios de venta y adversarios
 4. **Golden set de C24** 70 → 45 consultas
+5. **C40 tiene su propia línea de corte de seis tramos** *(añadida el 24 sep)*, ordenada por **cuánto engaña hoy la pantalla** y no por coste — está en el §10.10 de su [informe](informes/c40-exploration-decisions.md) y resumida en su ficha. Los dos cortes que esa lista pre-autoriza: **«todos los puntos de venta»** (tramo 4), que es una frontera de autorización y por eso sale **antes** que el embudo de observabilidad, que no arriesga nada; y, si la latencia no cabe, **no generar argumentario en la ruta `catalog` de M1**, que ahorra cerca del 40 % de sus generaciones. Lo que **no** admite corte en C40 es el tramo 2 entero: sin él entrega un panel asistido **sin prosa**
 
 Los cortes **1 y 2 están confirmados de antemano** y se aplican desde el principio del change, no a mitad: C23 se escribe ya con 15 documentos en lugar de redactar 45 y tirar 30.
 

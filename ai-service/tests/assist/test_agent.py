@@ -1509,8 +1509,8 @@ def test_every_declared_prompt_version_names_the_file_that_is_loaded() -> None:
 
     assert AGENT_PROMPT_VERSION == "agent/v1"
     assert AGENT_PITCH_PROMPT_VERSION == "assist/v4"
-    # The deterministic route did not move.
-    assert PROMPT_VERSION == "assist/v3"
+    # The deterministic route moved to v5 in C40; the agent's pitch prompt did not follow it.
+    assert PROMPT_VERSION == "assist/v5"
 
 
 def test_the_argument_prompt_the_deterministic_route_runs_is_present_and_unedited() -> None:
