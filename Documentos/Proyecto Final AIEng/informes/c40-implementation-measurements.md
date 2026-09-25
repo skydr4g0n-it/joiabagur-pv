@@ -730,3 +730,56 @@ generados. `v5` aguanta todo el camino, no sólo el de dentro.
 Los dos llevan `git_sha` `1c315a9`, `prompt_version` `assist/v5` y `router_prompt_version`
 `router/v3`. La pasada de la exploración no se guardó, y por eso el encargo pedía explícitamente que
 éstas sí.
+
+---
+
+## 9 · Tramo 2 · los tres interruptores, donde se arranca (grupo 9)
+
+Una sola tarea, y su valor no está en escribirla sino en lo que obligó a comprobar. El bloque de
+C36 en `backend/README.md` documentaba dos interruptores; ahora documenta tres, con la tabla de
+variables de entorno y un párrafo de sección propio para `AiFreeQuerySearch`.
+
+### La columna que se añadió a la tabla, y por qué es la que importa
+
+La tarea pedía anotar «el hecho de que su ausencia deja la pantalla sirviendo en degradado sin
+decirlo». Al comprobarlo contra el código resultó que **ya no es cierto de los tres**, y precisamente
+por C40:
+
+| Interruptor | ¿Se anuncia antes de usarlo? |
+|---|---|
+| `AiSearch:EnabledByDefault` | **sí**, desde C40 — la insignia lee «Búsqueda por texto» |
+| `AiSalesAssist:EnabledByDefault` | **no** — sólo abriendo una ficha |
+| `AiFreeQuerySearch:EnabledByDefault` | **sí**, desde C40 — la opción asistida sale deshabilitada con su motivo |
+
+`aiAvailable` viaja **dentro** de una respuesta de búsqueda, así que hasta C40 la única forma de
+saber que una vía estaba apagada era usarla. `GET /api/ai/search/availability` es la lectura previa
+que lo cierra, y lleva `[DisableRateLimiting]` a propósito: heredar la política del controlador
+haría que comprobar si puedes buscar **te costara una búsqueda**. La ficha de venta **sigue sin
+lectura previa**, y eso queda escrito como lo que hay que mirar antes de diagnosticar una caída.
+
+### Una asimetría real entre los dos extremos del interruptor
+
+Documentarlo obligó a leer las dos comprobaciones, y **no coinciden**:
+
+| Superficie | Qué exige |
+|---|---|
+| `GET /api/ai/search/availability` | `AiFreeQuerySearch` **y** `AiSalesAssist`, las dos |
+| `POST /api/ai/search/assisted` | sólo `AiFreeQuerySearch` |
+
+Cada una es defendible por separado. La lectura previa exige las dos porque la mitad generativa de
+la respuesta es la funcionalidad de la ficha y arrastra su perfil de coste; el `POST` comprueba la
+suya porque es la que gobierna su propio cupo y su propio presupuesto. Juntas producen un cuadrante
+incómodo: **con `AiFreeQuerySearch` encendido y `AiSalesAssist` apagado, el endpoint responde
+perfectamente y la opción asistida no se puede pulsar**, con el motivo `switched_off`, que es exacto
+pero no nombra ninguno de los dos interruptores — y el que falta es el de la ficha.
+
+No se ha tocado. Cambiar el `POST` para que exigiera los dos alteraría el comportamiento más allá de
+lo que el grupo 9 pide, y la opción más estrecha aquí es **documentarlo**, que es lo que se ha hecho
+en el bloque del README. Queda anotado para 14.1.
+
+### Lo que esta tarea no cambió
+
+Cero código. La tarea 14.5 vuelve sobre `backend/README.md` junto al resto de la documentación de
+contexto, así que aquí sólo se ha escrito lo que hace falta para **arrancar** el sistema sin repetir
+la avería: los tres interruptores, sus defectos, sus síntomas y el comando de PowerShell con las
+tres líneas.

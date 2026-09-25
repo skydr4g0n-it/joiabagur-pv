@@ -77,7 +77,7 @@
 
 ## 9. Tramo 2 · documentación mínima para que no se repita la avería
 
-- [ ] 9.1 Anotar **los tres interruptores** —búsqueda asistida, ficha y consulta libre— en la documentación de puesta en marcha, con el hecho de que su ausencia deja la pantalla sirviendo en degradado sin decirlo
+- [x] 9.1 Anotar **los tres interruptores** —búsqueda asistida, ficha y consulta libre— en la documentación de puesta en marcha, con el hecho de que su ausencia deja la pantalla sirviendo en degradado sin decirlo
 
 ## 10. Tramo 3 · la abstención y los vacíos
 
