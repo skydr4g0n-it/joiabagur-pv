@@ -11,9 +11,9 @@ Verifica C41 en la rama `c41-add-pos-projection-scheduled-drain`. La rama está 
 está limpio. **No implementes nada y no arregles nada**: este encargo es producir un informe de
 verificación. Si encuentras algo que arreglar, lo listas con su recomendación y paras.
 
-La implementación declara **32 de 32 tareas**. La base contra la que se compara todo es `55bacb6`
-—los artefactos de partida: historia, ticket enriquecido, `epicas.md` y ficha del plan—, y la cabeza
-actual es el commit de implementación. `git diff --stat 55bacb6..HEAD` es el alcance entero.
+La implementación declara **32 de 32 tareas** y está en el commit **`13c86b9`**. La base contra la que
+se compara todo es **`55bacb6`** —los artefactos de partida: historia, ticket enriquecido,
+`epicas.md` y ficha del plan—. `git diff --stat 55bacb6..HEAD` da **32 ficheros, +3.673 / −72**.
 
 **Qué hace este change, en una frase:** `ai.pos_projection` se drena **sola al arrancar `jbg-ai` y
 cada 600 s**, con un *advisory lock* no bloqueante, y su edad llega a la tarjeta de estado del
@@ -66,10 +66,18 @@ Cada una produce un veredicto **incorrecto** con toda naturalidad.
      `PaymentMethodsControllerTests` y `ReturnsControllerTests`. El criterio útil es **si el nombre
      discrepante cae en esas clases y si el área del change está limpia**.
 
-   El área .NET de este change son exactamente dos clases de test:
-   `UnitTests/Application/AiGatewayHealthTests` e `IntegrationTests/AiHealthControllerTests`.
-   **Ninguna de las dos está entre los 45 de la línea base.** Si aparece alguna al cierre, es un
-   hallazgo; si no, el área está limpia.
+   **El cierre ya está medido: 1.347 tests · 1.299 correctas · 48 con error**, con la API parada, en
+   19 m 51 s. Comparado por nombres: **6 entran, 3 salen, y 8 de los 9 están en
+   `InventoryIntegrationTests`**; el noveno está en `SalesControllerTests`, que ya traía cuatro
+   fallos en la base. El área .NET de este change son exactamente dos clases —
+   `UnitTests/Application/AiGatewayHealthTests` e `IntegrationTests/AiHealthControllerTests`— y da
+   **7 de 7 en verde**, sin aparecer ni en los 45 de la base ni en los 48 del cierre.
+
+   **El recuento total sube de 1.329 a 1.347 y no es de este change**: el `baseline.trx` es de antes
+   de que C40_FIX cerrara, y su propio QA registra que pasó de 1.329 a 1.339 tests y de 45 a 52
+   fallos. Contra **su cierre**, este árbol da cuatro fallos menos. Compruébalo: `git status
+   --porcelain backend/src/JoiabagurPV.Tests/` debe salir vacío en el diff del change, porque **no
+   se añadió ni se modificó un solo test .NET**.
 
 3. **`vitest` sale 0 cuando lo canalizas.** `npm run test | tail` devuelve el código de `tail`. Un
    prompt verde no significa nada; lee el resumen.
@@ -217,8 +225,8 @@ hallazgos agrupados en **CRITICAL / WARNING / SUGGESTION** con recomendación ac
   C40_FIX refutó cinco afirmaciones de su implementador y encontró un defecto de producción; ese es
   el listón. **Que el implementador se haya abierto seis incidencias no significa que las haya
   encontrado todas.**
-- **La casilla que más pesa: la suite de .NET.** Se ejecutó al cierre con la API parada; comprueba
-  el resultado **por nombres** contra la línea base y di si algún nombre nuevo cae fuera de las tres
-  clases inestables documentadas.
+- **Si relanzas la suite de .NET, hazla sola.** Tarda ~20 minutos, levanta contenedores por test con
+  Testcontainers, y una pasada en paralelo con otra suite da resultados que no describen el código.
+  Y **para la API primero**, o repetirás la trampa 1.
 - Si algo no se puede verificar en este entorno, **dilo en una sección propia** en vez de
   convertirlo en un WARNING.
