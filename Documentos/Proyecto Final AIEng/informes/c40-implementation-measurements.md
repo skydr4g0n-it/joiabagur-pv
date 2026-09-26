@@ -662,6 +662,55 @@ un segundo, que es justo el caso en el que esperar siete sería más irritante.
    declaraba `degraded=unscoped`, con lo que se habría medido otra cosa. Se actualizaron
    `refreshed_at` y `computed_as_of` en 1 176 filas. Es manipulación de datos locales y no toca
    ningún código.
+
+   > ### ⚠ Anotación posterior — C41, 2026-09-26: esta manipulación se aplicó a la columna equivocada y no pudo funcionar
+   >
+   > **Nada de lo de arriba se modifica. Se anota.** El guard de frescura lee
+   > `ai.sync_checkpoint.last_incremental_sync_at`
+   > ([`search.py:79-83`](../../../ai-service/src/jbg_ai/retrieval/search.py#L79-L83)), y lo que se
+   > actualizó fue `ai.pos_projection.refreshed_at`. Son columnas distintas, y el *docstring* de
+   > `retrieval/projection.py` advierte explícitamente de la confusión. **El ámbito siguió caído
+   > durante toda la medición del grupo 8.**
+   >
+   > Cuatro pruebas, tomadas de la base local el 2026-09-26:
+   >
+   > | Evidencia | Valor |
+   > |---|---|
+   > | `ai.sync_checkpoint` · `pos-availability` | `last_incremental_sync_at` = `last_full_sync_at` = **2026-09-25 20:49:24 UTC**. Los dos iguales ⇒ el único drenaje que movió el checkpoint fue el `--full` de la sesión que abrió C41 |
+   > | `c40-dotnet-latency-42.json` | `measured_at` = **2026-09-25T05:42:42.933Z**, **15 h 07 min antes** de ese drenaje |
+   > | Filas con la huella del `UPDATE` | **94**, todas con `computed_as_of = 2026-09-25 05:32:04` — diez minutos antes de que empezara a medirse |
+   > | «1 176 filas» | Es el **total exacto de filas del POS `0388f003…`**: 1 082 asignadas más esas 94 |
+   >
+   > Un drenaje sólo avanza el checkpoint, nunca lo retrocede, así que a las 05:42 seguía en el 5 de
+   > septiembre ≈ **19,9 días** — que es el «19,7» que este informe declara.
+   >
+   > **Qué se sostiene y qué no:**
+   >
+   > | Cifra | ¿Se sostiene? | Por qué |
+   > |---|---|---|
+   > | **§8.1 · p50 3 404 ms / p95 7 160 ms / 0 de 42 fuera de presupuesto** | ✅ **Sí** | Sin ámbito el SQL es 2-3 ms más lento (C22: 7,3 ms con CTE contra 8-11 ms sin) frente a un p95 dominado por dos llamadas a proveedor. Y **.NET no repide** cuando la página llega corta: `AssistedSearchService` hace una sola llamada con `CandidateWindow` fijo, así que no hay viaje extra |
+   > | **§8.1 · coste de la capa .NET, 17 ms en p95** | ✅ Sí | Por diferencia contra `usage.totalMs`; no depende del ámbito |
+   > | **§8.2 · reparto de los dieciséis estados sobre 71 consultas** | ⚠️ **Describe el sistema degradado** | Sin ámbito, .NET recibe candidatos que la tienda no lleva y `Carried()` los tira. Los estados que dependen de un conjunto corto o vacío pueden haberse desplazado, y **la dirección es conocida**: más masa en los de resultado escaso |
+   > | **§8.2 · «estado 15 a cero en las 71»** | ✅ Sí | Es ausencia de marcadores en el argumentario; otro conjunto de candidatos no los crea |
+   >
+   > **Daño colateral, declarado:** ese `UPDATE` estampó `computed_as_of = now()`, rompiendo en esas
+   > filas el reloj inyectado `IndexFeed:SalesAsOf = 2026-08-23T23:59:59Z` que C22 instaló para que
+   > `sales_30d` fuera reproducible. La spec exige `computed_as_of` **por fila** precisamente para
+   > que una mezcla de relojes sea *visible en vez de silenciosa*: funcionó, y 94 filas siguen
+   > declarando el segundo reloj. Se dejan como prueba y son inofensivas —`is_assigned_hint = false`,
+   > y el prefiltro exige `IS TRUE`—.
+   >
+   > **Y el remate, que es la razón de ser de C41:** en las 42 filas del artefacto `degraded_reason`
+   > es **`null` las 42 veces**. No porque no hubiera degradación, sino porque **.NET no tiene campo
+   > para la degradación de la proyección**, sólo para la suya. La prueba existía únicamente en el
+   > log del contenedor. *Un dato que el sistema conoce, paga y descarta en la frontera.*
+   >
+   > **No se re-mide aquí**, y la razón está escrita en la decisión D15 de
+   > [HU-AIENG-041](../../Historias/AI-Eng/HU-AIENG-041.md): el arnés del grupo 8 **nunca se
+   > commiteó** —el commit `be45e07` añadió sólo este informe y los dos artefactos—, así que rehacerlo
+   > significa reescribirlo; y hacerlo antes de C41 reproduciría el defecto, porque el entorno vuelve
+   > a estar rancio a la hora. Si C39 lo pide, la remedición se hace **después** de C41 y sobre un
+   > entorno que se drena solo.
 3. **Dos pasadas enteras se descartaron por cuota del proveedor**, y es la misma trampa dos veces:
    46 de 90 en el grupo 4 con `--delay 0.3`, y 17 de 42 aquí sin espaciado. Una llamada limitada por
    cuota vuelve en ~150 ms, así que **arrastra el p95 hacia abajo** y empuja la consulta a un estado

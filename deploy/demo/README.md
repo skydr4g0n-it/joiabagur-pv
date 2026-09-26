@@ -445,16 +445,33 @@ command substitution instead: `H=$(grep '^H=' file | cut -d= -f2-)`.
 Both are **once per environment** and survive restarts, because they write to the database. Both were
 missing on this environment until C34 tripped over them on 2026-09-22.
 
-**The point-of-sale availability projection.** `ai.pos_projection` is populated by draining the feed
-the API serves, and **retrieval refuses to work without it**: `resolve_scope` raises rather than
-abstain over an empty projection, and the service answers **503** to `/v1/retrieval/products` **and**
-`/v1/retrieval/substitutes`. The .NET side degrades correctly — the search falls back to its lexical
-path and substitutes report `ai_unavailable`, both with a 200 — so from outside the environment looks
-healthy while the assisted path is dead.
+**The point-of-sale availability projection — no longer a manual step since C41.** `ai.pos_projection`
+is populated by draining the feed the API serves, and **retrieval refuses to work without it**:
+`resolve_scope` raises rather than abstain over an empty projection, and the service answers **503**
+to `/v1/retrieval/products` **and** `/v1/retrieval/substitutes`. The .NET side degrades correctly —
+the search falls back to its lexical path and substitutes report `ai_unavailable`, both with a 200 —
+so from outside the environment looks healthy while the assisted path is dead.
+
+**C41 makes this self-healing**: `jbg-ai` drains the feed **when it starts**, in full when no
+checkpoint exists, which is exactly the state a freshly deployed environment is in. Then every ten
+minutes. So the container coming up is what populates the projection, and `verify.sh` **fails the
+deployment** if it did not — that is its fifth condition, and it is why this step is now a safety net
+rather than a requirement.
+
+Run it by hand only to force a **full reconciliation** — after `IndexFeed:SalesAsOf` changes, or when
+`GET /health` reports failed pages. A drain that overlaps the scheduled one declines and exits `75`,
+writing nothing:
 
 ```bash
 docker exec -i jbg-demo-ai python -m jbg_ai.indexing sync-pos --full
 docker exec -i jbg-demo-postgres psql -U postgres -d joiabagur_pv -At -c 'select count(*), count(distinct pos_id) from ai.pos_projection'
+```
+
+To read the state instead of changing it, ask the health report — which is also what the
+administrator dashboard card shows, and what `verify.sh` checks:
+
+```bash
+docker exec -i jbg-demo-ai python -c "import json,urllib.request; print(json.dumps(json.load(urllib.request.urlopen('http://127.0.0.1:8000/health'))['projection'], indent=2))"
 ```
 
 **The knowledge corpus.** `ai.knowledge_chunk` starts empty because **the corpus does not ship in the
