@@ -110,7 +110,7 @@ Tomadas el **2026-09-26** sobre la exploración del código, en dos rondas: la p
 
 **Referencias:**
 
-- Change: [`c40-fix-all-shops-scope-unreachable`](../../../openspec/changes/c40-fix-all-shops-scope-unreachable/) · ticket [T-AIENG-040-FIX](../../../openspec/changes/c40-fix-all-shops-scope-unreachable/ticket.md) · [proposal](../../../openspec/changes/c40-fix-all-shops-scope-unreachable/proposal.md).
+- Change: [`c40-fix-all-shops-scope-unreachable`](../../../openspec/changes/archive/2026-09-26-c40-fix-all-shops-scope-unreachable/) · ticket [T-AIENG-040-FIX](../../../openspec/changes/archive/2026-09-26-c40-fix-all-shops-scope-unreachable/ticket.md) · [proposal](../../../openspec/changes/archive/2026-09-26-c40-fix-all-shops-scope-unreachable/proposal.md).
 - Historia que origina el defecto: [HU-AIENG-040](HU-AIENG-040.md) · change archivado [`2026-09-25-add-frontend-free-query-panel`](../../../openspec/changes/archive/2026-09-25-add-frontend-free-query-panel/) · su [informe de implementación](../../Proyecto%20Final%20AIEng/informes/c40-implementation-measurements.md), §12.
 - Specs vivas afectadas: [`assisted-search-panel`](../../../openspec/specs/assisted-search-panel/spec.md) (dos requisitos modificados) · [`ai-free-query-search`](../../../openspec/specs/ai-free-query-search/spec.md) (el de disponibilidad).
 - Precedente de historia correctora: [HU-AIENG-FIX1](HU-AIENG-FIX1.md), que también nace de una spec bien formada y falsa.
