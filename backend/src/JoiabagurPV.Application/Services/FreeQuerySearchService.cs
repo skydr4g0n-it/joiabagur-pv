@@ -90,7 +90,9 @@ public class FreeQuerySearchService : IFreeQuerySearchService
         // With no shop named there is no per-shop entry to look up, so the default governs.
         // That is the narrow reading and the safe one: a deployment that enables the feature
         // shop by shop has not enabled it for «all of them».
-        if (!IsEnabled(options, request.PointOfSaleId))
+        // The shared predicate, so that what this route enforces and what the availability probe
+        // reports cannot drift apart. See AiScopeSwitchExtensions.
+        if (!options.IsEnabledForScope(request.PointOfSaleId))
         {
             degradedReason = "switched_off";
         }
@@ -413,10 +415,6 @@ public class FreeQuerySearchService : IFreeQuerySearchService
         pointOfSaleId is { } named
             ? AiCallScope.ForPointOfSale(userId, role, named)
             : AiCallScope.ForAllPointsOfSale(userId, role);
-
-    /// <summary>Whether the assisted answer is offered for this request's scope.</summary>
-    private static bool IsEnabled(AiFreeQuerySearchOptions options, Guid? pointOfSaleId) =>
-        pointOfSaleId is { } named ? options.IsEnabledFor(named) : options.EnabledByDefault;
 
     private static AiSearchFilters BuildFilters(FreeQuerySearchRequest request) => new()
     {

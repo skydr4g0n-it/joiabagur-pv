@@ -413,6 +413,73 @@ Sobre los dos primeros conviene una precisión que ahorra tests engañosos. Al p
 > El detalle está en
 > `Documentos/Proyecto Final AIEng/informes/c40-implementation-measurements.md` §1 y §14.3.
 
+> **Actualización del 2026-09-26, sobre `c40-fix-all-shops-scope-unreachable` (C40_FIX).** La suite
+> llega a **1.339 tests** con la implementación (+10) y a **1.347** tras su verificación
+> independiente (+8). Cuatro pasadas completas, dos de cada pasada:
+>
+> | Pasada | Con error | Total |
+> |---|---|---|
+> | Línea base del implementador, sobre `501c97c` | 45 | 1.329 |
+> | Cierre del implementador, sobre `4b1d056` | 52 | 1.339 |
+> | Línea base de la verificación, **sobre el mismo `4b1d056`** | **51** | 1.339 |
+> | Cierre de la verificación | 53 | 1.347 |
+>
+> **Cero fallos en el área del change** —`AssistedSearch*`, `AiSearch*`, `FreeQuery*`, `AiScope*`,
+> `Availability*`— en las cuatro. Las dos pasadas dirigidas dieron 122/122 y 130/130.
+>
+> **Y aquí está la medición más fuerte que este documento tiene sobre la rotación.** Las dos pasadas
+> completas de la verificación difieren en **doce nombres** —siete entran, cinco salen— y **los doce
+> están en `InventoryIntegrationTests`**. Cero rotación fuera de ella: ni una clase más aparece o
+> desaparece. La entrada de C40 midió quince nombres repartidos entre dos clases; ésta los concentra
+> en una sola, y el `+2` neto del recuento (51 → 53) es **exactamente** el saldo de esa rotación
+> (7 − 5), no de los ocho tests nuevos, que salieron los ocho en verde. Nótese además que
+> la línea base de la verificación y el cierre del implementador **son el mismo commit y dan 51 y
+> 52**: el recuento no identifica un árbol.
+>
+> **Un corolario de método, que costó una sesión al implementador.** `dotnet test` **desde la raíz
+> del repositorio** imprime `MSBUILD : error MSB1003` —no hay solución ahí, vive en
+> `backend/src/JoiabagurPV.sln`— y **sale 0 sin ejecutar un solo test**. Es una segunda vía al mismo
+> desenlace que el `JoiabagurPV.API.exe` vivo bloqueando `bin/Debug`, y refuerza la única regla que
+> vale: **leer la línea de resumen, nunca el código de salida.**
+>
+> El detalle está en el `qa.md` del change archivado, §1 y §11.9.
+
+### `coverlet` no mide `JoiabagurPV.Application`, y no avisa
+
+**Cualquier cifra de cobertura tomada en este repositorio con el comando por defecto excluye la capa
+donde vive la lógica de negocio.** Encontrado en el QA de C34 y **reproducido el 2026-09-26** al
+verificar C40_FIX, así que no es una anomalía de una máquina.
+
+```bash
+dotnet test --collect:"XPlat Code Coverage"   # el informe NO trae JoiabagurPV.Application
+```
+
+El informe Cobertura sale con `JoiabagurPV.API`, `JoiabagurPV.Domain` y `JoiabagurPV.Infrastructure`
+y **sin** `JoiabagurPV.Application`. No hay error, no hay aviso: el paquete simplemente no está. Con
+`--diag` aparece la causa:
+
+```text
+[coverlet]Unable to instrument module: …\JoiabagurPV.Tests\bin\Debug\net10.0\JoiabagurPV.Application.dll
+Coverlet.Core.Exceptions.CecilAssemblyResolutionException: AssemblyResolutionException for
+'Microsoft.Extensions.Logging.Abstractions, Version=10.0.0.0, …'
+```
+
+Ese ensamblado llega del **framework compartido de ASP.NET Core** y nunca se copia al `bin`, así que
+Mono.Cecil no lo resuelve y coverlet abandona el módulo entero. **La sugerencia de coverlet,
+`-p:CopyLocalLockFileAssemblies=true`, no lo arregla** (probado en C34 y en C40_FIX).
+
+Lo que sí funciona, y hay que deshacerlo después:
+
+1. copiar a `backend/src/JoiabagurPV.Tests/bin/Debug/net10.0/` los `Microsoft.Extensions.*.dll` del
+   framework `Microsoft.AspNetCore.App/10.0.11` que no estén ya ahí —fueron **47** las dos veces—,
+   sólo para que Cecil los resuelva: en ejecución no cuentan, porque el host carga por `deps.json`;
+2. correr con `--no-build`;
+3. **borrarlos a continuación** y comprobar que no queda ninguno.
+
+Con eso `JoiabagurPV.Application` aparece en el informe. **Consecuencia práctica:** si el DoD de un
+change pide cobertura sobre código nuevo que vive en `Application` —que es donde vive casi todo—, el
+comando del README no la mide, y la cifra que devuelve describe la herramienta y no el cambio.
+
 ### Por qué se acumularon sin que nadie los viera
 
 Los dos árboles se comportan de forma muy distinta, y esa es la clave:

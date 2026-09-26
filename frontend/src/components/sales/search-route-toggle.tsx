@@ -41,6 +41,18 @@ interface SearchRouteToggleProps {
   assistedAvailable: boolean;
   /** Why it is not, when it is not. Shown beside the disabled option. */
   assistedUnavailableReason?: string | null;
+  /**
+   * Why the fast route cannot serve the current scope, when it cannot (C40_FIX).
+   *
+   * **A reason of reachability, never of switch.** The fast route does not accept the every-shop
+   * scope, which is a different fact from its switch being off, and the caller passes the already
+   * written text rather than a flag precisely so the two cannot be conflated here. Saying «semantic
+   * search is switched off» when it is not would be the class of false statement this panel exists
+   * to stop making.
+   */
+  semanticUnavailableReason?: string | null;
+  /** True when the search covers every shop, so no wording may name one (C40_FIX). */
+  scopeIsAllPointsOfSale?: boolean;
   /** True while a search is in flight: changing route mid-search would be confusing. */
   disabled?: boolean;
 }
@@ -50,6 +62,8 @@ export function SearchRouteToggle({
   onChange,
   assistedAvailable,
   assistedUnavailableReason,
+  semanticUnavailableReason,
+  scopeIsAllPointsOfSale = false,
   disabled = false,
 }: SearchRouteToggleProps) {
   return (
@@ -64,7 +78,8 @@ export function SearchRouteToggle({
         <RouteOption
           route="semantic"
           selected={value === 'semantic'}
-          disabled={disabled}
+          disabled={disabled || Boolean(semanticUnavailableReason)}
+          unavailableReason={semanticUnavailableReason ?? null}
           onSelect={() => onChange('semantic')}
           icon={<Zap className="size-4" aria-hidden />}
         />
@@ -76,7 +91,9 @@ export function SearchRouteToggle({
           // click is the same lie this whole change exists to remove, moved one step later.
           disabled={disabled || !assistedAvailable}
           unavailableReason={
-            assistedAvailable ? null : assistedUnavailableText(assistedUnavailableReason)
+            assistedAvailable
+              ? null
+              : assistedUnavailableText(assistedUnavailableReason, scopeIsAllPointsOfSale)
           }
           onSelect={() => onChange('assisted')}
           icon={<Sparkles className="size-4" aria-hidden />}

@@ -186,6 +186,26 @@ describe('aiSearchService.getAvailability', () => {
     // failure here must not become a message the operator cannot act on.
     expect(outcome).toEqual({ kind: 'unknown' });
   });
+
+  /**
+   * C40_FIX, added by its independent verification: the branch this change introduced here had no
+   * test of its own.
+   *
+   * **Omitted, never blanked.** The route reads the key not being there as the scope covering every
+   * shop and refuses anything else, so sending `pointOfSaleId: ''` would turn the wider scope into
+   * a validation error rather than the wider answer. Asserting on `params` being absent is the
+   * point: a truthiness check is easy to "tidy" into a template string later, and nothing downstream
+   * would catch it — the page test only sees that this function was called with `undefined`.
+   */
+  it('should omit the query parameter entirely when no point of sale is given', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {} } as never);
+
+    await aiSearchService.getAvailability();
+
+    expect(apiClient.get).toHaveBeenCalledWith('/ai/search/availability', {
+      params: undefined,
+    });
+  });
 });
 
 /**

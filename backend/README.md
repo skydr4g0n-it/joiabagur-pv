@@ -307,7 +307,7 @@ requested point of sale.
 > |---|---|---|---|
 > | `AiSearch:EnabledByDefault` | `false` | The panel falls to the lexical path; the badge reads «Búsqueda por texto» and the result rows carry the degraded origin | **Yes**, since C40 |
 > | `AiSalesAssist:EnabledByDefault` | `false` | The card answers 200 with `aiAvailable: false` and «El asistente no está disponible»; `substitutes` answers `ai_unavailable` | **No** — only by opening a card |
-> | `AiFreeQuerySearch:EnabledByDefault` | `false` | The assisted option of the route toggle is **disabled with its reason beside it** — «La respuesta asistida está desactivada en esta tienda» — and `GET /api/ai/search/availability` answers `assistedAnswerAvailable: false`, `switched_off` | **Yes**, since C40 |
+> | `AiFreeQuerySearch:EnabledByDefault` | `false` | The assisted option of the route toggle is **disabled with its reason beside it** — «La respuesta asistida está desactivada en esta tienda», or the same phrase without the shop when the scope covers every one of them — and `GET /api/ai/search/availability` answers `assistedAnswerAvailable: false`, `switched_off`. **Since C40_FIX it also decides whether the every-shop scope is usable at all**, because that scope is served by the assisted route alone: with this off, an administrator who picks it reaches a scope they cannot search from, and the panel says so rather than leaving both options dead | **Yes**, since C40 |
 >
 > All three are documented in their own options class — *«Defaults to false, so enabling a shop is
 > an explicit act»* — and that default is right for production. What was missing is any mention
@@ -321,9 +321,34 @@ requested point of sale.
 > no quota and makes no call to `jbg-ai` — only the switch can be known without calling, so an
 > outage or a rejected credential is still discovered by making a request.
 >
+> **Since C40_FIX the route answers for a *scope* and not only for a shop.** Omit `pointOfSaleId` and
+> it reports the every-shop scope, whose verdict is the deployment default — the narrow reading, and
+> the same one the free-query route enforces: a deployment that switches the feature on shop by shop
+> has **not** switched it on for all of them at once. Both sides read one shared predicate
+> (`AiScopeSwitchExtensions`) precisely so they cannot drift, because a probe that disagrees with the
+> route it describes puts the screen back to presenting a capability that is off as though it were on.
+> A **blank** `pointOfSaleId` is still refused with 400: absence is the field not being there, and
+> anything else is a value that has to be usable. Until C40_FIX the absence was refused too, so a
+> screen offering the wider scope had nothing to read and showed the generative path disabled with no
+> reason — this route's own failure mode, one scope along.
+>
 > **The sale card still has no pre-flight read.** With its switch off `SalesAssistService` never
 > calls the AI service (`degradedReason = "switched_off"`), the card degrades correctly, and it
 > looks exactly like an outage. Check this switch before diagnosing one.
+>
+> **And one combination makes the probe lie in the other direction, which is more confusing.** The
+> probe reports the generative flag as `AiFreeQuerySearch` **AND** `AiSalesAssist`, while
+> `FreeQuerySearchService` — the route that flag describes — applies **only the first**; nothing on the
+> free-query path reads `AiSalesAssistOptions` at all. So with the free query **on** and the sale card
+> **off**, `GET /api/ai/search/availability` answers `assistedAnswerAvailable: false` /
+> `switched_off` for a scope that `POST /api/ai/search/assisted` serves with generated prose —
+> measured over HTTP, not inferred. On screen that disables the assisted option and, in the every-shop
+> scope, disables both routes and prints «La búsqueda en todas las tiendas usa la respuesta asistida,
+> y está desactivada» of something that works. So: **if the panel says the assisted answer is off and
+> `curl` against the route answers fine, look at the sale card's switch, not at the free query's.**
+> Which side is wrong is a product decision, recorded in
+> [../openspec/DEFERRED_TASKS.md](../openspec/DEFERRED_TASKS.md); today's answer is pinned by
+> `AiScopePredicateAgreementTests`.
 >
 > **The assisted answer needs two switches on, not one, and the two endpoints do not agree on
 > which.** `GET availability` reports it available only when `AiFreeQuerySearch` **and**
@@ -565,6 +590,19 @@ dotnet test
 > fallos conocidos* in [../Documentos/testing-backend.md](../Documentos/testing-backend.md).
 
 ### Run with Coverage
+
+> **This command does not measure `JoiabagurPV.Application`, and it does not say so.** The Cobertura
+> report comes back with `API`, `Domain` and `Infrastructure` and simply **no `Application` package** —
+> which is where most of the business logic lives. `coverlet` cannot instrument that assembly here
+> because `Microsoft.Extensions.Logging.Abstractions` arrives from the shared ASP.NET Core framework
+> and is never copied to `bin`, so Mono.Cecil fails to resolve it and abandons the module. There is no
+> error and no warning: you only see it with `--diag`, or by noticing the package is missing.
+>
+> So a coverage figure taken with the command below **is not a figure for the application layer**, and
+> the 70 % threshold in the next section is being applied to something narrower than it looks. The
+> workaround — and how to undo it — is in
+> [../Documentos/testing-backend.md](../Documentos/testing-backend.md), under *«`coverlet` no mide
+> `JoiabagurPV.Application`, y no avisa»*. Found in C34's QA, reproduced when verifying C40_FIX.
 
 ```bash
 # Run tests with coverage collection

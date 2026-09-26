@@ -345,6 +345,27 @@ describe('ProductCard', () => {
 > test que C40 añade o toca en verde. Detalle en
 > `Documentos/Proyecto Final AIEng/informes/c40-implementation-measurements.md` §10 y §14.3.
 
+> **Actualización del 2026-09-26, sobre `c40-fix-all-shops-scope-unreachable` (C40_FIX).** La suite
+> tiene **848 tests**: C40_FIX añade **14** de página y **1** de servicio, los quince en verde. La
+> línea base del implementador dio **113 fallos de 834 en 14 de 57 ficheros**; su cierre, **114 de 848
+> en 15**.
+>
+> **Y la verificación independiente midió el cierre otra vez, sobre el mismo commit `4b1d056`, y dio
+> 113 en 14 ficheros.** El nombre que sobra en una pasada y falta en la otra es
+> `admin/__tests__/family-review.test.tsx :: family review screen should create a family with its
+> members from the review screen` — **el mismo** que C36 usó para refutar que aquí el conjunto fuera
+> estable, y el mismo al que C40 apuntaba. Es la **tercera** observación independiente de ese nombre
+> rotando, y esta vez en la dirección contraria: rojo para quien implementó, verde para quien
+> verificó, mismo árbol. De paso se confirma el par de `scan.test.tsx` que describe la entrada
+> anterior: `should render loading state initially` sigue rojo y `should show manual SKU input
+> fallback after initialization` sale verde.
+>
+> **La consecuencia operativa, que es la que importa:** en este árbol **113 y 114 son el mismo
+> resultado**, y quien mida uno u otro no está observando su propio cambio. `assisted.test.tsx` —el
+> área del change— no aparece entre los rojos en ninguna de las tres pasadas.
+>
+> Detalle en el `qa.md` del change archivado, §1.1 y §11.9.
+
 > **Re-medido el 2026-09-13, al cerrar C28: 595 tests, 113 fallos, en 14 de 48 ficheros.** La suite
 > ha crecido 113 tests en dos semanas y el rojo **no ha crecido con ella**: cae de 118 a 113 y de 17
 > ficheros a 14. La proporción pasa del 24 % al 19 %. El conjunto de nombres fallidos de C28 fue
@@ -442,7 +463,11 @@ Una petición sin manejador **no rompe el test**: imprime un aviso y devuelve na
 
 ### `tsc --noEmit` no es una puerta
 
-Devuelve decenas de errores preexistentes en los ficheros de plantilla de Metronic: `lucide-react` sin exportar `ShieldUser`, `VectorSquare` o `PanelTopBottomDashed`, módulos ausentes (`@/components/image-input`, `embla-carousel-react`), y tipos rotos en `chart.tsx` y `data-grid-table.tsx`. Filtra su salida a tus propios ficheros antes de sacar conclusiones. **La puerta real es `npm run build`**, que sí pasa en verde.
+Devuelve decenas de errores preexistentes en los ficheros de plantilla de Metronic: `lucide-react` sin exportar `ShieldUser`, `VectorSquare` o `PanelTopBottomDashed`, módulos ausentes (`@/components/image-input`, `embla-carousel-react`), y tipos rotos en `chart.tsx` y `data-grid-table.tsx`. Filtra su salida a tus propios ficheros antes de sacar conclusiones.
+
+**Pero no lo sustituyas por `npm run build`, porque `npm run build` no comprueba tipos.** *(Corregido el 2026-09-26, al verificar C40_FIX: este párrafo decía que la puerta real era `npm run build`, y es falso.)* Vite transpila con **esbuild**, que descarta las anotaciones de tipo **sin mirarlas**, así que el build sale verde sobre un error de tipos y `vitest` tampoco lo ve. Medido sobre el mismo árbol: `npm run build` **sale 0** en 27,7 s mientras `tsc --noEmit` **sale 2** con 176 errores. C40 se comió un commit entero por esto —un DTO anulable en .NET y todavía `number` en `ai-search.types.ts`, con tests y build en verde— y **el `tsc --noEmit` filtrado fue lo único que lo encontró**.
+
+La lectura correcta es que **ninguno de los dos es una puerta por sí solo** y miden cosas distintas: `npm run build` dice «compila y empaqueta», `tsc --noEmit` filtrado a tus ficheros dice «los tipos cuadran». Para cualquier cambio que mueva un tipo —un DTO, una firma de servicio, un campo anulable— hay que correr los dos.
 
 ---
 
