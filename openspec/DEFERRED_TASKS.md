@@ -831,7 +831,7 @@ tocar `ai-service/`. Mientras no se haga, cualquier entorno nuevo nace sin corpu
 > ahora cuántos puntos de venta se han quedado sin surtido, que es el dato que faltaba para que este
 > fallo fuera visible sin abrir un log.
 >
-> Change [`add-pos-projection-scheduled-drain`](changes/add-pos-projection-scheduled-drain/),
+> Change [`add-pos-projection-scheduled-drain`](changes/archive/2026-09-26-add-pos-projection-scheduled-drain/),
 > historia [HU-AIENG-041](../Documentos/Historias/AI-Eng/HU-AIENG-041.md).
 
 **Estado:** identificado el 2026-09-22 al desplegar la demo, resuelto en ese entorno sin arreglo

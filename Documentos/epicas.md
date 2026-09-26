@@ -475,7 +475,7 @@ El corazón del Proyecto Final. Búsqueda que combina la rama vectorial y la lé
 > **Ampliado el 2026-09-26 — C41, y la épica se reabre.** **C41**
 > (`add-pos-projection-scheduled-drain`) se enriquece con historia
 > ([HU-AIENG-041](Historias/AI-Eng/HU-AIENG-041.md)) y ticket
-> ([T-AIENG-041](../openspec/changes/add-pos-projection-scheduled-drain/ticket.md)). **Entra en EP14 y
+> ([T-AIENG-041](../openspec/changes/archive/2026-09-26-add-pos-projection-scheduled-drain/ticket.md)). **Entra en EP14 y
 > no en EP15**, que es lo que su ticket declaraba: la capability que modifica es `pos-projection`,
 > nacida en C22, y el criterio del repositorio ya se aplicó al revés con C40 —*«C40 es de EP15, aunque
 > modifique la capability `assisted-search-panel` de esta épica»*—. La épica la fija **de qué trata el

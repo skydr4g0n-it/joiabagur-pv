@@ -216,7 +216,7 @@ Las quince se tomaron con el desarrollador en la sesión de exploración del 202
 ### Referencias
 
 - Change de OpenSpec: `openspec/changes/add-pos-projection-scheduled-drain/` (C41)
-- Ticket: [T-AIENG-041](../../../openspec/changes/add-pos-projection-scheduled-drain/ticket.md)
+- Ticket: [T-AIENG-041](../../../openspec/changes/archive/2026-09-26-add-pos-projection-scheduled-drain/ticket.md)
 - Ficha del plan: [§3 · C41](../../Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md)
 - Diseño RAG: [§6.2, §6.3, §7.6, §12](../../Proyecto%20Final%20AIEng/proyecto-final-diseno-rag-joiabagur.md)
 - Capabilities que se modifican:

@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-09-26 · **Rama:** `c41-add-pos-projection-scheduled-drain` · **Historia:**
 [HU-AIENG-041](../../Historias/AI-Eng/HU-AIENG-041.md) · **Ticket:**
-[T-AIENG-041](../../../openspec/changes/add-pos-projection-scheduled-drain/ticket.md)
+[T-AIENG-041](../../../openspec/changes/archive/2026-09-26-add-pos-projection-scheduled-drain/ticket.md)
 
 ---
 

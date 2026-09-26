@@ -1984,7 +1984,7 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 > una de sus cuatro del entorno, con 19,7 días. Dos sesiones distintas, la misma causa, el mismo
 > arreglo a mano: **la frescura no tiene dueño**, porque `sync-pos` es sólo CLI y alguien tiene que
 > acordarse. Petición registrada en el
-> [ticket](../../openspec/changes/add-pos-projection-scheduled-drain/ticket.md).
+> [ticket](../../openspec/changes/archive/2026-09-26-add-pos-projection-scheduled-drain/ticket.md).
 
 **Objetivo.** Que la frescura de `ai.pos_projection` **deje de ser un acto manual**, y que su edad
 **se diga antes de buscar** en vez de quedarse en una línea de etapa que no llega a ninguna pantalla.
@@ -2020,7 +2020,7 @@ El envío de `ProductSearchEvent` **ya no consiste en construir el evento**: el 
 > **no repide** cuando la página llega corta—. **Se anota, no se rehace**: el arnés del grupo 8 nunca
 > se commiteó, así que rehacerlo es reescribirlo. Historia
 > [HU-AIENG-041](../Historias/AI-Eng/HU-AIENG-041.md), ticket
-> [T-AIENG-041](../../openspec/changes/add-pos-projection-scheduled-drain/ticket.md).
+> [T-AIENG-041](../../openspec/changes/archive/2026-09-26-add-pos-projection-scheduled-drain/ticket.md).
 
 **Lo primero que hay que entender, porque la lectura intuitiva está equivocada.** La rancidez **no es
 una fuga**. Hay dos filtros y sólo uno es la frontera: el prefiltro de `ai.pos_projection` estrecha la
