@@ -336,6 +336,20 @@ requested point of sale.
 > calls the AI service (`degradedReason = "switched_off"`), the card degrades correctly, and it
 > looks exactly like an outage. Check this switch before diagnosing one.
 >
+> **And one combination makes the probe lie in the other direction, which is more confusing.** The
+> probe reports the generative flag as `AiFreeQuerySearch` **AND** `AiSalesAssist`, while
+> `FreeQuerySearchService` — the route that flag describes — applies **only the first**; nothing on the
+> free-query path reads `AiSalesAssistOptions` at all. So with the free query **on** and the sale card
+> **off**, `GET /api/ai/search/availability` answers `assistedAnswerAvailable: false` /
+> `switched_off` for a scope that `POST /api/ai/search/assisted` serves with generated prose —
+> measured over HTTP, not inferred. On screen that disables the assisted option and, in the every-shop
+> scope, disables both routes and prints «La búsqueda en todas las tiendas usa la respuesta asistida,
+> y está desactivada» of something that works. So: **if the panel says the assisted answer is off and
+> `curl` against the route answers fine, look at the sale card's switch, not at the free query's.**
+> Which side is wrong is a product decision, recorded in
+> [../openspec/DEFERRED_TASKS.md](../openspec/DEFERRED_TASKS.md); today's answer is pinned by
+> `AiScopePredicateAgreementTests`.
+>
 > **The assisted answer needs two switches on, not one, and the two endpoints do not agree on
 > which.** `GET availability` reports it available only when `AiFreeQuerySearch` **and**
 > `AiSalesAssist` are both enabled for that point of sale — the generative half of the answer is
@@ -576,6 +590,19 @@ dotnet test
 > fallos conocidos* in [../Documentos/testing-backend.md](../Documentos/testing-backend.md).
 
 ### Run with Coverage
+
+> **This command does not measure `JoiabagurPV.Application`, and it does not say so.** The Cobertura
+> report comes back with `API`, `Domain` and `Infrastructure` and simply **no `Application` package** —
+> which is where most of the business logic lives. `coverlet` cannot instrument that assembly here
+> because `Microsoft.Extensions.Logging.Abstractions` arrives from the shared ASP.NET Core framework
+> and is never copied to `bin`, so Mono.Cecil fails to resolve it and abandons the module. There is no
+> error and no warning: you only see it with `--diag`, or by noticing the package is missing.
+>
+> So a coverage figure taken with the command below **is not a figure for the application layer**, and
+> the 70 % threshold in the next section is being applied to something narrower than it looks. The
+> workaround — and how to undo it — is in
+> [../Documentos/testing-backend.md](../Documentos/testing-backend.md), under *«`coverlet` no mide
+> `JoiabagurPV.Application`, y no avisa»*. Found in C34's QA, reproduced when verifying C40_FIX.
 
 ```bash
 # Run tests with coverage collection

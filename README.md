@@ -360,7 +360,9 @@ La segunda ruta del mismo panel, y la que pone el RAG delante del operario **sin
 
 ### GET /api/ai/search/availability — Qué vías están encendidas, antes de gastar
 
-Devuelve los dos interruptores de un punto de venta **sin llamar a la IA y sin consumir cuota**, para que el panel pueda decir qué puede ofrecer antes de la primera búsqueda. Lleva `[DisableRateLimiting]` a propósito: heredar la política del controlador haría que comprobar si puedes buscar **te costara una búsqueda**. Hasta C40 la única forma de saber que una vía estaba apagada era usarla, y así es como el panel acabó ofreciendo una capacidad desactivada.
+Devuelve los dos interruptores **sin llamar a la IA y sin consumir cuota**, para que el panel pueda decir qué puede ofrecer antes de la primera búsqueda. Lleva `[DisableRateLimiting]` a propósito: heredar la política del controlador haría que comprobar si puedes buscar **te costara una búsqueda**. Hasta C40 la única forma de saber que una vía estaba apagada era usarla, y así es como el panel acabó ofreciendo una capacidad desactivada.
+
+**Responde de un ámbito y no de una tienda.** `pointOfSaleId` es **opcional**: con una tienda informa de ella, y **omitido** informa del ámbito «todas las tiendas» devolviendo el identificador **nulo**. Un valor que no sirve —vacío, con espacios, ilegible o un GUID truncado— es **400**, porque la ausencia es que el parámetro no esté y cualquier otra cosa es un valor que tiene que ser usable. Es la misma distinción que aplica `POST /api/ai/search/assisted`, y por el mismo motivo: sin tienda el prefiltro de disponibilidad **no se aplica**, mientras un identificador en blanco sería un comodín por accidente.
 
 ---
 
