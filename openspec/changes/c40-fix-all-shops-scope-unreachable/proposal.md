@@ -61,12 +61,16 @@ ya existe.
 
 ### Modified Capabilities
 
-- `assisted-search-panel`: el requisito de ámbito **afirma hoy que el panel envía un punto de venta
-  concreto en toda búsqueda**, lo que dejó de ser cierto con C40; pasa a exigir además **el control
-  explícito** que permite entrar en el ámbito global y a distinguirlo de haber elegido una tienda. Y el
-  requisito de disponibilidad, que hoy la enuncia **«para el punto de venta seleccionado»**, pasa a
-  cubrir también el ámbito sin tienda, de modo que abrirlo no pueda apagar la ruta asistida en
-  silencio.
+- `assisted-search-panel`: **dos requisitos nuevos y tres corregidos.** Los nuevos son **el control** —que
+  el panel ofrezca al administrador una manera explícita de entrar en el ámbito global, distinguible de
+  haber elegido una tienda, y que **no** la ofrezca al operario, con su motivo escrito— y **el estado del
+  toggle de ruta en ese ámbito**, donde la ruta rápida queda deshabilitada con un motivo **de ámbito** y no
+  de interruptor. Los corregidos son los tres enunciados que hoy son falsos: el de ámbito, que **afirma que
+  el panel envía un punto de venta concreto en toda búsqueda**; el de disponibilidad, que la enuncia **«para
+  el punto de venta seleccionado»** y por eso deja la lectura sin resolver y apaga la ruta asistida en
+  silencio; y el de la etiqueta de existencias, cuya cláusula *«cambiar de tienda refresca las
+  existencias»* nunca describió lo que el panel hace —limpia los resultados— y cuyo test sólo comprobó la
+  otra mitad del escenario.
 - `ai-free-query-search`: la ruta de disponibilidad SHALL informar hoy **«for one point of sale»**;
   pasa a **aceptar la ausencia** y a reportar el ámbito por defecto, que es lo que el servicio ya
   calcula y el controlador rechaza.

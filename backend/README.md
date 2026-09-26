@@ -307,7 +307,7 @@ requested point of sale.
 > |---|---|---|---|
 > | `AiSearch:EnabledByDefault` | `false` | The panel falls to the lexical path; the badge reads «Búsqueda por texto» and the result rows carry the degraded origin | **Yes**, since C40 |
 > | `AiSalesAssist:EnabledByDefault` | `false` | The card answers 200 with `aiAvailable: false` and «El asistente no está disponible»; `substitutes` answers `ai_unavailable` | **No** — only by opening a card |
-> | `AiFreeQuerySearch:EnabledByDefault` | `false` | The assisted option of the route toggle is **disabled with its reason beside it** — «La respuesta asistida está desactivada en esta tienda» — and `GET /api/ai/search/availability` answers `assistedAnswerAvailable: false`, `switched_off` | **Yes**, since C40 |
+> | `AiFreeQuerySearch:EnabledByDefault` | `false` | The assisted option of the route toggle is **disabled with its reason beside it** — «La respuesta asistida está desactivada en esta tienda», or the same phrase without the shop when the scope covers every one of them — and `GET /api/ai/search/availability` answers `assistedAnswerAvailable: false`, `switched_off`. **Since C40_FIX it also decides whether the every-shop scope is usable at all**, because that scope is served by the assisted route alone: with this off, an administrator who picks it reaches a scope they cannot search from, and the panel says so rather than leaving both options dead | **Yes**, since C40 |
 >
 > All three are documented in their own options class — *«Defaults to false, so enabling a shop is
 > an explicit act»* — and that default is right for production. What was missing is any mention
@@ -320,6 +320,17 @@ requested point of sale.
 > without anybody noticing. `GET /api/ai/search/availability` is the read that closes it, and it costs
 > no quota and makes no call to `jbg-ai` — only the switch can be known without calling, so an
 > outage or a rejected credential is still discovered by making a request.
+>
+> **Since C40_FIX the route answers for a *scope* and not only for a shop.** Omit `pointOfSaleId` and
+> it reports the every-shop scope, whose verdict is the deployment default — the narrow reading, and
+> the same one the free-query route enforces: a deployment that switches the feature on shop by shop
+> has **not** switched it on for all of them at once. Both sides read one shared predicate
+> (`AiScopeSwitchExtensions`) precisely so they cannot drift, because a probe that disagrees with the
+> route it describes puts the screen back to presenting a capability that is off as though it were on.
+> A **blank** `pointOfSaleId` is still refused with 400: absence is the field not being there, and
+> anything else is a value that has to be usable. Until C40_FIX the absence was refused too, so a
+> screen offering the wider scope had nothing to read and showed the generative path disabled with no
+> reason — this route's own failure mode, one scope along.
 >
 > **The sale card still has no pre-flight read.** With its switch off `SalesAssistService` never
 > calls the AI service (`degradedReason = "switched_off"`), the card degrades correctly, and it

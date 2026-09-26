@@ -1213,3 +1213,273 @@ describe('AssistedSalesSearchPage — changing the shop', () => {
     expect(aiSearchService.search).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * The every-point-of-sale scope (C40_FIX)
+ *
+ * C40 built this scope in full and left no way into it, so none of it ever ran. The reason none of
+ * its 136 scenarios caught that is the reason these tests are here and at page level: the row's own
+ * tests pass the no-shop state **straight to the component**, so they exercised the state without
+ * ever exercising the path to it. Auditing the state is not auditing the way in.
+ */
+describe('AssistedSalesSearchPage — the every-point-of-sale scope', () => {
+  /** Administrator with two shops, which is when the selector is shown and the option is offered. */
+  function asAdministrator() {
+    role = 'Administrator';
+    vi.mocked(pointOfSaleService.getPointsOfSale).mockResolvedValue([POS_ONE, POS_TWO]);
+  }
+
+  async function chooseEveryShop(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByLabelText('Punto de venta'));
+    await user.click(await screen.findByRole('option', { name: 'Todas las tiendas' }));
+  }
+
+  /** The no-shop answer: grouped by product, with no quantity and no stock flag. */
+  function assistedResponseWithoutShop() {
+    vi.mocked(aiSearchService.searchAssisted).mockResolvedValue({
+      kind: 'ok',
+      response: assistedResponse({
+        pointOfSaleId: null,
+        groups: [
+          {
+            familyId: null,
+            familyLabel: null,
+            members: [result({ quantityAtPointOfSale: null, hasStock: null })],
+          },
+        ],
+      }),
+    });
+  }
+
+  it('should offer the every-shop scope when the caller is an administrator', async () => {
+    const user = userEvent.setup();
+    asAdministrator();
+    renderPanel();
+    await ready();
+
+    await user.click(screen.getByLabelText('Punto de venta'));
+
+    expect(await screen.findByRole('option', { name: 'Todas las tiendas' })).toBeInTheDocument();
+  });
+
+  it('should not offer the every-shop scope when the caller is an operator', async () => {
+    const user = userEvent.setup();
+    // Two shops, so the selector is shown and its absence cannot be blamed on the selector itself.
+    vi.mocked(pointOfSaleService.getPointsOfSale).mockResolvedValue([POS_ONE, POS_TWO]);
+    renderPanel();
+    await ready();
+
+    await user.click(screen.getByLabelText('Punto de venta'));
+    expect(await screen.findByRole('option', { name: 'Fornells' })).toBeInTheDocument();
+
+    // The narrowing belongs to the screen, not to authorisation: the route keeps serving this scope
+    // to operators. What the panel declines to offer is a tool that answers the wrong question at a
+    // counter, since it reports no stock at all and so cannot close a sale.
+    expect(screen.queryByRole('option', { name: 'Todas las tiendas' })).not.toBeInTheDocument();
+  });
+
+  it('should select a concrete shop on load rather than the every-shop scope', async () => {
+    asAdministrator();
+    renderPanel();
+    await ready();
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Punto de venta')).toHaveTextContent(POS_ONE.name),
+    );
+    expect(screen.queryByTestId('assisted-scope-consequence')).not.toBeInTheDocument();
+  });
+
+  it('should issue no search request when the scope changes to every shop', async () => {
+    const user = userEvent.setup();
+    asAdministrator();
+    renderPanel();
+    await ready();
+
+    await user.type(screen.getByLabelText('¿Qué busca el cliente?'), 'anillo');
+    await user.click(screen.getByRole('button', { name: /^Buscar$/ }));
+    await screen.findByTestId('assisted-search-result');
+
+    await chooseEveryShop(user);
+
+    // Picking a scope is not asking for a search, and the displayed results stop describing the
+    // scope that is now selected, so they go.
+    await waitFor(() =>
+      expect(screen.queryByTestId('assisted-search-result')).not.toBeInTheDocument(),
+    );
+    expect(aiSearchService.search).toHaveBeenCalledTimes(1);
+    expect(aiSearchService.searchAssisted).not.toHaveBeenCalled();
+  });
+
+  it('should state the consequence of the scope before any search is issued', async () => {
+    const user = userEvent.setup();
+    asAdministrator();
+    renderPanel();
+    await ready();
+
+    await chooseEveryShop(user);
+
+    const stated = await screen.findByTestId('assisted-scope-consequence');
+    expect(stated).toHaveTextContent(/todo el catálogo/i);
+    expect(stated).toHaveTextContent(/elige una tienda/i);
+    expect(aiSearchService.search).not.toHaveBeenCalled();
+    expect(aiSearchService.searchAssisted).not.toHaveBeenCalled();
+  });
+
+  it('should disable the fast route with a reason of scope when every shop is selected', async () => {
+    const user = userEvent.setup();
+    asAdministrator();
+    renderPanel();
+    await ready();
+
+    await chooseEveryShop(user);
+
+    const reason = await screen.findByTestId('route-unavailable-semantic');
+    expect(reason).toHaveTextContent(/una tienda concreta/i);
+  });
+
+  it('should not state the semantic path as switched off when the fast route is disabled by scope', async () => {
+    const user = userEvent.setup();
+    asAdministrator();
+    renderPanel();
+    await ready();
+
+    await chooseEveryShop(user);
+
+    // Two different facts. The fast route does not accept this scope; its switch is untouched.
+    // Reporting the first as the second is the class of false statement this panel exists to stop
+    // making, and it is the one C40 was opened to remove.
+    const reason = await screen.findByTestId('route-unavailable-semantic');
+    expect(reason).not.toHaveTextContent(/desactivad/i);
+  });
+
+  it('should keep the assisted route enabled when every shop is selected', async () => {
+    const user = userEvent.setup();
+    asAdministrator();
+    renderPanel();
+    await ready();
+
+    await chooseEveryShop(user);
+
+    // **The test that closes this change.** Before it, selecting the scope left the availability
+    // read unresolved, so the assisted option came out disabled with no reason to show: a path that
+    // switches itself off and does not say so, which is the exact shape of failure C40 existed to
+    // retire.
+    await waitFor(() =>
+      expect(screen.queryByTestId('route-unavailable-assisted')).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('ai-availability')).not.toHaveTextContent(
+      /Comprobando disponibilidad/i,
+    );
+  });
+
+  it('should state that the scope needs the assisted answer when it is switched off', async () => {
+    const user = userEvent.setup();
+    asAdministrator();
+    availabilityIs({
+      pointOfSaleId: null,
+      assistedAnswerAvailable: false,
+      assistedAnswerUnavailableReason: 'switched_off',
+    });
+    renderPanel();
+    await ready();
+
+    await chooseEveryShop(user);
+
+    // Both options of the toggle are disabled here, one by scope and one by switch. Left unsaid
+    // that is a scope you can pick and cannot search from.
+    const deadEnd = await screen.findByTestId('assisted-scope-dead-end');
+    expect(deadEnd).toHaveTextContent(/respuesta asistida/i);
+    expect(deadEnd).toHaveTextContent(/desactivada/i);
+  });
+
+  it('should not claim the assisted answer is off at this shop when every shop is selected', async () => {
+    const user = userEvent.setup();
+    asAdministrator();
+    availabilityIs({
+      pointOfSaleId: null,
+      assistedAnswerAvailable: false,
+      assistedAnswerUnavailableReason: 'switched_off',
+    });
+    renderPanel();
+    await ready();
+
+    await chooseEveryShop(user);
+
+    // There is no shop to speak of in this scope, so naming one is not a wording preference: it is
+    // a false statement.
+    await waitFor(() =>
+      expect(screen.getByTestId('route-unavailable-assisted')).not.toHaveTextContent(
+        /en esta tienda/i,
+      ),
+    );
+    expect(screen.getByTestId('ai-availability')).not.toHaveTextContent(/en esta tienda/i);
+  });
+
+  it('should send no point of sale when searching every shop', async () => {
+    const user = userEvent.setup();
+    asAdministrator();
+    renderPanel();
+    await ready();
+
+    await chooseEveryShop(user);
+    await user.type(screen.getByLabelText('¿Qué busca el cliente?'), 'anillo de plata');
+    await user.click(screen.getByRole('button', { name: /^Buscar$/ }));
+
+    await waitFor(() => expect(aiSearchService.searchAssisted).toHaveBeenCalledTimes(1));
+
+    // **Absent, not blank.** The routes tell the two apart on purpose: an absent point of sale
+    // leaves the availability prefilter unapplied, while a blank identifier names no shop and is
+    // refused. Reading one as the other would turn a client bug into a wider search.
+    const payload = vi.mocked(aiSearchService.searchAssisted).mock.calls[0][0];
+    expect(payload).not.toHaveProperty('pointOfSaleId');
+    expect(JSON.stringify(payload)).not.toContain('00000000-0000-0000-0000-000000000000');
+
+    // The fast route refuses this scope with a 400, so it must not be the one that was asked.
+    expect(aiSearchService.search).not.toHaveBeenCalled();
+  });
+
+  it('should read availability without a point of sale when every shop is selected', async () => {
+    const user = userEvent.setup();
+    asAdministrator();
+    renderPanel();
+    await ready();
+
+    await chooseEveryShop(user);
+
+    await waitFor(() =>
+      expect(aiSearchService.getAvailability).toHaveBeenLastCalledWith(undefined),
+    );
+  });
+
+  it('should state that a shop is needed to read stock when every shop is selected', async () => {
+    const user = userEvent.setup();
+    asAdministrator();
+    assistedResponseWithoutShop();
+    renderPanel();
+    await ready();
+
+    await chooseEveryShop(user);
+    await user.type(screen.getByLabelText('¿Qué busca el cliente?'), 'anillo de plata');
+    await user.click(screen.getByRole('button', { name: /^Buscar$/ }));
+
+    const row = await screen.findByTestId('assisted-search-result');
+    // Not a zero, which would be a false statement about a piece that may be in the next shop along.
+    expect(row).toHaveTextContent(/selecciona una tienda/i);
+    expect(row).not.toHaveTextContent(POS_ONE.name);
+  });
+
+  it('should disable the sale card action when every shop is selected', async () => {
+    const user = userEvent.setup();
+    asAdministrator();
+    assistedResponseWithoutShop();
+    renderPanel();
+    await ready();
+
+    await chooseEveryShop(user);
+    await user.type(screen.getByLabelText('¿Qué busca el cliente?'), 'anillo de plata');
+    await user.click(screen.getByRole('button', { name: /^Buscar$/ }));
+
+    const row = await screen.findByTestId('assisted-search-result');
+    expect(within(row).getByRole('button', { name: /ficha/i })).toBeDisabled();
+  });
+});

@@ -1242,3 +1242,72 @@ Anotado aquí porque el informe de implementación lo declara diferido y la veri
 faltaba esta mitad: la entrada estaba en el informe y no en este fichero.
 
 ---
+
+## Active Change: `c40-fix-all-shops-scope-unreachable` (C40_FIX)
+
+### La ruta rápida no acepta el ámbito global — y arreglarlo exige antes agrupar en la rama léxica
+
+**Son una sola tarea, y ése es el hallazgo.** Separadas parecen dos mejoras independientes; juntas son
+una tarea con un orden obligatorio, porque hacer la primera sin la segunda entrega un **HTTP 500**.
+
+**Qué falta.** `POST /api/ai/search` —la ruta rápida, la que el panel usa **por defecto**— rechaza el
+ámbito «todas las tiendas» con un 400 de validación:
+`AssistedSearchRequestValidator` lleva `RuleFor(x => x.PointOfSaleId).NotEmpty()`, y
+`AssistedSearchRequest.PointOfSaleId` es `Guid` y no `Guid?`. El ámbito sólo lo sirve
+`POST /api/ai/search/assisted`, cuyo request sí es anulable.
+
+**Por qué C40_FIX no lo hizo.** Porque limitó el control al administrador, y con esa audiencia la
+objeción económica a fijar la ruta generativa se cae: no son cien mostradores en ráfagas, son consultas
+ocasionales de administración. Extender la ruta rápida arrastra el DTO, el validador, `AuthoriseAsync`,
+la construcción del ámbito, la hidratación, `RecordAsync` y `AssistedSearchResponse` de
+`AssistedSearchService`, **el servicio más transitado y más probado del árbol**, con toda su cola de
+tests de integración. Se declaró fuera de alcance con su motivo en el `design.md` del change (D2).
+
+**Y la mina que hay que desactivar antes, que es la parte no obvia.** La capa de repositorio ya es
+anulable, pero **no de forma uniforme**:
+
+| Método de `IAssistedSearchRepository` | Acepta `Guid?` | Agrupa por producto con nulo |
+|---|---|---|
+| `HydrateAsync` | sí | **sí**, con un comentario que explica el peligro |
+| `SearchLexicalAsync` | sí | **no** — proyecta `ToRow` desde filas de `Inventory` |
+
+`Carried(null)` suelta el filtro de tienda, así que un producto que tres tiendas llevan vuelve **tres
+veces**, y `AssistedSearchService.BuildResultsAsync` hace `rows.ToDictionary(row => row.ProductId)`
+**incondicionalmente, en las dos ramas**. Resultado: `ArgumentException` → **HTTP 500**.
+
+Hoy la rama nula de `SearchLexicalAsync` es **código muerto**: su único llamante es `DegradedAsync`, que
+siempre pasa una tienda concreta. Se activaría en el instante en que la ruta rápida aceptara la
+ausencia — y **primero en desarrollo local**, donde `AiSearch__EnabledByDefault` no está declarado en
+ningún `appsettings` y por tanto la ruta degradada es la que corre siempre.
+
+### Qué hace falta cuando se haga
+
+1. **Primero la agrupación**: replicar en `SearchLexicalAsync` el `GroupBy(ProductId)` de
+   `HydrateAsync` para la rama nula, con `Quantity = null` — sin sumar y sin elegir la de una tienda al
+   azar, por lo mismo que la hidratación ya razona—, y **un test que le pase `null` y compruebe que un
+   producto de varias tiendas vuelve una sola vez**. Sin ese test la mina vuelve a quedar dormida y sin
+   guarda.
+2. `AssistedSearchRequest.PointOfSaleId` a `Guid?`; el validador retira `.NotEmpty()` y **rechaza
+   `Guid.Empty`** con el mismo criterio y el mismo texto que ya usa el controlador de la consulta libre:
+   ausencia es que la clave no esté, y cualquier otra cosa es un valor que tiene que ser usable.
+3. `AuthoriseAsync` omitida con nulo; `AiCallScope.ForAllPointsOfSale` en vez de `ForPointOfSale`;
+   el predicado del interruptor por el método de extensión que C40_FIX extrajo, que ya resuelve el nulo.
+4. `RecordAsync` omitido sin tienda, como ya hace `FreeQuerySearchService`.
+5. `AssistedSearchResponse.PointOfSaleId` a `Guid?`.
+6. En el frontend, retirar la fijación de ruta de `assisted.tsx` —`effectiveRoute`— y el motivo de
+   ámbito del lado semántico del toggle, más los dos tests que los fijan.
+
+### Lo que esto ensancharía, y hay que decirlo al hacerlo
+
+**El hueco de telemetría.** Hoy una consulta global no se registra, y con el control limitado al
+administrador eso es marginal. Si la ruta rápida acepta el ámbito, las búsquedas globales **semánticas**
+tampoco quedarían registradas, y ésas sí son la ruta por defecto: el agujero pasa de un puñado de
+consultas de administración a algo que puede sesgar la comparación de las dos rutas sobre la telemetría.
+La tarea de arriba —*«Una búsqueda en “todos los puntos de venta” no queda registrada»*— sube de
+prioridad en ese momento, no antes.
+
+Anotado al implementar C40_FIX, cuya exploración encontró las dos mitades: el 400 de la ruta rápida no
+figuraba en ninguna pasada anterior del ticket, y la mina de la rama léxica no figuraba en ninguna
+parte.
+
+---

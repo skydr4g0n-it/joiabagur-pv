@@ -15,8 +15,16 @@ import type { PitchStatus, SalesAssistCitation } from '@/types/sales-assist.type
 export interface AssistedSearchRequest {
   /** Natural-language query typed by the operator. */
   query: string;
-  /** Point of sale the search is served for. Always required — never inferred by the server. */
-  pointOfSaleId: string;
+  /**
+   * Point of sale the search is served for, never inferred by the server.
+   *
+   * **Optional on the type, required by this route.** `POST /api/ai/search` still refuses a
+   * request with no point of sale, so the panel only omits the field on the assisted route. The
+   * field is optional here so that one payload can be built for both routes without a cast;
+   * what stops an omission reaching this route is the panel pinning the assisted one whenever
+   * the every-shop scope is selected, not the type.
+   */
+  pointOfSaleId?: string;
   /** How many results to display. The server falls back to its configured default. */
   pageSize?: number;
   /**
@@ -136,7 +144,14 @@ export interface AssistedSearchResponse {
  * have had nothing behind it.
  */
 export interface AiSearchAvailability {
-  pointOfSaleId: string;
+  /**
+   * The shop the answer is about, or **null** when it is about the scope covering every shop.
+   *
+   * Null and not a blank identifier, for the same reason the request omits the field rather than
+   * blanking it: a blank identifier names no shop, and reading one as «all of them» would turn a
+   * client bug into a wider answer.
+   */
+  pointOfSaleId: string | null;
   /**
    * Whether the semantic path is on. False does not disable anything on screen — the panel still
    * searches, degrading to the lexical searcher with the filters applied — it explains the
@@ -280,8 +295,14 @@ export type SearchRoute = 'semantic' | 'assisted';
 export interface FreeQuerySearchRequest {
   /** What the operator typed, in their own words. */
   query: string;
-  /** The shop to answer about. Required: searching every shop is a scope of its own. */
-  pointOfSaleId: string;
+  /**
+   * The shop to answer about, or **absent** for the scope covering every shop.
+   *
+   * Absent is not a blank identifier. The route reads the field not being there as the wider
+   * scope and refuses a blank one, because what makes that scope safe is that an absent point of
+   * sale leaves the availability prefilter unapplied rather than matching every shop.
+   */
+  pointOfSaleId?: string;
   /** Families wanted. The server falls back to its configured default. */
   pageSize?: number;
   /** The visit this search belongs to, so a rephrasing is not counted as an abandoned query. */

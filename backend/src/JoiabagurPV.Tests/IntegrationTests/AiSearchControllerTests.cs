@@ -347,6 +347,44 @@ public class AiSearchControllerTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    /// <remarks>
+    /// C40_FIX. This route refused an absent point of sale, so a screen offering the every-shop
+    /// scope had nothing to read and showed the generative path disabled with no reason — the
+    /// failure the route was created to prevent, reappearing one scope along.
+    /// </remarks>
+    [Fact]
+    public async Task Availability_WithoutPointOfSale_ReturnsTheDefaultScope()
+    {
+        var response = await _operatorClient.GetAsync("/api/ai/search/availability");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK,
+            "an absent point of sale is the scope covering every one of them, not a malformed request");
+
+        var body = (await response.Content.ReadFromJsonAsync<AiSearchAvailabilityResponse>())!;
+
+        body.PointOfSaleId.Should().BeNull(
+            "the wider scope comes back as an absence and never as a blank identifier");
+        body.AssistedAnswerUnavailableReason.Should().Be(
+            body.AssistedAnswerAvailable ? null : "switched_off");
+    }
+
+    /// <remarks>
+    /// The distinction that makes this scope safe, asserted on the way in: an absent point of sale
+    /// leaves the availability prefilter unapplied, while a blank identifier names no shop. Reading
+    /// the second as the first would turn a client bug into a wider answer, which is the
+    /// wildcard-by-accident C40 spent a whole group of work closing.
+    /// </remarks>
+    [Fact]
+    public async Task Availability_WithBlankPointOfSale_Returns400()
+    {
+        var response = await _operatorClient.GetAsync(
+            $"/api/ai/search/availability?pointOfSaleId={Guid.Empty}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "a blank identifier is a value that names no shop, so it has to be refused rather than "
+            + "read as though the field had not been sent");
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private static Task<HttpResponseMessage> SearchAsync(HttpClient client, string query, Guid pointOfSaleId) =>

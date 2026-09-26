@@ -151,16 +151,26 @@ public class AssistedSearchService : IAssistedSearchService
     /// the AI service will write prose for this shop. Reporting availability on one of the two
     /// would put the screen back where C40 found it — offering a capability that is switched off.
     /// </remarks>
-    public AiSearchAvailabilityResponse GetAvailability(Guid pointOfSaleId)
+    public AiSearchAvailabilityResponse GetAvailability(Guid? pointOfSaleId)
     {
+        // The shared predicate in all three, so that what this reports and what each route
+        // enforces cannot drift. With no shop named the deployment default governs — the narrow
+        // reading, already decided by the free-query route: enabling the feature shop by shop has
+        // not enabled it for «all of them». See AiScopeSwitchExtensions.
         var assistedAnswer =
-            _freeQueryOptions.CurrentValue.IsEnabledFor(pointOfSaleId)
-            && _assistOptions.CurrentValue.IsEnabledFor(pointOfSaleId);
+            _freeQueryOptions.CurrentValue.IsEnabledForScope(pointOfSaleId)
+            && _assistOptions.CurrentValue.IsEnabledForScope(pointOfSaleId);
 
         return new AiSearchAvailabilityResponse
         {
             PointOfSaleId = pointOfSaleId,
-            SemanticSearchAvailable = _options.CurrentValue.IsEnabledFor(pointOfSaleId),
+
+            // Reported with its own predicate even for the wider scope, which the fast route does
+            // not serve. **This describes a switch, not reachability.** Answering false here would
+            // state that semantic search is switched off, which is a different fact and a false
+            // one; that the fast route cannot serve this scope is the panel's to say, and it says
+            // it in its own words.
+            SemanticSearchAvailable = _options.CurrentValue.IsEnabledForScope(pointOfSaleId),
             AssistedAnswerAvailable = assistedAnswer,
 
             // Only the switch can be known without calling. An outage or a rejected credential is

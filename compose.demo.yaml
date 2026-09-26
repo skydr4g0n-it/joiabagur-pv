@@ -196,6 +196,20 @@ services:
       # switch the demo would answer every card with the degraded one read from
       # the catalog — a 200, `aiAvailable: false`, and the AI never called.
       AiSalesAssist__EnabledByDefault: "true"
+      # Class C - versioned literal, and THE THIRD OF THE FAMILY, missing until C40_FIX.
+      #
+      # C40 gave the free-query route a rollout gate of its own, deliberately separate
+      # from the two above because the three features have different cost profiles -
+      # and did not add it here. The property defaults to false with an empty
+      # allowlist, so on this environment `GET /api/ai/search/availability` answered
+      # `assistedAnswerAvailable: false` with `switched_off` for EVERY shop: the whole
+      # generative panel C40 built, switched off, in the environment whose only job is
+      # to show it. Exactly the failure the comment above this block describes.
+      #
+      # It is a prerequisite and not an improvement for C40_FIX: the every-shop scope
+      # is served by the assisted route alone, so with this off an administrator picking
+      # «Todas las tiendas» reaches a scope they cannot search from on the first click.
+      AiFreeQuerySearch__EnabledByDefault: "true"
       # The budget of the generative client. 10 s, because the AI service
       # declares a worst case of 2 x 4 s for the provider calls of one request;
       # start-up refuses anything below 8000.

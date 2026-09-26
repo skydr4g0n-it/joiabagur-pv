@@ -68,6 +68,21 @@ import type { PointOfSale } from '@/types/point-of-sale.types';
 
 const PAGE_SIZE = 10;
 
+/**
+ * The value the scope option carries inside the selector, and **nowhere else** (C40_FIX).
+ *
+ * A `Select` needs a value for every option, and the scope covering every shop is not a shop, so
+ * it needs one that no identifier can collide with. The same pattern the category filter on this
+ * page already uses — `value={category || 'all'}` — for the same reason.
+ *
+ * **It never reaches a request.** Every call site translates it to the *absence* of the point-of-sale
+ * field before anything is sent, because what makes this scope safe is that an absent point of sale
+ * leaves the availability prefilter unapplied rather than matching every shop. A blank identifier
+ * travelling instead would be the wildcard-by-accident that C40 spent a whole group of work closing,
+ * and both routes refuse one on purpose.
+ */
+const ALL_POINTS_OF_SALE = '__all__';
+
 /** Everything the panel can be showing, once a search has settled. */
 type PanelState =
   | { kind: 'idle' }
@@ -141,6 +156,49 @@ export function AssistedSalesSearchPage() {
   const [availability, setAvailability] = useState<AiSearchAvailability | null>(null);
   const [availabilitySettled, setAvailabilitySettled] = useState(false);
 
+  /**
+   * Whether the search covers every shop rather than one (C40_FIX).
+   *
+   * C40 built this scope in full — a third `AiCallScope` class, a third claims profile,
+   * authorisation open to both roles, nullable quantities and a row with three states — and left no
+   * way into it, so none of it ever ran. This is that way in.
+   */
+  const scopeIsAllPointsOfSale = pointOfSaleId === ALL_POINTS_OF_SALE;
+
+  /**
+   * The point of sale as the network sees it: a real identifier, or **nothing at all**.
+   *
+   * The single place the selector's sentinel stops being a value. Everything downstream — the
+   * availability probe, the search payload — reads this and never `pointOfSaleId`.
+   */
+  const scopedPointOfSaleId = scopeIsAllPointsOfSale ? undefined : pointOfSaleId || undefined;
+
+  /**
+   * Whether the every-shop scope is on offer at all.
+   *
+   * **Administrators only, and this is a decision of the screen rather than an authorisation
+   * boundary.** The free-query route serves the scope to operators too, by its own requirement and
+   * with its reason written down, and that stays as it is: the boundary actually being protected is
+   * that nobody may *name* a shop they are not assigned to. What the panel declines to offer is a
+   * tool that answers the wrong question at a counter — the scope reports no stock at all, so it
+   * cannot close a sale, and «is it in another shop?» is precisely what it does not answer.
+   */
+  const canScopeToAllPointsOfSale = isAdmin;
+
+  /**
+   * The route the next search will actually take (C40_FIX).
+   *
+   * **The every-shop scope pins the assisted one**, because the fast route refuses a request with no
+   * point of sale — `POST /api/ai/search` validates it as required and answers 400. Letting the
+   * chosen route stand would print «La búsqueda asistida requiere un punto de venta» underneath the
+   * control that had just offered the scope: the screen contradicting itself, which is worse than
+   * the gap this change came to close.
+   *
+   * Derived rather than written into state, so that leaving the scope restores whatever the operator
+   * had chosen instead of silently keeping them on the expensive route.
+   */
+  const effectiveRoute: SearchRoute = scopeIsAllPointsOfSale ? 'assisted' : route;
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -169,6 +227,13 @@ export function AssistedSalesSearchPage() {
    * it — the flag inside a search response arrives too late to prevent anything.
    */
   useEffect(() => {
+    // Nothing is chosen yet, because the shops are still loading. That is the only state with no
+    // scope to read availability for.
+    //
+    // **The every-shop scope is a scope, not a gap** (C40_FIX). While this guard also caught it,
+    // selecting it left `settled` false for good, so the badge stayed on «Comprobando
+    // disponibilidad…» and the assisted option came out disabled with no reason to show — the very
+    // failure this probe was introduced to remove, reappearing one scope along.
     if (!pointOfSaleId) {
       setAvailability(null);
       setAvailabilitySettled(false);
@@ -178,7 +243,7 @@ export function AssistedSalesSearchPage() {
     let current = true;
     setAvailabilitySettled(false);
 
-    aiSearchService.getAvailability(pointOfSaleId).then((outcome) => {
+    aiSearchService.getAvailability(scopedPointOfSaleId).then((outcome) => {
       // A stale answer must never overwrite a newer one, the same guard the search itself uses.
       if (!current) return;
       setAvailability(outcome.kind === 'ok' ? outcome.availability : null);
@@ -188,6 +253,9 @@ export function AssistedSalesSearchPage() {
     return () => {
       current = false;
     };
+    // `scopedPointOfSaleId` is derived from `pointOfSaleId`, so listing the latter describes when
+    // this effect must run without re-running it twice for one change of scope.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pointOfSaleId]);
 
   const runSearch = useCallback(
@@ -198,9 +266,14 @@ export function AssistedSalesSearchPage() {
       const seq = ++requestSeq.current;
       setState({ kind: 'loading' });
 
+      // **The scope travels as an absence, never as a blank identifier** (C40_FIX). Spreading a
+      // conditional rather than assigning `undefined` so the key is not present at all: the route
+      // reads the field not being there as «every shop» and refuses a blank one, and the two must
+      // stay tellable apart — reading a blank as an absence would turn a client bug into a wider
+      // search.
       const payload = {
         query: trimmed,
-        pointOfSaleId,
+        ...(scopedPointOfSaleId ? { pointOfSaleId: scopedPointOfSaleId } : {}),
         pageSize: PAGE_SIZE,
         searchSessionId,
         materials,
@@ -210,7 +283,7 @@ export function AssistedSalesSearchPage() {
       // One request, on the route the operator chose. The two endpoints differ in switch,
       // allowance, time budget and circuit, which is why they are two and not a `mode` field.
       const outcome =
-        route === 'assisted'
+        effectiveRoute === 'assisted'
           ? await aiSearchService.searchAssisted(payload)
           : await aiSearchService.search(payload);
 
@@ -240,7 +313,9 @@ export function AssistedSalesSearchPage() {
     },
     // searchSessionId is stable for the life of the panel; listed so the dependency array
     // describes what the callback actually reads rather than what happens to change.
-    [pointOfSaleId, materials, category, searchSessionId, route],
+    // `scopedPointOfSaleId` is derived from `pointOfSaleId`, already listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pointOfSaleId, materials, category, searchSessionId, effectiveRoute],
   );
 
   const handleSubmit = () => runSearch(query);
@@ -341,7 +416,9 @@ export function AssistedSalesSearchPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Buscar con ayuda</h1>
           <p className="text-muted-foreground">
-            Describe la pieza con tus palabras y te enseño lo que hay en tu tienda
+            {scopeIsAllPointsOfSale
+              ? 'Describe la pieza con tus palabras y te enseño lo que hay en el catálogo'
+              : 'Describe la pieza con tus palabras y te enseño lo que hay en tu tienda'}
           </p>
         </div>
       </div>
@@ -351,7 +428,11 @@ export function AssistedSalesSearchPage() {
         path was switched off was to use it, which is how the panel spent the whole project
         serving from its degraded route while looking exactly as it does when the AI answers.
       */}
-      <AiAvailabilityBadge availability={availability} settled={availabilitySettled} />
+      <AiAvailabilityBadge
+        availability={availability}
+        settled={availabilitySettled}
+        scopeIsAllPointsOfSale={scopeIsAllPointsOfSale}
+      />
 
       <Card>
         <CardContent className="space-y-4 pt-6">
@@ -363,6 +444,13 @@ export function AssistedSalesSearchPage() {
                   <SelectValue placeholder="Selecciona un punto de venta" />
                 </SelectTrigger>
                 <SelectContent>
+                  {/*
+                    First in the list and set apart, because it is not one more shop: it is a
+                    different question. Administrators only — see `canScopeToAllPointsOfSale`.
+                  */}
+                  {canScopeToAllPointsOfSale ? (
+                    <SelectItem value={ALL_POINTS_OF_SALE}>Todas las tiendas</SelectItem>
+                  ) : null}
                   {pointsOfSale.map((pos) => (
                     <SelectItem key={pos.id} value={pos.id}>
                       {pos.name}
@@ -370,6 +458,20 @@ export function AssistedSalesSearchPage() {
                   ))}
                 </SelectContent>
               </Select>
+
+              {/*
+                The consequence, stated before searching rather than discovered result by result.
+                The scope reports no stock at all, so an administrator who expects «where is it?»
+                has to learn here that the answer is «does it exist?».
+              */}
+              {scopeIsAllPointsOfSale ? (
+                <p
+                  className="text-sm text-muted-foreground"
+                  data-testid="assisted-scope-consequence"
+                >
+                  Verás piezas de todo el catálogo. Para leer existencias, elige una tienda.
+                </p>
+              ) : null}
             </div>
           ) : null}
 
@@ -378,12 +480,36 @@ export function AssistedSalesSearchPage() {
             panel's first rule is that a search happens only when the operator asks for one.
           */}
           <SearchRouteToggle
-            value={route}
+            value={effectiveRoute}
             onChange={setRoute}
             assistedAvailable={availability?.assistedAnswerAvailable ?? false}
             assistedUnavailableReason={availability?.assistedAnswerUnavailableReason}
+            semanticUnavailableReason={
+              scopeIsAllPointsOfSale
+                ? 'La búsqueda rápida trabaja sobre una tienda concreta'
+                : null
+            }
+            scopeIsAllPointsOfSale={scopeIsAllPointsOfSale}
             disabled={state.kind === 'loading'}
           />
+
+          {/*
+            The dead end, said out loud (C40_FIX). With the every-shop scope selected the fast route
+            cannot serve it and the assisted one is switched off, so both options of the toggle are
+            disabled. Left unsaid that is a scope you can pick and cannot search from — which is the
+            same silence this whole change exists to remove.
+
+            Stated rather than pre-disabling the scope option: knowing in advance would mean reading
+            the probe twice on every load, once for the selected scope and once for the wider one,
+            and picking a scope costs no request at all.
+          */}
+          {scopeIsAllPointsOfSale &&
+          availabilitySettled &&
+          !(availability?.assistedAnswerAvailable ?? false) ? (
+            <p className="text-sm text-warning" data-testid="assisted-scope-dead-end">
+              La búsqueda en todas las tiendas usa la respuesta asistida, y está desactivada.
+            </p>
+          ) : null}
           <div className="space-y-2">
             <Label htmlFor="assisted-query">¿Qué busca el cliente?</Label>
             <div className="flex gap-2">
@@ -583,10 +709,20 @@ export function AssistedSalesSearchPage() {
           !response.lowConfidence &&
           response.candidatesReturned > 0 ? (
             <Alert>
-              <AlertTitle>Nada de esto está en tu tienda</AlertTitle>
+              {/*
+                Worded per scope (C40_FIX). «Tu tienda» is false when the search covered every one
+                of them, and the fallback these lines carried — «este punto de venta» — was written
+                when one shop was the only scope there was. With no shop, what did not survive is
+                that nothing in the whole catalogue is on any active shelf.
+              */}
+              <AlertTitle>
+                {scopeIsAllPointsOfSale
+                  ? 'Nada de esto está en el catálogo activo'
+                  : 'Nada de esto está en tu tienda'}
+              </AlertTitle>
               <AlertDescription>
                 Encontré {response.candidatesReturned} piezas parecidas, pero ninguna está
-                disponible en {posName || 'este punto de venta'}.
+                disponible en {scopeIsAllPointsOfSale ? 'ninguna tienda' : posName || 'este punto de venta'}.
                 {hasFilters ? ' Prueba a quitar los filtros.' : ''}
               </AlertDescription>
             </Alert>
@@ -606,7 +742,9 @@ export function AssistedSalesSearchPage() {
             <Alert>
               <AlertTitle>Sin resultados</AlertTitle>
               <AlertDescription>
-                La búsqueda por texto tampoco ha encontrado nada en tu tienda.
+                {scopeIsAllPointsOfSale
+                  ? 'La búsqueda por texto tampoco ha encontrado nada en el catálogo.'
+                  : 'La búsqueda por texto tampoco ha encontrado nada en tu tienda.'}
               </AlertDescription>
             </Alert>
           ) : null}
@@ -627,7 +765,8 @@ export function AssistedSalesSearchPage() {
               reads as the system being unable to search, when the shop simply does not carry it. */}
           {shortPage ? (
             <p className="text-sm text-muted-foreground" data-testid="assisted-search-short-page">
-              {response.results.length} resultados en {posName || 'esta tienda'} ·{' '}
+              {response.results.length} resultados en{' '}
+              {scopeIsAllPointsOfSale ? 'todas las tiendas' : posName || 'esta tienda'} ·{' '}
               {response.candidatesReturned} candidatos considerados
             </p>
           ) : null}

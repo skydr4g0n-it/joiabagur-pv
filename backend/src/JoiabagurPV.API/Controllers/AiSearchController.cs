@@ -230,22 +230,40 @@ public class AiSearchController : ControllerBase
     /// same bit it is being asked for, and the search itself remains authorised as before.
     /// </para>
     /// </remarks>
-    /// <param name="pointOfSaleId">The point of sale to report on.</param>
+    /// <param name="pointOfSaleId">
+    /// The point of sale to report on, or omitted for the scope covering every one of them.
+    /// </param>
     [HttpGet("availability")]
     [DisableRateLimiting]
     [ProducesResponseType(typeof(AiSearchAvailabilityResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public IActionResult Availability([FromQuery] Guid pointOfSaleId)
+    public IActionResult Availability([FromQuery] Guid? pointOfSaleId)
     {
         if (!_currentUserService.UserId.HasValue)
         {
             return Unauthorized(new { message = "User not authenticated." });
         }
 
+        // **Absent means every shop; blank is a malformed request.** The same distinction the
+        // free-query route draws, word for word and for the same reason: a caller that meant «all
+        // of them» omits the field, and a caller that sent an empty identifier sent a value that
+        // names no shop. Reading the second as the first would turn a client bug into a wider
+        // answer — and it is the distinction that makes this scope safe, since an absent point of
+        // sale leaves the availability prefilter unapplied rather than matching everything.
+        //
+        // Until C40_FIX this refused the absence too, so a screen offering the wider scope had
+        // nothing to read and showed the generative path disabled with no reason: the failure this
+        // route exists to prevent, reappearing one scope along.
         if (pointOfSaleId == Guid.Empty)
         {
-            return BadRequest(new { errors = new[] { "El punto de venta es obligatorio." } });
+            return BadRequest(new
+            {
+                errors = new[]
+                {
+                    "El punto de venta no es válido. Omítelo para consultar todas las tiendas."
+                }
+            });
         }
 
         return Ok(_searchService.GetAvailability(pointOfSaleId));

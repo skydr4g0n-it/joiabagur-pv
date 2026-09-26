@@ -22,9 +22,27 @@ const UNAVAILABLE_REASONS: Record<string, string> = {
   switched_off: 'La respuesta asistida está desactivada en esta tienda',
 };
 
-export function assistedUnavailableText(reason?: string | null): string {
+/**
+ * The same reasons, worded for the scope that covers every shop (C40_FIX).
+ *
+ * A separate table rather than a conditional inside the phrases: in that scope there is no shop to
+ * speak of, so «está desactivada **en esta tienda**» is not a wording preference, it is a false
+ * statement — and a screen making one of those is exactly what this panel keeps being fixed for.
+ */
+const UNAVAILABLE_REASONS_ALL_SHOPS: Record<string, string> = {
+  switched_off: 'La respuesta asistida está desactivada',
+};
+
+/**
+ * @param scopeIsAllPointsOfSale True when the search covers every shop, so no wording may name one.
+ */
+export function assistedUnavailableText(
+  reason?: string | null,
+  scopeIsAllPointsOfSale = false,
+): string {
+  const table = scopeIsAllPointsOfSale ? UNAVAILABLE_REASONS_ALL_SHOPS : UNAVAILABLE_REASONS;
   if (!reason) return 'La respuesta asistida no está disponible ahora mismo';
-  return UNAVAILABLE_REASONS[reason] ?? 'La respuesta asistida no está disponible ahora mismo';
+  return table[reason] ?? 'La respuesta asistida no está disponible ahora mismo';
 }
 
 interface AiAvailabilityBadgeProps {
@@ -32,13 +50,19 @@ interface AiAvailabilityBadgeProps {
   availability: AiSearchAvailability | null;
   /** True once the read has settled, however it settled. */
   settled: boolean;
+  /** True when the search covers every shop, so no wording may name one (C40_FIX). */
+  scopeIsAllPointsOfSale?: boolean;
 }
 
 /**
  * Marked by text as well as by colour, like the origin label of the result row: the shop floor is
  * not a place to rely on a green dot.
  */
-export function AiAvailabilityBadge({ availability, settled }: AiAvailabilityBadgeProps) {
+export function AiAvailabilityBadge({
+  availability,
+  settled,
+  scopeIsAllPointsOfSale = false,
+}: AiAvailabilityBadgeProps) {
   if (!settled) {
     return (
       <Badge variant="secondary" className="gap-1.5" data-testid="ai-availability">
@@ -75,7 +99,7 @@ export function AiAvailabilityBadge({ availability, settled }: AiAvailabilityBad
     return (
       <Badge variant="warning" className="gap-1.5" data-testid="ai-availability">
         <TriangleAlert className="size-3.5" aria-hidden />
-        Búsqueda inteligente disponible · {assistedUnavailableText(availability.assistedAnswerUnavailableReason)}
+        Búsqueda inteligente disponible · {assistedUnavailableText(availability.assistedAnswerUnavailableReason, scopeIsAllPointsOfSale)}
       </Badge>
     );
   }
@@ -92,7 +116,7 @@ export function AiAvailabilityBadge({ availability, settled }: AiAvailabilityBad
   return (
     <Badge variant="warning" className="gap-1.5" data-testid="ai-availability">
       <TriangleAlert className="size-3.5" aria-hidden />
-      Búsqueda por texto · {assistedUnavailableText(availability.assistedAnswerUnavailableReason)}
+      Búsqueda por texto · {assistedUnavailableText(availability.assistedAnswerUnavailableReason, scopeIsAllPointsOfSale)}
     </Badge>
   );
 }

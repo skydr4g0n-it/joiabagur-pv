@@ -24,8 +24,18 @@ namespace JoiabagurPV.Application.DTOs.Ai;
 /// </remarks>
 public class AiSearchAvailabilityResponse
 {
-    /// <summary>Point of sale the answer is about.</summary>
-    public Guid PointOfSaleId { get; set; }
+    /// <summary>
+    /// Point of sale the answer is about, or <see langword="null"/> when it is about the scope
+    /// covering every one of them.
+    /// </summary>
+    /// <remarks>
+    /// <strong>Null, and never <see cref="Guid.Empty"/>.</strong> An absent point of sale is the
+    /// wider scope; a blank identifier names no shop and is refused at the door, exactly as the
+    /// free-query route refuses one. Reporting the wider scope as a blank identifier would erase
+    /// that distinction on the way back, which is the same wildcard-by-accident C40 spent a whole
+    /// group of work closing on the way in.
+    /// </remarks>
+    public Guid? PointOfSaleId { get; set; }
 
     /// <summary>
     /// Whether the semantic path is switched on. When false the panel still searches — it

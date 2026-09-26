@@ -1039,4 +1039,101 @@ public class AssistedSearchServiceTests
         {
         }
     }
+
+    // ------------------------------------------- availability of the every-point-of-sale scope (C40_FIX)
+
+    /// <remarks>
+    /// C40 built the every-shop scope in full and left the probe answering for a named shop only,
+    /// so a screen offering the scope had nothing to read: the generative path came out disabled
+    /// with no reason to show, which is the shape of failure this route was created to remove.
+    /// </remarks>
+    [Fact]
+    public void GetAvailability_WithoutPointOfSale_ReportsTheDefaultScope()
+    {
+        var availability = CreateService().GetAvailability(null);
+
+        availability.PointOfSaleId.Should().BeNull(
+            "an absent point of sale is the wider scope, and it must not come back as a blank one");
+        availability.SemanticSearchAvailable.Should().BeTrue();
+        availability.AssistedAnswerAvailable.Should().BeTrue();
+        availability.AssistedAnswerUnavailableReason.Should().BeNull();
+    }
+
+    /// <remarks>
+    /// The narrow reading, and the safe one: a deployment that enables the feature shop by shop has
+    /// not enabled it for «all of them». Reading it the other way would spend a generative budget
+    /// on behalf of shops whose owner deliberately switched the feature off.
+    /// </remarks>
+    [Fact]
+    public void GetAvailability_WithoutPointOfSale_IgnoresThePerShopAllowlist()
+    {
+        _freeQueryOptions.EnabledByDefault = false;
+        _freeQueryOptions.EnabledPointOfSaleIds = [PointOfSaleId];
+
+        var availability = CreateService().GetAvailability(null);
+
+        availability.AssistedAnswerAvailable.Should().BeFalse(
+            "an allowlisted shop does not switch the feature on for the scope that covers them all");
+        availability.AssistedAnswerUnavailableReason.Should().Be("switched_off");
+
+        // And the same configuration still reports the named shop as available, so what is being
+        // asserted is the scope rule and not a switch that happens to be off.
+        CreateService().GetAvailability(PointOfSaleId).AssistedAnswerAvailable.Should().BeTrue();
+    }
+
+    /// <remarks>
+    /// <strong>The guard against the probe and the route drifting apart.</strong> They are computed
+    /// in different services, and when they disagree the screen presents a capability that is off as
+    /// though it were on — which is the defect C40 was opened to remove. Both now read the same
+    /// extension method, and this asserts the verdict rather than the call site.
+    /// </remarks>
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public void GetAvailability_WithoutPointOfSale_MatchesTheRoutePredicate(
+        bool freeQueryDefault,
+        bool assistDefault)
+    {
+        _freeQueryOptions.EnabledByDefault = freeQueryDefault;
+        _freeQueryOptions.EnabledPointOfSaleIds = [PointOfSaleId];
+        _assistOptions.EnabledByDefault = assistDefault;
+        _assistOptions.EnabledPointOfSaleIds = [PointOfSaleId];
+
+        var probe = CreateService().GetAvailability(null);
+
+        // What the free-query route itself would enforce for the very same scope.
+        var routeWouldServe = _freeQueryOptions.IsEnabledForScope(null);
+
+        probe.AssistedAnswerAvailable.Should().Be(routeWouldServe && _assistOptions.IsEnabledForScope(null),
+            "the probe must report the predicate the route applies, never one of its own");
+    }
+
+    /// <remarks>
+    /// The probe describes <em>switches</em>; the panel describes <em>reachability</em>. The fast
+    /// route does not accept this scope, but saying so here by answering false would state that
+    /// semantic search is switched off — a different fact, and a false one.
+    /// </remarks>
+    [Fact]
+    public void GetAvailability_WithoutPointOfSale_StillReportsTheSemanticSwitchOnItsOwnTerms()
+    {
+        _options.EnabledByDefault = true;
+
+        CreateService().GetAvailability(null).SemanticSearchAvailable.Should().BeTrue();
+
+        _options.EnabledByDefault = false;
+        _options.EnabledPointOfSaleIds = [PointOfSaleId];
+
+        CreateService().GetAvailability(null).SemanticSearchAvailable.Should().BeFalse();
+    }
+
+    [Fact]
+    public void GetAvailability_WithoutPointOfSale_MakesNoAiCall()
+    {
+        CreateService().GetAvailability(null);
+
+        _gateway.VerifyNoOtherCalls();
+        _telemetry.VerifyNoOtherCalls();
+    }
 }

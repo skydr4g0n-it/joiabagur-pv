@@ -62,6 +62,30 @@ sirvió por su ruta degradada durante todo el proyecto sin que nadie lo notara. 
 /api/ai/search/availability` no cuesta cuota ni llama al servicio de IA, y alimenta una insignia de
 cuatro estados y la opción deshabilitada del toggle, con su motivo al lado.
 
+**El ámbito «todas las tiendas», y por qué sólo lo ve el administrador (C40_FIX).** C40 construyó ese
+ámbito entero —tercera clase de `AiCallScope`, tercer perfil de *claims*, autorización abierta a los
+dos roles, cantidades anulables y una fila con sus tres estados— y **no dejó forma de entrar en él**,
+así que nada de aquello llegó a ejecutarse. El selector ahora lo ofrece, y **sólo al administrador**:
+el ámbito no informa existencias, así que no puede cerrar una venta — responde *«esta pieza existe en
+el catálogo»* y **no** *«está en la tienda del Puerto»*. Es una decisión **de la pantalla y no de
+autorización**: la ruta sigue sirviendo el ámbito a operarios, por su propio requisito y con su razón
+escrita.
+
+Tres cosas que conviene no romper al tocar este panel:
+
+- **El centinela del `Select` no sale al cable.** Se traduce a la **ausencia** del campo antes de la
+  petición, nunca a un identificador en blanco. Las dos rutas distinguen las dos cosas a propósito: la
+  ausencia hace que el prefiltro de disponibilidad **no se aplique**, y un valor en blanco no nombra
+  ninguna tienda y se rechaza.
+- **El ámbito global fija la ruta asistida**, y la rápida queda deshabilitada **con un motivo de
+  ámbito** —«trabaja sobre una tienda concreta»— y nunca con el del interruptor. `POST /api/ai/search`
+  exige punto de venta y responde 400 sin él; dejar que el operario la eligiera pintaría ese error
+  debajo del control que acaba de ofrecer el ámbito. Extender esa ruta al ámbito global es tarea
+  diferida, y **exige antes** agrupar por producto en `SearchLexicalAsync` (ver `DEFERRED_TASKS.md`).
+- **Ninguna cadena puede nombrar una tienda en ese ámbito.** Hay una tabla de copia aparte para él, y
+  cinco textos del panel se eligen por ámbito. «En esta tienda» cuando no hay tienda no es un matiz de
+  redacción: es una afirmación falsa, que es lo que este panel lleva dos changes corrigiendo.
+
 **La respuesta asistida puede llegar de dieciséis maneras** y las dieciséis se distinguen en
 pantalla. No es una lista de mensajes: es una **unión discriminada** resuelta en
 [`lib/free-query-states.ts`](src/lib/free-query-states.ts), porque los estados son combinaciones de

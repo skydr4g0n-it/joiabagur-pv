@@ -110,18 +110,24 @@ export const aiSearchService = {
   },
 
   /**
-   * Reads which assisted paths are switched on for a point of sale.
+   * Reads which assisted paths are switched on for a scope: one point of sale, or every one of
+   * them when none is given.
    *
    * Never throws, and never reports a failure as an outage: a panel that cannot read the switches
    * still searches perfectly well, so the badge says it could not tell rather than announcing a
    * problem the operator can neither verify nor fix.
    *
-   * Costs no AI call and no quota, which is what makes it safe to ask before every search.
+   * Costs no AI call and no quota, which is what makes it safe to ask before every search — and
+   * what makes it safe to ask again whenever the scope changes.
+   *
+   * **The parameter is omitted rather than blanked** when there is no shop. The route refuses a
+   * blank identifier on purpose and reads only a genuine absence as the wider scope, so sending
+   * an empty string here would turn the wider scope into a validation error.
    */
-  getAvailability: async (pointOfSaleId: string): Promise<AiSearchAvailabilityOutcome> => {
+  getAvailability: async (pointOfSaleId?: string): Promise<AiSearchAvailabilityOutcome> => {
     try {
       const response = await apiClient.get<AiSearchAvailability>(AVAILABILITY_ENDPOINT, {
-        params: { pointOfSaleId },
+        params: pointOfSaleId ? { pointOfSaleId } : undefined,
       });
       return { kind: 'ok', availability: response.data };
     } catch {
