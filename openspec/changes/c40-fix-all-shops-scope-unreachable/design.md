@@ -151,9 +151,18 @@ Hoy:   AssistedSearchService.GetAvailability(Guid pos)
        FreeQuerySearchService.IsEnabled(options, Guid? pos)
          └── pos is { } named ? IsEnabledFor(named) : EnabledByDefault   ← el predicado real
 
-Después: IsEnabledFor(this <opciones>, Guid?)  —— un método de extensión por clase,
-         consumido por la sonda Y por la ruta, de modo que no puedan divergir.
+Después: IsEnabledForScope(this <opciones>, Guid?)  —— un método de extensión por clase,
+         consumido por la sonda Y por la ruta, de modo que **la regla del nulo** no
+         pueda divergir.
 ```
+
+> **Corregido en la verificación independiente (2026-09-26).** Lo que el predicado extraído garantiza es
+> que **la resolución de la ausencia** —nulo → `EnabledByDefault`— es la misma a los dos lados. **No**
+> garantiza que el veredicto de la sonda coincida con el de la ruta, porque la sonda devuelve la
+> *conjunción* del interruptor de la consulta libre **y** el de la ficha de venta, y
+> `FreeQuerySearchService` no lee el segundo en ningún punto. Medido: con
+> `AiFreeQuerySearch__EnabledByDefault=true` y `AiSalesAssist__EnabledByDefault=false` la sonda responde
+> `switched_off` para un ámbito que la ruta sirve con prosa generada. Ver R4 y `DEFERRED_TASKS.md`.
 
 Si sonda y ruta calculan predicados distintos se recrea **la avería original de C40**: la pantalla
 diciendo una cosa y el backend haciendo otra. El predicado sin tienda es `EnabledByDefault`, la lectura
@@ -230,7 +239,7 @@ tienda»), que es capacidad nueva y no cabe en un fix.
       │                             │  results:= idle                ← D7                   │
       │                             │  ✗ NINGUNA petición de búsqueda                       │
       │                             │── GET /availability (sin pos) ▶│                       │
-      │                             │                            │ IsEnabledFor(null)       │
+      │                             │                            │ IsEnabledForScope(null)  │
       │                             │                            │  → EnabledByDefault ← D4 │
       │                             │◀── 200 {pointOfSaleId: null, …} ───────────────────── │
       │                             │                                                       │
@@ -273,6 +282,24 @@ escenario 2 lo fija.
 
 **R4 · Que la sonda y la ruta calculen predicados distintos.** Es la avería original de C40. →
 **Mitigación:** D4, el predicado extraído, más un test que compara las dos respuestas para el mismo ámbito.
+
+> **La mitigación quedó a medias, y la verificación independiente del 2026-09-26 lo midió.** Dos cosas:
+>
+> 1. **El test no comparaba nada.** `GetAvailability_WithoutPointOfSale_MatchesTheRoutePredicate` calcula
+>    el valor esperado con los mismos métodos de extensión que la sonda y **nunca invoca**
+>    `FreeQuerySearchService`. Sobrevive en verde a invertir la rama nula del predicado compartido **y** a
+>    reescribir la ruta con una regla distinta para la ausencia (dos mutaciones, compiladas y ejecutadas).
+>    Lo único que fija es la sonda contra `AiScopeSwitchExtensions`, que es un lado. Sustituido por
+>    `AiScopePredicateAgreementTests`, que construye las dos piezas sobre las mismas opciones, **ejecuta la
+>    ruta** y compara veredictos; caza las dos mutaciones.
+> 2. **El riesgo sigue vivo, en una dirección.** La sonda reporta `freeQuery && salesAssist`; la ruta
+>    aplica `freeQuery` a secas. Con el primero encendido y el segundo apagado, la sonda dice
+>    `switched_off` de un ámbito que la ruta sirve con prosa —comprobado por HTTP contra la API en
+>    marcha—, y en el panel eso deshabilita **las dos** vías y escribe «…usa la respuesta asistida, y está
+>    desactivada» de algo que funciona: el propio defecto que este change vino a cerrar, alcanzable por
+>    una combinación de interruptores. Es comportamiento heredado de C40, no introducido aquí, pero el
+>    requisito que este change escribe lo prohíbe. Decisión pendiente en `DEFERRED_TASKS.md`; fijado en
+>    código por `Probe_AlsoReportsTheSaleCardSwitch_WhichTheRouteNeverApplies`.
 
 **R5 · `openspec validate --all --strict` no detecta el defecto que este change corrige.** Las tres specs
 implicadas están **bien formadas**; lo que falla es su contenido. → **Mitigación:** la puerta de verdad es

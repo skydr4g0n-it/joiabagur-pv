@@ -255,7 +255,16 @@ public class AiSearchController : ControllerBase
         // Until C40_FIX this refused the absence too, so a screen offering the wider scope had
         // nothing to read and showed the generative path disabled with no reason: the failure this
         // route exists to prevent, reappearing one scope along.
-        if (pointOfSaleId == Guid.Empty)
+        //
+        // **And absence is the field not being there — not the field being there with nothing
+        // usable in it.** A `Guid?` swallows a query value it cannot parse — an empty string,
+        // whitespace, a typo, a truncated identifier — and binds `null`, which since C40_FIX is a
+        // *meaning* rather than a missing field; `SuppressModelStateInvalidFilter` is on globally,
+        // so nothing else refuses it either. While the parameter was a non-nullable `Guid` the
+        // guard above caught all of it, because a failed bind left `Guid.Empty`. Making the
+        // parameter nullable removed that net, so the key being present is checked here.
+        if (pointOfSaleId == Guid.Empty
+            || (pointOfSaleId is null && Request.Query.ContainsKey(nameof(pointOfSaleId))))
         {
             return BadRequest(new
             {

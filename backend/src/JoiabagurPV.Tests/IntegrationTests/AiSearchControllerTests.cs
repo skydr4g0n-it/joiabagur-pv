@@ -385,6 +385,31 @@ public class AiSearchControllerTests : IAsyncLifetime
             + "read as though the field had not been sent");
     }
 
+    /// <remarks>
+    /// <strong>Independent verification, 2026-09-26.</strong> The <c>Guid.Empty</c> form has a test;
+    /// these two forms had none, and both were served as the wider scope. A <c>Guid?</c> swallows a
+    /// query value it cannot parse and hands over <see langword="null"/>, and since C40_FIX
+    /// <see langword="null"/> is a <em>meaning</em> — every point of sale — rather than a missing
+    /// field. <c>SuppressModelStateInvalidFilter</c> is on globally, so nothing else refuses it
+    /// either. Until C40_FIX the parameter was a non-nullable <c>Guid</c>, which bound to
+    /// <c>Guid.Empty</c> on a failure and fell into the guard below it, so the change removed that
+    /// net without replacing it.
+    /// </remarks>
+    [Theory]
+    [InlineData("")]
+    [InlineData("%20")]
+    [InlineData("notaguid")]
+    [InlineData("22222222-2222-2222-2222")]
+    public async Task Availability_WithAnUnusablePointOfSale_Returns400(string unusable)
+    {
+        var response = await _operatorClient.GetAsync(
+            $"/api/ai/search/availability?pointOfSaleId={unusable}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "the field being there with nothing usable in it is a value, not an absence, and reading "
+            + "it as the wider scope turns a client bug into a wider answer");
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private static Task<HttpResponseMessage> SearchAsync(HttpClient client, string query, Guid pointOfSaleId) =>

@@ -146,10 +146,16 @@ public class AssistedSearchService : IAssistedSearchService
     /// Reads switches and calls nothing.
     ///
     /// The generative flag requires <strong>both</strong> the free-query endpoint's own switch and
-    /// the sale card's, because both have to be on for the panel's assisted route to produce
-    /// anything: the first governs whether this endpoint answers at all, and the second whether
-    /// the AI service will write prose for this shop. Reporting availability on one of the two
-    /// would put the screen back where C40 found it — offering a capability that is switched off.
+    /// the sale card's. <strong>That is stricter than the route it describes, and knowingly so
+    /// since the independent verification of C40_FIX measured it.</strong> The first switch is the
+    /// one <c>FreeQuerySearchService</c> actually enforces; the second belongs to
+    /// <c>SalesAssistService</c> and is <em>not</em> read anywhere on the free-query path — the
+    /// gateway writes prose for a free query with the sale card switched off, verified over HTTP.
+    /// So with the free query on and the card off this reports <c>switched_off</c> for a scope the
+    /// route serves, which the panel turns into a disabled option and, in the every-shop scope,
+    /// into a dead end with a false reason. Kept as it stands rather than loosened here, because
+    /// which side is wrong is a product decision: see <c>openspec/DEFERRED_TASKS.md</c> and
+    /// <c>AiScopePredicateAgreementTests</c>, which pins the present answer.
     /// </remarks>
     public AiSearchAvailabilityResponse GetAvailability(Guid? pointOfSaleId)
     {

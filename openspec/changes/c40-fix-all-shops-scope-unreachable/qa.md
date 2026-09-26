@@ -1,13 +1,15 @@
 # QA — C40_FIX `c40-fix-all-shops-scope-unreachable`
 
 > Registro de las comprobaciones **realmente ejecutadas** sobre la implementación del change, con sus resultados y su evidencia.
-> **Fecha:** exploración y artefactos el **2026-09-26**, implementación el mismo día · **Rama:** `c40-fix-all-shops-scope-unreachable` · **Artefactos de partida:** `501c97c` (`proposal`, HU, ticket enriquecido y `epicas.md`), publicado en `origin` · **Implementación sin commitear** a petición del desarrollador.
+> **Fecha:** exploración y artefactos el **2026-09-26**, implementación el mismo día · **Rama:** `c40-fix-all-shops-scope-unreachable` · **Artefactos de partida:** `501c97c` (`proposal`, HU, ticket enriquecido y `epicas.md`), publicado en `origin` · **Implementación commiteada después** en `4b1d056`, que es el árbol que verifica el §11.
 > **Idioma:** cuerpo en español, identificadores técnicos en inglés, por coherencia con [ticket.md](ticket.md) y con la [HU](../../../Documentos/Historias/AI-Eng/HU-AIENG-040-FIX.md).
 > **Alcance:** **38/38 tareas**. La 10.2 —comprobación manual en el entorno— la ejecutó el desarrollador el 2026-09-26 sobre el entorno local; evidencia en el §6, **con una salvedad que se declara y no se disimula**.
 > **Este change NO mueve el contrato:** `ai-service/openapi.json` sin diff y `ai-service/` sin tocar (§5).
 > **Este change NO crea migraciones:** ninguna entidad, columna ni índice cambia (§5).
 > **Este change SÍ llamó a un proveedor real**, una vez, en la verificación en vivo del §4: una consulta libre de ámbito global contra `jbg-ai` con `STUB_MODE=false`. Del orden de una milésima de dólar.
 > **Lo que esta pasada encontró:** **tres defectos del método de medición, míos, los tres corregidos en el acto** (§8.1, §8.2, §8.3), **una segunda vía —no documentada— a la trampa del «`dotnet test` sale 0 sin ejecutar nada»** (§8.2), y una **medición que endurece lo que `CLAUDE.md` documenta** sobre la inestabilidad de `InventoryIntegrationTests` (§1.2).
+>
+> **▸ Los §1 a §10 son la autodeclaración del implementador. El [§11](#11-verificación-independiente--2026-09-26) es una verificación independiente posterior, que refutó cinco de sus afirmaciones y encontró un defecto de producción.** Las correcciones dentro de los §1 a §10 van marcadas en línea con su fecha, sin borrar lo que decían.
 
 ---
 
@@ -114,6 +116,8 @@ Backend: 1.329 → 1.339 = **+10** ✓ (8 + 2). Frontend: 834 → 848 = **+14** 
 
 Contra el código anterior **los 14 de página fallarían todos** en `findByRole('option', { name: 'Todas las tiendas' })`, porque la opción no existía: no hay forma de que pasen sin el cambio. De los .NET, `GetAvailability_WithoutPointOfSale_IgnoresThePerShopAllowlist` asserta **las dos direcciones** —el ámbito global apagado y la tienda de la lista encendida, con la misma configuración—, así que discrimina en vez de confirmar un interruptor que casualmente está a false.
 
+> **Refutado por medición en la verificación independiente del 2026-09-26 (§11.4).** Revertido el frontend de producción a `501c97c` y ejecutado el fichero, **fallan 12 de los 14, no los 14**: pasan `should not offer the every-shop scope when the caller is an operator` y `should select a concrete shop on load rather than the every-shop scope`, porque los dos asertan **ausencias** que el código anterior también satisfacía. Siguen valiendo como guardas de regresión hacia adelante; lo que no hacen es demostrar este change. Y el primero de los dos es justamente el escenario que el `design.md` lista en D6 como *«el operario no lo tiene → falla si se enseña por error»*, así que ahí la afirmación de fallabilidad también se pasa de fuerte. Aritmética de la pasada: 71 = 59 verdes (57 antiguos + los 2 vacíos) + 12 rojos.
+
 ---
 
 ## 2. La puerta de entrada (grupo 1)
@@ -150,6 +154,8 @@ Comprobado con `awk`, extrayendo los `#### Scenario:` de cada requisito en la sp
 | `The stock label names the shop, and says so plainly when there is no shop to name` | 4 | ✅ 3 literales **+1 renombrado a propósito**, **+1 nuevo** |
 
 **El renombrado es deliberado y es el fondo del asunto.** La spec viva tiene `#### Scenario: Changing shop calls no model`, cuyo primer `THEN` dice *«the stock figures are refreshed»* — y el panel **limpia** los resultados, así que esa cláusula nunca fue verdad y el test de C40 sólo comprobó el segundo `AND`. La delta lo deja como `Changing shop clears rather than refreshes, and calls no model`: mismo `WHEN`, el `THEN` falso sustituido por el verdadero y el `AND` intacto. Renombrarlo es el punto: el nombre viejo describía sólo la mitad que se sostenía.
+
+> **Matizado en la verificación independiente del 2026-09-26 (§11.5).** La comprobación es correcta pero **se hizo sobre la unidad equivocada**: cuenta escenarios, y un `## MODIFIED` reemplaza el requisito **entero**, párrafos de prosa incluidos. Comparados también los párrafos, con los cuatro requisitos modificados, aparece **una pérdida real**: en `ai-free-query-search` el párrafo *«The route exists because availability was previously observable only inside the response of a search that had already been paid for…»* —el motivo por el que la ruta de disponibilidad existe— **no se reproducía en ninguna parte de la delta**, así que el archivado lo habría borrado de la spec viva. Restituido en la delta. Los demás párrafos no reproducidos son, uno a uno, los enunciados que este change corrige a propósito, o superconjuntos suyos.
 
 ### 3.2. La regla de la primera línea física, en los 6 requisitos
 
@@ -232,8 +238,8 @@ Los tres operarios sembrados tienen **exactamente una** tienda, así que el sele
 |---|---|
 | Código según las capas de `modelo-c4.md` y las convenciones de `project.md` | Domain intacto · Infrastructure intacto · el predicado en `Application/Configuration` · el controlador en `API` |
 | Backend: xUnit + Moq + FluentAssertions, nomenclatura `Método_Escenario_ResultadoEsperado` | 10 casos nuevos, los diez con esa forma (§1.3) |
-| Frontend: Vitest + RTL, nomenclatura `should … when …`, queries accesibles | 14 casos nuevos; `getByLabelText`, `findByRole('option')`, `getByRole('button')` |
-| Cobertura ≥ 70 % sobre el código nuevo | **No medida con `coverlet`** — se declara en el §9. El código nuevo es un método de extensión ×3, una rama de nulo y seis condicionales de interfaz, y todos tienen test nominal |
+| Frontend: Vitest + RTL, nomenclatura `should … when …`, queries accesibles, cobertura ≥ 70 % | 14 casos nuevos; `getByLabelText`, `findByRole('option')`, `getByRole('button')`. **· La cobertura no se midió aquí y el DoD la pide: medida después en la verificación independiente — 93,7 % / 94,1 % / 83,3 % de línea en los tres componentes, y un hueco real en `ai-search.service.ts` cerrado con un test (§11.8)** |
+| Cobertura ≥ 70 % sobre el código nuevo | **No medida con `coverlet`** — se declara en el §9. El código nuevo es un método de extensión ×3, una rama de nulo y seis condicionales de interfaz, y todos tienen test nominal. **· Medida después en la verificación independiente: 100 % de línea en el predicado, en `GetAvailability` y en el DTO; 87,5 % en el controlador. Casilla satisfecha — §11.8** |
 | `ai-service`: sin cambios y `openapi.json` sin diff | §5, comprobado |
 | Sin migración de EF Core | §5, comprobado |
 | Deltas de spec y `openspec validate --all --strict` en `0 failed` | **63 passed · 0 failed** (§1) |
@@ -302,3 +308,234 @@ Hoy es código muerto: su único llamante pasa siempre una tienda concreta. Se a
 | Tests nuevos | **24 casos** de 21 declaraciones · la aritmética de las dos suites cierra |
 | Contrato · migraciones | sin diff · ninguna |
 | Commit | **ninguno**, a petición del desarrollador |
+
+---
+
+## 11. Verificación independiente — 2026-09-26
+
+> Segunda pasada, **con la intención de refutar** lo escrito arriba y no de confirmarlo. Sobre `4b1d056`, el commit de implementación. Todo lo que aquí se afirma se volvió a medir; donde no se pudo medir, se dice.
+> **Resultado en una línea:** el change hace lo que dice **y** dos de sus afirmaciones no se sostienen —el test que guarda su invariante central es tautológico, y la sonda de disponibilidad sigue divergiendo de la ruta en una dirección— más **un defecto de producción nuevo, introducido por este change y corregido aquí**: la ruta de disponibilidad servía como «todas las tiendas» cualquier identificador ilegible de la *query string*.
+> **Entregado por esta pasada:** 1 fix de producción con 4 casos de test, 1 clase de test nueva que sí demuestra el invariante, 3 mutaciones de control compiladas y ejecutadas, las 5 casillas del §9 medidas (4 cerradas, 1 pendiente), y 6 correcciones en los artefactos.
+
+### 11.1. Lo que se refutó
+
+| Afirmación | Dónde | Veredicto |
+|---|---|---|
+| El test `…MatchesTheRoutePredicate` demuestra que sonda y ruta calculan el mismo predicado | `tasks.md` 2.3, `design.md` D4/R4, `qa.md` §1.4, mensaje de `4b1d056` | **Refutada.** Es tautológico: calcula lo esperado con los mismos métodos de extensión que la sonda y **nunca invoca `FreeQuerySearchService`**. Sobrevive a dos mutaciones (§11.2) |
+| «el predicado extraído … de modo que no puedan divergir» | `design.md` D4 | **Refutada en parte.** Comparte la regla del nulo; el veredicto sigue divergiendo (§11.3). Corregido en `design.md` |
+| «los 14 de página fallarían todos» contra el código anterior | `qa.md` §1.4 | **Refutada por medición: fallan 12** (§11.4). Corregido en `qa.md` |
+| «Cada `## MODIFIED` reproduce el requisito vivo entero» | `qa.md` §3.1 | **Matizada:** comprobado sobre escenarios, no sobre prosa; **un párrafo se perdía** (§11.5). Restituido en la delta |
+| `Guid.Empty` no viaja nunca y las dos rutas y la sonda lo rechazan | `design.md`, delta `ai-free-query-search` | **Refutada para la sonda:** `?pointOfSaleId=`, `=%20`, `=notaguid` y un GUID truncado devolvían **200** con el ámbito global (§11.6). Corregido en el controlador, con test |
+| «Implementación sin commitear» | cabecera del `qa.md` | Obsoleta: está en `4b1d056`. Corregida |
+| La casilla de cobertura del DoD es sólo la del backend | `qa.md` §7 y §9 | **Incompleta:** el DoD pide `≥70 %` en **las dos** capas. Medidas las dos (§11.8), y al medir la del frontend apareció **un hueco en la rama que este change introduce** en `ai-search.service.ts`: cerrado con un test |
+| Los nombres de test que `tasks.md` promete | `tasks.md` 2.3 y 3.4 | **Cuatro no existen con ese nombre**, y uno no existe en esa capa (§11.12) |
+
+### 11.2. El test de la guarda no guarda nada: tres mutaciones, compiladas y ejecutadas
+
+`GetAvailability_WithoutPointOfSale_MatchesTheRoutePredicate` afirma
+
+```csharp
+probe.AssistedAnswerAvailable.Should().Be(_freeQueryOptions.IsEnabledForScope(null) && _assistOptions.IsEnabledForScope(null))
+```
+
+que es **la misma expresión que `GetAvailability` evalúa**, línea por línea. No hay nada de la ruta en el test.
+
+| Mutación | Qué inyecta | `…MatchesTheRoutePredicate` | La suite del área | `AiScopePredicateAgreementTests` (nuevo) |
+|---|---|---|---|---|
+| **M1** | `IsEnabledForScope(null)` devuelve `!EnabledByDefault`, en las tres clases | **4/4 VERDE** | 3 rojos de 122 | **3 rojos de 4** |
+| **M2** | la ruta resuelve la ausencia con `EnabledPointOfSaleIds.Count > 0` en vez del predicado compartido | **4/4 VERDE** | **1 rojo** de 122 | **3 rojos de 4** |
+| **M3** | la **sonda** resuelve la ausencia con una regla propia | 1 rojo de 4 | — | 1 rojo de 4 |
+
+**Lectura exacta, que es más interesante que «está mal».** El test sí ata la sonda a `AiScopeSwitchExtensions` (M3 lo caza). Lo que no hace es atar **la ruta** a nada, que es la mitad que el nombre promete y la mitad donde vive la avería de C40. Y M1 no la caza **ninguna** comparación sonda-contra-ruta, porque mueve la regla compartida a los dos lados a la vez: el valor de la regla necesita aserción propia en cada lado, y la divergencia necesita ejecutar las dos piezas. Son dos tests, no uno.
+
+### 11.3. El test que sí lo demuestra, y lo que encuentra al primer intento
+
+`backend/src/JoiabagurPV.Tests/UnitTests/Application/AiScopePredicateAgreementTests.cs` (4 casos, verdes sobre `4b1d056`): construye `AssistedSearchService` y `FreeQuerySearchService` sobre **los mismos objetos de opciones**, pregunta a una y **ejecuta la otra**, y compara veredictos.
+
+- `ProbeAndRoute_AgreeOnTheWiderScope_WhateverTheFreeQuerySwitchSays` — caza M2 y M3.
+- `Route_ReadsTheAbsenceAsTheDeploymentDefault_AndIgnoresTheAllowlist` — el valor de la regla **por la ruta**, no por el método de extensión. Caza M1.
+- `Probe_AlsoReportsTheSaleCardSwitch_WhichTheRouteNeverApplies` — fija el desacuerdo que sigue vivo.
+
+**Y ese desacuerdo es el hallazgo de fondo.** La sonda devuelve `freeQuery && salesAssist`; `FreeQuerySearchService` **no lee `AiSalesAssistOptions` en ningún punto**. Con el primero encendido y el segundo apagado, contra la API real:
+
+| Llamada | Respuesta medida |
+|---|---|
+| `GET /api/ai/search/availability` sin tienda | `{"assistedAnswerAvailable":false,"assistedAnswerUnavailableReason":"switched_off"}` |
+| `POST /api/ai/search/assisted` sin tienda | `200` · `aiAvailable:true` · `degradedReason:null` · `pitchStatus:"generated"` · prosa real |
+
+En pantalla, con «Todas las tiendas» esa combinación deshabilita **las dos** vías y escribe *«La búsqueda en todas las tiendas usa la respuesta asistida, y está desactivada»* de un ámbito que el backend sirve: **el defecto que este change vino a cerrar, alcanzable por interruptores en vez de por una opción que falta.** Es herencia de C40, no de C40_FIX — pero el requisito que C40_FIX escribe lo prohíbe, y el comentario que justificaba la conjunción (*«whether the AI service will write prose for this shop»*) **es falso**: nada del camino de la consulta libre lee ese interruptor. Comentario corregido, decisión anotada en `DEFERRED_TASKS.md`, respuesta de hoy fijada en test. **No se cambió el comportamiento**: qué lado está mal es decisión de producto y las dos salidas tienen coste.
+
+### 11.4. Los 14 tests de página contra el código anterior: **12, no 14**
+
+Revertidos a `501c97c` los cinco ficheros de producción del frontend —`assisted.tsx`, `ai-availability-badge.tsx`, `search-route-toggle.tsx`, `ai-search.service.ts`, `ai-search.types.ts`—, ejecutado `assisted.test.tsx`, y restaurado el árbol (`git status` limpio después).
+
+**71 tests · 59 verdes · 12 rojos.** Los dos nuevos que pasan sin el cambio:
+
+| Test nuevo verde contra el código anterior | Por qué |
+|---|---|
+| `should not offer the every-shop scope when the caller is an operator` | Asserta una **ausencia**. Antes del change la opción no existía para nadie, así que pasa vacío |
+| `should select a concrete shop on load rather than the every-shop scope` | El efecto de carga ya fijaba la primera tienda activa antes del change |
+
+Siguen siendo guardas de regresión válidas —fallarían si mañana la opción se enseñara a un operario, que es justo lo que `design.md` D6 quiere proteger—, pero **no demuestran este change**, y el primero es precisamente el escenario que D6 presenta como fallable. La aritmética cierra: 59 = 57 antiguos + 2 vacíos.
+
+### 11.5. Las deltas, comparadas párrafo a párrafo y no sólo escenario a escenario
+
+Comparación mecánica de los 4 `## MODIFIED` contra `openspec/specs/`, sobre **escenarios y prosa**:
+
+| Requisito | Escenarios vivos | Literales | Cambiados a propósito | Nuevos | Prosa viva no reproducida |
+|---|---:|---:|---:|---:|---|
+| `The search is scoped to one point of sale…` | 3 | 3 | 0 | 1 | 1 — el `SHALL` falso, retirado a propósito |
+| `The availability of each AI path…` | 3 | 2 | 1 (`for the scope currently selected`) | 1 | 1 — el `SHALL` falso, retirado a propósito |
+| `The stock label names the shop…` | 4 | 3 | 1 (renombrado) | 1 | 2 — una es la cláusula falsa del refresco; la otra se reproduce **ampliada** |
+| `Availability of both AI paths…` (free query) | 2 | 2 | 0 | 2 | 2 — una es el «for one point of sale»; **la otra se perdía** |
+
+**El renombrado es correcto.** Mismo `WHEN`, el `THEN` falso sustituido por el verdadero, el `AND` intacto, y el nombre nuevo describe las dos cláusulas en vez de la mitad que se sostenía. Sobrevive al archivado sin pérdida: el `MODIFIED` reemplaza el requisito entero, así que el escenario viejo desaparece con su cláusula falsa, que es el propósito.
+
+**La pérdida que sí había.** El párrafo *«The route exists because availability was previously observable only inside the response of a search that had already been paid for…»* no aparecía en ninguna parte de la delta (`grep` sobre el change: 0 ocurrencias; sólo vive en `openspec/specs/ai-free-query-search/spec.md:72`). Un `MODIFIED` reemplaza el bloque completo, así que el archivado habría borrado de la spec viva **el motivo por el que la ruta de disponibilidad existe**. Restituido en la delta, y la regla de la primera línea física comprobada de nuevo después de restituirlo.
+
+**La regla de la primera línea física, en los 6 requisitos:** los seis llevan `SHALL` en la primera línea física de su descripción, con longitudes de **228 a 346** caracteres, sin ajustar. Vuelto a comprobar tras editar la delta. `openspec validate --all --strict` → **63 passed · 0 failed**.
+
+### 11.6. **Defecto nuevo, introducido por este change** — un identificador ilegible se leía como «todas las tiendas»
+
+`Availability` pasó de `[FromQuery] Guid` a `[FromQuery] Guid?`. Con el tipo no anulable, un valor que no parsea dejaba `Guid.Empty` y caía en la guarda `== Guid.Empty` → 400. Con `Guid?`, **el binder devuelve `null`** — y `null` es ahora el ámbito global. `SuppressModelStateInvalidFilter` está activado globalmente (`ServiceCollectionExtensions.cs:69`), así que nada más lo rechaza.
+
+Medido contra `localhost:5056`, autenticado como administrador, **antes del fix**:
+
+| Petición | Antes de C40_FIX | Con C40_FIX (medido) | La delta exige |
+|---|---|---|---|
+| `?pointOfSaleId=00000000-…-0000` | 400 | 400 ✅ | refusal |
+| `?pointOfSaleId=` | 400 | **200 · `pointOfSaleId:null`** ❌ | refusal |
+| `?pointOfSaleId=%20` | 400 | **200 · `pointOfSaleId:null`** ❌ | refusal |
+| `?pointOfSaleId=notaguid` | 400 | **200 · `pointOfSaleId:null`** ❌ | refusal |
+| `?pointOfSaleId=22222222-2222-2222-2222` | 400 | **200 · `pointOfSaleId:null`** ❌ | refusal |
+
+La delta lo dice sin margen: *«absence is the field not being there and anything else is a value that has to be usable»*, con su escenario `A blank point of sale is refused rather than read as an absence`. El test del change cubría **sólo** la forma `Guid.Empty`.
+
+**Impacto real, dicho sin inflarlo:** es la sonda, que no llama al modelo ni gasta cuota, así que no hay búsqueda más ancha ni fuga de datos. Lo que produce es una **afirmación falsa en pantalla** —la disponibilidad del ámbito global presentada como la de la tienda que el cliente creía estar preguntando— que es la clase de fallo de esta capacidad. Y el panel no puede provocarlo: `aiSearchService.getAvailability` omite el parámetro cuando no hay tienda, comprobado en el tráfico real.
+
+**Corregido** en `AiSearchController.Availability`: la clave presente con un valor que no parsea se rechaza con el mismo texto. **Test añadido**: `Availability_WithAnUnusablePointOfSale_Returns400`, `[Theory]` de 4 casos. Rojo 4/4 antes del fix, verde después; las 40 pruebas de `~Availability` en verde.
+
+### 11.7. Las cinco casillas del §9, medidas
+
+| Casilla del §9 | Estado |
+|---|---|
+| **Cobertura con `coverlet`** | **Medida.** La afirmación del QA de C34 —`coverlet` no instrumenta `Application`— **confirmada al reproducirla**: el informe por defecto sólo trae `API`, `Domain` e `Infrastructure`. Aplicado su apaño (copiar al `bin` los 47 `Microsoft.Extensions.*.dll` del framework compartido, correr con `--no-build`, borrarlos — 0 restantes, comprobado) y medida la cifra que el DoD pide (§11.8) |
+| **El operario con varias tiendas, en pantalla** | **Cerrada.** Creado `op_verif_2t` con dos tiendas y conducido el navegador: selector visible con **exactamente sus dos tiendas** y **sin** «Todas las tiendas». El recorte no es un artefacto de la asignación única |
+| **El callejón sin salida, en pantalla** | **Cerrada.** API reiniciada **sin** `AiFreeQuerySearch__EnabledByDefault`. Leído: *«La búsqueda en todas las tiendas usa la respuesta asistida, y está desactivada»*, las dos vías deshabilitadas, y la insignia dice *«La respuesta asistida está desactivada»* **sin** «en esta tienda» |
+| **`npm run build`** | **Cerrada.** Verde en 27,7 s. `tsc --noEmit` filtrado: **0 errores** en los ficheros del change (176 preexistentes en la plantilla Metronic) |
+| **La demo desplegada** | **Sigue sin verificar.** No se desplegó el entorno de demostración. Lo comprobado es que la línea existe en `compose.demo.yaml` con su comentario, y que la variable hace lo que dice en local: reiniciando la API sin ella el panel entra en el callejón sin salida, y con ella no |
+
+### 11.8. La cobertura que el DoD pedía, medida
+
+Con el apaño del §11.7 aplicado, 105 tests del área (`AssistedSearchServiceTests`, `AiScopePredicateAgreementTests`, `FreeQuerySearchServiceTests`, `~Availability`), `coverlet.collector` 6.0.4, informe Cobertura:
+
+| Código nuevo o cambiado por el change | Líneas | Cobertura de línea | De rama |
+|---|---:|---:|---:|
+| `AiScopeSwitchExtensions` (los 3 métodos de extensión) | 3/3 | **100 %** | 100 % |
+| `AssistedSearchService.GetAvailability` | 21/21 | **100 %** | 100 % |
+| `AiSearchAvailabilityResponse` | 4/4 | **100 %** | 100 % |
+| `FreeQuerySearchService` (clase entera) | — | **100 %** | 76,9 % |
+| `AiSearchController.Availability` | 14/16 | **87,5 %** | 90 % |
+
+Las dos líneas sin cubrir de `Availability` son la guarda `Unauthorized`, inalcanzable por detrás de `[Authorize]`.
+
+**Y el DoD pide la cifra del frontend también**, que ni el §7 ni el §9 mencionan. Medida con `@vitest/coverage-v8`:
+
+| Fichero del frontend | Líneas | Rama |
+|---|---:|---:|
+| `pages/sales/assisted.tsx` | **93,7 %** | 83,0 % |
+| `components/sales/ai-availability-badge.tsx` | **94,1 %** | 91,7 % |
+| `components/sales/search-route-toggle.tsx` | **83,3 %** | 100 % |
+| `services/ai-search.service.ts` | **100 %** | 100 % **tras añadir un test** (abajo) |
+
+**Y aquí salió un hueco real.** Con sus tests tal como los dejó el change, `ai-search.service.ts` quedaba en **93,75 % de rama con la línea 130 sin cubrir** — que es **precisamente la rama que este change introduce**: `params: pointOfSaleId ? { pointOfSaleId } : undefined`. Los tres tests de `getAvailability` pasan siempre un identificador, y el test de página sólo ve que la función se llamó con `undefined`, no lo que la función hace entonces. O sea: la pieza que garantiza que el ámbito global viaja **como ausencia y no como cadena vacía** —la propiedad de la que cuelga la seguridad del ámbito— no tenía aserción propia en su capa. Añadido `should omit the query parameter entirely when no point of sale is given`: el fichero pasa a **100 / 100**.
+
+**Casilla del DoD satisfecha en las dos capas: todo por encima del 70 %.**
+
+### 11.9. Las dos suites, medidas otra vez y comparadas por **nombres**
+
+**Backend.** Línea base propia sobre `4b1d056` en un `git worktree` aparte, y la pasada del árbol verificado a continuación, en el mismo binario de solución:
+
+| Pasada | Resultado |
+|---|---|
+| Línea base propia, `4b1d056` limpio (worktree) | **51 con error · 1.288 superados · 1.339 tests** · 10 m 57 s |
+| Árbol verificado (`4b1d056` + el fix del §11.6 + 8 tests nuevos) | **53 con error · 1.294 superados · 1.347 tests** · 9 m 18 s |
+| El §1 del implementador, sobre el mismo `4b1d056` | 52 con error · 1.339 tests |
+
+Aritmética: **1.339 + 8 = 1.347** ✓ — los 4 casos de `Availability_WithAnUnusablePointOfSale_Returns400` y los 4 de `AiScopePredicateAgreementTests`, los ocho verdes.
+
+**Doce nombres difieren entre mi línea base y mi cierre —siete entran, cinco salen— y los doce están en `InventoryIntegrationTests`.** Cero nombres distintos fuera de esa clase. Es la primera de las tres que `CLAUDE.md` nombra como no deterministas de una pasada a la siguiente sobre el mismo binario, y esta pasada la mide **más inestable todavía** que las anteriores: el QA del implementador contó siete nombres rotando en dos corridas aisladas de esa clase, y aquí rotan doce entre dos corridas completas. El fix del §11.6 no tiene camino causal hacia ella —toca una guarda de `[FromQuery]` en `AiSearchController.Availability`— y el `+2` neto es exactamente el saldo de esa rotación (7 − 5), no de los tests nuevos.
+
+**Frontend.** El change no toca el frontend en esta pasada, así que el árbol verificado **es** el frontend de `4b1d056` y una corrida sirve de las dos:
+
+| Pasada | Resultado |
+|---|---|
+| Esta verificación, sobre `4b1d056` | **113 en rojo · 735 en verde · 848 tests · 14 ficheros** |
+| El §1 del implementador, sobre el mismo commit | **114 en rojo · 15 ficheros** |
+
+**El nombre que sobra en su pasada y falta en la mía es `admin/__tests__/family-review.test.tsx :: family review screen should create a family with its members from the review screen`** — el mismo que `CLAUDE.md` registra como el que refutó la idea de que aquí el conjunto es estable, y el mismo al que el §1.1 atribuye su +1. **Tercera observación independiente del mismo nombre rotando**, ahora en la dirección contraria. De paso se confirma el otro par que `CLAUDE.md` describe: en `scan.test.tsx`, `should render loading state initially` sale rojo y `should show manual SKU input fallback after initialization` verde.
+
+**El área propia, verde en las dos suites:** `assisted.test.tsx` no aparece entre los 113 nombres, y ninguna clase `AssistedSearch*`, `AiSearch*`, `FreeQuery*`, `AiScope*` ni `Availability*` aparece entre los rojos del backend, ni en la línea base ni al cierre.
+
+### 11.10. Lo verificado en vivo por esta pasada, con las respuestas medidas
+
+Navegador conducido con Playwright contra `localhost:3000` y la API en `localhost:5056`, con `jpv-pv-jbg-ai` y proveedor real.
+
+**Administrador, tres interruptores encendidos:**
+
+| Comprobación | Medido |
+|---|---|
+| «Todas las tiendas» **la primera** de la lista, y sólo 11 tiendas activas de las 12 | ✅ 12 opciones: la global + 11 |
+| Consecuencia antes de buscar | ✅ *«Verás piezas de todo el catálogo. Para leer existencias, elige una tienda.»* |
+| Vía rápida deshabilitada **con motivo de ámbito**, no de interruptor | ✅ *«La búsqueda rápida trabaja sobre una tienda concreta»*; la insignia sigue diciendo *«Búsqueda inteligente disponible»* |
+| Vía asistida habilitada y seleccionada | ✅ `aria-checked=true`, no deshabilitada |
+| Cambiar de ámbito **no emite búsqueda** | ✅ cero `POST`; sólo la relectura de la sonda |
+| La sonda se relee **omitiendo el parámetro** | ✅ `GET /api/ai/search/availability` sin *query string* |
+| El campo y el botón siguen usables | ✅ `Buscar` deshabilitado en vacío, habilitado al escribir |
+| El `POST` **no lleva el campo** | ✅ `{"query":…,"pageSize":10,"searchSessionId":…,"materials":[]}` — la clave no está |
+| Resultados: sin cifras, sin tienda, ficha deshabilitada, cada producto una vez | ✅ *«Selecciona una tienda para ver existencias»* en las 10 filas, **0 SKU duplicados**, **10/10** botones de ficha deshabilitados |
+
+**Operario con dos tiendas (`op_verif_2t`, creado para esto):** selector visible con `["Aeroport de Menorca","Ciutadella Centre"]` y **sin** la opción global. Y la ruta **sí** le sirve el ámbito: `GET availability` sin tienda → `200`; `POST /api/ai/search/assisted` sin tienda → `200` con cantidades nulas; nombrando una tienda no asignada → **403**. La estrechez es de pantalla y no de autorización, como el requisito exige.
+
+> **`op_verif_2t` / `Verif123!` queda creado en la base de desarrollo** con dos tiendas asignadas. Es el usuario que faltaba para ejercitar ese camino; bórralo si estorba.
+
+### 11.11. Lo que **esta** pasada tampoco verifica
+
+- **La demo desplegada.** Igual que el §9: la línea del compose está y hace lo que dice en local, pero el entorno de demostración no se levantó.
+- **`ai-service`.** Ni la suite de Python ni `openapi.json`: comprobado que el diff no los toca, no ejecutado.
+- **La ruta rápida con ámbito global.** Fuera de alcance por decisión; comprobado sólo que sigue respondiendo 400.
+- **El `HTTP 500` dormido de `SearchLexicalAsync`.** Confirmada la **estructura** del defecto —`GroupBy` sólo en `HydrateAsync`, `ToDictionary(row => row.ProductId)` incondicional, único llamante con tienda concreta— pero **no se provocó el 500**, porque haría falta llamar al repositorio con nulo desde el servicio y hoy no hay camino. Sigue siendo razonamiento sobre el código, no una medición.
+- **Cuál de los dos lados del desacuerdo del §11.3 es el correcto.** Es decisión de producto; queda en `DEFERRED_TASKS.md` con las dos salidas y su coste.
+- **La cobertura del `ai-service`.** No se midió, y el DoD no la pide porque el change no lo toca.
+- **Los 176 errores de `tsc` de la plantilla.** Filtrados, no revisados: son preexistentes y ajenos al change.
+
+### 11.12. Los nombres que `tasks.md` promete y el árbol no tiene
+
+Buscado en el árbol cada identificador de test que las tareas nombran. **Cuatro no existen así:**
+
+| `tasks.md` dice | El árbol tiene |
+|---|---|
+| 2.3 `IsEnabledFor_WithoutPointOfSale_MatchesTheRoutePredicate` | `GetAvailability_WithoutPointOfSale_MatchesTheRoutePredicate` |
+| 3.4 `Availability_WithoutPointOfSale_ReturnsDefaultScope` | `Availability_WithoutPointOfSale_ReturnsTheDefaultScope` |
+| 3.4 `Availability_WithBlankPointOfSale_ReturnsBadRequest` | `Availability_WithBlankPointOfSale_Returns400` |
+| 3.4 `Availability_WithoutPointOfSale_CallsNoAiService` | **no existe como test de integración**; lo cubre el unitario `GetAvailability_WithoutPointOfSale_MakesNoAiCall` |
+
+Renombrar entre plan e implementación es normal, y los tres primeros son sólo eso. El cuarto es una tarea marcada `[x]` cuyo entregable literal —un test de integración— **no está**: lo que hay es un unitario que comprueba lo mismo sobre los dobles, sin pasar por HTTP. La cobertura existe; el recuento del §1.3 ya lo refleja (2 declaraciones en `AiSearchControllerTests`, no 3). Y la tarea 2.3 prometía comparar «los tres interruptores»: el test entregado compara dos, y el semántico va en un test aparte.
+
+### 11.13. Lo que esta pasada reprodujo tal cual, midiéndolo otra vez
+
+Que también es resultado, y aquí es la mayor parte:
+
+| Afirmación del §1 al §10 | Reproducida |
+|---|---|
+| El área propia del backend, 122/122 en verde sobre `4b1d056` | ✅ **122/122**, idéntico |
+| `openspec validate --all --strict` → `0 failed` | ✅ **63 passed · 0 failed**, antes y después de mis ediciones |
+| La regla de la primera línea física en los 6 requisitos | ✅ los 6, 228–346 caracteres |
+| `coverlet` no instrumenta `Application` (hallazgo del QA de C34) | ✅ **confirmado al reproducirlo**, y su apaño funciona |
+| `SearchLexicalAsync` es un `HTTP 500` dormido | ✅ estructura confirmada: `GroupBy` sólo en `HydrateAsync`, `ToDictionary` incondicional en `AssistedSearchService:415`, único llamante con tienda concreta |
+| `AiScopeSwitchExtensions` es el único sitio donde se decide el ámbito | ✅ los `IsEnabledFor(Guid)` que quedan están los tres en rutas cuyo punto de venta es obligatorio y validado: ruta rápida, ficha de venta y sustitutos. **Ningún camino que deba tratar la ausencia usa la sobrecarga no anulable** |
+| La autorización **no** se endureció | ✅ comprobado contra la API viva con un operario real, no sólo por los tests: ámbito global servido con `200`, tienda no asignada con `403` |
+| `openapi.json` sin diff, sin migraciones, `ai-service` sin tocar | ✅ `git diff` sobre los tres árboles: vacío |
+| El área propia, verde en las dos suites | ✅ cero nombres de `AssistedSearch*`, `AiSearch*`, `FreeQuery*`, `AiScope*` ni `Availability*` en los rojos del backend; `assisted.test.tsx` ausente de los 113 del frontend |
+| Sin `TODO`/`FIXME`/`HACK`/`XXX` | ✅ `grep` sobre el diff: ninguno |
+| UI en es-ES, sin cifras en el ámbito global | ✅ leído en pantalla, las seis cadenas |

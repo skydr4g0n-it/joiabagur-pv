@@ -4,9 +4,11 @@
 
 The backend SHALL expose an authenticated read route that reports whether the semantic path and the assisted path are each available for the scope asked about — one named point of sale, or every point of sale when none is named — and that route MUST NOT call the AI service, MUST NOT consume any request-rate quota and MUST NOT run any model.
 
-The route previously reported for one point of sale only and refused its absence with a validation error. That made the every-point-of-sale scope unreadable: a screen offering it had nothing to read, so the generative path appeared switched off with no reason to show — which is the same shape of failure this route was created to remove, reintroduced one scope along.
+The route exists because availability was previously observable only inside the response of a search that had already been paid for, which makes it impossible for a screen to state, before the operator acts, that a capability is off.
 
-With no point of sale named, the route MUST report the scope's default state, which is the same predicate the search route applies when no point of sale is named: a deployment that switches the feature on shop by shop has not switched it on for every shop at once. The route MUST NOT compute a predicate of its own, because a probe that disagrees with the route it describes puts the screen back to presenting a capability that is off as though it were on.
+It previously reported for one point of sale only and refused its absence with a validation error. That made the every-point-of-sale scope unreadable: a screen offering it had nothing to read, so the generative path appeared switched off with no reason to show — which is the same shape of failure this route was created to remove, reintroduced one scope along.
+
+With no point of sale named, the route MUST report the scope's default state, resolving the absence by the very rule the search route resolves it with: a deployment that switches the feature on shop by shop has not switched it on for every shop at once. The route MUST NOT resolve the absence by a rule of its own, because a probe that disagrees with the route it describes puts the screen back to presenting a capability that is off as though it were on.
 
 The route MUST distinguish an absent point of sale from a blank one: an absent point of sale is the wider scope, and a blank identifier MUST be refused, because absence is the field not being there and anything else is a value that has to be usable. The identifier the response carries MUST be absent or null when no point of sale was named, and MUST NOT be reported as a blank identifier.
 
