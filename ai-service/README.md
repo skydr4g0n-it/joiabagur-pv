@@ -318,22 +318,70 @@ the `catalog` row. A page that fails is recorded in `ai.sync_failure` and the dr
 on with the remaining pages; the bookmark stays before the page that failed, so a retry
 starts in front of it rather than past it.
 
-**There is no route and no scheduler**, on purpose. `ai-service-api-contracts` enumerates
-the `/v1` surface in a MUST, and an in-process scheduler would add a background task to a
-container capped at 512 MiB competing for a pool of five connections. Honesty about
-staleness comes from `projection_age_seconds` on the retrieval response, not from a hidden
-cron: if nobody has synchronised, the response says so and the guard acts on it.
+**There is still no route** — `ai-service-api-contracts` enumerates the `/v1` surface in a
+MUST — **but since C41 there IS a scheduler**, and you no longer have to run this command to
+keep the projection fresh.
 
-Cron recipe, every ten minutes, logging what it did:
+### The scheduled drain (C41)
+
+The service drains this feed **once when it starts** and then **every
+`JPV_POS_SYNC_INTERVAL_SECONDS`**. The start-up drain runs in full when no checkpoint exists —
+so a brand-new environment synchronises itself — and incrementally when one does.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `JPV_POS_SYNC_SCHEDULER_ENABLED` | `true` | Off restores exactly the pre-C41 behaviour, this command as the only drain. That is the ablation and the rollback |
+| `JPV_POS_SYNC_INTERVAL_SECONDS` | `600` | **Derived, not chosen.** What matters is how many consecutive failed drains fit under `JPV_POS_PROJECTION_MAX_AGE_SECONDS` before the guard degrades the scope: at the 3600 s ceiling, 1800 s tolerates one, 900 s three, 600 s five. Rule: `ceiling / interval >= 4` |
+
+It does not start under `STUB_MODE`, nor without a configured feed, and it **never blocks
+start-up**: the task is created and not awaited, because the container health check probes
+`/health` on a three-second timeout and the composition chains service start-up on it. A feed
+that does not answer is logged and retried with bounded backoff, and never prevents the process
+from starting.
+
+**Why the paragraph this replaces was wrong, which is worth knowing.** It read *«there is no
+route and no scheduler, on purpose … an in-process scheduler would add a background task to a
+container capped at 512 MiB competing for a pool of five connections … honesty about staleness
+comes from `projection_age_seconds`, not from a hidden cron»*, and it carried this recipe:
 
 ```cron
+# DO NOT USE. Kept as the record of a recipe that could not work here.
 */10 * * * * cd /srv/jbg-ai && /usr/local/bin/uv run python -m jbg_ai.indexing sync-pos >> /var/log/jbg-ai/sync-pos.log 2>&1
 ```
 
-Run `--full` once after first deploying, and again whenever `IndexFeed:SalesAsOf` changes.
-An incremental run recomputes nothing: the feed re-emits only pairs whose inventory row
-moved, so a clock changed afterwards leaves every unchanged pair on the old one. The stored
-`computed_as_of` is what makes such a mixture visible instead of silent.
+It was never installed anywhere, and not through forgetfulness: it begins by changing into a
+**host directory**, while this service ships as a container — the demo drains with
+`docker exec -i jbg-demo-ai …`. It described a deployment that does not exist. The cost
+argument does not survive measurement either: an incremental drain fetches nought or one page
+of at most two hundred rows and holds one connection for seconds, once every ten minutes,
+keeping no state between ticks. And the honesty argument is the one the evidence refuted — the
+age was reported faithfully for twenty days and **reached no screen**, across three sessions and
+two distinct failure modes, two of which published measurements taken over a scope that had
+silently degraded. Reporting honestly was necessary and it was not sufficient. The cron is no
+longer hidden either: `GET /health` reports when the drain last ran.
+
+### Concurrency: the advisory lock
+
+Every drain — scheduled, or this command run by hand — takes a **non-blocking** advisory lock
+before writing anything, and one that cannot get it **declines** and writes nothing. Declining
+is not failing: the work is being done by whoever holds the lock.
+
+`ai.sync_checkpoint` holds one row per feed, so two drains writing at once interleave the
+keyset, and an interleaved keyset **does not fail — it skips rows in silence**, which is worse
+than the staleness this exists to fix.
+
+| Exit code | Meaning |
+|---|---|
+| `0` | Drained, no failed pages |
+| `1` | At least one page failed, or the feed is not configured |
+| `75` | Another drain holds the lock; nothing was written |
+
+### When you still run it by hand
+
+Run `--full` whenever `IndexFeed:SalesAsOf` changes, and after failed pages — `GET /health`
+reports the count. An incremental run recomputes nothing: the feed re-emits only pairs whose
+inventory row moved, so a clock changed afterwards leaves every unchanged pair on the old one.
+The stored `computed_as_of` is what makes such a mixture visible instead of silent.
 
 
 ## The knowledge corpus and its index (C23)
@@ -1226,7 +1274,7 @@ These four tests exist to catch failures that produce **no error at all**: an HN
 - No SQL access to schema `public`, ever
 - No production deploy, SSM or `CREATE EXTENSION` on RDS. C17 delivered the **enriched health** — `GET /health` reports database reachability, indexed document count, whether the embedding provider credential is configured, and a contrast between the configured embedding model and the one recorded on the index rows, all without ever calling the provider — and deployed it to an **isolated demo account**, not to the shop's production account. The return annotation stays an open mapping, so `openapi.json` is unchanged
 - No production tuning: `halfvec`, `hnsw.iterative_scan`, `CREATE INDEX CONCURRENTLY` and the `VACUUM`/`REINDEX` cycle are deliberate omissions at ~1,500 vectors, not oversights
-- No edits to `indexing/embeddings.py`, frozen since C11. The POS feed **is** drained since C22, by `python -m jbg_ai.indexing sync-pos` — a command with a documented cron, not a route and not an in-process scheduler
+- No edits to `indexing/embeddings.py`, frozen since C11. The POS feed **is** drained since C22, by `python -m jbg_ai.indexing sync-pos` — a command, not a route. *(Corrected by C41: it also said «not an in-process scheduler», and since C41 there is one — the command's documented cron was never installable, because it changed into a host directory against a containerised service. There is still no route.)*
 - **The rotation figures describe the world at its horizon, not "today".** The synthetic world of C10 ends on **2026-08-23**, and since C22 the sales windows are counted against a declared reference instant (`IndexFeed:SalesAsOf`) rather than the wall clock. Two consequences worth stating plainly. It is what makes the aggregates **reproducible** — the same configuration and seed give the same figures on different days, which a ranking that reads `now()` never could, dataset horizon or not. And it means `sales_30d` describes the thirty days before that instant: peak summer for a world whose seasonality is extreme, so **23,54 %** of assigned pairs are non-zero rather than the 16,28 % a wall-clock reading gave on 2026-09-05. Neither figure is "the truth about today"; the declared one is the one that can be cited twice and mean the same thing. Removing the setting restores wall-clock behaviour, and with it the drift to zero that made the setting necessary
 
 ## Layout

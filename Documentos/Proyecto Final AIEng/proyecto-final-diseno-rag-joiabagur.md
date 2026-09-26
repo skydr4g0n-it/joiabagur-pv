@@ -226,7 +226,7 @@ flowchart TB
 | **Detección de divergencia** | `GET /v1/index/status` compara conteo y hash agregado del índice contra el del feed; expone `drift_count` y `last_full_sync_at`. Sincronización completa nocturna que reconcilia |
 | **Reintentos** | Backoff exponencial con tope; un lote fallido no bloquea el resto; los fallos quedan en `ai.sync_failure` para reintento manual |
 | **Versionado** | `embedding_model` + `embedding_version` por fila. Cambiar de modelo se hace en **columna nueva**, nunca sobrescribiendo |
-| **Frescura de inventario** | La proyección se refresca cada 5-10 min y **nunca excluye** (§7.6) |
+| **Frescura de inventario** | La proyección se refresca cada 5-10 min y **nunca excluye** (§7.6) *(cumplido el 2026-09-26 con **C41**, y con dos precisiones que el diseño no tenía. La horquilla pasa a ser **600 s**, **derivados** de `techo / intervalo ≥ 4` sobre el techo de 3.600 s: lo que importa no es la cadencia sino cuántos drenajes fallidos seguidos caben antes de que el guard degrade el ámbito. Y el drenaje corre **también al arrancar el proceso** —completo si no hay checkpoint—, porque los tres incidentes registrados se encontraron **levantando un entorno para probarlo**, no en régimen permanente: un intervalo deja una ventana abierta justo en el momento en que se mide. Entre C22 y C41 esta fila describió una intención: el planificador existía sólo como receta de cron en un README, y apuntaba a una ruta de host contra un servicio que se despliega en contenedor.)* |
 
 ### 6.4. Seguridad y degradación
 

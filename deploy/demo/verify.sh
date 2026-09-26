@@ -11,7 +11,7 @@
 # making it reachable so that it could be checked would destroy precisely the
 # property the check exists to protect (C17 D21).
 #
-# It fails the deployment on any of four conditions, and the first one is the
+# It fails the deployment on any of five conditions, and the first one is the
 # reason this script exists at all:
 #
 #   1. Zero indexed documents. A deployment with an empty index answers 200s,
@@ -21,6 +21,11 @@
 #      spaces, producing noise with no error anywhere.
 #   3. The database is unreachable.
 #   4. The embedding provider credential is not configured.
+#   5. The point-of-sale availability projection holds no assigned row for some
+#      point of sale (C41). Same shape as the first, one table along: every
+#      scoped retrieval answers 503, the API degrades correctly to its lexical
+#      path with a 200, and the environment looks healthy from outside. It had
+#      already reached this environment once, in C34.
 #
 # Note what it does NOT do: it never asks whether the provider is answering.
 # `/health` does not call it either. A third-party outage is not a failed
@@ -71,6 +76,36 @@ if index.get("status") != "ok":
 if body.get("provider") != "configured":
     failures.append(f"provider credential is {body.get('provider')!r}, expected 'configured'")
 
+# Fifth condition (C41), and the same shape as the first one table along. An environment whose
+# index is full but whose point-of-sale projection is empty PASSED this check until now: every
+# scoped retrieval answers 503, the .NET side degrades correctly to its lexical path and answers
+# 200, a valid certificate is served and the screens render — so the deployment looks like a
+# success and quietly finds nothing that the assortment should have narrowed. It reached a
+# deployed environment once already, and the deferred task recording it is closed by this block.
+#
+# Tolerant of an older AI image that does not report the section: absent is not a failure, it is
+# a version skew, and failing a deployment for it would be a false alarm about the wrong thing.
+projection = body.get("projection")
+if isinstance(projection, dict):
+    points_of_sale = projection.get("points_of_sale")
+    without_scope = projection.get("shops_without_scope")
+
+    if projection.get("status") == "never_drained":
+        failures.append(
+            "the point-of-sale projection has never been drained; every scoped retrieval "
+            "will answer 503 while this deployment looks healthy from outside"
+        )
+    elif isinstance(points_of_sale, int) and points_of_sale == 0:
+        failures.append(
+            "the point-of-sale projection holds no rows at all; assisted search cannot be "
+            "scoped to any shop"
+        )
+    elif isinstance(without_scope, int) and without_scope > 0:
+        failures.append(
+            f"{without_scope} point(s) of sale hold no assigned row in the projection; "
+            "assisted search answers 503 for each of them"
+        )
+
 if failures:
     print("[verify] FAILED:", file=sys.stderr)
     for failure in failures:
@@ -78,6 +113,11 @@ if failures:
     sys.exit(1)
 
 print(f"[verify] OK — {documents} documents indexed with {index.get('model')}")
+if isinstance(projection, dict):
+    print(
+        f"[verify] OK — projection drained {projection.get('age_seconds')}s ago, "
+        f"{projection.get('points_of_sale')} point(s) of sale scoped"
+    )
 PYTHON
 
 echo "[verify] Post-deployment verification passed."

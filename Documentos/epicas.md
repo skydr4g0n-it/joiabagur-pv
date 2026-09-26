@@ -464,12 +464,71 @@ El corazón del Proyecto Final. Búsqueda que combina la rama vectorial y la lé
 - Recuperación vectorial sobre HNSW y léxica con `ts_rank` en español, fusionadas con RRF
 - Diccionario de sinónimos del dominio aplicado en expansión de consulta, nunca en indexación
 - Prefiltro blando: el surtido del punto de venta acota, y la disponibilidad penaliza el score pero **nunca excluye** un candidato (**C22**)
+- Frescura de esa proyección **con dueño ejecutable**: drenaje al arrancar el servicio y cada 600 s, con lock, y su edad dicha en la tarjeta de estado del administrador (**C41**)
 - Sobre-recuperación (`top_k × 3`, tope 60) para que .NET tenga margen tras hidratar
 - Abstención por umbral: devolver cero resultados es información válida
 - Endpoint de búsqueda en .NET con hidratación, circuit breaker y fallback léxico
 - Panel de búsqueda asistida en el frontend
 
-**Changes asociados:** C12 (hecho), C13 (hecho), C14 (hecho), C15 (hecho), C16 (hecho), C20 (hecho), C21 (hecho), **C22 (hecho)**, **C25** (`recalibrate-ranking-and-abstention` — **hecho**, abierto el 2026-09-11 y archivado el 2026-09-12; renombrado desde `add-business-signals-ranking`), **C25bis** (`clean-plain-fusion` — **implementado el 2026-09-12**, 45/45, pendiente de archivar)
+**Changes asociados:** C12 (hecho), C13 (hecho), C14 (hecho), C15 (hecho), C16 (hecho), C20 (hecho), C21 (hecho), **C22 (hecho)**, **C25** (`recalibrate-ranking-and-abstention` — **hecho**, abierto el 2026-09-11 y archivado el 2026-09-12; renombrado desde `add-business-signals-ranking`), **C25bis** (`clean-plain-fusion` — **implementado el 2026-09-12**, 45/45, pendiente de archivar), **C41** (`add-pos-projection-scheduled-drain` — **abierto el 25 sep**, no previsto en ninguna ola: nace de las pruebas manuales posteriores al cierre de C40)
+
+> **Ampliado el 2026-09-26 — C41, y la épica se reabre.** **C41**
+> (`add-pos-projection-scheduled-drain`) se enriquece con historia
+> ([HU-AIENG-041](Historias/AI-Eng/HU-AIENG-041.md)) y ticket
+> ([T-AIENG-041](../openspec/changes/archive/2026-09-26-add-pos-projection-scheduled-drain/ticket.md)). **Entra en EP14 y
+> no en EP15**, que es lo que su ticket declaraba: la capability que modifica es `pos-projection`,
+> nacida en C22, y el criterio del repositorio ya se aplicó al revés con C40 —*«C40 es de EP15, aunque
+> modifique la capability `assisted-search-panel` de esta épica»*—. La épica la fija **de qué trata el
+> change**, no qué capability toca.
+>
+> **El problema: la frescura de `ai.pos_projection` no tiene dueño ejecutable.** El *checkpoint* del
+> feed `pos-availability` venía del **5 de septiembre** contra un techo de 3.600 s, y hubo que drenarlo
+> a mano. **Y es la tercera vez, con dos modos de fallo distintos**: C34 encontró la proyección
+> **vacía** en la demo —`count_scope = 0`, **503 en toda recuperación**, con .NET degradando a léxico
+> con 200, *«así que desde fuera el entorno parece sano»*—, y C40 y C41 la encontraron **rancia** a 19,7
+> y 20 días. **No es una fuga**: la frontera es `Carried()` en .NET y ningún operario ve una pieza que
+> su tienda no lleva. Lo que causa es que **la página llegue corta**, que es la avería que C22 midió —
+> ocho de once tiendas por debajo de una página en seis de cada veinte búsquedas, peor caso **un solo
+> producto**.
+>
+> **La exploración del 26 sep reencuadra el ticket seis veces, y dos de ellas cambian el alcance.**
+> **(1) El planificador ya existe y vive en prosa:** `ai-service/README.md:330` lleva desde C22 una
+> receta de cron cada diez minutos que **es inejecutable en la topología que desplegamos**, porque
+> empieza por `cd /srv/jbg-ai` y `jbg-ai` es un contenedor. Por eso nadie la instaló. **(2) El drenaje
+> se queda en `jbg-ai` y no pasa a un `BackgroundService` de .NET:** lo que el ticket pedía no es un
+> planificador sino **una segunda implementación del protocolo del keyset**, y como la spec obliga a
+> conservar el CLI quedarían **dos drenadores escribiendo la misma fila de checkpoint** — la corrupción
+> de la que el propio ticket avisa. Además .NET tendría que escribir `ai.*`, frontera que
+> `bootstrap.sql` hace **estructural por *grants***. **(3) El disparo que importa es el de arranque**,
+> no el del intervalo: los tres incidentes ocurrieron *levantando un entorno para probar*, y un cron de
+> host no corre en el portátil de nadie. **(4) La edad se dice en `GET /health` y no en
+> `GET /api/ai/search/availability`**, porque esa ruta tiene un `MUST` de spec viva que le prohíbe
+> llamar al servicio de IA y su método es síncrono, mientras el informe de salud es *mapping* abierto en
+> los dos lados y llega a la tarjeta de administrador que C17 ya construyó: **coste de contrato cero**.
+> **(5) El lock va dentro del drenaje y no en el planificador**, o el CLI corrido a mano —que es como
+> se arregló las tres veces— queda fuera. **(6) La edad es del drenaje y es global**, no de la tienda:
+> el checkpoint es una fila por feed.
+>
+> **Y un hallazgo que obliga a anotar un informe publicado.** La manipulación declarada en el §8 de C40
+> —*«se actualizaron `refreshed_at` y `computed_as_of` en 1.176 filas»*— **se aplicó a la columna
+> equivocada**: el guard lee `ai.sync_checkpoint.last_incremental_sync_at`. Cuatro pruebas lo cierran:
+> los dos campos del checkpoint son **idénticos** (2026-09-25 20:49:24 UTC), luego el único drenaje fue
+> el de C41; el artefacto del grupo 8 está fechado **15 h 07 min antes**; quedan **94 filas** con la
+> huella del `UPDATE` (`computed_as_of = 2026-09-25 05:32:04`, diez minutos antes de medir); y «1.176»
+> es el **total exacto de filas del POS `0388f003…`**. **El reparto de los dieciséis estados describe el
+> sistema degradado**; la latencia (p50 3.404 / p95 7.160) **se sostiene**, porque sin ámbito el SQL es
+> 2-3 ms más lento contra un p95 dominado por dos llamadas a proveedor y .NET **no repide** cuando la
+> página llega corta. **Se anota, no se rehace** (el arnés del grupo 8 nunca se commiteó). Y el remate:
+> `degraded_reason` es **`null` las 42 veces** del artefacto, porque .NET no tiene campo para la
+> degradación de la proyección — *un dato que el sistema conoce, paga y descarta en la frontera*.
+>
+> **Alcance acordado:** drenaje al arrancar (completo sin checkpoint, incremental con él) y cada
+> **600 s** —derivado de `techo / intervalo ≥ 4`, que tolera cinco fallos seguidos—, con
+> `pg_try_advisory_lock` no bloqueante; sección `projection` en `GET /health` → tarjeta de
+> administrador; y un **quinto motivo de fallo en `verify.sh`** que caza la proyección vacía y cierra la
+> deuda de C34 en `DEFERRED_TASKS.md`. **Se corta el botón manual, también el del administrador**: el
+> argumento que mata el del operario —*«con el tramo 1 hecho, no tiene caso de uso»*— vale igual para
+> él. **Sin ruta nueva bajo `/v1`, sin regenerar `openapi.json`, sin migración y sin tocar `Carried()`.**
 
 > **Actualizado el 2026-09-12, al implementar C25bis.** El borrado **no movió nada, y está demostrado**: dos corridas del arnés sobre el mismo golden set y la misma huella de índice dan **315 filas por consulta idénticas** en las cinco configuraciones supervivientes, listas de resultados incluidas, y el único elemento de la procedencia que difiere es la revisión del código. Suite **994 → 997 con cero fallos** a los dos lados. **Tres puntos de su ficha se refutaron por comprobación**: los pesos por lista sí tenían lector vivo —se retiran por ser trampas que la spec prohíbe mover, no por estar muertos—, la variante adaptativa perdedora no existía porque C25 ya la había retirado, y el fallo al arranque no era alcanzable con `extra="ignore"` y tenía más radio de daño que el defecto que prevenía, así que la obligación se acotó a la configuración de evaluación, donde ya estaba implementada: **cero código nuevo**. El principio que queda escrito es *una perilla es algo que se puede poner; un registro es algo que se escribe* — por eso `Provenance.fusion_mode` sobrevive al selector y `judgements.jsonl` conserva `v2-hibrido` en `pooled_in` mientras `POOLED` lo pierde. La fila de referencia queda **histórica y citable** con tres artefactos —informe, JSONL y su propia configuración, movida a `evals/configs/retired/`— y **por qué se retiró sigue demostrable sin ser activable**, como aritmética pura sobre `fuse()`.
 
@@ -487,6 +546,7 @@ El corazón del Proyecto Final. Búsqueda que combina la rama vectorial y la lé
 - [HU-AIENG-021: Búsqueda híbrida — rama léxica, fusión RRF de tres listas y filtros estructurales que degradan](Historias/AI-Eng/HU-AIENG-021.md) *(C21 — **implementado**; OR con ordenación por coordinación en vez de conjunción estricta; fusión RRF de lista tecleada, expandida y vectorial con pesos configurables y rama vectorial a menor peso; filtros deducidos del texto que degradan y nunca excluyen; `@>` y realce de exacto descartados con medición; degradación honesta a léxico cuando cae el proveedor; `low_confidence` como desacuerdo entre ramas; singleton del cliente de embeddings con caché acotado; sin migración, sin OpenAPI y sin tocar `backend/`)*
 - [HU-AIENG-022: Prefiltro blando por punto de venta — la proyección pondera, el surtido acota y el reloj deja de derivar](Historias/AI-Eng/HU-AIENG-022.md) *(C22 — **hecho**, archivado 2026-09-05; sincronización de `ai.pos_projection` desde el feed de disponibilidad con CLI y checkpoint propio; tombstone `unassigned` como borrado suave; filtro duro sobre `is_assigned_hint` replicando `Carried()`; CTE de alcance más KNN exacto en las tres ramas, porque HNSW nunca se usó y forzarlo trunca a 40 de 60; `qty_bucket = '0'` degrada y nunca elimina; `projection_age_seconds` desde el checkpoint —nunca desde `refreshed_at`— gobernando 503 sobre proyección vacía y degradación declarada sobre proyección vieja; reloj inyectado `IndexFeed:SalesAsOf`; flag de ablación para C24; **una revisión de Alembic aditiva** (`computed_as_of`) abierta contra su propia ficha, `openapi.json` regenerado y **tres deltas MODIFIED** sobre specs vivas, más la capacidad nueva `pos-projection`)*
 - [HU-AIENG-025: Recalibrar el ranking y la abstención — que la fusión fusione, que el stock pese y que el buscador sepa callar](Historias/AI-Eng/HU-AIENG-025.md) *(C25 — **hecho**, archivado el 2026-09-12; fusión en **dos etapas** con pesos por rama, que corrige el defecto por el que los 60 documentos léxicos ganaban al #1 vectorial **siempre** y lo dejaban en la posición 33; el barrido pasa a **una dimensión** porque sólo importa el cociente `ρ = w_vec / w_lex`, con banda útil `[0,9 ; 1,1]` que la rejilla de C24 sólo tocaba en un punto; regla adaptativa `w_lex × cobertura` **sin parámetros**, consumiendo el `coordination` que se calculaba y se tiraba, con el denominador corregido para excluir los grupos de `tsquery` vacía; **métrica `nDCG@5 operativo`** derivada de los juicios existentes **sin re-etiquetar**, con la relevancia pura como guardarraíl, porque la rúbrica de C24 no menciona stock y un barrido sobre ella converge a peso 0; señal de POS por `LEFT JOIN` **separada** del alcance por `INNER JOIN`, para medir la reordenación sin pagar el coste de recall del prefiltro; rotación como **desempate declarado y no calibrado**; abstención diseñada **después** de medir `min(distancia)` por consulta y con `fuera-de-dominio` ampliada de 5 a 15-20; barrido en fases `capture`/`rescore` que hace el de señales **exacto y sin proveedor**; tabla de **seis filas** con `v2b-fusion` aislando la fusión de las señales y la fusión plana **conservada** como modo para que `v2-hibrido` siga reproduciendo la línea base; **dos puntos de la ficha refutados por medición** —penalización de variante ambigua y calibración de `1-2`/`3+`—; dos capacidades nuevas (`business-signals-ranking`, `retrieval-abstention`) y tres deltas `MODIFIED`; **sin migración, sin OpenAPI y sin tocar `backend/`, `frontend/` ni `terraform/`**)*
+- [HU-AIENG-041: La frescura de `ai.pos_projection` deja de ser un acto manual — drenaje al arrancar y por horario, con lock, y la edad dicha en la tarjeta del administrador](Historias/AI-Eng/HU-AIENG-041.md) *(C41 — **abierto el 25 sep**, enriquecido el 26 sep; tarea de `lifespan` en `jbg-ai` que reutiliza `sync_pos_availability` **sin reescribirlo**, con drenaje de arranque —completo sin checkpoint, incremental con él— e intervalo de **600 s** derivado de `techo / intervalo ≥ 4`; `pg_try_advisory_lock` **no bloqueante y dentro del drenaje**, para que cubra también al CLI corrido a mano; la tarea **no bloquea el arranque**, porque el `HEALTHCHECK` sondea `/health` con 3 s y `depends_on: service_healthy` tumbaría el despliegue; sección `projection` en `GET /health` —edad desde el **checkpoint** y nunca desde `refreshed_at`, `stale` contra el techo, páginas fallidas y puntos de venta sin ámbito— transportada por `AiHealthResponse` hasta la tarjeta de C17; quinto motivo de fallo en `verify.sh` que caza la proyección vacía y cierra la deuda de C34; **quince decisiones cerradas y las seis preguntas del ticket respondidas**; **sin insignia de operario, sin botón manual —tampoco para el administrador—, sin ruta bajo `/v1`, sin regenerar `openapi.json`, sin migración y sin tocar `Carried()`**; deroga con refutación numérica el `MUST NOT start an in-process scheduler` de `pos-projection`)*
 
 ---
 
@@ -799,11 +859,11 @@ Se miden por *changes* de OpenSpec, no por número de historias: la serie `HU-AI
 | **EP11** | Plataforma del Servicio de IA | C01, C02, C03, C05, C17 | 🔴 completa |
 | **EP12** | Corpus y Enriquecimiento del Catálogo | C06a (hecho), C06b (hecho), C08 (hecho), C09 (hecho), C10 (hecho), C11 (hecho), **C23 (hecho)**, **FIX1 (hecho)** | 🔴 parcial |
 | **EP13** | Familias de Producto y Desambiguación | C07 (hecho), C18a (hecho), C18b (hecho), **C28 (hecho)** | 🟢 completa |
-| **EP14** | Búsqueda Semántica Híbrida | C12, C13, C14, C15, C16, C20, C21, **C22**, **C25** (hechos) | 🟠 parcial |
+| **EP14** | Búsqueda Semántica Híbrida | C12, C13, C14, C15, C16, C20, C21, **C22**, **C25** (hechos), **C41** *(abierto el 25 sep, no previsto)* | 🟠 **parcial — reabierta** |
 | **EP15** | Venta Asistida, Sustitutos y Agentes | **C26 (archivado)**, ~~C27~~ *(cortado 12 sep)*, **C30a (archivado 13 sep)**, **C30b (archivado 14 sep)** *(partidos el 13 sep)*, **C31 (archivado 16 sep)**, **C32a (archivado 20 sep)**, **C32b (archivado 21 sep)** *(partidos el 20 sep)*, **C34 (archivado 22 sep)**, **C36 (archivado 24 sep)**, **C40 (archivado 25 sep)** *(no previsto)*, **C40_FIX** *(abierto el 25 sep, fuera de la numeración C: corrige a C40)* | 🟠 **parcial — reabierta** |
 | **EP16** | ~~Inventario Asistido y Señales de Demanda~~ | ~~C19, C29, C33, C35, C37~~ | ⛔ **anulada 31 ago** |
 | **EP17** | Evaluación y Observabilidad de IA | C04 (hecho), **C24 (hecho)**, C38, C39 · *(C25 amplía el arnés y el golden set desde EP14)* | 🔴 parcial |
-| **TOTAL PF** | | **47 fichas · 41 vivas** (5 anuladas, 1 cortada) — **39 archivadas, 2 pendientes** | |
+| **TOTAL PF** | | **47 fichas · 41 vivas** (5 anuladas, 1 cortada) — **39 archivadas, 3 pendientes** | |
 
 > **Actualizado el 2026-09-26, al explorar C40_FIX — y de paso se corrige el recuento, que el archivado
 > de C40 dejó sin mover.** **39 archivadas y 2 pendientes** —C38 y C39, en ese orden—
@@ -813,6 +873,15 @@ Se miden por *changes* de OpenSpec, no por número de historias: la serie `HU-AI
 > después de cerrarse. Es la misma clase de desfase que el change que ahora se abre viene a corregir en
 > las specs — documentación bien formada y falsa—, sólo que aquí la cazó una relectura y no una prueba
 > manual.
+>
+> **Corregido el 2026-09-26, al enriquecer C41: eran 3 pendientes y no 2.** La fila decía **2** y
+> **C41 no aparecía en ninguna parte de este documento**, ni en la tabla ni en EP14, pese a estar
+> abierto desde el 25 de septiembre — el mismo desfase que la nota de arriba acababa de corregir para
+> C40, repetido una ficha después. Las pendientes son **C38, C39 y C41**, contadas contra el
+> [plan de changes](Proyecto%20Final%20AIEng/proyecto-final-plan-changes-openspec.md), que ya las daba
+> así y **manda sobre este resumen**. Las 41 vivas no se mueven: C41 ya estaba dentro de ellas en el
+> plan. **Y C41 entra en EP14, no en EP15** como declaraba su ticket: modifica `pos-projection`, que
+> nació en C22.
 >
 > **C40_FIX (`c40-fix-all-shops-scope-unreachable`) es lo que sale de las pruebas manuales sobre el
 > entorno levantado tras cerrar C40**, con historia ([HU-AIENG-040-FIX](Historias/AI-Eng/HU-AIENG-040-FIX.md))
@@ -977,7 +1046,7 @@ Las épicas del PF **presuponen el MVP terminado**: operan sobre el catálogo, e
 
 1. **EP11** (cimientos) — sin el esqueleto, los contratos y el esquema vectorial no arranca nada.
 2. **EP12** en paralelo con el resto de EP11 — el corpus es el insumo de la búsqueda.
-3. **EP14** — requiere corpus indexado (EP12) y contratos (EP11). Es la ruta crítica principal.
+3. **EP14** — requiere corpus indexado (EP12) y contratos (EP11). Es la ruta crítica principal. *(Actualizado el 26 sep: la épica **se reabre con C41**, que no venía de ninguna ola sino de las pruebas manuales posteriores al cierre de C40. **C41 no tapona a nadie** —es una hoja: no toca prompt, ni fase de abstención, ni el contrato congelado, así que no compite con C38 ni con C39 y puede ir antes, después o en paralelo—, **pero va antes de cualquier remedición**: el entorno está hoy a **14,4 veces** el techo de rancidez, así que una pasada tomada ahora volvería a describir un sistema desconfigurado, que es exactamente lo que le pasó al grupo 8 de C40. Su zona principal es **`ai-service/`** —la ficha del plan dice *«backend/ y frontend/ — no toca ai-service/»* y **está mal**, porque el drenaje se queda en `jbg-ai`—, más `deploy/demo/` y un retoque en el DTO de salud y en la tarjeta. **No se abre a la vez que ningún change que toque `retrieval/` o `indexing/`.**)*
 4. **EP13** — puede avanzar en paralelo desde que existe el índice; su aprobación humana alimenta la desambiguación de EP15.
 5. **EP15** — requiere recuperación funcionando (EP14) y familias (EP13). **Y es donde arranca lo que queda** *(13 sep)*: con C26 archivado, **C30a es el único change libre que desbloquea algo**, y desbloquea la cadena entera —`C30a → C34 → C36` y `C30a → C30b → C31 → C32 → C38`—. *(Al día 22 sep: la cadena `C30a → C34 → C36` está **en su último eslabón**, con C36 en curso; por el otro lado sólo queda **C38**, que depende de C34 y no de la pantalla de C36, así que los dos pueden avanzar en paralelo.)*. Sus cuatro changes de servicio comparten zona y son **estrictamente secuenciales**: no se abren dos a la vez. *(Actualizado el 14 sep: archivado C30a, los nodos libres pasan a ser **dos** —**C30b** y **C34**—, uno por cada rama de la bifurcación. Se abre **C30b** primero por la regla 2 del §1 del plan, desbloqueo antes que calendario: abre C31 y C38, mientras C34 es el arranque de la otra rama y no tapona a nadie que no esté ya esperando. La secuencialidad estricta sigue aplicando dentro de `assist/`: **C30b ‖ C31 ‖ C32 no se solapan**.)* *(Actualizado el 14 sep: archivado C30b, los nodos libres vuelven a ser **dos** —**C31** y **C34**— y se abre **C31**. No es por desbloqueo, que ahí empatan: es por la **ventana de contrato**. `/v1/assist/sale` sigue con **cero consumidores**, así que C31 puede mover descripciones y vocabulario sin que nadie pague; en cuanto C34 escriba el cliente .NET, esa ventana se cierra y cualquier ajuste del enrutador lo paga el otro lado. Y C34 nace entonces conociendo ya el vocabulario del enrutador y su presupuesto de latencia, que es justo lo que la anotación del 14 sep le deja escrito en su ficha.)* *(Actualizado el 20 sep: archivados C31 y **C32a**, se abre **C32b**. La ventana de contrato **sigue abierta y se gasta ahora**: `/v1/assist/sale` continúa con cero consumidores .NET, así que la ruta nueva `POST /v1/assist/agent` se añade al momento más barato que queda —el mismo argumento con el que C30a y C31 movieron el contrato sin coste—, y a partir de C34 ya no lo sería. Los nodos libres son **dos**, **C32b** y **C34**, y se abre C32b porque **es el único que tapona el cierre**: `C32b → C38 → C39`, mientras C34 sólo abre C36. La secuencialidad estricta dentro de `assist/` se mantiene: **C30a ‖ C30b ‖ C31 ‖ C32a ‖ C32b nunca simultáneos**.)* *(Actualizado el 21 sep: archivado C32b, **C34 es el único nodo libre** y se abre. Con él la ventana de contrato de `/v1/assist/sale` **se cierra**: a partir de aquí la ruta tiene un consumidor .NET, y cualquier cambio en su forma se paga en los dos lados. C34 no la mueve —`openapi.json` queda idéntico byte a byte—, y deja fuera la consulta libre y el agente porque sus marcadores no dicen de qué pieza son.)* *(Actualizado el 24 sep: archivado C36, la épica quedó cerrada y **se reabre el mismo día con C40**, que no venía de ninguna ola sino de comprobar C36 en demo. **C40 es el único nodo libre y el arranque de lo que queda**, `C40 → C38 → C39`, y su orden respecto a C38 es **obligado y no disciplina de rama**: sube el prompt a `assist/v5` y mueve la fase de la abstención, así que unas cifras de C38 tomadas antes describirían un prompt sustituido y una fase movida. **La ventana de contrato de `/v1/assist/sale` está cerrada desde C34**, así que C40 paga lo que C31 y C32b no pagaron: `filters` en `AssistRequest` es **adición pura** y se verifica hoja a hoja, pero ya cuesta un lado más. Y **la secuencialidad estricta dentro de `assist/` sigue aplicando**, a la que se suma ahora `retrieval/`: C40 mueve la fase de la abstención, así que tampoco se solapa con C21, C22 ni C25.)* *(Actualizado el 26 sep: archivado C40, el nodo libre es **C40_FIX** y la cadena que queda es `C38 → C39`. **C40_FIX no tapona a nadie** —es una hoja, fuera de la numeración C, y C38 no depende de él— pero **va primero de todos modos, y no por disciplina de rama**: corrige un `SHALL` de `assisted-search-panel` que afirma lo contrario de lo que el sistema hace, y cada change archivado encima consolida esa afirmación. **Comparte zona con C38** —el panel y sus specs—, así que los dos no se abren en paralelo. **No mueve el contrato con `jbg-ai`**: `openapi.json` queda sin diff, porque el tercer perfil de *claims* de C40 ya acepta un token sin `pos_id` en recuperación y assist. Y **no toca `assist/` ni `retrieval/`**, así que la secuencialidad estricta de esas dos zonas no le aplica.)*
 6. ~~**EP16**~~ — **anulada el 2026-08-31** junto con sus cinco changes. Ya no ocupa lugar en el orden.

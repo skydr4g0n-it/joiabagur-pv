@@ -809,10 +809,35 @@ tocar `ai-service/`. Mientras no se haga, cualquier entorno nuevo nace sin corpu
 
 ---
 
-## C22 · un entorno recién desplegado deja `ai.pos_projection` vacía, y la recuperación responde 503
+## ~~C22 · un entorno recién desplegado deja `ai.pos_projection` vacía, y la recuperación responde 503~~ — **CERRADA por C41 (2026-09-26)**
 
-**Estado:** identificado el 2026-09-22 al desplegar la demo, **resuelto en ese entorno**, sin arreglo
-sistemático. **Zona:** `deploy/demo/` y el runbook.
+> **Cerrada, y por las dos vías a la vez en lugar de elegir una.** La pregunta abierta al final de
+> esta entrada era si `deploy.sh` debía drenar cuando la tabla está vacía o si bastaba con el paso
+> del runbook más una comprobación en `verify.sh`. C41 hace **las dos**, porque resultaron no ser
+> alternativas sino capas distintas:
+>
+> - **El drenaje deja de depender de que alguien lo recuerde.** `jbg-ai` drena el feed **al arrancar**
+>   —completo cuando no hay checkpoint, que es exactamente este caso— y después cada 600 s. Un
+>   entorno recién desplegado se cura solo antes de que nadie lo mire, sin tocar `deploy.sh`: la
+>   condición «la tabla está vacía» ya la resuelve el propio orquestador, porque
+>   `resolve_start_cursor` devuelve un keyset vacío y `is_full` se calcula de ahí.
+> - **Y `verify.sh` gana su quinto motivo de fallo**, que es la red de seguridad. Era la opción
+>   «más barata» y sigue siéndolo, pero por sí sola sólo *detecta*: falla el despliegue y deja a una
+>   persona ejecutando el `docker exec`. Con el drenaje de arranque, la comprobación pasa a ser lo
+>   que debe ser — una afirmación que se verifica, no un trabajo pendiente.
+>
+> La frase que justificaba la entrada —*«un entorno con índice lleno y proyección vacía pasa hoy la
+> verificación posterior al despliegue»*— deja de ser cierta. Y la tarjeta del administrador reporta
+> ahora cuántos puntos de venta se han quedado sin surtido, que es el dato que faltaba para que este
+> fallo fuera visible sin abrir un log.
+>
+> Change [`add-pos-projection-scheduled-drain`](changes/archive/2026-09-26-add-pos-projection-scheduled-drain/),
+> historia [HU-AIENG-041](../Documentos/Historias/AI-Eng/HU-AIENG-041.md).
+
+**Estado:** identificado el 2026-09-22 al desplegar la demo, resuelto en ese entorno sin arreglo
+sistemático, y **cerrado sistemáticamente el 2026-09-26 por C41**. **Zona:** `deploy/demo/` y el
+runbook. *El texto original se conserva íntegro debajo, porque es el diagnóstico y sigue siendo la
+mejor descripción del fallo.*
 
 `resolve_scope` se niega a abstenerse sobre una proyección vacía y lanza `RetrievalDependencyError`,
 que la ruta traduce a **503**:

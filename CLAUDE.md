@@ -160,3 +160,42 @@ The full inventory — the five root causes and which files each one accounts fo
 - `ai-service/openapi.json` is a frozen contract with the .NET side. If
   `test_openapi_snapshot_is_stable` fails, the boundary moved — agree the change with
   whoever owns the .NET client before regenerating it with the README one-liner.
+
+## Escribir ficheros largos: el heredoc no sirve, y el error miente
+
+Este repositorio escribe documentos largos constantemente —historias de 400 líneas, tickets de 550,
+fichas del plan— y **el heredoc de Bash no puede con ellos**. Escribir
+
+```bash
+cat > Documentos/Historias/AI-Eng/HU-AIENG-041.md <<'EOF'
+...37 KB de markdown...
+EOF
+```
+
+falla con:
+
+```text
+ENAMETOOLONG: name too long, uv_spawn
+```
+
+**El mensaje es engañoso y es la mitad de la trampa.** Habla de un *nombre* demasiado largo y nombra
+`uv_spawn`, así que se lee como un problema de ruta —que en Windows tiene un límite real de 260
+caracteres— o como algo del entorno de `uv`. No es ninguna de las dos cosas: **el cuerpo entero del
+heredoc viaja en la línea de comandos del proceso que se lanza**, y Windows la corta en **32 767
+caracteres** (`CreateProcess`). El documento que disparó esto medía **37,5 KB**; el ticket de al lado,
+**38,2 KB**. El límite no es del fichero ni de la ruta: es de cuánto texto cabe en la invocación.
+
+| Qué escribir | Con qué |
+|---|---|
+| Un documento entero (historia, ticket, informe, spec) | **La herramienta de escritura de ficheros.** Siempre, sin estimar el tamaño primero |
+| Un retoque dentro de un documento existente | La herramienta de edición, contra una cadena única |
+| Un fragmento corto: `.env`, un YAML de pocas líneas, un script de usar y tirar | Heredoc, sin problema |
+
+**La regla práctica: si el contenido no cabe cómodamente en pantalla, no cabe en un heredoc.** No
+merece la pena calcular bytes — el modo de fallo es un error que no dice lo que pasa, y el intento
+fallido se paga entero porque hay que reescribir el documento completo en la segunda llamada.
+
+**Y no se arregla troceándolo.** Encadenar `cat >>` en varias llamadas funciona, pero deja el fichero
+a medias si una falla, mezcla el contenido con el escapado del shell (`` ` ``, `$`, `\`) y hace que
+cualquier revisión posterior tenga que reconstruir mentalmente el documento a partir de N comandos.
+Una sola escritura, con la herramienta que existe para eso.
