@@ -19,7 +19,9 @@ import {
   Power,
   Users,
   CreditCard,
+  Percent,
 } from 'lucide-react';
+import { useAuth } from '@/providers/auth-provider';
 import { pointOfSaleService } from '@/services/point-of-sale.service';
 import { PointOfSale } from '@/types/point-of-sale.types';
 import { DataGrid, DataGridContainer } from '@/components/ui/data-grid';
@@ -39,15 +41,19 @@ import { toast } from 'sonner';
 import { PointOfSaleFormDialog } from './components/point-of-sale-form-dialog';
 import { OperatorAssignmentsDialog } from './components/operator-assignments-dialog';
 import { PaymentMethodAssignmentsDialog } from './components/payment-method-assignments-dialog';
+import { CommissionTiersDialog } from './components/commission-tiers-dialog';
 
 const columnHelper = createColumnHelper<PointOfSale>();
 
 export function PointsOfSalePage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Administrator';
   const [pointsOfSale, setPointsOfSale] = useState<PointOfSale[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [isOperatorsDialogOpen, setIsOperatorsDialogOpen] = useState(false);
   const [isPaymentMethodsDialogOpen, setIsPaymentMethodsDialogOpen] = useState(false);
+  const [isCommissionDialogOpen, setIsCommissionDialogOpen] = useState(false);
   const [selectedPointOfSale, setSelectedPointOfSale] = useState<PointOfSale | null>(null);
 
   // Fetch points of sale
@@ -93,6 +99,11 @@ export function PointsOfSalePage() {
     setIsPaymentMethodsDialogOpen(true);
   };
 
+  const handleManageCommissions = (pointOfSale: PointOfSale) => {
+    setSelectedPointOfSale(pointOfSale);
+    setIsCommissionDialogOpen(true);
+  };
+
   // Handle status toggle
   const handleToggleStatus = async (pointOfSale: PointOfSale) => {
     console.log('Toggling status for POS:', pointOfSale);
@@ -131,6 +142,11 @@ export function PointsOfSalePage() {
   // Handle payment methods dialog close
   const handlePaymentMethodsDialogClose = () => {
     setIsPaymentMethodsDialogOpen(false);
+    setSelectedPointOfSale(null);
+  };
+
+  const handleCommissionDialogClose = () => {
+    setIsCommissionDialogOpen(false);
     setSelectedPointOfSale(null);
   };
 
@@ -222,6 +238,12 @@ export function PointsOfSalePage() {
                   <CreditCard className="mr-2 size-4" />
                   Métodos de Pago
                 </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => handleManageCommissions(pointOfSale)}>
+                    <Percent className="mr-2 size-4" />
+                    Comisiones
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => handleToggleStatus(pointOfSale)}>
                   <Power className="mr-2 size-4" />
@@ -237,7 +259,7 @@ export function PointsOfSalePage() {
         },
       }),
     ],
-    []
+    [isAdmin]
   );
 
   const table = useReactTable({
@@ -345,6 +367,12 @@ export function PointsOfSalePage() {
       <PaymentMethodAssignmentsDialog
         open={isPaymentMethodsDialogOpen}
         onClose={handlePaymentMethodsDialogClose}
+        pointOfSale={selectedPointOfSale}
+      />
+
+      <CommissionTiersDialog
+        open={isCommissionDialogOpen}
+        onClose={handleCommissionDialogClose}
         pointOfSale={selectedPointOfSale}
       />
     </div>

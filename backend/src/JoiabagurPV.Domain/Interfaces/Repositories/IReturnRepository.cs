@@ -1,3 +1,4 @@
+using JoiabagurPV.Domain.Commission;
 using JoiabagurPV.Domain.Entities;
 
 namespace JoiabagurPV.Domain.Interfaces.Repositories;
@@ -67,4 +68,15 @@ public interface IReturnRepository : IRepository<Return>
         Guid? productId = null,
         int skip = 0,
         int take = 50);
+
+    Task<decimal> GetReturnAmountTotalInWindowAsync(
+        IEnumerable<Guid>? pointOfSaleIds,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        Guid? pointOfSaleId = null);
+
+    Task<List<ReturnYtdEvent>> GetReturnYtdEventsForPosYearAsync(
+        Guid pointOfSaleId,
+        DateTime yearStartUtc,
+        DateTime yearEndUtc);
 }

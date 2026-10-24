@@ -128,6 +128,8 @@ public class SalesReportControllerTests : IAsyncLifetime
         result.TotalSalesCount.Should().Be(5);
         result.TotalQuantity.Should().Be(10);
         result.TotalAmount.Should().Be(500.00m);
+        result.TotalCommission.Should().Be(0m);
+        result.TotalAmountNet.Should().Be(500.00m);
     }
 
     [Fact]
@@ -143,7 +145,8 @@ public class SalesReportControllerTests : IAsyncLifetime
     [Fact]
     public async Task GetSalesReport_Unauthenticated_Returns401()
     {
-        var response = await _client.GetAsync("/api/reports/sales");
+        var anonymousClient = _factory.CreateClient();
+        var response = await anonymousClient.GetAsync("/api/reports/sales");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }

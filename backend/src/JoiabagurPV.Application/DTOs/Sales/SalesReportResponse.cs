@@ -10,4 +10,7 @@ public class SalesReportResponse
     public int TotalSalesCount { get; set; }
     public int TotalQuantity { get; set; }
     public decimal TotalAmount { get; set; }
+    public decimal TotalCommission { get; set; }
+    public decimal TotalAmountNet { get; set; }
+    public List<SalesReportPosAggregateDto>? AggregatesByPointOfSale { get; set; }
 }

@@ -1,3 +1,4 @@
+using JoiabagurPV.Domain.Commission;
 using JoiabagurPV.Domain.Common;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Interfaces.Repositories;
@@ -307,5 +308,44 @@ public class SaleRepository : Repository<Sale>, ISaleRepository
         }
 
         return query;
+    }
+
+    public async Task<List<SaleReportLine>> GetSaleLinesForCommissionReportAsync(
+        IEnumerable<Guid>? pointOfSaleIds,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        Guid? pointOfSaleId = null,
+        Guid? productId = null,
+        Guid? userId = null,
+        Guid? paymentMethodId = null,
+        string? search = null,
+        decimal? amountMin = null,
+        decimal? amountMax = null,
+        bool? hasPhoto = null,
+        bool? priceWasOverridden = null)
+    {
+        var query = BuildReportQuery(pointOfSaleIds, startDate, endDate, pointOfSaleId,
+            productId, userId, paymentMethodId, search, amountMin, amountMax, hasPhoto, priceWasOverridden);
+
+        return await query
+            .Select(s => new SaleReportLine(
+                s.Id,
+                s.PointOfSaleId,
+                s.SaleDate,
+                s.Price * s.Quantity))
+            .ToListAsync();
+    }
+
+    public async Task<List<SaleYtdEvent>> GetSaleYtdEventsForPosYearAsync(
+        Guid pointOfSaleId,
+        DateTime yearStartUtc,
+        DateTime yearEndUtc)
+    {
+        return await _context.Sales
+            .Where(s => s.PointOfSaleId == pointOfSaleId
+                && s.SaleDate >= yearStartUtc
+                && s.SaleDate <= yearEndUtc)
+            .Select(s => new SaleYtdEvent(s.Id, s.SaleDate, s.CreatedAt, s.Price * s.Quantity))
+            .ToListAsync();
     }
 }

@@ -19,7 +19,8 @@ systemctl enable amazon-ssm-agent
 systemctl start amazon-ssm-agent
 
 # ─── Certbot (Let's Encrypt) ─────────────────────────────────────────────────
-pip3 install certbot certbot-nginx
+# Pin certifi>=2026.10.19 (GHSA-6q48-6c7w-9gw2: emSign ECC Root CA - G3 removed)
+pip3 install 'certifi>=2026.10.19' certbot certbot-nginx
 
 # pip installs certbot to /usr/local/bin; cron PATH does not include it — use full path.
 cat > /etc/cron.d/certbot-jpv << 'CRON_EOF'

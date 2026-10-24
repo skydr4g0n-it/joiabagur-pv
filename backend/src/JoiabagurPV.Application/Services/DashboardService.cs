@@ -12,6 +12,7 @@ public class DashboardService : IDashboardService
     private readonly IReturnRepository _returnRepository;
     private readonly IInventoryRepository _inventoryRepository;
     private readonly IUserPointOfSaleRepository _userPointOfSaleRepository;
+    private readonly IPosCommissionReportService _commissionReportService;
     private readonly IMemoryCache _cache;
 
     private const string PaymentDistributionCacheKeyPrefix = "dashboard:payment-distribution";
@@ -29,12 +30,14 @@ public class DashboardService : IDashboardService
         IReturnRepository returnRepository,
         IInventoryRepository inventoryRepository,
         IUserPointOfSaleRepository userPointOfSaleRepository,
+        IPosCommissionReportService commissionReportService,
         IMemoryCache cache)
     {
         _saleRepository = saleRepository ?? throw new ArgumentNullException(nameof(saleRepository));
         _returnRepository = returnRepository ?? throw new ArgumentNullException(nameof(returnRepository));
         _inventoryRepository = inventoryRepository ?? throw new ArgumentNullException(nameof(inventoryRepository));
         _userPointOfSaleRepository = userPointOfSaleRepository ?? throw new ArgumentNullException(nameof(userPointOfSaleRepository));
+        _commissionReportService = commissionReportService ?? throw new ArgumentNullException(nameof(commissionReportService));
         _cache = cache ?? throw new ArgumentNullException(nameof(cache));
     }
 
@@ -60,8 +63,8 @@ public class DashboardService : IDashboardService
             .Select(g => new { Count = g.Count(), Total = g.Sum(s => s.Price * s.Quantity) })
             .FirstOrDefaultAsync();
 
-        var monthlySalesRevenue = await salesQuery
-            .Where(s => s.SaleDate >= monthStart && s.SaleDate <= monthEnd && !s.ReturnSales.Any())
+        var monthlySalesGross = await salesQuery
+            .Where(s => s.SaleDate >= monthStart && s.SaleDate <= monthEnd)
             .SumAsync(s => s.Price * s.Quantity);
 
         decimal? previousYearRevenue = null;
@@ -86,6 +89,15 @@ public class DashboardService : IDashboardService
             .FirstOrDefaultAsync();
 
         var monthlyReturnsTotal = monthlyReturns?.Total ?? 0m;
+        var monthlyRevenue = monthlySalesGross - monthlyReturnsTotal;
+
+        var monthlySaleLines = await _saleRepository.GetSaleLinesForCommissionReportAsync(
+            pointOfSaleIds: null,
+            startDate: monthStart,
+            endDate: monthEnd);
+
+        var monthlyCommission = await _commissionReportService.ComputeCommissionForSalesAsync(
+            monthlySaleLines.Select(l => new SaleCommissionLine(l.SaleId, l.PointOfSaleId, l.SaleDateUtc, l.Amount)));
 
         var paymentDistribution = await GetPaymentMethodDistributionAsync(monthStart, monthEnd);
         var returnCategoryDistribution = await GetReturnCategoryDistributionAsync(monthStart, monthEnd);
@@ -94,7 +106,8 @@ public class DashboardService : IDashboardService
         {
             SalesTodayCount = todaySales?.Count ?? 0,
             SalesTodayTotal = todaySales?.Total ?? 0m,
-            MonthlyRevenue = monthlySalesRevenue,
+            MonthlyRevenue = monthlyRevenue,
+            MonthlyRevenueNet = monthlyRevenue - monthlyCommission,
             PreviousYearMonthlyRevenue = previousYearRevenue,
             MonthlyReturnsCount = monthlyReturns?.Count ?? 0,
             MonthlyReturnsTotal = monthlyReturnsTotal,
@@ -133,6 +146,31 @@ public class DashboardService : IDashboardService
             .Where(s => s.SaleDate >= weekStart && !s.ReturnSales.Any())
             .SumAsync(s => s.Price * s.Quantity);
 
+        var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var monthEnd = new DateTime(now.Year, now.Month,
+            DateTime.DaysInMonth(now.Year, now.Month),
+            23, 59, 59, DateTimeKind.Utc);
+
+        var monthlySalesGross = await salesQuery
+            .Where(s => s.SaleDate >= monthStart && s.SaleDate <= monthEnd)
+            .SumAsync(s => s.Price * s.Quantity);
+
+        var monthlyReturnsTotal = await returnsQuery
+            .Where(r => r.ReturnDate >= monthStart && r.ReturnDate <= monthEnd)
+            .SelectMany(r => r.ReturnSales)
+            .SumAsync(rs => rs.Quantity * rs.UnitPrice);
+
+        var monthlyRevenue = monthlySalesGross - monthlyReturnsTotal;
+
+        var monthlySaleLines = await _saleRepository.GetSaleLinesForCommissionReportAsync(
+            pointOfSaleIds: new[] { posId },
+            startDate: monthStart,
+            endDate: monthEnd,
+            pointOfSaleId: posId);
+
+        var monthlyCommission = await _commissionReportService.ComputeCommissionForSalesAsync(
+            monthlySaleLines.Select(l => new SaleCommissionLine(l.SaleId, l.PointOfSaleId, l.SaleDateUtc, l.Amount)));
+
         var returnsTodayCount = await returnsQuery
             .CountAsync(r => r.ReturnDate >= todayStart);
 
@@ -141,6 +179,8 @@ public class DashboardService : IDashboardService
             SalesTodayCount = todaySales?.Count ?? 0,
             SalesTodayTotal = todaySales?.Total ?? 0m,
             WeeklyRevenue = weeklyRevenue,
+            MonthlyRevenue = monthlyRevenue,
+            MonthlyRevenueNet = monthlyRevenue - monthlyCommission,
             ReturnsTodayCount = returnsTodayCount
         };
     }

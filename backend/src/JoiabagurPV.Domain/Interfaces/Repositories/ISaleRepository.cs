@@ -1,3 +1,4 @@
+using JoiabagurPV.Domain.Commission;
 using JoiabagurPV.Domain.Entities;
 
 namespace JoiabagurPV.Domain.Interfaces.Repositories;
@@ -117,4 +118,23 @@ public interface ISaleRepository : IRepository<Sale>
         decimal? amountMax = null,
         bool? hasPhoto = null,
         bool? priceWasOverridden = null);
+
+    Task<List<SaleReportLine>> GetSaleLinesForCommissionReportAsync(
+        IEnumerable<Guid>? pointOfSaleIds,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        Guid? pointOfSaleId = null,
+        Guid? productId = null,
+        Guid? userId = null,
+        Guid? paymentMethodId = null,
+        string? search = null,
+        decimal? amountMin = null,
+        decimal? amountMax = null,
+        bool? hasPhoto = null,
+        bool? priceWasOverridden = null);
+
+    Task<List<SaleYtdEvent>> GetSaleYtdEventsForPosYearAsync(
+        Guid pointOfSaleId,
+        DateTime yearStartUtc,
+        DateTime yearEndUtc);
 }

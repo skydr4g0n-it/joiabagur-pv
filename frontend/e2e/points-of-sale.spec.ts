@@ -441,6 +441,41 @@ test.describe('Point of Sale Management', () => {
     });
   });
 
+  test.describe('Commission tiers', () => {
+    test('should save commission tiers when admin submits valid ranges', async ({ page }) => {
+      await page.goto('/points-of-sale');
+
+      await page.route('**/api/point-of-sales/1/commission-tiers', async (route) => {
+        if (route.request().method() === 'GET') {
+          await route.fulfill({ status: 200, json: [] });
+        } else if (route.request().method() === 'PUT') {
+          const body = route.request().postDataJSON();
+          await route.fulfill({
+            status: 200,
+            json: body.tiers.map((t: Record<string, unknown>, i: number) => ({
+              id: String(i + 1),
+              ...t,
+            })),
+          });
+        } else {
+          await route.continue();
+        }
+      });
+
+      await page.getByRole('button', { name: /abrir menú/i }).first().click();
+      await page.getByRole('menuitem', { name: /comisiones/i }).click();
+
+      await expect(page.getByRole('dialog', { name: /comisiones/i })).toBeVisible();
+
+      await page.getByLabel(/mín\. €/i).first().fill('0');
+      await page.getByLabel(/máx\. €/i).first().fill('20000');
+      await page.getByLabel(/^%$/i).first().fill('20');
+
+      await page.getByRole('button', { name: /guardar/i }).click();
+      await expect(page.getByText('Comisiones guardadas correctamente')).toBeVisible();
+    });
+  });
+
   test.describe('Error Handling', () => {
     test('should display error when points of sale fail to load', async ({ page }) => {
       // Override route to simulate error

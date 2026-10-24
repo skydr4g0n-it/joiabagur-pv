@@ -1,3 +1,4 @@
+using JoiabagurPV.Domain.Commission;
 using JoiabagurPV.Domain.Common;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Interfaces.Repositories;
@@ -159,5 +160,54 @@ public class ReturnRepository : Repository<Return>, IReturnRepository
         }
 
         return query;
+    }
+
+    public async Task<decimal> GetReturnAmountTotalInWindowAsync(
+        IEnumerable<Guid>? pointOfSaleIds,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        Guid? pointOfSaleId = null)
+    {
+        var query = _context.Returns
+            .Include(r => r.ReturnSales)
+            .AsQueryable();
+
+        if (pointOfSaleIds != null)
+        {
+            var posIds = pointOfSaleIds.ToList();
+            query = query.Where(r => posIds.Contains(r.PointOfSaleId));
+        }
+
+        if (pointOfSaleId.HasValue)
+            query = query.Where(r => r.PointOfSaleId == pointOfSaleId.Value);
+
+        if (startDate.HasValue)
+            query = query.Where(r => r.ReturnDate >= startDate.Value);
+
+        if (endDate.HasValue)
+            query = query.Where(r => r.ReturnDate <= endDate.Value);
+
+        var total = await query
+            .SelectMany(r => r.ReturnSales)
+            .SumAsync(rs => rs.Quantity * rs.UnitPrice);
+
+        return total;
+    }
+
+    public async Task<List<ReturnYtdEvent>> GetReturnYtdEventsForPosYearAsync(
+        Guid pointOfSaleId,
+        DateTime yearStartUtc,
+        DateTime yearEndUtc)
+    {
+        return await _context.Returns
+            .Where(r => r.PointOfSaleId == pointOfSaleId
+                && r.ReturnDate >= yearStartUtc
+                && r.ReturnDate <= yearEndUtc)
+            .Select(r => new ReturnYtdEvent(
+                r.Id,
+                r.ReturnDate,
+                r.CreatedAt,
+                r.ReturnSales.Sum(rs => rs.Quantity * rs.UnitPrice)))
+            .ToListAsync();
     }
 }

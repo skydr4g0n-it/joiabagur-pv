@@ -1,60 +1,67 @@
 schema: spec-driven
 
+# Project-wide facts injected into every artifact, apply, and archive.
+# Keep durable detail in Documentos/; omit anything the agent can learn from code.
+# See: https://openspec.dev/docs/project-config
 context: |
   Jewelry POS management system — multi-location inventory, sales, AI image recognition.
-  Target: 2-3 concurrent users, ~500 products, free-tier cloud (AWS).
+  Scale: 2–3 concurrent users, ~500 products, free-tier AWS.
 
-  Backend: .NET 10, ASP.NET Core Web API, C#, EF Core, PostgreSQL 15+, JWT auth, Serilog.
-  API docs: Scalar (not Swagger). Excel: ClosedXML. Passwords: BCrypt.Net.
+  Backend: .NET 10, ASP.NET Core Web API, C#, EF Core, PostgreSQL 15+, JWT + refresh tokens,
+  Serilog, Scalar (not Swagger), ClosedXML, BCrypt.Net.
   Layered monolith: Domain → Infrastructure → Application → API.
-  Testing: xUnit, Moq, FluentAssertions, Bogus, Testcontainers.
 
-  Frontend: React 19, TypeScript (strict), Vite, Metronic React (Layout 8 sidebar).
-  UI: Radix UI + Tailwind CSS + Lucide icons. Forms: React Hook Form + Zod.
-  Tables: TanStack Table. Routing: React Router v7. Toasts: Sonner. Theme: next-themes.
-  Testing: Vitest, React Testing Library, MSW, Playwright.
-  ML: TensorFlow.js client-side inference (MobileNetV2 transfer learning).
+  Frontend: React 19, TypeScript strict, Vite, Metronic React (Layout 8 sidebar).
+  UI: Radix UI + Tailwind + Lucide. Forms: React Hook Form + Zod. Tables: TanStack Table.
+  Routing: React Router v7. Toasts: Sonner. Prefer Metronic components over custom UI.
+  ML: TensorFlow.js in-browser (MobileNetV2 transfer learning), confidence threshold 40%.
 
-  Infra: Docker Compose (dev), AWS App Runner + RDS + S3 + CloudFront (prod).
-  Storage: IFileStorageService abstraction (local dev, S3 prod).
+  Infra: Docker Compose (dev); prod = EC2 + Docker + nginx, RDS PostgreSQL, S3, ECR,
+  SSM Parameter Store, GitHub OIDC deploy. Storage via IFileStorageService (local/S3).
 
-  Roles: Admin (full access), Operator (restricted to assigned POS).
-  Currency: EUR (€), locale es-ES. UI language: Spanish. Technical docs: English.
+  Roles: Admin (full), Operator (assigned POS only). Currency EUR (€), locale/UI es-ES.
+  Technical docs and tickets: English. User stories and user-facing guides: Spanish.
+  Docs live under Documentos/ (epicas, modelo-de-datos, arquitectura, Guias, Historias).
 
-  Key constraints:
-  - Max 5-10 DB connections (connection pooling).
-  - Mandatory pagination on all lists (max 50 items/page).
-  - Frontend bundle < 500KB initial load.
-  - Stock cannot be negative (application-level validation).
-  - Sale.Price is a snapshot, not a reference to current product price.
-  - Manual price override only when POS.AllowManualPriceEdit = true, audited.
-  - Cart checkout is atomic (all-or-nothing) with idempotency key; all lines same POS + payment method.
-  - Returns: same POS as sale, 30-day window, mandatory category, multi-sale supported.
-  - Inventory.IsActive determines product assignment to POS (not just quantity).
-  - Prefer Metronic UI components over custom implementations.
-  - Backend naming: Microsoft C# conventions, async/await for I/O, Repository + Service patterns.
-  - Frontend naming: functional components, hooks, colocated tests.
+  Constraints that must shape designs and tasks:
+  - Max 5–10 DB connections; mandatory list pagination (max 50/page); frontend initial bundle < 500KB.
+  - Stock cannot go negative; Sale.Price is a snapshot; payment method must be assigned to the POS.
+  - Manual price override only when POS.AllowManualPriceEdit = true (audited).
+  - Cart checkout is atomic with idempotency key; all lines share POS + payment method.
+  - Returns: same POS as sale, 30-day window, mandatory category; multi-sale supported.
+  - Inventory.IsActive = product assigned to POS; products need ≥1 photo for recognition.
+  - Jewelry component prices use 4-decimal precision; component management is admin-only.
 
-  Epics: EP1-Products, EP2-Inventory, EP3-Sales, EP4-AI Recognition, EP5-Returns,
-  EP6-Payment Methods, EP7-Auth/Users, EP8-POS, EP9-Reports, EP10-Jewelry Components.
-
-  Reference docs: Documentos/epicas.md, Documentos/modelo-de-datos.md,
-  Documentos/arquitectura.md, Documentos/Guias/*.md, Documentos/Historias/*.md.
+  Epics: EP1 Products, EP2 Inventory, EP3 Sales, EP4 AI Recognition, EP5 Returns,
+  EP6 Payment Methods, EP7 Auth/Users, EP8 POS, EP9 Reports, EP10 Jewelry Components.
 
 rules:
   proposal:
+    - Before writing any proposal artifact, run an interactive clarification pass: ask focused questions about goals, scope, constraints, edge cases, and acceptance criteria. Wait for answers; iterate with follow-ups until remaining ambiguity is resolved or the user explicitly says to proceed.
+    - After clarification, propose a short list of optional improvements or alternatives (each with a one-line trade-off). Ask the user to accept or reject each item; do not include rejected items in the proposal.
+    - Only after clarification and the accept/reject pass are complete, create proposal.md (and related artifacts). Do not draft or write proposal files earlier.
     - Proposals must not contain code — only design documents (proposal.md, tasks.md, design.md, spec deltas).
     - Check Documentos/epicas.md for existing user stories before proposing new ones.
-    - Reference the data model in Documentos/modelo-de-datos.md for entity/field decisions.
+    - Reference Documentos/modelo-de-datos.md for entity/field decisions.
+    - Always state what is out of scope.
   specs:
     - Use Given/When/Then format for all scenarios.
-    - Reference existing spec patterns in openspec/specs/ before inventing new ones.
+    - Reference existing patterns in openspec/specs/ before inventing new ones.
     - Spec requirements must be verifiable (no vague qualifiers like "fast" or "user-friendly").
   design:
     - Include sequence diagrams for flows spanning multiple layers or services.
     - Document trade-offs explicitly when multiple approaches exist.
   tasks:
     - Each task must be completable in a single AI coding session.
-    - Include validation step (test, build, manual check) in every task.
-    - After completing tasks, update affected docs in Documentos/ (epicas.md, modelo-de-datos.md, Historias/, Guias/).
+    - Include a validation step (test, build, or manual check) in every task.
     - "Backend test naming: Method_Scenario_ExpectedResult. Frontend: should [behavior] when [condition]."
+    - Plan Playwright coverage for user-facing UI flows; unit/integration tests for backend services.
+
+operations:
+  apply:
+    guidance:
+      - Run focused tests for touched areas before marking a task complete.
+      - After implementation, update only Documentos/ files affected by the change (epicas.md, Historias/, modelo-de-datos.md, modelo-c4.md, arquitectura.md, Guias/).
+  archive:
+    guidance:
+      - Summarize what shipped and which specs/docs changed before finishing.

@@ -24,6 +24,7 @@ public class SalesService : ISalesService
     private readonly IFileStorageService _fileStorageService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDashboardService _dashboardService;
+    private readonly IPosCommissionReportService _commissionReportService;
 
     public SalesService(
         ISaleRepository saleRepository,
@@ -36,7 +37,8 @@ public class SalesService : ISalesService
         IInventoryService inventoryService,
         IFileStorageService fileStorageService,
         IUnitOfWork unitOfWork,
-        IDashboardService dashboardService)
+        IDashboardService dashboardService,
+        IPosCommissionReportService commissionReportService)
     {
         _saleRepository = saleRepository ?? throw new ArgumentNullException(nameof(saleRepository));
         _salePhotoRepository = salePhotoRepository ?? throw new ArgumentNullException(nameof(salePhotoRepository));
@@ -49,6 +51,7 @@ public class SalesService : ISalesService
         _fileStorageService = fileStorageService ?? throw new ArgumentNullException(nameof(fileStorageService));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
         _dashboardService = dashboardService ?? throw new ArgumentNullException(nameof(dashboardService));
+        _commissionReportService = commissionReportService ?? throw new ArgumentNullException(nameof(commissionReportService));
     }
 
     /// <inheritdoc/>
@@ -660,7 +663,9 @@ public class SalesService : ISalesService
                 TotalPages = 0,
                 TotalSalesCount = 0,
                 TotalQuantity = 0,
-                TotalAmount = 0
+                TotalAmount = 0,
+                TotalCommission = 0,
+                TotalAmountNet = 0
             };
         }
 
@@ -675,7 +680,15 @@ public class SalesService : ISalesService
             request.HasPhoto, request.PriceWasOverridden,
             skip, request.PageSize);
 
-        var (aggCount, aggQuantity, aggAmount) = await _saleRepository.GetSalesReportAggregatesAsync(
+        var (aggCount, aggQuantity, _) = await _saleRepository.GetSalesReportAggregatesAsync(
+            posIds,
+            request.StartDate, request.EndDate,
+            request.PointOfSaleId, request.ProductId,
+            request.UserId, request.PaymentMethodId,
+            request.Search, request.AmountMin, request.AmountMax,
+            request.HasPhoto, request.PriceWasOverridden);
+
+        var commissionResult = await _commissionReportService.ComputeReportCommissionsAsync(
             posIds,
             request.StartDate, request.EndDate,
             request.PointOfSaleId, request.ProductId,
@@ -694,7 +707,12 @@ public class SalesService : ISalesService
             TotalPages = totalPages,
             TotalSalesCount = aggCount,
             TotalQuantity = aggQuantity,
-            TotalAmount = aggAmount
+            TotalAmount = commissionResult.ReturnAdjustedGross,
+            TotalCommission = commissionResult.TotalCommission,
+            TotalAmountNet = commissionResult.TotalAmountNet,
+            AggregatesByPointOfSale = commissionResult.AggregatesByPointOfSale.Count > 0
+                ? commissionResult.AggregatesByPointOfSale
+                : null
         };
     }
 
@@ -730,11 +748,19 @@ public class SalesService : ISalesService
 
         var items = sales.Select(MapToReportItemDto).ToList();
 
-        var stream = GenerateSalesReportExcel(items);
+        var commissionResult = await _commissionReportService.ComputeReportCommissionsAsync(
+            posIds,
+            request.StartDate, request.EndDate,
+            request.PointOfSaleId, request.ProductId,
+            request.UserId, request.PaymentMethodId,
+            request.Search, request.AmountMin, request.AmountMax,
+            request.HasPhoto, request.PriceWasOverridden);
+
+        var stream = GenerateSalesReportExcel(items, commissionResult);
         return (stream, aggCount);
     }
 
-    private MemoryStream GenerateSalesReportExcel(List<SalesReportItemDto> items)
+    private MemoryStream GenerateSalesReportExcel(List<SalesReportItemDto> items, SalesReportCommissionResult totals)
     {
         using var workbook = new ClosedXML.Excel.XLWorkbook();
 
@@ -819,6 +845,15 @@ public class SalesService : ISalesService
 
         wsSummary.Column(4).Style.NumberFormat.Format = "#,##0.00";
         wsSummary.Columns().AdjustToContents();
+
+        var summaryTotalsRow = totalRow + 2;
+        wsSummary.Cell(summaryTotalsRow, 1).Value = "Importe total (ventas - devoluciones)";
+        wsSummary.Cell(summaryTotalsRow, 4).Value = totals.ReturnAdjustedGross;
+        wsSummary.Cell(summaryTotalsRow + 1, 1).Value = "Comisión total";
+        wsSummary.Cell(summaryTotalsRow + 1, 4).Value = totals.TotalCommission;
+        wsSummary.Cell(summaryTotalsRow + 2, 1).Value = "Importe neto";
+        wsSummary.Cell(summaryTotalsRow + 2, 4).Value = totals.TotalAmountNet;
+        wsSummary.Range(summaryTotalsRow, 1, summaryTotalsRow + 2, 4).Style.Font.Bold = true;
 
         var ms = new MemoryStream();
         workbook.SaveAs(ms);

@@ -5,6 +5,7 @@ public class DashboardStatsDto
     public int SalesTodayCount { get; set; }
     public decimal SalesTodayTotal { get; set; }
     public decimal MonthlyRevenue { get; set; }
+    public decimal MonthlyRevenueNet { get; set; }
     public decimal? PreviousYearMonthlyRevenue { get; set; }
     public int MonthlyReturnsCount { get; set; }
     public decimal MonthlyReturnsTotal { get; set; }

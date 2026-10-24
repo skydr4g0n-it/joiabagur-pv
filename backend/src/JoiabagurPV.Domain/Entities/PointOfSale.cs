@@ -50,4 +50,9 @@ public class PointOfSale : BaseEntity
     /// Navigation property for payment method assignments.
     /// </summary>
     public ICollection<PointOfSalePaymentMethod> PaymentMethodAssignments { get; set; } = new List<PointOfSalePaymentMethod>();
+
+    /// <summary>
+    /// Annual sales commission tiers for this point of sale.
+    /// </summary>
+    public ICollection<PointOfSaleCommissionTier> CommissionTiers { get; set; } = new List<PointOfSaleCommissionTier>();
 }

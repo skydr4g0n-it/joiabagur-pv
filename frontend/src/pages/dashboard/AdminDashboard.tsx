@@ -38,6 +38,7 @@ import { salesService } from '@/services/sales.service';
 import type { DashboardStats, PaginatedLowStockResult } from '@/types/dashboard.types';
 import type { Sale } from '@/types/sales.types';
 import { ROUTES } from '@/routing/routes';
+import { formatGrossWithNetInParentheses } from '@/lib/format-currency';
 
 const CHART_COLORS = [
   '#2563eb', '#dc2626', '#16a34a', '#ca8a04', '#9333ea',
@@ -234,7 +235,12 @@ export function AdminDashboard() {
             )}
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.monthlyRevenue)}</div>
+            <div className="text-2xl font-bold">
+              {formatGrossWithNetInParentheses(
+                stats.monthlyRevenue,
+                stats.monthlyRevenueNet ?? stats.monthlyRevenue
+              )}
+            </div>
             {yoyChange !== null ? (
               <p className={`text-xs ${yoyChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {yoyChange >= 0 ? '+' : ''}{yoyChange.toFixed(1)}% vs. mismo mes del año anterior

@@ -20,26 +20,32 @@ public class PointOfSalesController : ControllerBase
     private readonly IPointOfSaleService _pointOfSaleService;
     private readonly IUserPointOfSaleService _userPointOfSaleService;
     private readonly IPaymentMethodService _paymentMethodService;
+    private readonly IPointOfSaleCommissionTierService _commissionTierService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IValidator<CreatePointOfSaleRequest> _createValidator;
     private readonly IValidator<UpdatePointOfSaleRequest> _updateValidator;
+    private readonly IValidator<ReplaceCommissionTiersRequest> _commissionTiersValidator;
     private readonly ILogger<PointOfSalesController> _logger;
 
     public PointOfSalesController(
         IPointOfSaleService pointOfSaleService,
         IUserPointOfSaleService userPointOfSaleService,
         IPaymentMethodService paymentMethodService,
+        IPointOfSaleCommissionTierService commissionTierService,
         ICurrentUserService currentUserService,
         IValidator<CreatePointOfSaleRequest> createValidator,
         IValidator<UpdatePointOfSaleRequest> updateValidator,
+        IValidator<ReplaceCommissionTiersRequest> commissionTiersValidator,
         ILogger<PointOfSalesController> logger)
     {
         _pointOfSaleService = pointOfSaleService;
         _userPointOfSaleService = userPointOfSaleService;
         _paymentMethodService = paymentMethodService;
+        _commissionTierService = commissionTierService;
         _currentUserService = currentUserService;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
+        _commissionTiersValidator = commissionTiersValidator;
         _logger = logger;
     }
 
@@ -469,6 +475,59 @@ public class PointOfSalesController : ControllerBase
             return Ok(assignment);
         }
         catch (DomainException ex) when (ex.Message.Contains("no encontrada"))
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (DomainException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    #endregion
+
+    #region Commission Tiers
+
+    [HttpGet("{id:guid}/commission-tiers")]
+    [Authorize(Roles = "Administrator")]
+    [ProducesResponseType(typeof(List<CommissionTierDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetCommissionTiers(Guid id)
+    {
+        try
+        {
+            var tiers = await _commissionTierService.GetTiersAsync(id);
+            return Ok(tiers);
+        }
+        catch (DomainException ex) when (ex.Message.Contains("no encontrado"))
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
+
+    [HttpPut("{id:guid}/commission-tiers")]
+    [Authorize(Roles = "Administrator")]
+    [ProducesResponseType(typeof(List<CommissionTierDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ReplaceCommissionTiers(Guid id, [FromBody] ReplaceCommissionTiersRequest request)
+    {
+        var validationResult = await _commissionTiersValidator.ValidateAsync(request);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(new { errors = validationResult.Errors.Select(e => e.ErrorMessage) });
+        }
+
+        try
+        {
+            var tiers = await _commissionTierService.ReplaceTiersAsync(id, request);
+            return Ok(tiers);
+        }
+        catch (DomainException ex) when (ex.Message.Contains("no encontrado"))
         {
             return NotFound(new { error = ex.Message });
         }

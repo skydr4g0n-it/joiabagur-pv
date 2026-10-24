@@ -1,5 +1,7 @@
 using FluentAssertions;
+using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Application.Services;
+using JoiabagurPV.Domain.Commission;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Enums;
 using JoiabagurPV.Domain.Interfaces.Repositories;
@@ -15,6 +17,7 @@ public class DashboardServiceTests
     private readonly Mock<IReturnRepository> _returnRepoMock;
     private readonly Mock<IInventoryRepository> _inventoryRepoMock;
     private readonly Mock<IUserPointOfSaleRepository> _uposRepoMock;
+    private readonly Mock<IPosCommissionReportService> _commissionServiceMock;
     private readonly IMemoryCache _cache;
     private readonly DashboardService _sut;
 
@@ -24,13 +27,35 @@ public class DashboardServiceTests
         _returnRepoMock = new Mock<IReturnRepository>();
         _inventoryRepoMock = new Mock<IInventoryRepository>();
         _uposRepoMock = new Mock<IUserPointOfSaleRepository>();
+        _commissionServiceMock = new Mock<IPosCommissionReportService>();
         _cache = new MemoryCache(new MemoryCacheOptions());
+
+        _commissionServiceMock
+            .Setup(x => x.ComputeCommissionForSalesAsync(It.IsAny<IEnumerable<SaleCommissionLine>>(), default))
+            .ReturnsAsync(0m);
+
+        _saleRepoMock
+            .Setup(x => x.GetSaleLinesForCommissionReportAsync(
+                It.IsAny<IEnumerable<Guid>?>(),
+                It.IsAny<DateTime?>(),
+                It.IsAny<DateTime?>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<string?>(),
+                It.IsAny<decimal?>(),
+                It.IsAny<decimal?>(),
+                It.IsAny<bool?>(),
+                It.IsAny<bool?>()))
+            .ReturnsAsync(new List<SaleReportLine>());
 
         _sut = new DashboardService(
             _saleRepoMock.Object,
             _returnRepoMock.Object,
             _inventoryRepoMock.Object,
             _uposRepoMock.Object,
+            _commissionServiceMock.Object,
             _cache);
     }
 
@@ -63,7 +88,8 @@ public class DashboardServiceTests
         // Assert
         result.SalesTodayCount.Should().Be(2);
         result.SalesTodayTotal.Should().Be(250m);
-        result.MonthlyRevenue.Should().Be(450m);
+        result.MonthlyRevenue.Should().Be(400m);
+        result.MonthlyRevenueNet.Should().Be(400m);
         result.PreviousYearMonthlyRevenue.Should().BeNull();
         result.MonthlyReturnsCount.Should().Be(1);
         result.PaymentMethodDistribution.Should().NotBeNull();

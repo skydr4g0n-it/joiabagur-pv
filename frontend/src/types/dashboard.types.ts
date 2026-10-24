@@ -28,6 +28,7 @@ export interface DashboardStats {
   salesTodayCount: number;
   salesTodayTotal: number;
   monthlyRevenue: number;
+  monthlyRevenueNet: number;
   previousYearMonthlyRevenue: number | null;
   monthlyReturnsCount: number;
   monthlyReturnsTotal: number;

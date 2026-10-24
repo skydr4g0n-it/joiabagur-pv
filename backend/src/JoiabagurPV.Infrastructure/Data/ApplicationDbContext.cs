@@ -48,6 +48,11 @@ public class ApplicationDbContext : DbContext
     public DbSet<PointOfSalePaymentMethod> PointOfSalePaymentMethods { get; set; }
 
     /// <summary>
+    /// Gets or sets the PointOfSaleCommissionTiers DbSet.
+    /// </summary>
+    public DbSet<PointOfSaleCommissionTier> PointOfSaleCommissionTiers { get; set; }
+
+    /// <summary>
     /// Gets or sets the Products DbSet.
     /// </summary>
     public DbSet<Product> Products { get; set; }

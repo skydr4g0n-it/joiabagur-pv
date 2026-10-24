@@ -32,6 +32,13 @@ export interface SalesReportItem {
   hasPhoto: boolean;
 }
 
+export interface SalesReportPosAggregate {
+  pointOfSaleId: string;
+  totalAmount: number;
+  totalCommission: number;
+  totalAmountNet: number;
+}
+
 export interface SalesReportResponse {
   items: SalesReportItem[];
   totalCount: number;
@@ -41,4 +48,7 @@ export interface SalesReportResponse {
   totalSalesCount: number;
   totalQuantity: number;
   totalAmount: number;
+  totalCommission: number;
+  totalAmountNet: number;
+  aggregatesByPointOfSale?: SalesReportPosAggregate[] | null;
 }

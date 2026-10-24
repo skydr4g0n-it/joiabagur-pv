@@ -34,10 +34,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { formatCurrency, formatGrossWithNetInParentheses } from '@/lib/format-currency';
+import type { SalesReportPosAggregate } from '@/types/sales-report.types';
 
 const columnHelper = createColumnHelper<SalesReportItem>();
-const fmt = (v: number) =>
-  new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v);
+const fmt = formatCurrency;
 
 function getDefaultDateRange() {
   const end = new Date();
@@ -55,7 +56,14 @@ export function SalesReportPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-  const [aggregates, setAggregates] = useState({ totalSalesCount: 0, totalQuantity: 0, totalAmount: 0 });
+  const [aggregates, setAggregates] = useState({
+    totalSalesCount: 0,
+    totalQuantity: 0,
+    totalAmount: 0,
+    totalCommission: 0,
+    totalAmountNet: 0,
+  });
+  const [posAggregates, setPosAggregates] = useState<SalesReportPosAggregate[]>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 });
 
   const defaultDates = useMemo(() => getDefaultDateRange(), []);
@@ -104,7 +112,10 @@ export function SalesReportPage() {
         totalSalesCount: result.totalSalesCount,
         totalQuantity: result.totalQuantity,
         totalAmount: result.totalAmount,
+        totalCommission: result.totalCommission ?? 0,
+        totalAmountNet: result.totalAmountNet ?? result.totalAmount,
       });
+      setPosAggregates(result.aggregatesByPointOfSale ?? []);
     } catch {
       toast.error('Error al cargar el reporte de ventas');
     } finally {
@@ -417,7 +428,7 @@ export function SalesReportPage() {
       </div>
 
       {/* Global totals */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="rounded-lg border p-4">
           <p className="text-sm text-muted-foreground">Total ventas (según filtros)</p>
           <p className="text-2xl font-bold">
@@ -433,10 +444,43 @@ export function SalesReportPage() {
         <div className="rounded-lg border p-4">
           <p className="text-sm text-muted-foreground">Importe total</p>
           <p className="text-2xl font-bold text-green-600">
-            {isLoading ? <Skeleton className="h-8 w-24" /> : fmt(aggregates.totalAmount)}
+            {isLoading ? (
+              <Skeleton className="h-8 w-40" />
+            ) : (
+              formatGrossWithNetInParentheses(aggregates.totalAmount, aggregates.totalAmountNet)
+            )}
+          </p>
+        </div>
+        <div className="rounded-lg border p-4">
+          <p className="text-sm text-muted-foreground">Comisión total</p>
+          <p className="text-2xl font-bold">
+            {isLoading ? <Skeleton className="h-8 w-24" /> : fmt(aggregates.totalCommission)}
           </p>
         </div>
       </div>
+
+      {posAggregates.length > 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Desglose por punto de venta</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {posAggregates.map((row) => {
+              const posName =
+                pointsOfSale.find((p) => p.id === row.pointOfSaleId)?.name ?? row.pointOfSaleId;
+              return (
+                <div key={row.pointOfSaleId} className="flex flex-wrap justify-between gap-2 border-b pb-2 last:border-0">
+                  <span className="font-medium">{posName}</span>
+                  <span>
+                    {formatGrossWithNetInParentheses(row.totalAmount, row.totalAmountNet)} · Comisión{' '}
+                    {fmt(row.totalCommission)}
+                  </span>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Data table */}
       <DataGridContainer>

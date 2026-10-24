@@ -30,6 +30,8 @@ public static class ServiceCollectionExtensions
 
         // Register point of sale management services
         services.AddScoped<IPointOfSaleService, PointOfSaleService>();
+        services.AddScoped<IPointOfSaleCommissionTierService, PointOfSaleCommissionTierService>();
+        services.AddScoped<IPosCommissionReportService, PosCommissionReportService>();
 
         // Register payment method management services
         services.AddScoped<IPaymentMethodService, PaymentMethodService>();

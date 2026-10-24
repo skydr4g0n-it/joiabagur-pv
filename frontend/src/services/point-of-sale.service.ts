@@ -11,6 +11,7 @@ import type {
   UserPointOfSale,
 } from '@/types/point-of-sale.types';
 import type { PointOfSalePaymentMethod } from '@/types/payment-method.types';
+import type { CommissionTier, CommissionTierInput } from '@/types/commission-tier.types';
 
 /**
  * Get all points of sale
@@ -152,6 +153,24 @@ export async function changePaymentMethodAssignmentStatus(
   return response.data;
 }
 
+export async function getCommissionTiers(pointOfSaleId: string): Promise<CommissionTier[]> {
+  const response = await apiClient.get<CommissionTier[]>(
+    `/point-of-sales/${pointOfSaleId}/commission-tiers`
+  );
+  return response.data;
+}
+
+export async function replaceCommissionTiers(
+  pointOfSaleId: string,
+  tiers: CommissionTierInput[]
+): Promise<CommissionTier[]> {
+  const response = await apiClient.put<CommissionTier[]>(
+    `/point-of-sales/${pointOfSaleId}/commission-tiers`,
+    { tiers }
+  );
+  return response.data;
+}
+
 export const pointOfSaleService = {
   getPointsOfSale,
   getPointOfSale,
@@ -165,4 +184,6 @@ export const pointOfSaleService = {
   assignPaymentMethodToPointOfSale,
   unassignPaymentMethodFromPointOfSale,
   changePaymentMethodAssignmentStatus,
+  getCommissionTiers,
+  replaceCommissionTiers,
 };

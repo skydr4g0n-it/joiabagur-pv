@@ -1,6 +1,8 @@
 # Python dependencies for ML model training
 # MobileNetV2 fine-tuning for jewelry product classification
 
+# GHSA-6q48-6c7w-9gw2: remove compromised emSign ECC Root CA - G3 from CA bundle
+certifi==2026.10.19
 tensorflow==2.15.0
 tensorflowjs==4.16.0
 pillow==10.2.0

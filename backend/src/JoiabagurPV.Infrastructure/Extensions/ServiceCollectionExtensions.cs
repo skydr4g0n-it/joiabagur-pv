@@ -63,6 +63,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPointOfSaleRepository, PointOfSaleRepository>();
         services.AddScoped<IPaymentMethodRepository, PaymentMethodRepository>();
         services.AddScoped<IPointOfSalePaymentMethodRepository, PointOfSalePaymentMethodRepository>();
+        services.AddScoped<IPointOfSaleCommissionTierRepository, PointOfSaleCommissionTierRepository>();
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<IProductPhotoRepository, ProductPhotoRepository>();
         services.AddScoped<ICollectionRepository, CollectionRepository>();

@@ -468,6 +468,41 @@ namespace JoiabagurPV.Infrastructure.Data.Migrations
                     b.ToTable("PointOfSales", (string)null);
                 });
 
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.PointOfSaleCommissionTier", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("CommissionPercent")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<decimal?>("MaxAmountInclusive")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("MinAmountInclusive")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("PointOfSaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PointOfSaleId");
+
+                    b.ToTable("PointOfSaleCommissionTiers", (string)null);
+                });
+
             modelBuilder.Entity("JoiabagurPV.Domain.Entities.PointOfSalePaymentMethod", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1240,6 +1275,17 @@ namespace JoiabagurPV.Infrastructure.Data.Migrations
                     b.Navigation("InitiatedByUser");
                 });
 
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.PointOfSaleCommissionTier", b =>
+                {
+                    b.HasOne("JoiabagurPV.Domain.Entities.PointOfSale", "PointOfSale")
+                        .WithMany("CommissionTiers")
+                        .HasForeignKey("PointOfSaleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PointOfSale");
+                });
+
             modelBuilder.Entity("JoiabagurPV.Domain.Entities.PointOfSalePaymentMethod", b =>
                 {
                     b.HasOne("JoiabagurPV.Domain.Entities.PaymentMethod", "PaymentMethod")
@@ -1473,6 +1519,8 @@ namespace JoiabagurPV.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("JoiabagurPV.Domain.Entities.PointOfSale", b =>
                 {
+                    b.Navigation("CommissionTiers");
+
                     b.Navigation("OperatorAssignments");
 
                     b.Navigation("PaymentMethodAssignments");
