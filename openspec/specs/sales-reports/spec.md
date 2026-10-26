@@ -8,20 +8,20 @@ Expose filtered sales reporting with global totals and Excel export so administr
 
 ### Requirement: Sales Report API with Extended Filters and Global Aggregates
 
-The system SHALL provide a REST API endpoint at `GET /api/reports/sales` that returns paginated sales data with extended filtering and global aggregate totals computed over the entire filtered result set (not just the current page). Only authenticated users can access this endpoint; administrators see all POS, operators see only assigned POS.
+The system SHALL provide a REST API endpoint at `GET /api/reports/sales` that returns paginated sales data with extended filtering and global aggregate totals computed over the entire filtered result set (not just the current page). Aggregates SHALL include `totalAmount` (filtered gross sale amounts minus return amounts in the filter window and scope; amounts stay VAT-inclusive), `totalCommission` (sum of per-sale commissions from `pos-commission-tiers`, including VAT applied to the net commission), and `totalAmountNet` (`totalAmount` minus that commission). Tier selection uses calendar-year UTC return-adjusted gross YTD. When the filtered set includes more than one point of sale, the response SHALL include per-POS aggregate breakdown with the same three amounts per POS. Only authenticated users can access this endpoint; administrators see all POS, operators see only assigned POS.
 
 #### Scenario: Administrator retrieves sales report with default filters
 
 - **WHEN** an authenticated administrator requests `GET /api/reports/sales` without filters
 - **THEN** the system returns paginated sales for the last 30 days across all points of sale
-- **AND** the response includes `items` (list of `SalesReportItem`), `totalCount`, `page`, `pageSize`, `totalPages`
-- **AND** the response includes global aggregates: `totalSalesCount`, `totalQuantity`, `totalAmount` computed over the entire filtered dataset
+- **AND** the response includes `items`, `totalCount`, `page`, `pageSize`, `totalPages`
+- **AND** the response includes global aggregates: `totalSalesCount`, `totalQuantity`, `totalAmount`, `totalCommission`, `totalAmountNet` over the filtered dataset
 
 #### Scenario: Filter sales report by text search
 
 - **WHEN** an authenticated user requests `GET /api/reports/sales?search=anillo`
 - **THEN** the system returns sales where `Product.SKU` or `Product.Name` contains "anillo" (case-insensitive)
-- **AND** global aggregates reflect only the matching sales
+- **AND** global aggregates reflect only the matching sales (and returns in scope per filter rules)
 
 #### Scenario: Filter sales report by amount range
 
@@ -57,7 +57,27 @@ The system SHALL provide a REST API endpoint at `GET /api/reports/sales` that re
 
 - **WHEN** the applied filters match zero sales
 - **THEN** the system returns an empty items list
-- **AND** `totalSalesCount = 0`, `totalQuantity = 0`, `totalAmount = 0`
+- **AND** `totalSalesCount = 0`, `totalQuantity = 0`, `totalAmount = 0`, `totalCommission = 0`, `totalAmountNet = 0`
+
+#### Scenario: Net amount subtracts commissions on filtered sales
+
+- **GIVEN** filtered sales with return-adjusted `totalAmount` T and calculated commission C on those sales
+- **WHEN** an authenticated user requests the sales report with those filters
+- **THEN** `totalCommission` equals C
+- **AND** `totalAmountNet` equals T − C
+
+#### Scenario: Returns in filter window reduce totalAmount
+
+- **GIVEN** filtered sales totaling 10000 EUR in the date range
+- **AND** returns totaling 2000 EUR with `ReturnDate` in the same filter window and POS scope
+- **WHEN** an authenticated user requests the sales report
+- **THEN** `totalAmount` equals 8000 EUR before commission
+
+#### Scenario: Per-POS breakdown when multiple POS match
+
+- **GIVEN** a filter that includes sales from POS A and POS B
+- **WHEN** an authenticated administrator requests the sales report
+- **THEN** the response includes per-POS entries with `totalAmount`, `totalCommission`, and `totalAmountNet` for each POS in the filtered set
 
 #### Scenario: Unauthenticated access denied
 
@@ -134,7 +154,7 @@ The system SHALL generate a second Excel sheet named "Resumen por punto de venta
 
 ### Requirement: Sales Report Frontend Page
 
-The system SHALL provide a frontend page at `/reports/sales` accessible from the Reports hub with filters, global totals display, paginated preview table, and Excel export functionality.
+The system SHALL provide a frontend page at `/reports/sales` accessible from the Reports hub with filters, global totals display (importe total with net after commission in parentheses), paginated preview table, and Excel export that includes summary totals for `totalAmount`, `totalCommission`, and `totalAmountNet`.
 
 #### Scenario: Reports hub includes sales report card
 
@@ -156,13 +176,15 @@ The system SHALL provide a frontend page at `/reports/sales` accessible from the
 #### Scenario: Global totals bar displays aggregate values
 
 - **WHEN** a report query returns results
-- **THEN** the page displays "Total (según filtros): X ventas, Y unidades, Z €" using `totalSalesCount`, `totalQuantity`, `totalAmount` from the API response
+- **THEN** the page displays totals using `totalSalesCount`, `totalQuantity`, and `totalAmount` from the API response
+- **AND** the importe total displays as return-adjusted gross formatted currency followed by `totalAmountNet` in parentheses (canonical pattern reused on dashboard monthly KPIs)
+- **AND** `totalCommission` is available in the totals area or breakdown
 - **AND** these values do not change when navigating between pages
 
 #### Scenario: Global totals bar with zero results
 
 - **WHEN** a report query returns zero results
-- **THEN** the page displays "Total (según filtros): 0 ventas, 0 unidades, 0 €"
+- **THEN** the page displays zero for sales count, units, importe total, commission, and parenthetical net amount
 
 #### Scenario: Preview table with pagination
 
@@ -175,6 +197,7 @@ The system SHALL provide a frontend page at `/reports/sales` accessible from the
 - **WHEN** the user clicks "Exportar Excel"
 - **AND** the current filters match <= 10,000 sales
 - **THEN** the browser downloads the generated Excel file
+- **AND** the file includes summary totals for `totalAmount`, `totalCommission`, and `totalAmountNet`
 
 #### Scenario: Export button shows warning on 409
 

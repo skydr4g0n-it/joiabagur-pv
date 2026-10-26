@@ -1,4 +1,9 @@
-## ADDED Requirements
+# pos-commission-tiers Specification
+
+## Purpose
+Define how annual POS sales commission tiers are applied to sales and returns for reporting, including VAT-aware commission amounts on gross sale prices.
+
+## Requirements
 
 ### Requirement: Calendar-Year Commission Per Sale From Pre-Sale YTD
 
