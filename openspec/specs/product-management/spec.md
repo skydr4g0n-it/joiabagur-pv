@@ -1,7 +1,9 @@
 # product-management Specification
 
 ## Purpose
-TBD - created by archiving change add-manual-product-creation. Update Purpose after archive.
+
+Maintain the global jewelry product catalog with CRUD, photos, search, and bulk import to support sales and recognition.
+
 ## Requirements
 ### Requirement: Manual Product Creation UI
 The system SHALL provide a user-friendly form interface for administrators to create individual products with real-time validation and immediate feedback.

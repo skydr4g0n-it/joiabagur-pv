@@ -1,3 +1,5 @@
+using JoiabagurPV.Domain.Common;
+
 namespace JoiabagurPV.Application.Commission;
 
 public enum CommissionTimelineEventKind
@@ -41,8 +43,17 @@ public static class PosCommissionCalculator
         IReadOnlyList<CommissionTierBracket> tiers)
     {
         var percent = GetCommissionPercentForYtd(ytdBeforeSale, tiers);
-        return Math.Round(saleAmount * percent / 100m, 2, MidpointRounding.AwayFromZero);
+        if (percent == 0m)
+            return 0m;
+
+        var vatDivisor = 1m + VatConstants.StandardRate;
+        var netBase = RoundMoney(saleAmount / vatDivisor);
+        var commissionNet = RoundMoney(netBase * percent / 100m);
+        return RoundMoney(commissionNet * vatDivisor);
     }
+
+    private static decimal RoundMoney(decimal value) =>
+        Math.Round(value, 2, MidpointRounding.AwayFromZero);
 
     /// <summary>
     /// Walks the UTC calendar-year timeline and returns commission per sale id.

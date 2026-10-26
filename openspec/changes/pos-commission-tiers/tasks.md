@@ -34,3 +34,9 @@
 - [x] 7.1 Sales report types and UI: parentheses net, show commission; per-POS breakdown when API returns it
 - [x] 7.2 Shared `formatGrossWithNetInParentheses` (or reuse from sales report totals); admin «Ingresos del mes» and operator monthly KPI show `bruto € (neto €)` like `/reports/sales`; manual or Playwright check
 - [x] 7.3 Playwright: `should show net amount in parentheses when report loads` with seeded tiers
+
+## 8. Commission on Net Amount, Then VAT
+
+- [x] 8.1 Add a shared domain VAT constant at 21% (`0.21`). Point the commission calculator at it. If any other business-code VAT literal exists, replace it with the same constant
+- [x] 8.2 Change `PosCommissionCalculator` so YTD and tier lookup stay on gross, and commission is `Round(Round(Round(gross / 1.21, 2) × percent / 100, 2) × 1.21, 2)` with midpoint away from zero. Unit test: 100.00 EUR at 10% → 9.99; 10000 EUR at 20% → 2000.00; empty tiers → 0. Update existing calculator tests that assumed gross × %
+- [x] 8.3 Confirm sales report and dashboard still subtract that commission from gross (`totalAmountNet`, `monthlyRevenueNet`) and that sale-row prices stay VAT-inclusive. Adjust assertions that encoded the old formula

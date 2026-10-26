@@ -1,7 +1,9 @@
 # component-templates Specification
 
 ## Purpose
-TBD - created by archiving change add-component-management. Update Purpose after archive.
+
+Define reusable component quantity templates so administrators can apply standard recipes to products faster and consistently.
+
 ## Requirements
 ### Requirement: Component Template Management
 The system SHALL provide CRUD operations for component templates that define reusable lists of components with quantities (without prices). Only administrators can manage templates.

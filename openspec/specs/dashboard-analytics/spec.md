@@ -1,4 +1,10 @@
-## ADDED Requirements
+# dashboard-analytics Specification
+
+## Purpose
+
+Provide role-aware dashboards and APIs so administrators and operators can monitor daily sales, monthly net revenue, returns, trends, and payment mix without ad-hoc queries.
+
+## Requirements
 
 ### Requirement: Administrator Dashboard KPIs
 

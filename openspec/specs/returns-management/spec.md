@@ -1,7 +1,9 @@
 # returns-management Specification
 
 ## Purpose
-TBD - created by archiving change add-returns-management. Update Purpose after archive.
+
+Process customer returns against prior sales within policy rules, restore inventory, and record categorized refund transactions.
+
 ## Requirements
 ### Requirement: Return Registration with Sale Association
 

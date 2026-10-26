@@ -1,7 +1,9 @@
 # component-reports Specification
 
 ## Purpose
-TBD - created by archiving change add-component-management. Update Purpose after archive.
+
+Provide administrator margin reports and Excel export derived from product component assignments and aggregated totals.
+
 ## Requirements
 ### Requirement: Product Margin Report
 The system SHALL provide a paginated report showing profit margins for products that have component assignments, with filtering, aggregated totals, and Excel export. Only administrators can access this report.

@@ -1,7 +1,9 @@
 # component-master Specification
 
 ## Purpose
-TBD - created by archiving change add-component-management. Update Purpose after archive.
+
+Maintain the administrator-managed master list of components (materials, labor, fees) with 4-decimal cost and sale prices.
+
 ## Requirements
 ### Requirement: Component Master Table Management
 The system SHALL provide CRUD operations for a component master table that defines materials, labor, and other elements assignable to products. Only administrators can access this functionality.

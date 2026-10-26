@@ -37,7 +37,7 @@ context: |
 
 rules:
   proposal:
-    - Before writing any proposal artifact, run an interactive clarification pass: ask focused questions about goals, scope, constraints, edge cases, and acceptance criteria. Wait for answers; iterate with follow-ups until remaining ambiguity is resolved or the user explicitly says to proceed.
+    - "Before writing any proposal artifact, run an interactive clarification pass: ask focused questions about goals, scope, constraints, edge cases, and acceptance criteria. Wait for answers; iterate with follow-ups until remaining ambiguity is resolved or the user explicitly says to proceed."
     - After clarification, propose a short list of optional improvements or alternatives (each with a one-line trade-off). Ask the user to accept or reject each item; do not include rejected items in the proposal.
     - Only after clarification and the accept/reject pass are complete, create proposal.md (and related artifacts). Do not draft or write proposal files earlier.
     - Proposals must not contain code — only design documents (proposal.md, tasks.md, design.md, spec deltas).

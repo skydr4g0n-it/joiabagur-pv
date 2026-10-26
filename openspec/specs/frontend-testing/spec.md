@@ -1,7 +1,9 @@
 # frontend-testing Specification
 
 ## Purpose
-TBD - created by archiving change setup-frontend-testing. Update Purpose after archive.
+
+Specify frontend testing stack, patterns, and CI expectations for unit tests and Playwright end-to-end coverage.
+
 ## Requirements
 ### Requirement: Unit Test Infrastructure
 

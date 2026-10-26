@@ -1,7 +1,9 @@
 # access-control Specification
 
 ## Purpose
-TBD - created by archiving change add-authentication-user-management. Update Purpose after archive.
+
+Enforce role-based access (Admin vs Operator) on APIs and UI, including operator scoping to assigned points of sale.
+
 ## Requirements
 ### Requirement: Role-Based Access Control
 

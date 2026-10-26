@@ -1,7 +1,9 @@
 # inventory-management Specification
 
 ## Purpose
-TBD - created by archiving change add-inventory-management. Update Purpose after archive.
+
+Manage per-POS product assignment, stock quantities, movements, imports, and adjustments while preserving audit history.
+
 ## Requirements
 ### Requirement: Product Assignment to Points of Sale
 
@@ -71,7 +73,7 @@ The system SHALL allow administrators to unassign products from points of sale u
 
 ### Requirement: Stock Import from Excel
 
-The system SHALL allow administrators to import stock quantities from Excel files. Quantity values MAY be positive (add stock) or negative (subtract stock). Positive quantities are added to existing Inventory records; negative quantities are subtracted. If a product is not yet assigned to the point of sale, the system SHALL create a new Inventory record (implicit assignment). The point of sale is selected in the UI before file upload; no POS column is required in the Excel file. The import is all-or-nothing: if any row would cause stock to drop below zero, the entire file SHALL be rejected with per-row error details.
+The system SHALL allow administrators to import stock adjustments from Excel for a UI-selected point of sale, with implicit assignment, signed quantities, and all-or-nothing validation that rejects the file when any row would make stock negative.
 
 #### Scenario: Import stock for existing inventory (positive quantity)
 

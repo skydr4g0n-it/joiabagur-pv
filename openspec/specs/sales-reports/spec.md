@@ -1,4 +1,10 @@
-# Sales Reports
+# sales-reports Specification
+
+## Purpose
+
+Expose filtered sales reporting with global totals and Excel export so administrators can review revenue, quantities, and sale attributes across points of sale.
+
+## Requirements
 
 ### Requirement: Sales Report API with Extended Filters and Global Aggregates
 

@@ -1,7 +1,9 @@
 # backend Specification
 
 ## Purpose
-TBD - created by archiving change init-backend-structure. Update Purpose after archive.
+
+Define the layered ASP.NET Core monolith structure, conventions, and cross-cutting standards for Domain, Application, Infrastructure, and API.
+
 ## Requirements
 ### Requirement: Layered Architecture
 

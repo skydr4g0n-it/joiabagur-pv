@@ -1,7 +1,9 @@
 # sales-management Specification
 
 ## Purpose
-TBD - created by archiving change add-sales-and-image-recognition. Update Purpose after archive.
+
+Register sales at the POS via AI-assisted or manual entry with stock, payment method, and price-policy validation in one atomic flow.
+
 ## Requirements
 ### Requirement: Sales Registration with Dual Entry Methods
 

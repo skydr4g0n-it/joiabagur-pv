@@ -1,7 +1,9 @@
 # user-management Specification
 
 ## Purpose
-TBD - created by archiving change add-authentication-user-management. Update Purpose after archive.
+
+Let administrators create and maintain user accounts, roles, POS assignments, and account status for the multi-location system.
+
 ## Requirements
 ### Requirement: User Creation
 

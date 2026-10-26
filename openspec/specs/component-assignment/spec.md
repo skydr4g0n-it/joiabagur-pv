@@ -1,7 +1,9 @@
 # component-assignment Specification
 
 ## Purpose
-TBD - created by archiving change add-component-management. Update Purpose after archive.
+
+Assign jewelry components to products with quantities and optional price overrides to drive cost, sale price, and margin calculations.
+
 ## Requirements
 ### Requirement: Component Assignment to Products
 The system SHALL allow administrators to assign components to products with quantities and price overrides. Each assignment requires a quantity (> 0), CostPrice (>= 0), and SalePrice (>= 0), all with 4-decimal precision. Assignments are managed in the product edit and create pages.

@@ -1,7 +1,9 @@
 # image-recognition Specification
 
 ## Purpose
-TBD - created by archiving change add-sales-and-image-recognition. Update Purpose after archive.
+
+Identify products from POS photos using in-browser transfer learning, confidence thresholds, and operator confirmation before sale.
+
 ## Requirements
 ### Requirement: Client-Side ML Inference
 

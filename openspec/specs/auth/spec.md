@@ -1,7 +1,9 @@
 # auth Specification
 
 ## Purpose
-TBD - created by archiving change add-authentication-user-management. Update Purpose after archive.
+
+Authenticate users with username and password, issue JWT access and refresh tokens, and manage session security for the API.
+
 ## Requirements
 ### Requirement: User Login
 

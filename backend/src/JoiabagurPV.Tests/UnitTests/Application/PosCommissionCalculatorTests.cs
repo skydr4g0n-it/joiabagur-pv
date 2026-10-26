@@ -62,4 +62,36 @@ public class PosCommissionCalculatorTests
         var commission = PosCommissionCalculator.CalculateCommissionForSale(50000m, 1000m, Array.Empty<CommissionTierBracket>());
         commission.Should().Be(0m);
     }
+
+    [Fact]
+    public void CalculateCommissionForSale_NetThenVatRounding_ExpectedResult()
+    {
+        var tiers = new List<CommissionTierBracket> { new(0m, null, 10m) };
+
+        var commission = PosCommissionCalculator.CalculateCommissionForSale(0m, 100m, tiers);
+
+        commission.Should().Be(9.99m);
+    }
+
+    [Fact]
+    public void BuildSaleCommissionMap_YtdStaysGross_ExpectedResult()
+    {
+        var firstSaleId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var secondSaleId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var events = new List<CommissionTimelineEvent>
+        {
+            new(CommissionTimelineEventKind.Sale, new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc), new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc), firstSaleId, 100m),
+            new(CommissionTimelineEventKind.Sale, new DateTime(2026, 4, 2, 0, 0, 0, DateTimeKind.Utc), new DateTime(2026, 4, 2, 0, 0, 0, DateTimeKind.Utc), secondSaleId, 100m),
+        };
+        var tiers = new List<CommissionTierBracket>
+        {
+            new(0m, 82.64m, 10m),
+            new(82.65m, null, 50m)
+        };
+
+        var map = PosCommissionCalculator.BuildSaleCommissionMap(events, tiers);
+
+        map[firstSaleId].Should().Be(9.99m);
+        map[secondSaleId].Should().Be(50.00m);
+    }
 }

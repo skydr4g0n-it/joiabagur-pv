@@ -2,7 +2,7 @@
 
 ### Requirement: Dashboard Stats API
 
-The system SHALL expose dashboard statistics including monthly revenue net of returns and net of POS commission for the current UTC month, using the same calendar-year return-adjusted YTD commission rules as sales reports and the current tier configuration per POS.
+The system SHALL expose dashboard statistics including monthly revenue net of returns and net of POS commission for the current UTC month, using the same calendar-year return-adjusted gross YTD tier rules and the same three-step VAT commission formula as sales reports, and the current tier configuration per POS. `monthlyRevenue` stays VAT-inclusive gross; `monthlyRevenueNet` is that gross minus VAT-inclusive commission.
 
 #### Scenario: Administrator requests global stats with net monthly revenue
 

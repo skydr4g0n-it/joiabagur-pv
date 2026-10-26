@@ -1,7 +1,9 @@
 # frontend Specification
 
 ## Purpose
-TBD - created by archiving change init-frontend-structure. Update Purpose after archive.
+
+Define the React + Metronic SPA shell, routing, layout, and shared UI patterns used across authenticated features.
+
 ## Requirements
 ### Requirement: Layout Configuration
 
