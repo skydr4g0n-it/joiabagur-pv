@@ -5,7 +5,8 @@ namespace JoiabagurPV.Application.Commission;
 public enum CommissionTimelineEventKind
 {
     Sale,
-    Return
+    Return,
+    CoverageRelease
 }
 
 public sealed record CommissionTimelineEvent(
@@ -77,6 +78,12 @@ public static class PosCommissionCalculator
             if (evt.Kind == CommissionTimelineEventKind.Return)
             {
                 ytd -= evt.Amount;
+                continue;
+            }
+
+            if (evt.Kind == CommissionTimelineEventKind.CoverageRelease)
+            {
+                ytd += evt.Amount;
                 continue;
             }
 

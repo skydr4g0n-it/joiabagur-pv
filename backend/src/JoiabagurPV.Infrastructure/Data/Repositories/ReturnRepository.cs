@@ -1,6 +1,8 @@
 using JoiabagurPV.Domain.Commission;
 using JoiabagurPV.Domain.Common;
 using JoiabagurPV.Domain.Entities;
+using JoiabagurPV.Domain.Enums;
+using JoiabagurPV.Domain.GiftCards;
 using JoiabagurPV.Domain.Interfaces.Repositories;
 using Microsoft.EntityFrameworkCore;
 
@@ -187,11 +189,36 @@ public class ReturnRepository : Repository<Return>, IReturnRepository
         if (endDate.HasValue)
             query = query.Where(r => r.ReturnDate <= endDate.Value);
 
-        var total = await query
+        var returnSales = await query
             .SelectMany(r => r.ReturnSales)
-            .SumAsync(rs => rs.Quantity * rs.UnitPrice);
+            .Select(rs => new { rs.SaleId, rs.Quantity, rs.UnitPrice, SaleQuantity = rs.Sale.Quantity })
+            .ToListAsync();
 
-        return total;
+        if (returnSales.Count == 0)
+            return 0m;
+
+        var saleIds = returnSales.Select(rs => rs.SaleId).Distinct().ToList();
+        var coverageRows = await _context.GiftCardCoverageEntries
+            .Where(e => saleIds.Contains(e.SaleId))
+            .GroupBy(e => e.SaleId)
+            .Select(g => new
+            {
+                SaleId = g.Key,
+                Apply = g.Where(e => e.EntryType == GiftCardCoverageEntryType.Apply).Sum(e => e.Amount),
+                Release = g.Where(e => e.EntryType == GiftCardCoverageEntryType.Release).Sum(e => e.Amount)
+            })
+            .ToListAsync();
+        var coverageMap = coverageRows.ToDictionary(r => r.SaleId, r => r.Apply - r.Release);
+
+        return returnSales.Sum(rs =>
+        {
+            var netCoverage = coverageMap.GetValueOrDefault(rs.SaleId, 0m);
+            if (netCoverage <= 0 || rs.SaleQuantity <= 0)
+                return rs.Quantity * rs.UnitPrice;
+
+            var coverageShare = netCoverage * rs.Quantity / rs.SaleQuantity;
+            return rs.Quantity * rs.UnitPrice - coverageShare;
+        });
     }
 
     public async Task<List<ReturnYtdEvent>> GetReturnYtdEventsForPosYearAsync(
@@ -199,15 +226,36 @@ public class ReturnRepository : Repository<Return>, IReturnRepository
         DateTime yearStartUtc,
         DateTime yearEndUtc)
     {
-        return await _context.Returns
+        var returns = await _context.Returns
+            .Include(r => r.ReturnSales)
+                .ThenInclude(rs => rs.Sale)
             .Where(r => r.PointOfSaleId == pointOfSaleId
                 && r.ReturnDate >= yearStartUtc
                 && r.ReturnDate <= yearEndUtc)
-            .Select(r => new ReturnYtdEvent(
-                r.Id,
-                r.ReturnDate,
-                r.CreatedAt,
-                r.ReturnSales.Sum(rs => rs.Quantity * rs.UnitPrice)))
             .ToListAsync();
+
+        var saleIds = returns.SelectMany(r => r.ReturnSales).Select(rs => rs.SaleId).Distinct().ToList();
+        var coverageRows = await _context.GiftCardCoverageEntries
+            .Where(e => saleIds.Contains(e.SaleId))
+            .GroupBy(e => e.SaleId)
+            .Select(g => new
+            {
+                SaleId = g.Key,
+                Apply = g.Where(e => e.EntryType == GiftCardCoverageEntryType.Apply).Sum(e => e.Amount),
+                Release = g.Where(e => e.EntryType == GiftCardCoverageEntryType.Release).Sum(e => e.Amount)
+            })
+            .ToListAsync();
+        var coverageMap = coverageRows.ToDictionary(r => r.SaleId, r => r.Apply - r.Release);
+
+        return returns.Select(r =>
+        {
+            var amount = r.ReturnSales.Sum(rs =>
+            {
+                var sale = rs.Sale;
+                var netCoverage = coverageMap.GetValueOrDefault(rs.SaleId, 0m);
+                return GiftCardEconomics.GetReturnEconomicAmount(sale, netCoverage, rs.Quantity);
+            });
+            return new ReturnYtdEvent(r.Id, r.ReturnDate, r.CreatedAt, amount);
+        }).ToList();
     }
 }

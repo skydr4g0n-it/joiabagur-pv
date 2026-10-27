@@ -50,6 +50,7 @@ export interface Sale {
   hasReturn: boolean;
   saleDate: string;
   createdAt: string;
+  giftCardCoverageAmount?: number;
 }
 
 /**
@@ -250,6 +251,7 @@ export interface CreateBulkSalesRequest {
   pointOfSaleId: string;
   paymentMethodId: string;
   notes?: string;
+  giftCardCodes?: string[];
   lines: BulkSaleLineRequest[];
 }
 

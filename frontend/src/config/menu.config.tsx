@@ -4,6 +4,7 @@ import {
   Warehouse,
   ShoppingCart,
   RotateCcw,
+  Gift,
   FileText,
   Settings,
   CreditCard,
@@ -42,6 +43,11 @@ export const MENU_ADMINISTRATOR: MenuConfig = [
     title: 'Devoluciones',
     icon: RotateCcw,
     path: ROUTES.RETURNS.ROOT,
+  },
+  {
+    title: 'Tarjetas regalo',
+    icon: Gift,
+    path: ROUTES.GIFT_CARDS.ROOT,
   },
   {
     title: 'Reportes',
@@ -105,6 +111,11 @@ export const MENU_OPERATOR: MenuConfig = [
     title: 'Devoluciones',
     icon: RotateCcw,
     path: ROUTES.RETURNS.ROOT,
+  },
+  {
+    title: 'Tarjetas regalo',
+    icon: Gift,
+    path: ROUTES.GIFT_CARDS.ROOT,
   },
   {
     title: 'Inventario',

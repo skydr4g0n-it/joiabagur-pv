@@ -271,3 +271,23 @@ Use el campo de ingreso manual de SKU debajo de la vista de cámara. También pu
 
 ### ¿El código QR es el mismo que el SKU?
 Sí. El código QR codifica el SKU del producto. No se requiere ningún campo adicional en la base de datos. También puede generar códigos QR y códigos de barras Code128 desde la página de edición del producto.
+
+---
+
+## Tarjetas regalo
+
+### Emisión
+- Menú **Tarjetas regalo** → **Emitir tarjeta**
+- Elija valor nominal (50/100/150/200 € o importe libre), caducidad, POS y método de pago
+- El sistema genera un código `GC-` único (imprimible con Code128 y QR)
+
+### Canje en caja
+- En el **carrito**, escanee o escriba el código `GC-` (no busca producto)
+- La cobertura se aplica a la línea más barata primero; la tarjeta es de **un solo uso** (el saldo gastable pasa a 0 aunque quede valor nominal sin usar)
+- Si el importe del carrito supera la tarjeta, cobre solo la diferencia con el método de pago elegido
+- Si la tarjeta cubre todo el importe, el checkout usa el método interno «Tarjeta regalo»
+
+### Cambio de producto (no devolución clásica)
+- Las joyas compradas con tarjeta **no** se devuelven por **Devoluciones → Nueva devolución**
+- Use **Tarjetas regalo → detalle → Cambiar producto** dentro de 30 días y en el mismo POS
+- El valor contabilizado restante de la tarjeta se aplica al nuevo artículo; el exceso se cobra en efectivo u otro método del POS

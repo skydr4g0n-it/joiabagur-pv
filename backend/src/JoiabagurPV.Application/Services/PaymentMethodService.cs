@@ -1,5 +1,6 @@
 using JoiabagurPV.Application.DTOs.PaymentMethods;
 using JoiabagurPV.Application.Interfaces;
+using JoiabagurPV.Domain.Constants;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Exceptions;
 using JoiabagurPV.Domain.Interfaces.Repositories;
@@ -100,6 +101,11 @@ public class PaymentMethodService : IPaymentMethodService
             throw new DomainException("Método de pago no encontrado");
         }
 
+        if (!isActive && paymentMethod.Code == GiftCardConstants.GiftCardPaymentMethodCode)
+        {
+            throw new DomainException("No se puede desactivar el método de pago de tarjeta regalo del sistema");
+        }
+
         paymentMethod.IsActive = isActive;
 
         await _paymentMethodRepository.UpdateAsync(paymentMethod);
@@ -112,7 +118,10 @@ public class PaymentMethodService : IPaymentMethodService
     }
 
     /// <inheritdoc/>
-    public async Task<List<PointOfSalePaymentMethodDto>> GetByPointOfSaleAsync(Guid pointOfSaleId, bool includeInactive = false)
+    public async Task<List<PointOfSalePaymentMethodDto>> GetByPointOfSaleAsync(
+        Guid pointOfSaleId,
+        bool includeInactive = false,
+        bool excludeGiftCardFromSales = false)
     {
         // Verify point of sale exists
         if (!await _pointOfSaleRepository.ExistsAsync(pointOfSaleId))
@@ -121,7 +130,15 @@ public class PaymentMethodService : IPaymentMethodService
         }
 
         var assignments = await _posPaymentMethodRepository.GetByPointOfSaleAsync(pointOfSaleId, includeInactive);
-        return assignments.Select(MapAssignmentToDto).ToList();
+        var dtos = assignments.Select(MapAssignmentToDto).ToList();
+        if (excludeGiftCardFromSales)
+        {
+            dtos = dtos
+                .Where(a => a.PaymentMethod.Code != GiftCardConstants.GiftCardPaymentMethodCode)
+                .ToList();
+        }
+
+        return dtos;
     }
 
     /// <inheritdoc/>
@@ -187,6 +204,13 @@ public class PaymentMethodService : IPaymentMethodService
             throw new DomainException("Asignación de método de pago no encontrada");
         }
 
+        var paymentMethod = assignment.PaymentMethod
+            ?? await _paymentMethodRepository.GetByIdAsync(paymentMethodId);
+        if (paymentMethod?.Code == GiftCardConstants.GiftCardPaymentMethodCode)
+        {
+            throw new DomainException("No se puede desasignar el método de pago de tarjeta regalo del sistema");
+        }
+
         // Business rule: Ensure at least one active payment method per point of sale
         var activeAssignments = await _posPaymentMethodRepository.GetByPointOfSaleAsync(pointOfSaleId, includeInactive: false);
         if (activeAssignments.Count <= 1)
@@ -208,6 +232,13 @@ public class PaymentMethodService : IPaymentMethodService
         if (assignment == null)
         {
             throw new DomainException("Asignación de método de pago no encontrada");
+        }
+
+        var paymentMethod = assignment.PaymentMethod
+            ?? await _paymentMethodRepository.GetByIdAsync(paymentMethodId);
+        if (!isActive && paymentMethod?.Code == GiftCardConstants.GiftCardPaymentMethodCode)
+        {
+            throw new DomainException("No se puede desactivar el método de pago de tarjeta regalo del sistema");
         }
 
         // Business rule: Ensure at least one active payment method per point of sale

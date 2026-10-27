@@ -44,6 +44,9 @@ public class DatabaseSeeder
     {
         await SeedDefaultAdminAsync();
         await SeedPaymentMethodsAsync();
+        await GiftCardSeedHelper.EnsureGiftCardPaymentMethodAsync(_context, _logger);
+        await GiftCardSeedHelper.EnsureGiftCardSystemProductAsync(_context, _logger);
+        await GiftCardSeedHelper.EnsureGiftCardMethodAssignedToAllPosAsync(_context, _logger);
     }
 
     private async Task SeedDefaultAdminAsync()

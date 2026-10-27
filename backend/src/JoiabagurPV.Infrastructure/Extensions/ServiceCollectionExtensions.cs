@@ -70,6 +70,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInventoryRepository, InventoryRepository>();
         services.AddScoped<IInventoryMovementRepository, InventoryMovementRepository>();
         services.AddScoped<ISaleRepository, SaleRepository>();
+        services.AddScoped<IGiftCardRepository, GiftCardRepository>();
         services.AddScoped<ISalePhotoRepository, SalePhotoRepository>();
         services.AddScoped<IReturnRepository, ReturnRepository>();
         services.AddScoped<IReturnSaleRepository, ReturnSaleRepository>();

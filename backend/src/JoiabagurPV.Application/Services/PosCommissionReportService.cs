@@ -10,15 +10,18 @@ public class PosCommissionReportService : IPosCommissionReportService
     private readonly ISaleRepository _saleRepository;
     private readonly IReturnRepository _returnRepository;
     private readonly IPointOfSaleCommissionTierRepository _tierRepository;
+    private readonly IGiftCardRepository _giftCardRepository;
 
     public PosCommissionReportService(
         ISaleRepository saleRepository,
         IReturnRepository returnRepository,
-        IPointOfSaleCommissionTierRepository tierRepository)
+        IPointOfSaleCommissionTierRepository tierRepository,
+        IGiftCardRepository giftCardRepository)
     {
         _saleRepository = saleRepository;
         _returnRepository = returnRepository;
         _tierRepository = tierRepository;
+        _giftCardRepository = giftCardRepository;
     }
 
     public async Task<SalesReportCommissionResult> ComputeReportCommissionsAsync(
@@ -122,6 +125,7 @@ public class PosCommissionReportService : IPosCommissionReportService
 
                 var salesEvents = await _saleRepository.GetSaleYtdEventsForPosYearAsync(posId, yearStart, yearEnd);
                 var returnEvents = await _returnRepository.GetReturnYtdEventsForPosYearAsync(posId, yearStart, yearEnd);
+                var releaseEvents = await _giftCardRepository.GetCoverageReleaseYtdEventsForPosYearAsync(posId, yearStart, yearEnd);
 
                 var timeline = new List<CommissionTimelineEvent>();
                 timeline.AddRange(salesEvents.Select(e => new CommissionTimelineEvent(
@@ -133,6 +137,12 @@ public class PosCommissionReportService : IPosCommissionReportService
                 timeline.AddRange(returnEvents.Select(e => new CommissionTimelineEvent(
                     CommissionTimelineEventKind.Return,
                     e.ReturnDateUtc,
+                    e.CreatedAtUtc,
+                    null,
+                    e.Amount)));
+                timeline.AddRange(releaseEvents.Select(e => new CommissionTimelineEvent(
+                    CommissionTimelineEventKind.CoverageRelease,
+                    e.EntryDateUtc,
                     e.CreatedAtUtc,
                     null,
                     e.Amount)));

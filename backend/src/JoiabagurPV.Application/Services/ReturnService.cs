@@ -23,6 +23,7 @@ public class ReturnService : IReturnService
     private readonly IFileStorageService _fileStorageService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDashboardService _dashboardService;
+    private readonly IGiftCardRepository _giftCardRepository;
 
     private const int ReturnWindowDays = 30;
 
@@ -36,7 +37,8 @@ public class ReturnService : IReturnService
         IInventoryService inventoryService,
         IFileStorageService fileStorageService,
         IUnitOfWork unitOfWork,
-        IDashboardService dashboardService)
+        IDashboardService dashboardService,
+        IGiftCardRepository giftCardRepository)
     {
         _returnRepository = returnRepository ?? throw new ArgumentNullException(nameof(returnRepository));
         _returnSaleRepository = returnSaleRepository ?? throw new ArgumentNullException(nameof(returnSaleRepository));
@@ -48,6 +50,7 @@ public class ReturnService : IReturnService
         _fileStorageService = fileStorageService ?? throw new ArgumentNullException(nameof(fileStorageService));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
         _dashboardService = dashboardService ?? throw new ArgumentNullException(nameof(dashboardService));
+        _giftCardRepository = giftCardRepository ?? throw new ArgumentNullException(nameof(giftCardRepository));
     }
 
     /// <inheritdoc/>
@@ -158,6 +161,24 @@ public class ReturnService : IReturnService
                     {
                         Success = false,
                         ErrorMessage = $"La venta {association.SaleId} no corresponde al punto de venta seleccionado."
+                    };
+                }
+
+                if (await _giftCardRepository.IsIssuanceSaleAsync(sale.Id))
+                {
+                    return new CreateReturnResult
+                    {
+                        Success = false,
+                        ErrorMessage = "No se puede devolver la venta de emisión de una tarjeta regalo por este flujo."
+                    };
+                }
+
+                if (await _giftCardRepository.SaleHasGiftCardCoverageAsync(sale.Id))
+                {
+                    return new CreateReturnResult
+                    {
+                        Success = false,
+                        ErrorMessage = "No se puede devolver una venta cubierta por tarjeta regalo por este flujo."
                     };
                 }
 
@@ -447,6 +468,12 @@ public class ReturnService : IReturnService
 
             if (availableForReturn > 0)
             {
+                if (await _giftCardRepository.IsIssuanceSaleAsync(sale.Id))
+                    continue;
+
+                if (await _giftCardRepository.SaleHasGiftCardCoverageAsync(sale.Id))
+                    continue;
+
                 var daysRemaining = (int)(sale.SaleDate.AddDays(ReturnWindowDays) - DateTime.UtcNow).TotalDays;
 
                 eligibleSales.Add(new EligibleSaleDto

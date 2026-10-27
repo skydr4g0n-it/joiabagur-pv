@@ -355,7 +355,10 @@ public class PointOfSalesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetPaymentMethods(Guid id, [FromQuery] bool includeInactive = false)
+    public async Task<IActionResult> GetPaymentMethods(
+        Guid id,
+        [FromQuery] bool includeInactive = false,
+        [FromQuery] bool forSalesCheckout = false)
     {
         // Check access for non-admin users
         if (!_currentUserService.IsAdmin)
@@ -375,7 +378,10 @@ public class PointOfSalesController : ControllerBase
 
         try
         {
-            var paymentMethods = await _paymentMethodService.GetByPointOfSaleAsync(id, includeInactive);
+            var paymentMethods = await _paymentMethodService.GetByPointOfSaleAsync(
+                id,
+                includeInactive,
+                excludeGiftCardFromSales: forSalesCheckout);
             return Ok(paymentMethods);
         }
         catch (DomainException ex) when (ex.Message.Contains("no encontrado"))

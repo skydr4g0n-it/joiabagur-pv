@@ -528,6 +528,23 @@ public class PaymentMethodsControllerTests : IAsyncLifetime
             method!.Name.Should().Be(name);
             method.IsActive.Should().BeTrue($"Payment method {code} should be active by default");
         }
+
+        var giftCard = paymentMethods!.FirstOrDefault(pm => pm.Code == "GIFT_CARD");
+        giftCard.Should().NotBeNull("GIFT_CARD seed method should exist");
+        giftCard!.Name.Should().Be("Tarjeta regalo");
+    }
+
+    [Fact]
+    public async Task Seed_GiftCardMethod_IsHiddenAndNotDeactivatable()
+    {
+        var methodsResponse = await _adminClient!.GetAsync("/api/payment-methods");
+        var methods = await methodsResponse.Content.ReadFromJsonAsync<List<PaymentMethodDto>>();
+        var giftCard = methods!.First(pm => pm.Code == "GIFT_CARD");
+
+        var deactivateResponse = await _adminClient.PatchAsJsonAsync(
+            $"/api/payment-methods/{giftCard.Id}/status",
+            new { isActive = false });
+        deactivateResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]

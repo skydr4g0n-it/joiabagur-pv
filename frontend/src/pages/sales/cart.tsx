@@ -3,8 +3,8 @@
  * Displays cart lines, allows removal, shows totals,
  * revalidates stock, and provides bulk checkout confirmation.
  */
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   ShoppingCart,
@@ -13,9 +13,12 @@ import {
   CheckCircle2,
   PackageX,
   Loader2,
+  Gift,
+  Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -35,8 +38,15 @@ import {
 import { useCart } from '@/providers/cart-provider';
 import { salesService } from '@/services/sales.service';
 import { inventoryService } from '@/services/inventory.service';
+import { giftCardService } from '@/services/gift-card.service';
+import { paymentMethodService } from '@/services/payment-method.service';
+import { computeGiftCardCoverageTotal } from '@/lib/gift-card-allocation';
+import { formatCurrency } from '@/lib/format-currency';
 import { ROUTES } from '@/routing/routes';
 import type { CartLine } from '@/types/sales.types';
+import type { GiftCardByCode } from '@/types/gift-card.types';
+
+const GIFT_CARD_PAYMENT_CODE = 'GIFT_CARD';
 
 interface StockStatus {
   available: number;
@@ -45,6 +55,7 @@ interface StockStatus {
 
 export function SalesCartPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     lines,
     lineCount,
@@ -62,6 +73,77 @@ export function SalesCartPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [globalNote, setGlobalNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [attachedCards, setAttachedCards] = useState<GiftCardByCode[]>([]);
+  const [cardCodeInput, setCardCodeInput] = useState('');
+  const [addingCard, setAddingCard] = useState(false);
+  const [giftCardPaymentMethodId, setGiftCardPaymentMethodId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadGiftPay = async () => {
+      if (!pointOfSaleId) return;
+      try {
+        const assignments = await paymentMethodService.getPointOfSalePaymentMethods(
+          pointOfSaleId,
+          true,
+        );
+        const gift = assignments.find((a) => a.paymentMethod?.code === GIFT_CARD_PAYMENT_CODE);
+        setGiftCardPaymentMethodId(gift?.paymentMethodId ?? null);
+      } catch {
+        setGiftCardPaymentMethodId(null);
+      }
+    };
+    loadGiftPay();
+  }, [pointOfSaleId]);
+
+  const lineTotals = useMemo(
+    () =>
+      lines.map((l) => {
+        const price = l.price ?? l.productPrice;
+        return { lineTotal: price * l.quantity };
+      }),
+    [lines],
+  );
+
+  const coverageTotal = useMemo(
+    () =>
+      computeGiftCardCoverageTotal(
+        lineTotals,
+        attachedCards.map((c) => ({ code: c.code, spendableBalance: c.spendableBalance })),
+      ),
+    [lineTotals, attachedCards],
+  );
+
+  const cashDue = Math.max(0, Math.round((total - coverageTotal) * 100) / 100);
+
+  const addGiftCardByCode = async (rawCode: string) => {
+    const code = rawCode.trim().toUpperCase();
+    if (!code.startsWith('GC-')) {
+      toast.error('El código debe empezar por GC-');
+      return;
+    }
+    if (!pointOfSaleId) {
+      toast.error('Selecciona un punto de venta en el carrito');
+      return;
+    }
+    if (attachedCards.some((c) => c.code === code)) {
+      toast.error('Esta tarjeta ya está en el carrito');
+      return;
+    }
+    setAddingCard(true);
+    try {
+      const card = await giftCardService.getByCode(code, pointOfSaleId);
+      setAttachedCards((prev) => [...prev, card]);
+      setCardCodeInput('');
+      toast.success(`Tarjeta ${code} añadida`);
+    } catch (error: unknown) {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'No se pudo validar la tarjeta regalo';
+      toast.error(message);
+    } finally {
+      setAddingCard(false);
+    }
+  };
 
   // Revalidate stock for all lines
   const revalidateStock = useCallback(async () => {
@@ -105,6 +187,15 @@ export function SalesCartPage() {
     revalidateStock();
   }, [revalidateStock]);
 
+  useEffect(() => {
+    const code = (location.state as { giftCardCode?: string } | null)?.giftCardCode;
+    if (code) {
+      addGiftCardByCode(code);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once when navigated from scanner
+  }, [location.state]);
+
   const hasInsufficientStock = Object.values(stockMap).some((s) => !s.sufficient);
   const canCheckout = lineCount > 0 && !hasInsufficientStock && !stockLoading;
 
@@ -117,13 +208,21 @@ export function SalesCartPage() {
     if (!pointOfSaleId || !paymentMethodId) return;
 
     setSubmitting(true);
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-bulk`;
+    const effectivePaymentMethodId =
+      cashDue <= 0 && giftCardPaymentMethodId ? giftCardPaymentMethodId : paymentMethodId;
+
+    if (cashDue <= 0 && attachedCards.length > 0 && !giftCardPaymentMethodId) {
+      toast.error('Método de pago de tarjeta regalo no configurado en este POS');
+      return;
+    }
 
     try {
       const result = await salesService.createBulkSales(
         {
           pointOfSaleId,
-          paymentMethodId,
+          paymentMethodId: effectivePaymentMethodId,
+          giftCardCodes: attachedCards.length > 0 ? attachedCards.map((c) => c.code) : undefined,
           notes: globalNote || undefined,
           lines: lines.map((l) => ({
             productId: l.productId,
@@ -348,11 +447,66 @@ export function SalesCartPage() {
               </div>
             </div>
 
-            <div className="border-t pt-3">
+            <div className="space-y-2 border-t pt-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Gift className="size-4" />
+                Tarjetas regalo
+              </div>
+              {attachedCards.map((card) => (
+                <div key={card.code} className="flex items-center justify-between text-sm">
+                  <span className="font-mono">{card.code}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-destructive"
+                    onClick={() =>
+                      setAttachedCards((prev) => prev.filter((c) => c.code !== card.code))
+                    }
+                  >
+                    Quitar
+                  </Button>
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <Input
+                  placeholder="GC-..."
+                  value={cardCodeInput}
+                  onChange={(e) => setCardCodeInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addGiftCardByCode(cardCodeInput);
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  disabled={addingCard}
+                  onClick={() => addGiftCardByCode(cardCodeInput)}
+                >
+                  <Plus className="size-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="border-t pt-3 space-y-1">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>{formatCurrency(total)}</span>
+              </div>
+              {coverageTotal > 0 && (
+                <div className="flex items-center justify-between text-sm text-emerald-700">
+                  <span>Cobertura tarjeta</span>
+                  <span>-{formatCurrency(coverageTotal)}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between">
-                <span className="font-semibold">Total</span>
+                <span className="font-semibold">Importe a cobrar</span>
                 <span className="text-xl font-bold text-primary">
-                  €{total.toFixed(2)}
+                  {formatCurrency(cashDue)}
                 </span>
               </div>
             </div>
@@ -390,7 +544,7 @@ export function SalesCartPage() {
                     <strong>Líneas:</strong> {lineCount}
                   </p>
                   <p>
-                    <strong>Total:</strong> €{total.toFixed(2)}
+                    <strong>Importe a cobrar:</strong> {formatCurrency(cashDue)}
                   </p>
                   <p>
                     <strong>Punto de venta:</strong> {pointOfSaleName}

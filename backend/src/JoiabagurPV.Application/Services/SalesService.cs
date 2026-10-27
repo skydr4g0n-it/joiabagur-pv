@@ -1,7 +1,11 @@
 using JoiabagurPV.Application.DTOs.Sales;
+using JoiabagurPV.Application.GiftCards;
+using JoiabagurPV.Domain.GiftCards;
 using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Domain.Common;
+using JoiabagurPV.Domain.Constants;
 using JoiabagurPV.Domain.Entities;
+using JoiabagurPV.Domain.Enums;
 using JoiabagurPV.Domain.Interfaces.Repositories;
 using JoiabagurPV.Domain.Interfaces.Services;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +29,8 @@ public class SalesService : ISalesService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDashboardService _dashboardService;
     private readonly IPosCommissionReportService _commissionReportService;
+    private readonly IGiftCardRepository _giftCardRepository;
+    private readonly IPaymentMethodRepository _paymentMethodRepository;
 
     public SalesService(
         ISaleRepository saleRepository,
@@ -38,7 +44,9 @@ public class SalesService : ISalesService
         IFileStorageService fileStorageService,
         IUnitOfWork unitOfWork,
         IDashboardService dashboardService,
-        IPosCommissionReportService commissionReportService)
+        IPosCommissionReportService commissionReportService,
+        IGiftCardRepository giftCardRepository,
+        IPaymentMethodRepository paymentMethodRepository)
     {
         _saleRepository = saleRepository ?? throw new ArgumentNullException(nameof(saleRepository));
         _salePhotoRepository = salePhotoRepository ?? throw new ArgumentNullException(nameof(salePhotoRepository));
@@ -52,6 +60,8 @@ public class SalesService : ISalesService
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
         _dashboardService = dashboardService ?? throw new ArgumentNullException(nameof(dashboardService));
         _commissionReportService = commissionReportService ?? throw new ArgumentNullException(nameof(commissionReportService));
+        _giftCardRepository = giftCardRepository ?? throw new ArgumentNullException(nameof(giftCardRepository));
+        _paymentMethodRepository = paymentMethodRepository ?? throw new ArgumentNullException(nameof(paymentMethodRepository));
     }
 
     /// <inheritdoc/>
@@ -300,7 +310,7 @@ public class SalesService : ISalesService
                 return new CreateSaleResult
                 {
                     Success = true,
-                    Sale = MapToDto(saleWithDetails!),
+                    Sale = MapToDto(saleWithDetails!, 0m),
                     WarningMessage = stockValidation.IsLowStock ? stockValidation.WarningMessage : null,
                     IsLowStock = stockValidation.IsLowStock,
                     RemainingStock = movementResult.QuantityAfter
@@ -347,7 +357,8 @@ public class SalesService : ISalesService
             }
         }
 
-        return MapToDto(sale);
+        var coverage = await _giftCardRepository.GetNetCoverageOnSaleAsync(sale.Id);
+        return MapToDto(sale, coverage);
     }
 
     /// <inheritdoc/>
@@ -412,9 +423,12 @@ public class SalesService : ISalesService
 
         var totalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize);
 
+        var saleIds = sales.Select(s => s.Id).ToList();
+        var coverageMap = await _giftCardRepository.GetNetCoverageBySaleIdsAsync(saleIds);
+
         return new SalesHistoryResponse
         {
-            Sales = sales.Select(MapToDto).ToList(),
+            Sales = sales.Select(s => MapToDto(s, coverageMap.GetValueOrDefault(s.Id, 0m))).ToList(),
             TotalCount = totalCount,
             Page = request.Page,
             PageSize = request.PageSize,
@@ -500,6 +514,8 @@ public class SalesService : ISalesService
                     return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: Product with ID {line.ProductId} not found." };
                 if (!product.IsActive)
                     return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: Product '{product.Name}' is not active." };
+                if (product.SystemProductKind != null)
+                    return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: System products cannot be sold through bulk checkout." };
                 if (line.Price.HasValue && !pointOfSale.AllowManualPriceEdit)
                     return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: Manual price editing is not allowed for this point of sale." };
 
@@ -513,6 +529,40 @@ public class SalesService : ISalesService
                     return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: {stockValidation.ErrorMessage ?? "Insufficient stock."}" };
             }
 
+            var giftCardCodes = request.GiftCardCodes?
+                .Where(c => !string.IsNullOrWhiteSpace(c))
+                .Select(c => c.Trim())
+                .ToList() ?? new List<string>();
+
+            var lineTotals = new List<decimal>();
+            for (int i = 0; i < request.Lines.Count; i++)
+            {
+                var line = request.Lines[i];
+                var product = products[line.ProductId];
+                var officialPrice = product.Price;
+                decimal effectivePrice;
+                if (pointOfSale.AllowManualPriceEdit && line.Price.HasValue && line.Price.Value != officialPrice)
+                    effectivePrice = line.Price.Value;
+                else
+                    effectivePrice = officialPrice;
+                lineTotals.Add(effectivePrice * line.Quantity);
+            }
+
+            var cartTotal = lineTotals.Sum();
+            List<GiftCardAllocationApply> allocationApplies = new();
+            Dictionary<string, GiftCard> lockedCardsByCode = new();
+            Guid? giftCardPaymentMethodId = null;
+
+            if (giftCardCodes.Count > 0)
+            {
+                giftCardPaymentMethodId = await _paymentMethodRepository.GetAll()
+                    .Where(pm => pm.Code == GiftCardConstants.GiftCardPaymentMethodCode)
+                    .Select(pm => pm.Id)
+                    .FirstOrDefaultAsync();
+                if (giftCardPaymentMethodId == Guid.Empty)
+                    return new CreateBulkSalesResult { Success = false, ErrorMessage = "Gift card payment method is not configured." };
+            }
+
             var bulkOperationId = Guid.NewGuid();
             var createdSales = new List<SaleDto>();
             var warnings = new List<BulkSaleLineWarning>();
@@ -520,6 +570,86 @@ public class SalesService : ISalesService
             await _unitOfWork.BeginTransactionAsync();
             try
             {
+                if (giftCardCodes.Count > 0)
+                {
+                    var locked = await _giftCardRepository.LockByCodesAsync(giftCardCodes);
+                    lockedCardsByCode = locked.ToDictionary(c => c.Code, c => c);
+
+                    foreach (var code in giftCardCodes)
+                    {
+                        if (!lockedCardsByCode.TryGetValue(code, out var card))
+                        {
+                            await _unitOfWork.RollbackTransactionAsync();
+                            return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Gift card '{code}' was not found." };
+                        }
+
+                        if (card.PointOfSaleId != request.PointOfSaleId)
+                        {
+                            await _unitOfWork.RollbackTransactionAsync();
+                            return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Gift card '{code}' is not valid at this point of sale." };
+                        }
+
+                        if (GiftCardEconomics.IsExpiredForRedemption(card.ExpiryDate))
+                        {
+                            await _unitOfWork.RollbackTransactionAsync();
+                            return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Gift card '{code}' is expired." };
+                        }
+
+                        if (card.SpendableBalance <= 0)
+                        {
+                            await _unitOfWork.RollbackTransactionAsync();
+                            return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Gift card '{code}' was already used." };
+                        }
+                    }
+
+                    var cardsInOrder = giftCardCodes
+                        .Select(code => (code, lockedCardsByCode[code].SpendableBalance))
+                        .ToList();
+                    var lineStates = lineTotals
+                        .Select((total, index) => new GiftCardAllocationLineState(index, total, total))
+                        .ToList();
+                    var (applies, consumedCodes) = GiftCardAllocation.Allocate(lineStates, cardsInOrder);
+                    allocationApplies = applies;
+
+                    foreach (var code in consumedCodes)
+                        lockedCardsByCode[code].SpendableBalance = 0m;
+                }
+
+                var coverageTotal = allocationApplies.Sum(a => a.Amount);
+                var cashDue = cartTotal - coverageTotal;
+                Guid linePaymentMethodId;
+
+                if (cashDue <= 0)
+                {
+                    if (giftCardPaymentMethodId == null)
+                    {
+                        await _unitOfWork.RollbackTransactionAsync();
+                        return new CreateBulkSalesResult { Success = false, ErrorMessage = "Gift card payment method is not configured." };
+                    }
+
+                    if (request.PaymentMethodId != giftCardPaymentMethodId.Value)
+                    {
+                        await _unitOfWork.RollbackTransactionAsync();
+                        return new CreateBulkSalesResult { Success = false, ErrorMessage = "Fully covered checkouts must use the gift card payment method." };
+                    }
+
+                    linePaymentMethodId = giftCardPaymentMethodId.Value;
+                }
+                else
+                {
+                    if (giftCardPaymentMethodId.HasValue && request.PaymentMethodId == giftCardPaymentMethodId.Value)
+                    {
+                        await _unitOfWork.RollbackTransactionAsync();
+                        return new CreateBulkSalesResult { Success = false, ErrorMessage = "Gift card payment method cannot be used when cash is still due." };
+                    }
+
+                    linePaymentMethodId = request.PaymentMethodId;
+                }
+
+                var appliesByLine = allocationApplies
+                    .GroupBy(a => a.LineIndex)
+                    .ToDictionary(g => g.Key, g => g.ToList());
+
                 for (int i = 0; i < request.Lines.Count; i++)
                 {
                     var line = request.Lines[i];
@@ -555,7 +685,7 @@ public class SalesService : ISalesService
                         ProductId = line.ProductId,
                         PointOfSaleId = request.PointOfSaleId,
                         UserId = userId,
-                        PaymentMethodId = request.PaymentMethodId,
+                        PaymentMethodId = linePaymentMethodId,
                         Price = effectivePrice,
                         Quantity = line.Quantity,
                         PriceWasOverridden = priceWasOverridden,
@@ -567,6 +697,25 @@ public class SalesService : ISalesService
 
                     sale = await _saleRepository.AddAsync(sale);
                     await _unitOfWork.SaveChangesAsync();
+
+                    if (appliesByLine.TryGetValue(i, out var lineApplies))
+                    {
+                        var entryDate = sale.SaleDate;
+                        foreach (var apply in lineApplies)
+                        {
+                            var card = lockedCardsByCode[apply.CardCode];
+                            await _giftCardRepository.AddCoverageEntryAsync(new GiftCardCoverageEntry
+                            {
+                                GiftCardId = card.Id,
+                                SaleId = sale.Id,
+                                EntryType = GiftCardCoverageEntryType.Apply,
+                                Amount = apply.Amount,
+                                EntryDate = entryDate
+                            });
+                        }
+
+                        await _unitOfWork.SaveChangesAsync();
+                    }
 
                     if (!string.IsNullOrEmpty(line.PhotoBase64))
                     {
@@ -602,7 +751,10 @@ public class SalesService : ISalesService
                     }
 
                     var saleWithDetails = await _saleRepository.GetByIdWithDetailsAsync(sale.Id);
-                    createdSales.Add(MapToDto(saleWithDetails!));
+                    var coverageOnSale = appliesByLine.TryGetValue(i, out var applied)
+                        ? applied.Sum(a => a.Amount)
+                        : 0m;
+                    createdSales.Add(MapToDto(saleWithDetails!, coverageOnSale));
 
                     if (finalStockValidation.IsLowStock)
                     {
@@ -898,7 +1050,7 @@ public class SalesService : ISalesService
     /// <summary>
     /// Maps a Sale entity to a SaleDto.
     /// </summary>
-    private static SaleDto MapToDto(Sale sale)
+    private static SaleDto MapToDto(Sale sale, decimal giftCardCoverageAmount)
     {
         return new SaleDto
         {
@@ -921,7 +1073,8 @@ public class SalesService : ISalesService
             HasPhoto = sale.Photo != null,
             HasReturn = sale.ReturnSales.Count > 0,
             SaleDate = sale.SaleDate,
-            CreatedAt = sale.CreatedAt
+            CreatedAt = sale.CreatedAt,
+            GiftCardCoverageAmount = giftCardCoverageAmount
         };
     }
 }

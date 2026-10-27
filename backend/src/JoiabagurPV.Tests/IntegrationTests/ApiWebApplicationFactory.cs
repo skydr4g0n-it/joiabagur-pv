@@ -112,6 +112,12 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
             throw new InvalidOperationException("Database not initialized. Call InitializeAsync first.");
         }
 
+        using (var migrateScope = Services.CreateScope())
+        {
+            var context = migrateScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await context.Database.MigrateAsync();
+        }
+
         // Initialize Respawner on first use (after schema is created)
         if (_respawner == null)
         {

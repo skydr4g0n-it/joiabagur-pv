@@ -1,6 +1,7 @@
 using FluentAssertions;
 using JoiabagurPV.Application.DTOs.PaymentMethods;
 using JoiabagurPV.Application.Services;
+using JoiabagurPV.Domain.Constants;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Exceptions;
 using JoiabagurPV.Domain.Interfaces.Repositories;
@@ -532,6 +533,74 @@ public class PaymentMethodServiceTests
         result.IsActive.Should().BeTrue();
         _posPaymentMethodRepositoryMock.Verify(r => r.UpdateAsync(assignment), Times.Once);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+    }
+
+    #endregion
+
+    #region Gift card payment method
+
+    [Fact]
+    public async Task GetByPointOfSaleAsync_ExcludeGiftCardFromSales_OmitsGiftCard()
+    {
+        var pointOfSaleId = Guid.NewGuid();
+        var cash = TestDataGenerator.CreatePaymentMethod(code: "CASH", name: "Efectivo");
+        var giftCard = TestDataGenerator.CreatePaymentMethod(
+            code: GiftCardConstants.GiftCardPaymentMethodCode,
+            name: "Tarjeta regalo");
+
+        var assignments = new List<PointOfSalePaymentMethod>
+        {
+            new() { PointOfSaleId = pointOfSaleId, PaymentMethodId = cash.Id, IsActive = true, PaymentMethod = cash },
+            new() { PointOfSaleId = pointOfSaleId, PaymentMethodId = giftCard.Id, IsActive = true, PaymentMethod = giftCard }
+        };
+
+        _pointOfSaleRepositoryMock.Setup(r => r.ExistsAsync(pointOfSaleId)).ReturnsAsync(true);
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetByPointOfSaleAsync(pointOfSaleId, false))
+            .ReturnsAsync(assignments);
+
+        var result = await _service.GetByPointOfSaleAsync(pointOfSaleId, false, excludeGiftCardFromSales: true);
+
+        result.Should().HaveCount(1);
+        result[0].PaymentMethod.Code.Should().Be("CASH");
+    }
+
+    [Fact]
+    public async Task ChangeStatusAsync_DeactivateGiftCard_ThrowsDomainException()
+    {
+        var giftCard = TestDataGenerator.CreatePaymentMethod(
+            code: GiftCardConstants.GiftCardPaymentMethodCode,
+            name: "Tarjeta regalo");
+        _paymentMethodRepositoryMock.Setup(r => r.GetByIdAsync(giftCard.Id)).ReturnsAsync(giftCard);
+
+        var act = () => _service.ChangeStatusAsync(giftCard.Id, false);
+
+        await act.Should().ThrowAsync<DomainException>()
+            .WithMessage("*tarjeta regalo*");
+    }
+
+    [Fact]
+    public async Task ChangeAssignmentStatusAsync_DeactivateGiftCard_ThrowsDomainException()
+    {
+        var pointOfSaleId = Guid.NewGuid();
+        var giftCard = TestDataGenerator.CreatePaymentMethod(
+            code: GiftCardConstants.GiftCardPaymentMethodCode,
+            name: "Tarjeta regalo");
+        var assignment = new PointOfSalePaymentMethod
+        {
+            Id = Guid.NewGuid(),
+            PointOfSaleId = pointOfSaleId,
+            PaymentMethodId = giftCard.Id,
+            IsActive = true,
+            PaymentMethod = giftCard
+        };
+
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, giftCard.Id))
+            .ReturnsAsync(assignment);
+
+        var act = () => _service.ChangeAssignmentStatusAsync(pointOfSaleId, giftCard.Id, false);
+
+        await act.Should().ThrowAsync<DomainException>()
+            .WithMessage("*tarjeta regalo*");
     }
 
     #endregion

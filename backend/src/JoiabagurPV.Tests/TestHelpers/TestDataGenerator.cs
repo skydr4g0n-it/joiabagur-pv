@@ -121,7 +121,7 @@ public static class TestDataGenerator
             .RuleFor(p => p.Name, f => f.Company.CompanyName())
             .RuleFor(p => p.Code, f => f.Random.AlphaNumeric(6).ToUpperInvariant())
             .RuleFor(p => p.Address, f => f.Address.FullAddress())
-            .RuleFor(p => p.Phone, f => f.Phone.PhoneNumber())
+            .RuleFor(p => p.Phone, f => f.Random.Replace("6#########"))
             .RuleFor(p => p.Email, f => f.Internet.Email())
             .RuleFor(p => p.IsActive, f => isActive ?? true)
             .RuleFor(p => p.CreatedAt, f => f.Date.Past().ToUniversalTime())

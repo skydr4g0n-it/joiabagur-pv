@@ -1,0 +1,13 @@
+# HU-EP3-005: Tarjetas regalo (emisión y canje)
+
+**Como** operador o administrador  
+**Quiero** emitir tarjetas regalo y aplicarlas en el carrito de ventas  
+**Para** cobrar el valor nominal en caja y permitir un solo canje por tarjeta
+
+## Criterios de aceptación
+
+- Valor nominal: 50/100/150/200 € o importe libre con dos decimales
+- Código `GC-` único; caducidad obligatoria
+- Canje en carrito escaneando `GC-` sin buscar producto; errores inmediatos si caducada, POS incorrecto o ya usada
+- Tras el primer canje el saldo gastable es 0; el resto nominal queda como valor contabilizado (no reutilizable en otra venta)
+- Checkout atómico con idempotencia existente del bulk

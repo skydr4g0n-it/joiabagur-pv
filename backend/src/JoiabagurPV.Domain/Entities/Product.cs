@@ -1,3 +1,5 @@
+using JoiabagurPV.Domain.Enums;
+
 namespace JoiabagurPV.Domain.Entities;
 
 /// <summary>
@@ -39,6 +41,11 @@ public class Product : BaseEntity
     /// Whether the product is currently active in the catalog.
     /// </summary>
     public bool IsActive { get; set; } = true;
+
+    /// <summary>
+    /// When set, the product is a system product excluded from the jewelry catalog.
+    /// </summary>
+    public SystemProductKind? SystemProductKind { get; set; }
 
     /// <summary>
     /// Navigation property for product photos.

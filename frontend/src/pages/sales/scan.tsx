@@ -4,6 +4,8 @@ import { CameraOff, Flashlight, FlashlightOff, X, ScanLine, Search } from 'lucid
 import { toast } from 'sonner';
 import { BarcodeScanningService } from '@/services/barcode-scanning.service';
 import { productService } from '@/services/product.service';
+import { giftCardService } from '@/services/gift-card.service';
+import { useCart } from '@/providers/cart-provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,6 +16,7 @@ type ScanState = 'initializing' | 'scanning' | 'error' | 'success';
 
 export function ScanningPage() {
   const navigate = useNavigate();
+  const { pointOfSaleId } = useCart();
   const [scanState, setScanState] = useState<ScanState>('initializing');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [flashOn, setFlashOn] = useState(false);
@@ -65,6 +68,23 @@ export function ScanningPage() {
     async (result: { value: string; type: string }) => {
       const sku = result.value.trim();
 
+      if (sku.toUpperCase().startsWith('GC-')) {
+        if (!pointOfSaleId) {
+          toast.error('Añade productos al carrito con un punto de venta antes de escanear tarjetas');
+          return;
+        }
+        try {
+          await giftCardService.getByCode(sku.toUpperCase(), pointOfSaleId);
+          navigate(ROUTES.SALES.CART, { state: { giftCardCode: sku.toUpperCase() } });
+        } catch (error: unknown) {
+          const message =
+            (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+            'Tarjeta regalo no válida';
+          toast.error(message);
+        }
+        return;
+      }
+
       try {
         const products = await productService.searchProducts(sku);
         const exactMatch = products.find(
@@ -93,7 +113,7 @@ export function ScanningPage() {
         });
       }
     },
-    [navigate],
+    [navigate, pointOfSaleId],
   );
 
   const handleToggleFlash = async () => {
@@ -106,8 +126,28 @@ export function ScanningPage() {
     if (!manualSku.trim()) return;
     setIsSubmittingManual(true);
 
+    const trimmed = manualSku.trim();
+    if (trimmed.toUpperCase().startsWith('GC-')) {
+      if (!pointOfSaleId) {
+        toast.error('Añade productos al carrito con un punto de venta antes de escanear tarjetas');
+        setIsSubmittingManual(false);
+        return;
+      }
+      try {
+        await giftCardService.getByCode(trimmed.toUpperCase(), pointOfSaleId);
+        navigate(ROUTES.SALES.CART, { state: { giftCardCode: trimmed.toUpperCase() } });
+      } catch (error: unknown) {
+        const message =
+          (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          'Tarjeta regalo no válida';
+        toast.error(message);
+        setIsSubmittingManual(false);
+      }
+      return;
+    }
+
     try {
-      const products = await productService.searchProducts(manualSku.trim());
+      const products = await productService.searchProducts(trimmed);
       const exactMatch = products.find(
         (p: any) => p.sku?.toUpperCase() === manualSku.trim().toUpperCase(),
       );

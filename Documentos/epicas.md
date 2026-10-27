@@ -80,6 +80,9 @@ Permite registrar ventas en los puntos de venta, con actualización automática 
 - Carrito de ventas con persistencia local y checkout masivo atómico (`POST /api/sales/bulk`)
 - Agrupación de ventas creadas en checkout masivo mediante `BulkOperationId`
 - Prevención de envíos duplicados mediante clave de idempotencia
+- Emisión de **tarjetas regalo** (valor nominal 50/100/150/200 € o importe libre), código `GC-`, un solo uso en caja
+- Aplicación de tarjetas en el carrito (escaneo `GC-` sin buscar producto) y cobro del resto en efectivo u otro método del POS
+- Cambio de productos comprados con tarjeta regalo (no devolución clásica)
 
 **Entidades del modelo de datos relacionadas:**
 - `Sale` (venta con precio snapshot, cantidad, método de pago, fecha, indicador de precio modificado, `BulkOperationId` opcional)
@@ -87,6 +90,7 @@ Permite registrar ventas en los puntos de venta, con actualización automática 
 - `InventoryMovement` (movimiento automático generado por la venta)
 - `PaymentMethod` y `PointOfSalePaymentMethod` (validación de métodos disponibles)
 - `User` (operador que realiza la venta)
+- `GiftCard`, `GiftCardCoverageEntry`, producto sistema `SYS-GIFT-CARD`
 
 **User Stories:**
 - [HU-EP3-001: Registrar venta con reconocimiento de imagen](Historias/HU-EP3-001.md) *(incluye validación de stock y selección de método de pago)*
@@ -148,6 +152,7 @@ Permite registrar devoluciones de productos vendidos, asociándolas a una o más
 - Generación automática de movimiento de inventario (tipo "Return")
 - Validación de cantidad disponible (vendida - ya devuelta)
 - Operadores pueden registrar devoluciones en sus puntos de venta asignados
+- **Exclusión:** no admite devolución clásica de ventas cubiertas por tarjeta regalo ni de la venta de emisión de la tarjeta; esas piezas solo se cambian con el flujo de **cambio de producto** de la tarjeta (30 días, mismo POS)
 
 **Entidades del modelo de datos relacionadas:**
 - `Return` (devolución con cantidad, categoría y motivo)

@@ -18,6 +18,7 @@ public class DashboardServiceTests
     private readonly Mock<IInventoryRepository> _inventoryRepoMock;
     private readonly Mock<IUserPointOfSaleRepository> _uposRepoMock;
     private readonly Mock<IPosCommissionReportService> _commissionServiceMock;
+    private readonly Mock<IGiftCardRepository> _giftCardRepoMock;
     private readonly IMemoryCache _cache;
     private readonly DashboardService _sut;
 
@@ -28,7 +29,19 @@ public class DashboardServiceTests
         _inventoryRepoMock = new Mock<IInventoryRepository>();
         _uposRepoMock = new Mock<IUserPointOfSaleRepository>();
         _commissionServiceMock = new Mock<IPosCommissionReportService>();
+        _giftCardRepoMock = new Mock<IGiftCardRepository>();
         _cache = new MemoryCache(new MemoryCacheOptions());
+
+        _giftCardRepoMock
+            .Setup(x => x.GetNetCoverageBySaleIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+            .ReturnsAsync(new Dictionary<Guid, decimal>());
+        _giftCardRepoMock
+            .Setup(x => x.GetCoverageNetInWindowAsync(
+                It.IsAny<IEnumerable<Guid>?>(),
+                It.IsAny<DateTime?>(),
+                It.IsAny<DateTime?>(),
+                It.IsAny<Guid?>()))
+            .ReturnsAsync(0m);
 
         _commissionServiceMock
             .Setup(x => x.ComputeCommissionForSalesAsync(It.IsAny<IEnumerable<SaleCommissionLine>>(), default))
@@ -56,6 +69,7 @@ public class DashboardServiceTests
             _inventoryRepoMock.Object,
             _uposRepoMock.Object,
             _commissionServiceMock.Object,
+            _giftCardRepoMock.Object,
             _cache);
     }
 

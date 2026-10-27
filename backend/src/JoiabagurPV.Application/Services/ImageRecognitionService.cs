@@ -311,7 +311,7 @@ public class ImageRecognitionService : IImageRecognitionService
         // Get all active products with photos
         var productsWithPhotos = await _productRepository
             .GetAll()
-            .Where(p => p.IsActive)
+            .Where(p => p.IsActive && p.SystemProductKind == null)
             .Include(p => p.Photos)
             .Where(p => p.Photos.Any())
             .ToListAsync();

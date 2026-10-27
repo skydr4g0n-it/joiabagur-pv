@@ -125,6 +125,204 @@ namespace JoiabagurPV.Infrastructure.Data.Migrations
                     b.ToTable("ComponentTemplateItems", (string)null);
                 });
 
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.GiftCard", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<DateOnly>("ExpiryDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("HolderName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("IssuanceIdempotencyKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("IssuanceSaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("IssuedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("NominalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("PointOfSaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("SpendableBalance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("IssuanceIdempotencyKey")
+                        .IsUnique()
+                        .HasFilter("\"IssuanceIdempotencyKey\" IS NOT NULL");
+
+                    b.HasIndex("IssuanceSaleId");
+
+                    b.HasIndex("IssuedByUserId");
+
+                    b.HasIndex("PointOfSaleId");
+
+                    b.ToTable("GiftCards", (string)null);
+                });
+
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.GiftCardCoverageEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<DateTime>("EntryDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EntryType")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("GiftCardId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SaleId");
+
+                    b.HasIndex("GiftCardId", "EntryDate");
+
+                    b.ToTable("GiftCardCoverageEntries", (string)null);
+                });
+
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.GiftCardExchangeOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("CashDue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<Guid>("GiftCardId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("NewSaleIdsCsv")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("ReturnIdsCsv")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GiftCardId", "IdempotencyKey")
+                        .IsUnique();
+
+                    b.ToTable("GiftCardExchangeOperations", (string)null);
+                });
+
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.GiftCardReassignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<Guid>("FromPointOfSaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GiftCardId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ToPointOfSaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FromPointOfSaleId");
+
+                    b.HasIndex("GiftCardId");
+
+                    b.HasIndex("ToPointOfSaleId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("GiftCardReassignments", (string)null);
+                });
+
             modelBuilder.Entity("JoiabagurPV.Domain.Entities.Inventory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -581,6 +779,9 @@ namespace JoiabagurPV.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
+
+                    b.Property<int?>("SystemProductKind")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAddOrUpdate()
@@ -1216,6 +1417,98 @@ namespace JoiabagurPV.Infrastructure.Data.Migrations
                     b.Navigation("Template");
                 });
 
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.GiftCard", b =>
+                {
+                    b.HasOne("JoiabagurPV.Domain.Entities.Sale", "IssuanceSale")
+                        .WithMany()
+                        .HasForeignKey("IssuanceSaleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("JoiabagurPV.Domain.Entities.User", "IssuedByUser")
+                        .WithMany()
+                        .HasForeignKey("IssuedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("JoiabagurPV.Domain.Entities.PointOfSale", "PointOfSale")
+                        .WithMany()
+                        .HasForeignKey("PointOfSaleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("IssuanceSale");
+
+                    b.Navigation("IssuedByUser");
+
+                    b.Navigation("PointOfSale");
+                });
+
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.GiftCardCoverageEntry", b =>
+                {
+                    b.HasOne("JoiabagurPV.Domain.Entities.GiftCard", "GiftCard")
+                        .WithMany("CoverageEntries")
+                        .HasForeignKey("GiftCardId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("JoiabagurPV.Domain.Entities.Sale", "Sale")
+                        .WithMany()
+                        .HasForeignKey("SaleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("GiftCard");
+
+                    b.Navigation("Sale");
+                });
+
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.GiftCardExchangeOperation", b =>
+                {
+                    b.HasOne("JoiabagurPV.Domain.Entities.GiftCard", "GiftCard")
+                        .WithMany()
+                        .HasForeignKey("GiftCardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GiftCard");
+                });
+
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.GiftCardReassignment", b =>
+                {
+                    b.HasOne("JoiabagurPV.Domain.Entities.PointOfSale", "FromPointOfSale")
+                        .WithMany()
+                        .HasForeignKey("FromPointOfSaleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("JoiabagurPV.Domain.Entities.GiftCard", "GiftCard")
+                        .WithMany("Reassignments")
+                        .HasForeignKey("GiftCardId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("JoiabagurPV.Domain.Entities.PointOfSale", "ToPointOfSale")
+                        .WithMany()
+                        .HasForeignKey("ToPointOfSaleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("JoiabagurPV.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("FromPointOfSale");
+
+                    b.Navigation("GiftCard");
+
+                    b.Navigation("ToPointOfSale");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("JoiabagurPV.Domain.Entities.Inventory", b =>
                 {
                     b.HasOne("JoiabagurPV.Domain.Entities.PointOfSale", "PointOfSale")
@@ -1505,6 +1798,13 @@ namespace JoiabagurPV.Infrastructure.Data.Migrations
             modelBuilder.Entity("JoiabagurPV.Domain.Entities.ComponentTemplate", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.GiftCard", b =>
+                {
+                    b.Navigation("CoverageEntries");
+
+                    b.Navigation("Reassignments");
                 });
 
             modelBuilder.Entity("JoiabagurPV.Domain.Entities.Inventory", b =>

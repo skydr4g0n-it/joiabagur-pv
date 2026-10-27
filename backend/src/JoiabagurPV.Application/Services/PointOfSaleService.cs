@@ -1,5 +1,6 @@
 using JoiabagurPV.Application.DTOs.PointOfSales;
 using JoiabagurPV.Application.Interfaces;
+using JoiabagurPV.Domain.Constants;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Exceptions;
 using JoiabagurPV.Domain.Interfaces.Repositories;
@@ -14,17 +15,23 @@ public class PointOfSaleService : IPointOfSaleService
 {
     private readonly IPointOfSaleRepository _pointOfSaleRepository;
     private readonly IUserPointOfSaleRepository _userPointOfSaleRepository;
+    private readonly IPaymentMethodRepository _paymentMethodRepository;
+    private readonly IPaymentMethodService _paymentMethodService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<PointOfSaleService> _logger;
 
     public PointOfSaleService(
         IPointOfSaleRepository pointOfSaleRepository,
         IUserPointOfSaleRepository userPointOfSaleRepository,
+        IPaymentMethodRepository paymentMethodRepository,
+        IPaymentMethodService paymentMethodService,
         IUnitOfWork unitOfWork,
         ILogger<PointOfSaleService> logger)
     {
         _pointOfSaleRepository = pointOfSaleRepository;
         _userPointOfSaleRepository = userPointOfSaleRepository;
+        _paymentMethodRepository = paymentMethodRepository;
+        _paymentMethodService = paymentMethodService;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -75,6 +82,19 @@ public class PointOfSaleService : IPointOfSaleService
 
         await _pointOfSaleRepository.AddAsync(pointOfSale);
         await _unitOfWork.SaveChangesAsync();
+
+        var giftCardMethod = await _paymentMethodRepository.GetByCodeAsync(GiftCardConstants.GiftCardPaymentMethodCode);
+        if (giftCardMethod != null)
+        {
+            try
+            {
+                await _paymentMethodService.AssignToPointOfSaleAsync(pointOfSale.Id, giftCardMethod.Id);
+            }
+            catch (DomainException ex) when (ex.Message.Contains("ya está asignado"))
+            {
+                // Already assigned (idempotent)
+            }
+        }
 
         _logger.LogInformation("Point of sale {Code} created successfully", pointOfSale.Code);
 

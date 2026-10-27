@@ -24,7 +24,7 @@ context: |
   Docs live under Documentos/ (epicas, modelo-de-datos, arquitectura, Guias, Historias).
 
   Constraints that must shape designs and tasks:
-  - Max 5–10 DB connections; mandatory list pagination (max 50/page); frontend initial bundle < 500KB.
+  - Max 10 DB connections; mandatory list pagination (max 50/page); frontend initial bundle < 500KB.
   - Stock cannot go negative; Sale.Price is a snapshot; payment method must be assigned to the POS.
   - Manual price override only when POS.AllowManualPriceEdit = true (audited).
   - Cart checkout is atomic with idempotency key; all lines share POS + payment method.
@@ -35,9 +35,10 @@ context: |
   Epics: EP1 Products, EP2 Inventory, EP3 Sales, EP4 AI Recognition, EP5 Returns,
   EP6 Payment Methods, EP7 Auth/Users, EP8 POS, EP9 Reports, EP10 Jewelry Components.
 
+# rules: artifact id → list of strings (quote only if a line contains ": " — YAML mapping syntax)
 rules:
   proposal:
-    - "Before writing any proposal artifact, run an interactive clarification pass: ask focused questions about goals, scope, constraints, edge cases, and acceptance criteria. Wait for answers; iterate with follow-ups until remaining ambiguity is resolved or the user explicitly says to proceed."
+    - Before writing any proposal artifact, run an interactive clarification pass, asking focused questions about goals, scope, constraints, edge cases, and acceptance criteria. Wait for answers; iterate with follow-ups until remaining ambiguity is resolved or the user explicitly says to proceed.
     - After clarification, propose a short list of optional improvements or alternatives (each with a one-line trade-off). Ask the user to accept or reject each item; do not include rejected items in the proposal.
     - Only after clarification and the accept/reject pass are complete, create proposal.md (and related artifacts). Do not draft or write proposal files earlier.
     - Proposals must not contain code — only design documents (proposal.md, tasks.md, design.md, spec deltas).
@@ -54,14 +55,20 @@ rules:
   tasks:
     - Each task must be completable in a single AI coding session.
     - Include a validation step (test, build, or manual check) in every task.
-    - "Backend test naming: Method_Scenario_ExpectedResult. Frontend: should [behavior] when [condition]."
+    - Backend test naming uses Method_Scenario_ExpectedResult; frontend tests use should [behavior] when [condition].
     - Plan Playwright coverage for user-facing UI flows; unit/integration tests for backend services.
 
 operations:
   apply:
     guidance:
+      - Treat the active change OpenSpec artifacts (proposal, design, tasks, and specs under the change) as the source of truth. Resolve paths, types, APIs, and identifiers only from those artifacts and from the existing codebase—never invent or assume them.
+      - Ship complete, buildable code in every file you touch. No stub bodies, skipped sections, or placeholder comments (ellipsis markers, "implement later", or "unchanged" elisions). When unsure, read the repo and artifacts before writing.
+      - Progress notes must stay concise yet complete—list tasks finished, files changed, validation commands run, and any blockers or risks. Do not skip facts needed to verify the work.
       - Run focused tests for touched areas before marking a task complete.
-      - After implementation, update only Documentos/ files affected by the change (epicas.md, Historias/, modelo-de-datos.md, modelo-c4.md, arquitectura.md, Guias/).
+      - After implementation, update Documentos/ files affected by the change (epicas.md, Historias/, modelo-de-datos.md, modelo-c4.md, arquitectura.md, Guias/).
   archive:
     guidance:
-      - Summarize what shipped and which specs/docs changed before finishing.
+      - If the change has delta specs under openspec/changes/<name>/specs/, run the openspec-sync-specs workflow and merge into openspec/specs/ before archiving. Do not move the change to archive while main specs are still out of date unless the user explicitly chooses archive without spec sync.
+      - Before archiving, sync official project documentation under Documentos/ with what shipped in the change (same scope as apply). Update only affected files among epicas.md, Historias/, modelo-de-datos.md, modelo-c4.md, arquitectura.md, and Guias/. User-facing guides in Spanish; technical documentation in English.
+      - Treat spec sync and Documentos sync as mandatory pre-archive steps. Complete both, then run openspec validate --specs when specs changed, then perform the archive move.
+      - Summarize what shipped, which openspec/specs and Documentos/ files were updated, and the archive target path before finishing. Be concise.

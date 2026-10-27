@@ -35,6 +35,9 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             .IsRequired()
             .HasPrecision(18, 2);
 
+        builder.Property(p => p.SystemProductKind)
+            .HasConversion<int?>();
+
         builder.Property(p => p.IsActive)
             .IsRequired()
             .HasDefaultValue(true);

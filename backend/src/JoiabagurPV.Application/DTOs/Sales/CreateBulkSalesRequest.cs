@@ -15,4 +15,5 @@ public class CreateBulkSalesRequest
     public Guid PaymentMethodId { get; set; }
     public string? Notes { get; set; }
     public List<BulkSaleLineRequest> Lines { get; set; } = new();
+    public List<string> GiftCardCodes { get; set; } = new();
 }

@@ -1,4 +1,5 @@
 using FluentValidation;
+using JoiabagurPV.Application.GiftCards;
 using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -49,6 +50,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IStockImportService, StockImportService>();
         services.AddScoped<IInventoryMovementService, InventoryMovementService>();
         services.AddScoped<IStockValidationService, StockValidationService>();
+
+        // Register gift card services
+        services.AddSingleton<GiftCardCodeGenerator>();
+        services.AddScoped<IGiftCardService, GiftCardService>();
 
         // Register sales management services
         services.AddScoped<ISalesService, SalesService>();

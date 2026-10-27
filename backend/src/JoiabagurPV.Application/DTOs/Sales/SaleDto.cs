@@ -104,4 +104,9 @@ public class SaleDto
     /// Created timestamp.
     /// </summary>
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>
+    /// Net gift card coverage on this sale (apply minus release).
+    /// </summary>
+    public decimal GiftCardCoverageAmount { get; set; }
 }

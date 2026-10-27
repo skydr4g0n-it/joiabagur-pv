@@ -1,6 +1,8 @@
+using JoiabagurPV.Domain.GiftCards;
 using JoiabagurPV.Domain.Commission;
 using JoiabagurPV.Domain.Common;
 using JoiabagurPV.Domain.Entities;
+using JoiabagurPV.Domain.Enums;
 using JoiabagurPV.Domain.Interfaces.Repositories;
 using Microsoft.EntityFrameworkCore;
 
@@ -327,13 +329,11 @@ public class SaleRepository : Repository<Sale>, ISaleRepository
         var query = BuildReportQuery(pointOfSaleIds, startDate, endDate, pointOfSaleId,
             productId, userId, paymentMethodId, search, amountMin, amountMax, hasPhoto, priceWasOverridden);
 
-        return await query
-            .Select(s => new SaleReportLine(
-                s.Id,
-                s.PointOfSaleId,
-                s.SaleDate,
-                s.Price * s.Quantity))
+        var sales = await query
+            .Select(s => new { s.Id, s.PointOfSaleId, s.SaleDate, Gross = s.Price * s.Quantity })
             .ToListAsync();
+
+        return await MapEconomicSaleReportLinesAsync(sales.Select(s => (s.Id, s.PointOfSaleId, s.SaleDate, s.Gross)).ToList());
     }
 
     public async Task<List<SaleYtdEvent>> GetSaleYtdEventsForPosYearAsync(
@@ -341,11 +341,58 @@ public class SaleRepository : Repository<Sale>, ISaleRepository
         DateTime yearStartUtc,
         DateTime yearEndUtc)
     {
-        return await _context.Sales
+        var sales = await _context.Sales
             .Where(s => s.PointOfSaleId == pointOfSaleId
                 && s.SaleDate >= yearStartUtc
                 && s.SaleDate <= yearEndUtc)
-            .Select(s => new SaleYtdEvent(s.Id, s.SaleDate, s.CreatedAt, s.Price * s.Quantity))
+            .Select(s => new { s.Id, s.SaleDate, s.CreatedAt, Gross = s.Price * s.Quantity })
             .ToListAsync();
+
+        var lines = await MapEconomicSaleReportLinesAsync(
+            sales.Select(s => (s.Id, pointOfSaleId, s.SaleDate, s.Gross)).ToList());
+
+        return sales.Select(s =>
+        {
+            var amount = lines.First(l => l.SaleId == s.Id).Amount;
+            return new SaleYtdEvent(s.Id, s.SaleDate, s.CreatedAt, amount);
+        }).ToList();
+    }
+
+    private async Task<List<SaleReportLine>> MapEconomicSaleReportLinesAsync(
+        List<(Guid SaleId, Guid PointOfSaleId, DateTime SaleDate, decimal Gross)> sales)
+    {
+        if (sales.Count == 0)
+            return new List<SaleReportLine>();
+
+        var saleIds = sales.Select(s => s.SaleId).ToList();
+        var coverageRows = await _context.GiftCardCoverageEntries
+            .Where(e => saleIds.Contains(e.SaleId))
+            .GroupBy(e => e.SaleId)
+            .Select(g => new
+            {
+                SaleId = g.Key,
+                Apply = g.Where(e => e.EntryType == GiftCardCoverageEntryType.Apply).Sum(e => e.Amount),
+                Release = g.Where(e => e.EntryType == GiftCardCoverageEntryType.Release).Sum(e => e.Amount)
+            })
+            .ToListAsync();
+        var coverageMap = coverageRows.ToDictionary(
+            r => r.SaleId,
+            r => r.Apply - r.Release);
+
+        var issuanceIds = await _context.GiftCards
+            .Where(g => saleIds.Contains(g.IssuanceSaleId))
+            .Select(g => g.IssuanceSaleId)
+            .ToListAsync();
+        var issuanceSet = issuanceIds.ToHashSet();
+
+        return sales.Select(s =>
+        {
+            var netCoverage = coverageMap.GetValueOrDefault(s.SaleId, 0m);
+            var amount = GiftCardEconomics.GetEconomicSaleAmount(
+                s.Gross,
+                netCoverage,
+                issuanceSet.Contains(s.SaleId));
+            return new SaleReportLine(s.SaleId, s.PointOfSaleId, s.SaleDate, amount);
+        }).ToList();
     }
 }

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using JoiabagurPV.Application.DTOs.PointOfSales;
+using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Application.Services;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Exceptions;
@@ -17,6 +18,8 @@ public class PointOfSaleServiceTests
 {
     private readonly Mock<IPointOfSaleRepository> _pointOfSaleRepositoryMock;
     private readonly Mock<IUserPointOfSaleRepository> _userPointOfSaleRepositoryMock;
+    private readonly Mock<IPaymentMethodRepository> _paymentMethodRepositoryMock;
+    private readonly Mock<IPaymentMethodService> _paymentMethodServiceMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<ILogger<PointOfSaleService>> _loggerMock;
     private readonly PointOfSaleService _sut;
@@ -25,12 +28,16 @@ public class PointOfSaleServiceTests
     {
         _pointOfSaleRepositoryMock = new Mock<IPointOfSaleRepository>();
         _userPointOfSaleRepositoryMock = new Mock<IUserPointOfSaleRepository>();
+        _paymentMethodRepositoryMock = new Mock<IPaymentMethodRepository>();
+        _paymentMethodServiceMock = new Mock<IPaymentMethodService>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _loggerMock = new Mock<ILogger<PointOfSaleService>>();
 
         _sut = new PointOfSaleService(
             _pointOfSaleRepositoryMock.Object,
             _userPointOfSaleRepositoryMock.Object,
+            _paymentMethodRepositoryMock.Object,
+            _paymentMethodServiceMock.Object,
             _unitOfWorkMock.Object,
             _loggerMock.Object);
     }

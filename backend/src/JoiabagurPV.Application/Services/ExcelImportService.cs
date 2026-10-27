@@ -1,5 +1,6 @@
 using ClosedXML.Excel;
 using JoiabagurPV.Application.DTOs.Products;
+using JoiabagurPV.Domain.Constants;
 using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Interfaces.Repositories;
@@ -498,6 +499,17 @@ public class ExcelImportService : IExcelImportService
                 else
                 {
                     seenSkus.Add(row.Sku);
+                }
+
+                if (string.Equals(row.Sku.Trim(), GiftCardConstants.SystemProductSku, StringComparison.OrdinalIgnoreCase))
+                {
+                    errors.Add(new ImportError
+                    {
+                        RowNumber = row.RowNumber,
+                        Field = ColSku,
+                        Message = "El SKU de tarjeta regalo del sistema no se puede importar.",
+                        Value = row.Sku
+                    });
                 }
             }
 

@@ -138,6 +138,26 @@ public class ApplicationDbContext : DbContext
     public DbSet<ProductPhotoEmbedding> ProductPhotoEmbeddings { get; set; }
 
     /// <summary>
+    /// Gets or sets the GiftCards DbSet.
+    /// </summary>
+    public DbSet<GiftCard> GiftCards { get; set; }
+
+    /// <summary>
+    /// Gets or sets the GiftCardCoverageEntries DbSet.
+    /// </summary>
+    public DbSet<GiftCardCoverageEntry> GiftCardCoverageEntries { get; set; }
+
+    /// <summary>
+    /// Gets or sets the GiftCardReassignments DbSet.
+    /// </summary>
+    public DbSet<GiftCardReassignment> GiftCardReassignments { get; set; }
+
+    /// <summary>
+    /// Gets or sets the GiftCardExchangeOperations DbSet.
+    /// </summary>
+    public DbSet<GiftCardExchangeOperation> GiftCardExchangeOperations { get; set; }
+
+    /// <summary>
     /// Configures the model that was discovered by convention from the entity types
     /// exposed in Microsoft.EntityFrameworkCore.DbSet`1 properties on your derived context.
     /// </summary>

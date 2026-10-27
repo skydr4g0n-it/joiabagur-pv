@@ -27,6 +27,10 @@ const SalesHistoryPage = lazy(() => import('@/pages/sales/history'));
 const ReturnsPage = lazy(() => import('@/pages/returns'));
 const NewReturnPage = lazy(() => import('@/pages/returns/new'));
 const ReturnsHistoryPage = lazy(() => import('@/pages/returns/history'));
+const GiftCardsListPage = lazy(() => import('@/pages/gift-cards/list'));
+const GiftCardIssuePage = lazy(() => import('@/pages/gift-cards/issue'));
+const GiftCardDetailPage = lazy(() => import('@/pages/gift-cards/detail'));
+const GiftCardExchangePage = lazy(() => import('@/pages/gift-cards/exchange'));
 const AIModelPage = lazy(() => import('@/pages/admin/ai-model'));
 const PaymentMethodsPage = lazy(() => import('@/pages/payment-methods'));
 const UsersPage = lazy(() => import('@/pages/users'));
@@ -82,6 +86,10 @@ export function AppRoutingSetup() {
             <Route path={ROUTES.RETURNS.ROOT} element={<ReturnsPage />} />
             <Route path={ROUTES.RETURNS.NEW} element={<NewReturnPage />} />
             <Route path={ROUTES.RETURNS.HISTORY} element={<ReturnsHistoryPage />} />
+            <Route path={ROUTES.GIFT_CARDS.ROOT} element={<GiftCardsListPage />} />
+            <Route path={ROUTES.GIFT_CARDS.ISSUE} element={<GiftCardIssuePage />} />
+            <Route path={ROUTES.GIFT_CARDS.EXCHANGE(':id')} element={<GiftCardExchangePage />} />
+            <Route path={ROUTES.GIFT_CARDS.DETAIL(':id')} element={<GiftCardDetailPage />} />
           </Route>
         </Route>
 

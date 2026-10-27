@@ -47,6 +47,12 @@ export const ROUTES = {
     HISTORY: '/returns/history',
     DETAIL: (id: string) => `/returns/${id}`,
   },
+  GIFT_CARDS: {
+    ROOT: '/gift-cards',
+    ISSUE: '/gift-cards/issue',
+    DETAIL: (id: string) => `/gift-cards/${id}`,
+    EXCHANGE: (id: string) => `/gift-cards/${id}/exchange`,
+  },
   PAYMENT_METHODS: '/payment-methods',
   USERS: '/users',
   POINTS_OF_SALE: '/points-of-sale',

@@ -28,6 +28,7 @@ public class ReturnServiceTests
     private readonly Mock<IFileStorageService> _fileStorageServiceMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<IDashboardService> _dashboardServiceMock;
+    private readonly Mock<IGiftCardRepository> _giftCardRepositoryMock;
     private readonly ReturnService _sut;
 
     public ReturnServiceTests()
@@ -42,6 +43,9 @@ public class ReturnServiceTests
         _fileStorageServiceMock = new Mock<IFileStorageService>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _dashboardServiceMock = new Mock<IDashboardService>();
+        _giftCardRepositoryMock = new Mock<IGiftCardRepository>();
+        _giftCardRepositoryMock.Setup(x => x.IsIssuanceSaleAsync(It.IsAny<Guid>())).ReturnsAsync(false);
+        _giftCardRepositoryMock.Setup(x => x.SaleHasGiftCardCoverageAsync(It.IsAny<Guid>())).ReturnsAsync(false);
 
         _sut = new ReturnService(
             _returnRepositoryMock.Object,
@@ -53,7 +57,8 @@ public class ReturnServiceTests
             _inventoryServiceMock.Object,
             _fileStorageServiceMock.Object,
             _unitOfWorkMock.Object,
-            _dashboardServiceMock.Object);
+            _dashboardServiceMock.Object,
+            _giftCardRepositoryMock.Object);
     }
 
     #region CreateReturn Validation Tests

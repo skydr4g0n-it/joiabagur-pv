@@ -51,7 +51,7 @@ public class ProductRepository : Repository<Product>, IProductRepository
     public async Task<List<Product>> GetByCollectionAsync(Guid collectionId, bool includeInactive = false)
     {
         var query = _context.Products
-            .Where(p => p.CollectionId == collectionId);
+            .Where(p => p.CollectionId == collectionId && p.SystemProductKind == null);
 
         if (!includeInactive)
         {
@@ -69,6 +69,7 @@ public class ProductRepository : Repository<Product>, IProductRepository
         var query = _context.Products
             .Include(p => p.Photos)
             .Include(p => p.Collection)
+            .Where(p => p.SystemProductKind == null)
             .AsQueryable();
 
         if (!includeInactive)

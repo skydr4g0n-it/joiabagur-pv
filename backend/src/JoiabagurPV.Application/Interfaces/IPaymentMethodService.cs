@@ -50,7 +50,10 @@ public interface IPaymentMethodService
     /// <param name="pointOfSaleId">The point of sale ID.</param>
     /// <param name="includeInactive">Whether to include inactive assignments.</param>
     /// <returns>List of payment method assignment DTOs.</returns>
-    Task<List<PointOfSalePaymentMethodDto>> GetByPointOfSaleAsync(Guid pointOfSaleId, bool includeInactive = false);
+    Task<List<PointOfSalePaymentMethodDto>> GetByPointOfSaleAsync(
+        Guid pointOfSaleId,
+        bool includeInactive = false,
+        bool excludeGiftCardFromSales = false);
 
     /// <summary>
     /// Assigns a payment method to a point of sale.

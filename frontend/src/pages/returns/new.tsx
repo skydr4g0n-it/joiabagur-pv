@@ -294,6 +294,15 @@ export function NewReturnPage() {
         </div>
       </div>
 
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          Las ventas cubiertas por tarjeta regalo y la emisión de tarjetas no admiten devolución
+          clásica. Usa el cambio de producto desde el detalle de la tarjeta regalo (un solo uso por
+          tarjeta; el valor nominal no se reactiva).
+        </AlertDescription>
+      </Alert>
+
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Form */}
         <div className="space-y-6 lg:col-span-2">

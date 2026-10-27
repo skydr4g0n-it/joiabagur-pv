@@ -2,6 +2,7 @@ using FluentAssertions;
 using JoiabagurPV.Application.DTOs.Products;
 using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Application.Services;
+using JoiabagurPV.Domain.Constants;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Exceptions;
 using JoiabagurPV.Domain.Interfaces.Repositories;
@@ -316,6 +317,21 @@ public class ProductServiceTests
         // Assert
         await act.Should().ThrowAsync<DomainException>()
             .WithMessage("*not found*");
+    }
+
+    #endregion
+
+    #region SearchProductsAsync Tests
+
+    [Fact]
+    public async Task Search_SystemProductSku_ReturnsEmpty()
+    {
+        _productRepositoryMock.Setup(x => x.GetAllAsync(false))
+            .ReturnsAsync(new List<Product>());
+
+        var result = await _sut.SearchProductsAsync(GiftCardConstants.SystemProductSku, isAdmin: true);
+
+        result.Should().BeEmpty();
     }
 
     #endregion

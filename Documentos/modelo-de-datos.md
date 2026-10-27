@@ -418,6 +418,7 @@ Catálogo centralizado de productos de la joyería.
 - `Price`: Precio actual del producto
 - `CollectionId`: Referencia opcional a la colección
 - `IsActive`: Flag para productos activos/inactivos
+- `SystemProductKind`: Nullable. Cuando está definido (p. ej. `GiftCard`), el producto es de sistema: no aparece en catálogo, búsqueda, importación Excel ni entrenamiento de IA. SKU reservado: `SYS-GIFT-CARD`.
 
 **Consideraciones Fase 2:**
 - Campo `Price` puede evolucionar a tabla `ProductPriceHistory` para historial de precios
@@ -487,6 +488,54 @@ Lista general de métodos de pago disponibles en el sistema.
 - Tarjeta TPV propio (CARD_OWN)
 - Tarjeta TPV punto de venta (CARD_POS)
 - PayPal (PAYPAL)
+- Tarjeta regalo (`GIFT_CARD`, método de sistema; oculto en el desplegable de ventas normales, asignado a todos los POS, no desactivable)
+
+---
+
+### GiftCard (Tarjetas regalo)
+
+Tarjeta vendida en emisión; el saldo gastable se consume en un único checkout.
+
+**Campos Clave:**
+- `Code`: Código único con prefijo `GC-` (índice único)
+- `PointOfSaleId`: POS actual donde puede canjearse (reasignable por admin)
+- `HolderName`: Titular opcional (máx. 100 caracteres)
+- `NominalAmount`: Valor nominal inmutable (18,2)
+- `SpendableBalance`: Saldo canjeable; pasa a 0 en el primer apply
+- `ExpiryDate`: Fecha UTC de caducidad (emisión: estrictamente posterior a hoy UTC)
+- `IssuanceSaleId`: Venta del producto de sistema ligada a la tarjeta
+- `IssuedByUserId`: Usuario que emitió la tarjeta
+- `IssuanceIdempotencyKey`: Clave opcional única para idempotencia de emisión
+
+**Regla de ingresos:** el `Sale.Price` de la venta de emisión **no se reduce** cuando la tarjeta se aplica después; la cobertura se registra en `GiftCardCoverageEntry`.
+
+---
+
+### GiftCardCoverageEntry (Cobertura de tarjeta regalo)
+
+Libro mayor append-only de cobertura aplicada o liberada.
+
+**Campos Clave:**
+- `GiftCardId`, `SaleId`: Tarjeta y venta de producto afectada
+- `EntryType`: `Apply` (cobertura en canje/cambio) o `Release` (devolución de cobertura en cambio)
+- `Amount`: Importe positivo (18,2)
+- `EntryDate`: Fecha económica del apply/release
+
+---
+
+### GiftCardReassignment (Reasignación de tarjeta)
+
+Historial cuando un admin mueve la tarjeta a otro POS. La venta de emisión permanece en el POS original.
+
+**Campos Clave:** `GiftCardId`, `FromPointOfSaleId`, `ToPointOfSaleId`, `UserId`, `OccurredAt`
+
+---
+
+### GiftCardExchangeOperation (Idempotencia de cambio)
+
+Registro de un cambio idempotente (`POST /api/gift-cards/{id}/exchanges`).
+
+**Campos Clave:** `GiftCardId`, `IdempotencyKey` (único por tarjeta), `CashDue`, `NewSaleIdsCsv`, `ReturnIdsCsv`
 
 ---
 
@@ -521,6 +570,8 @@ Registro de todas las ventas realizadas en el sistema.
 - `PriceWasOverridden`: Indica si el precio fue modificado manualmente por el operador (default `false`)
 - `OriginalProductPrice`: Precio oficial del producto al momento de la venta, solo se almacena cuando `PriceWasOverridden = true` (nullable)
 - `BulkOperationId`: UUID que agrupa ventas creadas juntas en un checkout masivo (nullable). Las ventas individuales tienen este campo en `null`
+
+**Tarjetas regalo:** la venta de emisión del producto `SYS-GIFT-CARD` guarda en `Price` el valor nominal elegido en emisión y no se modifica al canjear. La cobertura sobre ventas de joyería se refleja en `GiftCardCoverageAmount` en API/historial (neto apply − release en esa venta).
 
 **Consideraciones:**
 - `Price` es un snapshot para mantener integridad histórica; puede ser el precio oficial del producto o un precio manual si el POS lo permite
