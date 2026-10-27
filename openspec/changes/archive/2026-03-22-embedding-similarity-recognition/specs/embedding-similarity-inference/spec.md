@@ -1,3 +1,5 @@
+> **Withdrawn (2026-10-27):** Product-photo image recognition was retired. This document is historical. Current behavior is manual sales only, and /api/image-recognition returns 410 Gone.
+
 ## ADDED Requirements
 
 ### Requirement: Cosine Similarity Inference
@@ -21,7 +23,7 @@ The system SHALL recognize products by computing cosine similarity between a que
 - **WHEN** inference completes
 - **AND** the highest similarity score across all products is < 0.50 (MIN_TOP_SIMILARITY)
 - **THEN** system returns zero suggestions
-- **AND** displays message: "No se encontrÃ³ una correspondencia fiable"
+- **AND** displays message: "No se encontró una correspondencia fiable"
 - **AND** offers options: "Tomar otra foto" or "Registrar venta manual"
 
 #### Scenario: Top match above minimum but few above threshold

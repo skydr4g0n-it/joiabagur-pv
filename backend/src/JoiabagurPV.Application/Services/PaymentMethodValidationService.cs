@@ -48,12 +48,12 @@ public class PaymentMethodValidationService : IPaymentMethodValidationService
         var paymentMethod = await _paymentMethodRepository.GetByIdAsync(paymentMethodId);
         if (paymentMethod == null)
         {
-            throw new InvalidOperationException($"Payment method with ID {paymentMethodId} not found.");
+            throw new InvalidOperationException($"Método de pago con ID {paymentMethodId} no encontrado.");
         }
 
         if (!paymentMethod.IsActive)
         {
-            throw new InvalidOperationException($"Payment method '{paymentMethod.Name}' is not active.");
+            throw new InvalidOperationException($"El método de pago '{paymentMethod.Name}' no está activo.");
         }
 
         // Check if payment method is assigned to the point of sale and is active
@@ -66,13 +66,13 @@ public class PaymentMethodValidationService : IPaymentMethodValidationService
         if (assignment == null)
         {
             throw new InvalidOperationException(
-                $"Payment method '{paymentMethod.Name}' is not assigned to this point of sale.");
+                $"El método de pago '{paymentMethod.Name}' no está asignado a este punto de venta.");
         }
 
         if (!assignment.IsActive)
         {
             throw new InvalidOperationException(
-                $"Payment method '{paymentMethod.Name}' is not active for this point of sale.");
+                $"El método de pago '{paymentMethod.Name}' no está activo en este punto de venta.");
         }
     }
 }

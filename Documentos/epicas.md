@@ -7,7 +7,7 @@ Este documento describe las épicas principales del MVP (Fase 1) del sistema de 
 ## Épica 1: Gestión de Productos
 
 **Descripción:**  
-Permite gestionar el catálogo centralizado de productos de la joyería, incluyendo la creación, edición, importación desde Excel y asociación de fotos de referencia para el reconocimiento de imágenes.
+Permite gestionar el catálogo centralizado de productos de la joyería, incluyendo la creación, edición, importación desde Excel y fotos de catálogo por producto.
 
 **Alcance:**
 - Importación masiva de productos desde archivos Excel con matching por SKU
@@ -72,7 +72,7 @@ Permite registrar ventas en los puntos de venta, con actualización automática 
 **Alcance:**
 - Registro de ventas con método de pago
 - Actualización automática de stock al registrar venta
-- Registro de foto asociada a la venta (cuando se usa reconocimiento de imagen)
+- Registro manual, por escaneo de código o carrito (sin flujo de reconocimiento por imagen)
 - Validación de stock disponible antes de venta
 - Validación de método de pago asignado al punto de venta
 - Registro de usuario operador que realiza la venta
@@ -81,7 +81,7 @@ Permite registrar ventas en los puntos de venta, con actualización automática 
 - Agrupación de ventas creadas en checkout masivo mediante `BulkOperationId`
 - Prevención de envíos duplicados mediante clave de idempotencia
 - Emisión de **tarjetas regalo** (valor nominal 50/100/150/200 € o importe libre), código `GC-`, un solo uso en caja
-- Aplicación de tarjetas en el carrito (escaneo `GC-` sin buscar producto) y cobro del resto en efectivo u otro método del POS
+- Aplicación de tarjetas en el carrito y en la venta manual (escaneo `GC-` sin buscar producto) y cobro del resto en efectivo u otro método del POS
 - Cambio de productos comprados con tarjeta regalo (no devolución clásica)
 
 **Entidades del modelo de datos relacionadas:**
@@ -93,17 +93,18 @@ Permite registrar ventas en los puntos de venta, con actualización automática 
 - `GiftCard`, `GiftCardCoverageEntry`, producto sistema `SYS-GIFT-CARD`
 
 **User Stories:**
-- [HU-EP3-001: Registrar venta con reconocimiento de imagen](Historias/HU-EP3-001.md) *(incluye validación de stock y selección de método de pago)*
+- [HU-EP3-001: Registrar venta con reconocimiento de imagen](Historias/HU-EP3-001.md) *(retirada — histórico)*
 - [HU-EP3-002: Registrar venta manual (sin foto)](Historias/HU-EP3-002.md) *(incluye validación de stock y selección de método de pago)*
 - [HU-EP3-003: Registrar venta con precio manual modificado](Historias/HU-EP3-003.md) *(edición de precio cuando el POS lo permite, auditoría de precios modificados)*
 - [HU-EP3-004: Carrito de ventas y checkout masivo](Historias/HU-EP3-004.md) *(carrito persistente, checkout atómico multi-línea, idempotencia)*
+- [HU-EP3-005: Tarjetas regalo (emisión y canje)](Historias/HU-EP3-005.md) *(emisión con producto sistema, canje en carrito y venta manual, un solo uso)*
 
 ---
 
-## Épica 4: Reconocimiento de Imágenes con IA
+## Épica 4: Reconocimiento de Imágenes con IA *(retirada — 2026-10-27)*
 
 **Descripción:**  
-Sistema de identificación de productos mediante reconocimiento de imágenes usando inteligencia artificial, generando sugerencias ordenadas por precisión.
+Épica histórica: el reconocimiento de productos por foto ya no está disponible en la aplicación. Las entidades de modelo y embeddings pueden permanecer en base de datos, pero no se usan en los flujos actuales.
 
 **Alcance:**
 - Captura de foto del producto vendido
@@ -166,6 +167,7 @@ Permite registrar devoluciones de productos vendidos, asociándolas a una o más
 - [HU-EP5-001: Registrar devolución de producto vendido](Historias/HU-EP5-001.md)
 - [HU-EP5-002: Buscar ventas elegibles para asociar devolución](Historias/HU-EP5-002.md)
 - [HU-EP5-003: Consultar historial de devoluciones](Historias/HU-EP5-003.md)
+- [HU-EP5-004: Cambio de producto con tarjeta regalo](Historias/HU-EP5-004.md) *(flujo de cambio en lugar de devolución clásica; ventana 30 días, mismo POS)*
 
 ---
 

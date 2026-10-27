@@ -89,7 +89,7 @@ public class SalesService : ISalesService
                 return new CreateSaleResult
                 {
                     Success = false,
-                    ErrorMessage = "Quantity must be greater than zero."
+                    ErrorMessage = "La cantidad debe ser mayor que cero."
                 };
             }
 
@@ -107,7 +107,7 @@ public class SalesService : ISalesService
                     return new CreateSaleResult
                     {
                         Success = false,
-                        ErrorMessage = "Operator is not assigned to this point of sale."
+                        ErrorMessage = "El operador no está asignado a este punto de venta."
                     };
                 }
             }
@@ -119,7 +119,7 @@ public class SalesService : ISalesService
                 return new CreateSaleResult
                 {
                     Success = false,
-                    ErrorMessage = $"Product with ID {request.ProductId} not found."
+                    ErrorMessage = $"Producto con ID {request.ProductId} no encontrado."
                 };
             }
 
@@ -128,7 +128,7 @@ public class SalesService : ISalesService
                 return new CreateSaleResult
                 {
                     Success = false,
-                    ErrorMessage = $"Product '{product.Name}' is not active."
+                    ErrorMessage = $"El producto '{product.Name}' no está activo."
                 };
             }
 
@@ -139,7 +139,7 @@ public class SalesService : ISalesService
                 return new CreateSaleResult
                 {
                     Success = false,
-                    ErrorMessage = $"Point of sale with ID {request.PointOfSaleId} not found."
+                    ErrorMessage = $"Punto de venta con ID {request.PointOfSaleId} no encontrado."
                 };
             }
 
@@ -149,7 +149,7 @@ public class SalesService : ISalesService
                 return new CreateSaleResult
                 {
                     Success = false,
-                    ErrorMessage = "Manual price editing is not allowed for this point of sale."
+                    ErrorMessage = "Este punto de venta no permite editar el precio manualmente."
                 };
             }
 
@@ -164,7 +164,7 @@ public class SalesService : ISalesService
                 return new CreateSaleResult
                 {
                     Success = false,
-                    ErrorMessage = stockValidation.ErrorMessage ?? "Insufficient stock available."
+                    ErrorMessage = stockValidation.ErrorMessage ?? "Stock insuficiente."
                 };
             }
 
@@ -201,7 +201,7 @@ public class SalesService : ISalesService
                     return new CreateSaleResult
                     {
                         Success = false,
-                        ErrorMessage = $"Stock changed. Available: {finalStockValidation.AvailableQuantity}, Requested: {request.Quantity}"
+                        ErrorMessage = $"El stock ha cambiado. Disponible: {finalStockValidation.AvailableQuantity}, solicitado: {request.Quantity}."
                     };
                 }
 
@@ -295,7 +295,7 @@ public class SalesService : ISalesService
                     return new CreateSaleResult
                     {
                         Success = false,
-                        ErrorMessage = movementResult.ErrorMessage ?? "Failed to create inventory movement."
+                        ErrorMessage = movementResult.ErrorMessage ?? "No se pudo crear el movimiento de inventario."
                     };
                 }
 
@@ -327,7 +327,7 @@ public class SalesService : ISalesService
             return new CreateSaleResult
             {
                 Success = false,
-                ErrorMessage = $"An error occurred while creating the sale: {ex.Message}"
+                ErrorMessage = $"Ocurrió un error al crear la venta: {ex.Message}"
             };
         }
     }
@@ -473,7 +473,7 @@ public class SalesService : ISalesService
         {
             if (request.Lines.Count == 0)
             {
-                return new CreateBulkSalesResult { Success = false, ErrorMessage = "At least one sale line is required." };
+                return new CreateBulkSalesResult { Success = false, ErrorMessage = "Hace falta al menos una línea de venta." };
             }
 
             if (!isAdmin)
@@ -485,14 +485,14 @@ public class SalesService : ISalesService
                                     ups.IsActive);
                 if (!isAssigned)
                 {
-                    return new CreateBulkSalesResult { Success = false, ErrorMessage = "Operator is not assigned to this point of sale." };
+                    return new CreateBulkSalesResult { Success = false, ErrorMessage = "El operador no está asignado a este punto de venta." };
                 }
             }
 
             var pointOfSale = await _pointOfSaleRepository.GetByIdAsync(request.PointOfSaleId);
             if (pointOfSale == null)
             {
-                return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Point of sale with ID {request.PointOfSaleId} not found." };
+                return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Punto de venta con ID {request.PointOfSaleId} no encontrado." };
             }
 
             try
@@ -511,22 +511,22 @@ public class SalesService : ISalesService
 
                 var product = await _productRepository.GetByIdAsync(line.ProductId);
                 if (product == null)
-                    return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: Product with ID {line.ProductId} not found." };
+                    return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Línea {i + 1}: producto con ID {line.ProductId} no encontrado." };
                 if (!product.IsActive)
-                    return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: Product '{product.Name}' is not active." };
+                    return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Línea {i + 1}: el producto '{product.Name}' no está activo." };
                 if (product.SystemProductKind != null)
-                    return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: System products cannot be sold through bulk checkout." };
+                    return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Línea {i + 1}: los productos de sistema no se pueden vender en el checkout." };
                 if (line.Price.HasValue && !pointOfSale.AllowManualPriceEdit)
-                    return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: Manual price editing is not allowed for this point of sale." };
+                    return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Línea {i + 1}: este punto de venta no permite editar el precio manualmente." };
 
                 if (line.Quantity <= 0)
-                    return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: Quantity must be greater than zero." };
+                    return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Línea {i + 1}: la cantidad debe ser mayor que cero." };
 
                 products[line.ProductId] = product;
 
                 var stockValidation = await _stockValidationService.ValidateStockAvailabilityAsync(line.ProductId, request.PointOfSaleId, line.Quantity);
                 if (!stockValidation.IsValid)
-                    return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: {stockValidation.ErrorMessage ?? "Insufficient stock."}" };
+                    return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Línea {i + 1}: {stockValidation.ErrorMessage ?? "Stock insuficiente."}" };
             }
 
             var giftCardCodes = request.GiftCardCodes?
@@ -560,7 +560,7 @@ public class SalesService : ISalesService
                     .Select(pm => pm.Id)
                     .FirstOrDefaultAsync();
                 if (giftCardPaymentMethodId == Guid.Empty)
-                    return new CreateBulkSalesResult { Success = false, ErrorMessage = "Gift card payment method is not configured." };
+                    return new CreateBulkSalesResult { Success = false, ErrorMessage = "El método de pago de tarjeta regalo no está configurado." };
             }
 
             var bulkOperationId = Guid.NewGuid();
@@ -580,25 +580,25 @@ public class SalesService : ISalesService
                         if (!lockedCardsByCode.TryGetValue(code, out var card))
                         {
                             await _unitOfWork.RollbackTransactionAsync();
-                            return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Gift card '{code}' was not found." };
+                            return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Tarjeta regalo '{code}' no encontrada." };
                         }
 
                         if (card.PointOfSaleId != request.PointOfSaleId)
                         {
                             await _unitOfWork.RollbackTransactionAsync();
-                            return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Gift card '{code}' is not valid at this point of sale." };
+                            return new CreateBulkSalesResult { Success = false, ErrorMessage = $"La tarjeta regalo '{code}' no es válida en este punto de venta." };
                         }
 
                         if (GiftCardEconomics.IsExpiredForRedemption(card.ExpiryDate))
                         {
                             await _unitOfWork.RollbackTransactionAsync();
-                            return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Gift card '{code}' is expired." };
+                            return new CreateBulkSalesResult { Success = false, ErrorMessage = $"La tarjeta regalo '{code}' está caducada." };
                         }
 
                         if (card.SpendableBalance <= 0)
                         {
                             await _unitOfWork.RollbackTransactionAsync();
-                            return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Gift card '{code}' was already used." };
+                            return new CreateBulkSalesResult { Success = false, ErrorMessage = $"La tarjeta regalo '{code}' ya se ha utilizado." };
                         }
                     }
 
@@ -624,13 +624,13 @@ public class SalesService : ISalesService
                     if (giftCardPaymentMethodId == null)
                     {
                         await _unitOfWork.RollbackTransactionAsync();
-                        return new CreateBulkSalesResult { Success = false, ErrorMessage = "Gift card payment method is not configured." };
+                        return new CreateBulkSalesResult { Success = false, ErrorMessage = "El método de pago de tarjeta regalo no está configurado." };
                     }
 
                     if (request.PaymentMethodId != giftCardPaymentMethodId.Value)
                     {
                         await _unitOfWork.RollbackTransactionAsync();
-                        return new CreateBulkSalesResult { Success = false, ErrorMessage = "Fully covered checkouts must use the gift card payment method." };
+                        return new CreateBulkSalesResult { Success = false, ErrorMessage = "Si la tarjeta cubre todo el importe, el método de pago tiene que ser tarjeta regalo." };
                     }
 
                     linePaymentMethodId = giftCardPaymentMethodId.Value;
@@ -640,7 +640,7 @@ public class SalesService : ISalesService
                     if (giftCardPaymentMethodId.HasValue && request.PaymentMethodId == giftCardPaymentMethodId.Value)
                     {
                         await _unitOfWork.RollbackTransactionAsync();
-                        return new CreateBulkSalesResult { Success = false, ErrorMessage = "Gift card payment method cannot be used when cash is still due." };
+                        return new CreateBulkSalesResult { Success = false, ErrorMessage = "No se puede usar el método de tarjeta regalo cuando todavía queda importe por cobrar." };
                     }
 
                     linePaymentMethodId = request.PaymentMethodId;
@@ -659,7 +659,7 @@ public class SalesService : ISalesService
                     if (!finalStockValidation.IsValid)
                     {
                         await _unitOfWork.RollbackTransactionAsync();
-                        return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: Stock changed. Available: {finalStockValidation.AvailableQuantity}, Requested: {line.Quantity}" };
+                        return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Línea {i + 1}: el stock ha cambiado. Disponible: {finalStockValidation.AvailableQuantity}, solicitado: {line.Quantity}." };
                     }
 
                     var officialPrice = product.Price;
@@ -747,7 +747,7 @@ public class SalesService : ISalesService
                     if (!movementResult.Success)
                     {
                         await _unitOfWork.RollbackTransactionAsync();
-                        return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: {movementResult.ErrorMessage ?? "Failed to create inventory movement."}" };
+                        return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Línea {i + 1}: {movementResult.ErrorMessage ?? "No se pudo crear el movimiento de inventario."}" };
                     }
 
                     var saleWithDetails = await _saleRepository.GetByIdWithDetailsAsync(sale.Id);
@@ -762,7 +762,7 @@ public class SalesService : ISalesService
                         {
                             LineIndex = i,
                             ProductName = product.Name,
-                            Message = finalStockValidation.WarningMessage ?? "Low stock",
+                            Message = finalStockValidation.WarningMessage ?? "Stock bajo",
                             IsLowStock = true,
                             RemainingStock = movementResult.QuantityAfter
                         });
@@ -792,7 +792,7 @@ public class SalesService : ISalesService
             return new CreateBulkSalesResult
             {
                 Success = false,
-                ErrorMessage = $"An error occurred during bulk sale creation: {ex.Message}"
+                ErrorMessage = $"Ocurrió un error al crear las ventas: {ex.Message}"
             };
         }
     }
@@ -921,7 +921,7 @@ public class SalesService : ISalesService
         {
             "Fecha", "Hora", "SKU", "Producto", "Colección", "Punto de venta",
             "Cantidad", "Precio", "Total", "Precio original",
-            "Método de pago", "Operador", "Notas", "Con foto"
+            "Método de pago", "Operador", "Notas", "Devolución"
         };
         for (var c = 0; c < headers.Length; c++)
             ws.Cell(1, c + 1).Value = headers[c];
@@ -949,7 +949,7 @@ public class SalesService : ISalesService
             ws.Cell(row, 11).Value = item.PaymentMethodName;
             ws.Cell(row, 12).Value = item.OperatorName;
             ws.Cell(row, 13).Value = item.Notes ?? "";
-            ws.Cell(row, 14).Value = item.HasPhoto ? "Sí" : "No";
+            ws.Cell(row, 14).Value = item.HasReturn ? "Sí" : "No";
         }
 
         ws.Columns(8, 10).Style.NumberFormat.Format = "#,##0.00";
@@ -1043,7 +1043,8 @@ public class SalesService : ISalesService
             PaymentMethodName = sale.PaymentMethod?.Name ?? string.Empty,
             OperatorName = sale.User?.Username ?? string.Empty,
             Notes = sale.Notes,
-            HasPhoto = sale.Photo != null
+            HasPhoto = sale.Photo != null,
+            HasReturn = sale.ReturnSales.Count > 0
         };
     }
 

@@ -4,8 +4,6 @@ import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from '@/providers';
 import { CartProvider } from '@/providers/cart-provider';
-import { ModelHealthAlert } from '@/components/admin/model-health-alert';
-
 const { BASE_URL } = import.meta.env;
 
 export function App() {
@@ -21,7 +19,6 @@ export function App() {
       <BrowserRouter basename={BASE_URL}>
         <AuthProvider>
           <CartProvider>
-            <ModelHealthAlert />
             <Toaster />
             <AppRouting />
           </CartProvider>

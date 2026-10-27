@@ -235,7 +235,7 @@ public class SalesControllerTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("not assigned");
+        content.Should().Contain("no está asignado");
     }
 
     [Fact]

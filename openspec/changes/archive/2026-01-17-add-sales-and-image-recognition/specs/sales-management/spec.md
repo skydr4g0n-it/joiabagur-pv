@@ -1,3 +1,5 @@
+> **Withdrawn (2026-10-27):** Product-photo image recognition was retired. This document is historical. Current behavior is manual sales only, and /api/image-recognition returns 410 Gone.
+
 ## ADDED Requirements
 
 ### Requirement: Sales Registration with Dual Entry Methods
@@ -55,7 +57,7 @@ The system SHALL allow operators to register sales using two methods: AI-assiste
 - **WHEN** operator confirms sale
 - **THEN** system performs second validation immediately before transaction commit
 - **AND** validates stock has not changed since first check
-- **AND** if stock changed (another sale occurred), returns error: "Stock cambi√≥ durante la venta. Disponible ahora: X, Solicitado: Y"
+- **AND** if stock changed (another sale occurred), returns error: "Stock cambiÛ durante la venta. Disponible ahora: X, Solicitado: Y"
 - **AND** operator can retry with updated stock information
 
 #### Scenario: Concurrent sales of last unit
@@ -65,14 +67,14 @@ The system SHALL allow operators to register sales using two methods: AI-assiste
 - **AND** Operator A confirms sale first (stock becomes 0)
 - **AND** Operator B confirms sale second
 - **THEN** Operator B's second validation fails
-- **AND** returns error: "Stock cambi√≥. Disponible: 0, Solicitado: 1"
+- **AND** returns error: "Stock cambiÛ. Disponible: 0, Solicitado: 1"
 - **AND** Operator A's sale succeeds, Operator B's sale is rejected
 
 #### Scenario: Reject sale for unassigned product
 
 - **WHEN** operator attempts to create sale
 - **AND** product has no Inventory record at point of sale (IsActive = false or missing)
-- **THEN** system returns 400 Bad Request with error: "El producto no est√° asignado a este punto de venta"
+- **THEN** system returns 400 Bad Request with error: "El producto no est· asignado a este punto de venta"
 - **AND** does not create sale record
 - **NOTE**: Uses IStockValidationService from inventory-management
 
@@ -80,7 +82,7 @@ The system SHALL allow operators to register sales using two methods: AI-assiste
 
 - **WHEN** operator attempts to create sale
 - **AND** payment method is not assigned to point of sale OR IsActive = false
-- **THEN** system returns 400 Bad Request with error: "El m√©todo de pago no est√° disponible en este punto de venta"
+- **THEN** system returns 400 Bad Request with error: "El mÈtodo de pago no est· disponible en este punto de venta"
 - **AND** does not create sale record
 - **NOTE**: Uses payment-method-management validation integration
 
@@ -97,7 +99,7 @@ The system SHALL allow operators to register sales using two methods: AI-assiste
 - **AND** remaining stock after sale <= Inventory.MinimumThreshold (if configured)
 - **THEN** system returns success response with lowStockWarning flag = true
 - **AND** includes remaining stock quantity in response
-- **AND** frontend displays non-blocking toast: "‚ö†Ô∏è Quedan solo X unidades de este producto"
+- **AND** frontend displays non-blocking toast: "?? Quedan solo X unidades de este producto"
 - **NOTE**: Warning does not block sale, only informs operator
 
 #### Scenario: Validate quantity is positive
@@ -274,7 +276,7 @@ The system SHALL display all monetary values using Euro (EUR) currency format wi
 #### Scenario: Display prices in Euro format
 
 - **WHEN** displaying product prices, subtotals, or sale totals
-- **THEN** the ‚Ç¨ symbol is shown before the numeric value
+- **THEN** the Ä symbol is shown before the numeric value
 - **AND** prices are formatted with 2 decimal places
 - **AND** Spanish locale (es-ES) formatting is used for Intl.NumberFormat
 
@@ -299,7 +301,7 @@ The system SHALL display only active and assigned payment methods in the sales f
 #### Scenario: Prevent selection of deactivated payment method
 
 - **WHEN** payment method is deactivated after form loads but before submission
-- **THEN** backend validation rejects sale with error: "El m√©todo de pago no est√° disponible en este punto de venta"
+- **THEN** backend validation rejects sale with error: "El mÈtodo de pago no est· disponible en este punto de venta"
 - **AND** frontend handles error gracefully and refreshes payment method list
 
 ### Requirement: Sales Authorization and Access Control

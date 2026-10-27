@@ -4,7 +4,9 @@ namespace JoiabagurPV.Application.Interfaces;
 
 /// <summary>
 /// Service interface for image recognition and ML model management operations.
+/// Product-photo image recognition is withdrawn; HTTP endpoints return 410 Gone.
 /// </summary>
+[Obsolete("Product-photo image recognition is withdrawn. Endpoints return 410 Gone.")]
 public interface IImageRecognitionService
 {
     /// <summary>

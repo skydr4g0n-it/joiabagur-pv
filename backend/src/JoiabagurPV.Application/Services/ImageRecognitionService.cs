@@ -106,13 +106,13 @@ public class ImageRecognitionService : IImageRecognitionService
 
         if (productsWithPhotos == 0)
         {
-            return (false, "Cannot train model: No products have photos. Please upload product photos first.");
+            return (false, "No se puede entrenar el modelo: ningún producto tiene fotos. Sube fotos primero.");
         }
 
         var totalPhotos = await _productPhotoRepository.GetAll().CountAsync();
         if (totalPhotos < 10)
         {
-            return (false, $"Cannot train model: Only {totalPhotos} photos available. At least 10 photos recommended for training.");
+            return (false, $"No se puede entrenar el modelo: solo hay {totalPhotos} fotos. Se recomiendan al menos 10.");
         }
 
         return (true, null);
@@ -132,7 +132,7 @@ public class ImageRecognitionService : IImageRecognitionService
         var isInProgress = await _trainingJobRepository.IsJobInProgressAsync();
         if (isInProgress)
         {
-            throw new InvalidOperationException("A training job is already in progress. Please wait for it to complete.");
+            throw new InvalidOperationException("Ya hay un entrenamiento en curso. Espera a que termine.");
         }
 
         // Create training job
@@ -192,7 +192,7 @@ public class ImageRecognitionService : IImageRecognitionService
                 return new UploadTrainedModelResult
                 {
                     Success = false,
-                    ErrorMessage = "Model version is required."
+                    ErrorMessage = "La versión del modelo es obligatoria."
                 };
             }
 
@@ -202,7 +202,7 @@ public class ImageRecognitionService : IImageRecognitionService
                 return new UploadTrainedModelResult
                 {
                     Success = false,
-                    ErrorMessage = "Model topology JSON is required."
+                    ErrorMessage = "El JSON de topología del modelo es obligatorio."
                 };
             }
 
@@ -212,7 +212,7 @@ public class ImageRecognitionService : IImageRecognitionService
                 return new UploadTrainedModelResult
                 {
                     Success = false,
-                    ErrorMessage = "At least one weight file is required."
+                    ErrorMessage = "Hace falta al menos un archivo de pesos."
                 };
             }
 
@@ -223,7 +223,7 @@ public class ImageRecognitionService : IImageRecognitionService
                 return new UploadTrainedModelResult
                 {
                     Success = false,
-                    ErrorMessage = $"Model version {request.Version} already exists. Please use a different version."
+                    ErrorMessage = $"La versión {request.Version} ya existe. Usa otra versión."
                 };
             }
 
@@ -300,7 +300,7 @@ public class ImageRecognitionService : IImageRecognitionService
             return new UploadTrainedModelResult
             {
                 Success = false,
-                ErrorMessage = $"Failed to upload model: {ex.Message}"
+                ErrorMessage = $"No se pudo subir el modelo: {ex.Message}"
             };
         }
     }
@@ -418,7 +418,7 @@ public class ImageRecognitionService : IImageRecognitionService
     {
         if (request.Vector == null || request.Vector.Length != EmbeddingVectorLength)
         {
-            throw new ArgumentException($"Embedding vector must have exactly {EmbeddingVectorLength} elements.");
+            throw new ArgumentException($"El vector de embedding tiene que tener exactamente {EmbeddingVectorLength} elementos.");
         }
 
         // Upsert: delete existing embedding for this photo, then insert new one

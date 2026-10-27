@@ -1,3 +1,5 @@
+> **Withdrawn (2026-10-27):** Product-photo image recognition was retired. This document is historical. Current behavior is manual sales only, and /api/image-recognition returns 410 Gone.
+
 ## ADDED Requirements
 
 ### Requirement: Backend Unit Tests for Embedding Service

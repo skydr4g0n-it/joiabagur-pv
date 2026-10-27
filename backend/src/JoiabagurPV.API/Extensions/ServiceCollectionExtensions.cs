@@ -1,3 +1,4 @@
+using JoiabagurPV.API.Filters;
 using JoiabagurPV.API.Services;
 using JoiabagurPV.Application.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -42,6 +43,7 @@ public static class ServiceCollectionExtensions
 
         // Add HttpContextAccessor for CurrentUserService
         services.AddHttpContextAccessor();
+        services.AddScoped<ImageRecognitionWithdrawnFilter>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
 
         // Add JWT Authentication

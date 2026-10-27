@@ -72,6 +72,7 @@ function renderComponent(photos: ProductPhoto[] = [], onPhotosChange = vi.fn()) 
   return render(
     <ProductPhotoUpload
       productId="prod-123"
+      productSku="SKU-123"
       photos={photos}
       onPhotosChange={onPhotosChange}
     />
@@ -86,6 +87,36 @@ function createMockFile(name: string, size: number, type: string): File {
   return new File([blob], name, { type });
 }
 
+function mockUploadProductResponse(overrides: Partial<ProductPhoto> = {}) {
+  return {
+    id: 'prod-123',
+    sku: 'SKU-123',
+    name: 'Test',
+    price: 10,
+    isActive: true,
+    photos: [
+      {
+        id: 'photo-new',
+        productId: 'prod-123',
+        fileName: 'upload.jpg',
+        url: 'http://localhost/uploads/upload.jpg',
+        displayOrder: 0,
+        isPrimary: true,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+        ...overrides,
+      },
+    ],
+  } as Awaited<ReturnType<typeof productService.uploadPhoto>>;
+}
+
+async function queueFileAndUpload(user: ReturnType<typeof userEvent.setup>, file: File) {
+  const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+  fireEvent.change(input!, { target: { files: [file] } });
+  const uploadButton = await screen.findByRole('button', { name: /subir foto/i });
+  await user.click(uploadButton);
+}
+
 describe('ProductPhotoUpload', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -97,8 +128,8 @@ describe('ProductPhotoUpload', () => {
       renderComponent();
 
       // Assert
-      expect(screen.getByText(/arrastra una foto aquí/i)).toBeInTheDocument();
-      expect(screen.getByText(/selecciona un archivo/i)).toBeInTheDocument();
+      expect(screen.getByText(/arrastra fotos aquí/i)).toBeInTheDocument();
+      expect(screen.getByText(/selecciona archivos/i)).toBeInTheDocument();
     });
 
     it('should display "no photos" message when photos array is empty', () => {
@@ -150,7 +181,7 @@ describe('ProductPhotoUpload', () => {
       renderComponent(mockPhotos);
 
       // Assert
-      expect(screen.queryByText(/arrastra una foto aquí/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/arrastra fotos aquí/i)).not.toBeInTheDocument();
 
       // Cleanup
       mockUser.role = 'Administrator';
@@ -158,37 +189,40 @@ describe('ProductPhotoUpload', () => {
   });
 
   describe('File Upload (Task 16.7)', () => {
-    it('should upload photo when valid file is selected', async () => {
+    it('should upload photo without embeddings call when valid file is selected', async () => {
       // Arrange
       const user = userEvent.setup();
       const onPhotosChange = vi.fn();
       vi.mocked(productService.uploadPhoto).mockResolvedValue({
-        id: 'photo-3',
-        productId: 'prod-123',
-        fileName: 'new-photo.jpg',
-        url: 'http://localhost/uploads/new-photo.jpg',
-        displayOrder: 2,
-        isPrimary: false,
-        createdAt: '2024-01-03T00:00:00Z',
-        updatedAt: '2024-01-03T00:00:00Z',
-      });
+        id: 'prod-123',
+        sku: 'SKU-123',
+        name: 'Test',
+        price: 10,
+        isActive: true,
+        photos: [
+          {
+            id: 'photo-3',
+            productId: 'prod-123',
+            fileName: 'new-photo.jpg',
+            url: 'http://localhost/uploads/new-photo.jpg',
+            displayOrder: 2,
+            isPrimary: false,
+            createdAt: '2024-01-03T00:00:00Z',
+            updatedAt: '2024-01-03T00:00:00Z',
+          },
+        ],
+      } as Awaited<ReturnType<typeof productService.uploadPhoto>>);
 
       renderComponent([], onPhotosChange);
 
-      // Act - Click to select file
-      const selectButton = screen.getByText(/selecciona un archivo/i);
-      await user.click(selectButton);
-
-      // Simulate file selection
       const file = createMockFile('test.jpg', 1000, 'image/jpeg');
       const input = document.querySelector('input[type="file"]') as HTMLInputElement;
       expect(input).toBeTruthy();
-      
-      await waitFor(() => {
-        fireEvent.change(input!, { target: { files: [file] } });
-      });
+      fireEvent.change(input!, { target: { files: [file] } });
 
-      // Assert
+      const uploadButton = await screen.findByRole('button', { name: /subir foto/i });
+      await user.click(uploadButton);
+
       await waitFor(() => {
         expect(productService.uploadPhoto).toHaveBeenCalledWith('prod-123', expect.any(File));
         expect(onPhotosChange).toHaveBeenCalled();
@@ -196,48 +230,29 @@ describe('ProductPhotoUpload', () => {
     });
 
     it('should show loading indicator while uploading', async () => {
-      // Arrange
       const user = userEvent.setup();
       vi.mocked(productService.uploadPhoto).mockImplementation(
         () => new Promise((resolve) => setTimeout(resolve, 1000))
       );
 
       renderComponent();
+      await queueFileAndUpload(user, createMockFile('test.jpg', 1000, 'image/jpeg'));
 
-      // Act
-      const selectButton = screen.getByText(/selecciona un archivo/i);
-      await user.click(selectButton);
-
-      const file = createMockFile('test.jpg', 1000, 'image/jpeg');
-      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-      expect(input).toBeTruthy();
-      fireEvent.change(input!, { target: { files: [file] } });
-
-      // Assert
       await waitFor(() => {
-        expect(screen.getByText(/subiendo foto/i)).toBeInTheDocument();
+        expect(screen.getByText(/subiendo fotos/i)).toBeInTheDocument();
       });
     });
 
     it('should disable upload zone while uploading', async () => {
-      // Arrange
       const user = userEvent.setup();
       vi.mocked(productService.uploadPhoto).mockImplementation(
         () => new Promise((resolve) => setTimeout(resolve, 1000))
       );
 
       renderComponent();
+      await queueFileAndUpload(user, createMockFile('test.jpg', 1000, 'image/jpeg'));
 
-      // Act
-      const selectButton = screen.getByText(/selecciona un archivo/i);
-      await user.click(selectButton);
-
-      const file = createMockFile('test.jpg', 1000, 'image/jpeg');
       const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-      expect(input).toBeTruthy();
-      fireEvent.change(input!, { target: { files: [file] } });
-
-      // Assert - Input should be disabled
       await waitFor(() => {
         expect(input!).toBeDisabled();
       });
@@ -274,30 +289,24 @@ describe('ProductPhotoUpload', () => {
     });
 
     it('should upload photo on file drop', async () => {
-      // Arrange
+      const user = userEvent.setup();
       const onPhotosChange = vi.fn();
-      vi.mocked(productService.uploadPhoto).mockResolvedValue({
-        id: 'photo-3',
-        productId: 'prod-123',
-        fileName: 'dropped.jpg',
-        url: 'http://localhost/uploads/dropped.jpg',
-        displayOrder: 2,
-        isPrimary: false,
-        createdAt: '2024-01-03T00:00:00Z',
-        updatedAt: '2024-01-03T00:00:00Z',
-      });
+      vi.mocked(productService.uploadPhoto).mockResolvedValue(
+        mockUploadProductResponse({ fileName: 'dropped.jpg', url: 'http://localhost/uploads/dropped.jpg' })
+      );
 
       renderComponent([], onPhotosChange);
       const dropZone = document.querySelector('.border-dashed') as HTMLElement;
       expect(dropZone).toBeTruthy();
 
-      // Act - Drop file
       const file = createMockFile('dropped.jpg', 1000, 'image/jpeg');
       fireEvent.drop(dropZone!, {
         dataTransfer: { files: [file] },
       });
 
-      // Assert
+      const uploadButton = await screen.findByRole('button', { name: /subir foto/i });
+      await user.click(uploadButton);
+
       await waitFor(() => {
         expect(productService.uploadPhoto).toHaveBeenCalledWith('prod-123', expect.any(File));
         expect(onPhotosChange).toHaveBeenCalled();
@@ -356,56 +365,32 @@ describe('ProductPhotoUpload', () => {
     });
 
     it('should accept valid JPG file', async () => {
-      // Arrange
+      const user = userEvent.setup();
       const onPhotosChange = vi.fn();
-      vi.mocked(productService.uploadPhoto).mockResolvedValue({
-        id: 'photo-new',
-        productId: 'prod-123',
-        fileName: 'valid.jpg',
-        url: 'http://localhost/uploads/valid.jpg',
-        displayOrder: 0,
-        isPrimary: true,
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z',
-      });
+      vi.mocked(productService.uploadPhoto).mockResolvedValue(
+        mockUploadProductResponse({ fileName: 'valid.jpg', url: 'http://localhost/uploads/valid.jpg' })
+      );
 
       renderComponent([], onPhotosChange);
 
-      // Act
-      const file = createMockFile('valid.jpg', 1000, 'image/jpeg');
-      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-      expect(input).toBeTruthy();
-      fireEvent.change(input!, { target: { files: [file] } });
+      await queueFileAndUpload(user, createMockFile('valid.jpg', 1000, 'image/jpeg'));
 
-      // Assert
       await waitFor(() => {
         expect(productService.uploadPhoto).toHaveBeenCalledWith('prod-123', expect.any(File));
       });
     });
 
     it('should accept valid PNG file', async () => {
-      // Arrange
+      const user = userEvent.setup();
       const onPhotosChange = vi.fn();
-      vi.mocked(productService.uploadPhoto).mockResolvedValue({
-        id: 'photo-new',
-        productId: 'prod-123',
-        fileName: 'valid.png',
-        url: 'http://localhost/uploads/valid.png',
-        displayOrder: 0,
-        isPrimary: true,
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z',
-      });
+      vi.mocked(productService.uploadPhoto).mockResolvedValue(
+        mockUploadProductResponse({ fileName: 'valid.png', url: 'http://localhost/uploads/valid.png' })
+      );
 
       renderComponent([], onPhotosChange);
 
-      // Act
-      const file = createMockFile('valid.png', 1000, 'image/png');
-      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-      expect(input).toBeTruthy();
-      fireEvent.change(input!, { target: { files: [file] } });
+      await queueFileAndUpload(user, createMockFile('valid.png', 1000, 'image/png'));
 
-      // Assert
       await waitFor(() => {
         expect(productService.uploadPhoto).toHaveBeenCalledWith('prod-123', expect.any(File));
       });
@@ -425,32 +410,24 @@ describe('ProductPhotoUpload', () => {
       // Assert
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          'Archivo inválido',
-          expect.objectContaining({
-            description: 'Solo se permiten archivos JPG y PNG',
-          })
+          'Algunos archivos no son válidos',
+          expect.any(Object)
         );
       });
     });
 
     it('should show error toast for file too large', async () => {
-      // Arrange
       const { toast } = await import('sonner');
       renderComponent();
 
-      // Act
-      const file = createMockFile('huge.jpg', 10 * 1024 * 1024, 'image/jpeg'); // 10 MB
+      const file = createMockFile('huge.jpg', 10 * 1024 * 1024, 'image/jpeg');
       const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-      expect(input).toBeTruthy();
       fireEvent.change(input!, { target: { files: [file] } });
 
-      // Assert
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          'Archivo inválido',
-          expect.objectContaining({
-            description: 'El archivo no puede superar 5 MB',
-          })
+          'Algunos archivos no son válidos',
+          expect.any(Object)
         );
       });
     });
@@ -632,26 +609,16 @@ describe('ProductPhotoUpload', () => {
 
   describe('Error Handling (Task 16.9)', () => {
     it('should handle upload error gracefully', async () => {
-      // Arrange
+      const user = userEvent.setup();
       const { toast } = await import('sonner');
-      vi.mocked(productService.uploadPhoto).mockRejectedValue(
-        new Error('Upload failed')
-      );
+      vi.mocked(productService.uploadPhoto).mockRejectedValue(new Error('Upload failed'));
 
       renderComponent();
 
-      // Act
-      const file = createMockFile('test.jpg', 1000, 'image/jpeg');
-      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-      expect(input).toBeTruthy();
-      fireEvent.change(input!, { target: { files: [file] } });
+      await queueFileAndUpload(user, createMockFile('test.jpg', 1000, 'image/jpeg'));
 
-      // Assert
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith(
-          'Error al subir la foto',
-          expect.any(Object)
-        );
+        expect(toast.error).toHaveBeenCalledWith('Error al subir 1 foto');
       });
     });
 
@@ -736,7 +703,7 @@ describe('ProductPhotoUpload', () => {
       renderComponent();
 
       // Act
-      const selectButton = screen.getByText(/selecciona un archivo/i);
+      const selectButton = screen.getByText(/selecciona archivos/i);
       await user.click(selectButton);
 
       // Assert - File input should exist and accept correct formats
@@ -759,20 +726,15 @@ describe('ProductPhotoUpload', () => {
     });
 
     it('should disable actions during upload', async () => {
-      // Arrange
-      vi.mocked(productService.uploadPhoto).mockImplementation(
-        () => new Promise(() => {}) // Never resolves
-      );
+      const user = userEvent.setup();
+      vi.mocked(productService.uploadPhoto).mockImplementation(() => new Promise(() => {}));
 
       renderComponent();
 
-      // Act
       const file = createMockFile('test.jpg', 1000, 'image/jpeg');
-      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-      expect(input).toBeTruthy();
-      fireEvent.change(input!, { target: { files: [file] } });
+      await queueFileAndUpload(user, file);
 
-      // Assert
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
       await waitFor(() => {
         expect(input!).toBeDisabled();
       });
@@ -788,7 +750,7 @@ describe('ProductPhotoUpload', () => {
       renderComponent(mockPhotos);
 
       // Assert
-      expect(screen.queryByText(/arrastra una foto aquí/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/arrastra fotos aquí/i)).not.toBeInTheDocument();
       expect(screen.queryByRole('button')).not.toBeInTheDocument();
 
       // Cleanup

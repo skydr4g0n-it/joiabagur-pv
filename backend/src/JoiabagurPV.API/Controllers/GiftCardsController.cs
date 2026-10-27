@@ -128,7 +128,7 @@ public class GiftCardsController : ControllerBase
     public async Task<ActionResult<GiftCardByCodeDto>> GetByCode(string code, [FromQuery] Guid pointOfSaleId)
     {
         if (pointOfSaleId == Guid.Empty)
-            return BadRequest(new { message = "pointOfSaleId is required." });
+            return BadRequest(new { message = "El punto de venta es obligatorio." });
 
         var (card, error) = await _giftCardService.GetByCodeForPosAsync(code, pointOfSaleId);
         if (card == null && error == "Gift card not found.")

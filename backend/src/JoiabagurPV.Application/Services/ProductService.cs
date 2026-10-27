@@ -85,13 +85,13 @@ public class ProductService : IProductService
         // Validate SKU uniqueness
         if (await _productRepository.SkuExistsAsync(normalizedSku))
         {
-            throw new DomainException($"A product with SKU '{normalizedSku}' already exists.");
+            throw new DomainException($"Ya existe un producto con el SKU '{normalizedSku}'.");
         }
 
         // Validate price
         if (request.Price <= 0)
         {
-            throw new DomainException("Product price must be greater than zero.");
+            throw new DomainException("El precio del producto debe ser mayor que cero.");
         }
 
         // Validate collection if provided
@@ -100,7 +100,7 @@ public class ProductService : IProductService
             var collection = await _collectionRepository.GetByIdAsync(request.CollectionId.Value);
             if (collection == null)
             {
-                throw new DomainException($"Collection with ID '{request.CollectionId}' not found.");
+                throw new DomainException($"Colección con ID '{request.CollectionId}' no encontrada.");
             }
 
             // Ensure CollectionName is available in the response DTO
@@ -137,7 +137,7 @@ public class ProductService : IProductService
         var product = await _productRepository.GetByIdAsync(productId);
         if (product == null)
         {
-            throw new DomainException($"Product with ID '{productId}' not found.");
+            throw new DomainException($"Producto con ID '{productId}' no encontrado.");
         }
 
         var normalizedName = (request.Name ?? string.Empty).Trim();
@@ -149,7 +149,7 @@ public class ProductService : IProductService
         // Validate price
         if (request.Price <= 0)
         {
-            throw new DomainException("Product price must be greater than zero.");
+            throw new DomainException("El precio del producto debe ser mayor que cero.");
         }
 
         // Validate collection if provided
@@ -157,7 +157,7 @@ public class ProductService : IProductService
         {
             if (!await _collectionRepository.ExistsAsync(request.CollectionId.Value))
             {
-                throw new DomainException($"Collection with ID '{request.CollectionId}' not found.");
+                throw new DomainException($"Colección con ID '{request.CollectionId}' no encontrada.");
             }
         }
 
@@ -191,7 +191,7 @@ public class ProductService : IProductService
         var product = await _productRepository.GetByIdAsync(productId);
         if (product == null)
         {
-            throw new DomainException($"Product with ID '{productId}' not found.");
+            throw new DomainException($"Producto con ID '{productId}' no encontrado.");
         }
 
         product.IsActive = false;
@@ -207,7 +207,7 @@ public class ProductService : IProductService
         var product = await _productRepository.GetByIdAsync(productId);
         if (product == null)
         {
-            throw new DomainException($"Product with ID '{productId}' not found.");
+            throw new DomainException($"Producto con ID '{productId}' no encontrado.");
         }
 
         product.IsActive = true;

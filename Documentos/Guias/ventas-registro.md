@@ -1,5 +1,7 @@
 # Guía de Registro de Ventas
 
+> **Nota (2026-10-27):** El registro de ventas por reconocimiento de imagen (`/sales/new/image`) fue retirado. Los métodos activos son los listados abajo.
+
 ## Descripción General
 
 El sistema ofrece tres métodos para registrar ventas:
@@ -282,7 +284,7 @@ Sí. El código QR codifica el SKU del producto. No se requiere ningún campo ad
 - El sistema genera un código `GC-` único (imprimible con Code128 y QR)
 
 ### Canje en caja
-- En el **carrito**, escanee o escriba el código `GC-` (no busca producto)
+- En el **carrito** o en **Nueva venta** (venta manual), escanee o escriba el código `GC-` (no busca producto)
 - La cobertura se aplica a la línea más barata primero; la tarjeta es de **un solo uso** (el saldo gastable pasa a 0 aunque quede valor nominal sin usar)
 - Si el importe del carrito supera la tarjeta, cobre solo la diferencia con el método de pago elegido
 - Si la tarjeta cubre todo el importe, el checkout usa el método interno «Tarjeta regalo»

@@ -190,8 +190,13 @@ export function GiftCardDetailPage() {
       />
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle>Productos vinculados</CardTitle>
+          {card.linkedProducts.length > 0 && (
+            <Button size="sm" asChild>
+              <Link to={ROUTES.GIFT_CARDS.EXCHANGE(card.id)}>Cambiar producto</Link>
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           {card.linkedProducts.length === 0 ? (
@@ -203,6 +208,7 @@ export function GiftCardDetailPage() {
                   <TableHead>Producto</TableHead>
                   <TableHead>Fecha venta</TableHead>
                   <TableHead className="text-right">Cobertura</TableHead>
+                  <TableHead className="text-right">Acción</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -214,6 +220,15 @@ export function GiftCardDetailPage() {
                     </TableCell>
                     <TableCell>{formatDateTime(link.saleDate)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(link.coverageAmount)}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="outline" size="sm" asChild>
+                        <Link
+                          to={`${ROUTES.GIFT_CARDS.EXCHANGE(card.id)}?saleId=${encodeURIComponent(link.saleId)}`}
+                        >
+                          Cambiar
+                        </Link>
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

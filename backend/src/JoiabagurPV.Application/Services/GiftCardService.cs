@@ -81,12 +81,12 @@ public class GiftCardService : IGiftCardService
             var assigned = await _userPointOfSaleRepository.GetAll()
                 .AnyAsync(u => u.UserId == userId && u.PointOfSaleId == request.PointOfSaleId && u.IsActive);
             if (!assigned)
-                return new IssueGiftCardResult { Success = false, IsForbidden = true, ErrorMessage = "Operator is not assigned to this point of sale." };
+                return new IssueGiftCardResult { Success = false, IsForbidden = true, ErrorMessage = "El operador no está asignado a este punto de venta." };
         }
 
         var pos = await _pointOfSaleRepository.GetByIdAsync(request.PointOfSaleId);
         if (pos == null)
-            return new IssueGiftCardResult { Success = false, ErrorMessage = "Point of sale not found." };
+            return new IssueGiftCardResult { Success = false, ErrorMessage = "Punto de venta no encontrado." };
 
         try
         {
@@ -100,7 +100,7 @@ public class GiftCardService : IGiftCardService
         var systemProduct = await _productRepository.GetAll()
             .FirstOrDefaultAsync(p => p.SystemProductKind == SystemProductKind.GiftCard);
         if (systemProduct == null)
-            return new IssueGiftCardResult { Success = false, ErrorMessage = "Gift card system product is not configured." };
+            return new IssueGiftCardResult { Success = false, ErrorMessage = "El producto de sistema de tarjeta regalo no está configurado." };
 
         await _unitOfWork.BeginTransactionAsync();
         try
@@ -147,7 +147,7 @@ public class GiftCardService : IGiftCardService
             if (card == null)
             {
                 await _unitOfWork.RollbackTransactionAsync();
-                return new IssueGiftCardResult { Success = false, ErrorMessage = "Could not generate a unique gift card code." };
+                return new IssueGiftCardResult { Success = false, ErrorMessage = "No se pudo generar un código único de tarjeta regalo." };
             }
 
             await _unitOfWork.CommitTransactionAsync();
@@ -217,16 +217,16 @@ public class GiftCardService : IGiftCardService
     {
         var card = await _giftCardRepository.GetByCodeAsync(code);
         if (card == null)
-            return (null, "Gift card not found.");
+            return (null, "Tarjeta regalo no encontrada.");
 
         if (card.PointOfSaleId != pointOfSaleId)
-            return (null, "Gift card is not valid at this point of sale.");
+            return (null, "La tarjeta regalo no es válida en este punto de venta.");
 
         if (GiftCardEconomics.IsExpiredForRedemption(card.ExpiryDate))
-            return (null, "Gift card is expired.");
+            return (null, "La tarjeta regalo está caducada.");
 
         if (card.SpendableBalance <= 0)
-            return (null, "Gift card was already used.");
+            return (null, "La tarjeta regalo ya se ha utilizado.");
 
         return (new GiftCardByCodeDto
         {
@@ -246,18 +246,18 @@ public class GiftCardService : IGiftCardService
         bool isAdmin)
     {
         if (!isAdmin)
-            return new ReassignGiftCardResult { Success = false, IsForbidden = true, ErrorMessage = "Only administrators can reassign gift cards." };
+            return new ReassignGiftCardResult { Success = false, IsForbidden = true, ErrorMessage = "Solo los administradores pueden reasignar tarjetas regalo." };
 
         var card = await _giftCardRepository.GetByIdWithDetailsAsync(giftCardId);
         if (card == null)
-            return new ReassignGiftCardResult { Success = false, ErrorMessage = "Gift card not found." };
+            return new ReassignGiftCardResult { Success = false, ErrorMessage = "Tarjeta regalo no encontrada." };
 
         if (card.PointOfSaleId == request.ToPointOfSaleId)
             return new ReassignGiftCardResult { Success = true, Card = await MapDetailAsync(card) };
 
         var targetPos = await _pointOfSaleRepository.GetByIdAsync(request.ToPointOfSaleId);
         if (targetPos == null)
-            return new ReassignGiftCardResult { Success = false, ErrorMessage = "Target point of sale not found." };
+            return new ReassignGiftCardResult { Success = false, ErrorMessage = "El punto de venta de destino no existe." };
 
         var fromPosId = card.PointOfSaleId;
         card.PointOfSaleId = request.ToPointOfSaleId;
@@ -296,15 +296,15 @@ public class GiftCardService : IGiftCardService
             var assigned = await _userPointOfSaleRepository.GetAll()
                 .AnyAsync(u => u.UserId == userId && u.PointOfSaleId == request.PointOfSaleId && u.IsActive);
             if (!assigned)
-                return new ExchangeGiftCardResult { Success = false, ErrorMessage = "Operator is not assigned to this point of sale." };
+                return new ExchangeGiftCardResult { Success = false, ErrorMessage = "El operador no está asignado a este punto de venta." };
         }
 
         var card = await _giftCardRepository.GetByIdWithDetailsAsync(giftCardId);
         if (card == null)
-            return new ExchangeGiftCardResult { Success = false, ErrorMessage = "Gift card not found." };
+            return new ExchangeGiftCardResult { Success = false, ErrorMessage = "Tarjeta regalo no encontrada." };
 
         if (card.PointOfSaleId != request.PointOfSaleId)
-            return new ExchangeGiftCardResult { Success = false, ErrorMessage = "Gift card is not valid at this point of sale." };
+            return new ExchangeGiftCardResult { Success = false, ErrorMessage = "La tarjeta regalo no es válida en este punto de venta." };
 
         try
         {
@@ -321,23 +321,23 @@ public class GiftCardService : IGiftCardService
         {
             var sale = await _saleRepository.GetByIdWithDetailsAsync(line.SaleId);
             if (sale == null)
-                return new ExchangeGiftCardResult { Success = false, ErrorMessage = $"Sale {line.SaleId} not found." };
+                return new ExchangeGiftCardResult { Success = false, ErrorMessage = $"Venta {line.SaleId} no encontrada." };
 
             if (sale.PointOfSaleId != request.PointOfSaleId)
-                return new ExchangeGiftCardResult { Success = false, ErrorMessage = "Sale does not belong to this point of sale." };
+                return new ExchangeGiftCardResult { Success = false, ErrorMessage = "La venta no corresponde a este punto de venta." };
 
             if (sale.SaleDate < cutoff)
-                return new ExchangeGiftCardResult { Success = false, ErrorMessage = "Sale is outside the 30-day exchange window." };
+                return new ExchangeGiftCardResult { Success = false, ErrorMessage = "La venta está fuera del plazo de cambio de 30 días." };
 
             var hasApply = card.CoverageEntries.Any(e =>
                 e.SaleId == sale.Id && e.EntryType == GiftCardCoverageEntryType.Apply);
             if (!hasApply)
-                return new ExchangeGiftCardResult { Success = false, ErrorMessage = "Sale is not linked to this gift card." };
+                return new ExchangeGiftCardResult { Success = false, ErrorMessage = "La venta no está vinculada a esta tarjeta regalo." };
 
             var returned = await _returnSaleRepository.GetReturnedQuantityForSaleAsync(sale.Id);
             var available = sale.Quantity - returned;
             if (line.Quantity > available)
-                return new ExchangeGiftCardResult { Success = false, ErrorMessage = "Return quantity exceeds available quantity." };
+                return new ExchangeGiftCardResult { Success = false, ErrorMessage = "La cantidad a devolver supera la cantidad disponible." };
 
             returnSales.Add((sale, line.Quantity));
         }
@@ -347,17 +347,17 @@ public class GiftCardService : IGiftCardService
         {
             var product = await _productRepository.GetByIdAsync(np.ProductId);
             if (product == null || !product.IsActive || product.SystemProductKind != null)
-                return new ExchangeGiftCardResult { Success = false, ErrorMessage = "Invalid replacement product." };
+                return new ExchangeGiftCardResult { Success = false, ErrorMessage = "El producto de reemplazo no es válido." };
 
             foreach (var (oldSale, _) in returnSales)
             {
                 if (oldSale.ProductId == np.ProductId)
-                    return new ExchangeGiftCardResult { Success = false, ErrorMessage = "Replacement product must differ from the returned product." };
+                    return new ExchangeGiftCardResult { Success = false, ErrorMessage = "El producto nuevo tiene que ser distinto del devuelto." };
             }
 
             var stock = await _stockValidationService.ValidateStockAvailabilityAsync(np.ProductId, request.PointOfSaleId, np.Quantity);
             if (!stock.IsValid)
-                return new ExchangeGiftCardResult { Success = false, ErrorMessage = stock.ErrorMessage ?? "Insufficient stock." };
+                return new ExchangeGiftCardResult { Success = false, ErrorMessage = stock.ErrorMessage ?? "Stock insuficiente." };
 
             newProducts.Add((product, np.Quantity));
         }

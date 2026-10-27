@@ -188,9 +188,17 @@ export function SalesCartPage() {
   }, [revalidateStock]);
 
   useEffect(() => {
-    const code = (location.state as { giftCardCode?: string } | null)?.giftCardCode;
-    if (code) {
-      addGiftCardByCode(code);
+    const state = location.state as { giftCardCode?: string; giftCardCodes?: string[] } | null;
+    const codes = [
+      ...(state?.giftCardCodes ?? []),
+      ...(state?.giftCardCode ? [state.giftCardCode] : []),
+    ];
+    if (codes.length > 0) {
+      void (async () => {
+        for (const code of codes) {
+          await addGiftCardByCode(code);
+        }
+      })();
       navigate(location.pathname, { replace: true, state: {} });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once when navigated from scanner

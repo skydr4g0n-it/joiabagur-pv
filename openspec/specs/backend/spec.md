@@ -3,7 +3,6 @@
 ## Purpose
 
 Define the layered ASP.NET Core monolith structure, conventions, and cross-cutting standards for Domain, Application, Infrastructure, and API.
-
 ## Requirements
 ### Requirement: Layered Architecture
 
@@ -257,29 +256,25 @@ The backend infrastructure SHALL maintain automated database backups with config
 
 ### Requirement: ML Model Storage and Distribution
 
-The backend SHALL store and serve ML models uploaded by administrators, supporting version management and metadata tracking.
+The backend SHALL keep existing ML model files and ModelMetadata rows. It SHALL NOT serve, accept, or mutate them through `/api/image-recognition`. Authenticated requests to that API SHALL receive 410 Gone. The implementation types remain in the codebase and SHALL be marked deprecated. This change SHALL NOT add a migration that deletes model storage.
 
-#### Scenario: Store uploaded model
-- **WHEN** administrator uploads trained model via dashboard or CLI
-- **THEN** model files are stored in S3 at `/ml-models/v{version}/`
-- **AND** model.json and .bin shard files are validated before storing
-- **AND** ModelMetadata table is updated with version, upload date, and accuracy metrics
+#### Scenario: Authenticated model route is withdrawn
+- **GIVEN** an authenticated caller
+- **WHEN** the caller requests model metadata, model files, model versions, upload, or retrain under `/api/image-recognition`
+- **THEN** the response status is 410 Gone
+- **AND** model files are not written or deleted by that request
 
-#### Scenario: Serve model metadata
-- **WHEN** frontend requests GET /api/image-recognition/model/metadata
-- **THEN** backend returns latest model version, upload date, and download URL
-- **AND** response includes model size for download progress estimation
+#### Scenario: Stored model history remains
+- **GIVEN** ModelMetadata rows and stored model files from earlier uploads
+- **WHEN** this change is deployed
+- **THEN** those rows and files are left in place
+- **AND** no admin screen lists them
 
-#### Scenario: Serve model files
-- **WHEN** frontend requests model files
-- **THEN** backend serves files from S3 via pre-signed URL or proxy
-- **AND** appropriate cache headers are set for CDN optimization
-
-#### Scenario: Preserve model history
-- **WHEN** new model version is uploaded
-- **THEN** previous model versions are NOT deleted
-- **AND** ModelMetadata maintains history of all versions
-- **AND** admin can view training history in dashboard
+#### Scenario: Deprecated marker is present
+- **GIVEN** the image-recognition controller and its application service interfaces
+- **WHEN** a developer inspects those types
+- **THEN** each is marked obsolete with a message that product-photo image recognition is withdrawn
+- **AND** the method bodies remain in source
 
 ### Requirement: Dashboard Aggregation Service
 
@@ -332,3 +327,4 @@ The backend SHALL expose a DashboardController with a GET /api/dashboard/stats e
 - **WHEN** authenticated operator calls GET /api/dashboard/stats?posId={id}
 - **THEN** response includes POS-scoped KPIs
 - **AND** paymentMethodDistribution and returnCategoryDistribution are null
+

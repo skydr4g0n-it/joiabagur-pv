@@ -61,7 +61,7 @@ public class SalesController : ControllerBase
         // Get current user
         if (!_currentUserService.UserId.HasValue)
         {
-            return Unauthorized(new { message = "User not authenticated." });
+            return Unauthorized(new { message = "Usuario no autenticado." });
         }
 
         var userId = _currentUserService.UserId.Value;
@@ -91,7 +91,7 @@ public class SalesController : ControllerBase
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to process sale photo");
-                return BadRequest(new { message = "Failed to process photo. Please try again." });
+                return BadRequest(new { message = "No se pudo procesar la foto. Inténtalo de nuevo." });
             }
         }
 
@@ -135,7 +135,7 @@ public class SalesController : ControllerBase
 
         if (!_currentUserService.UserId.HasValue)
         {
-            return Unauthorized(new { message = "User not authenticated." });
+            return Unauthorized(new { message = "Usuario no autenticado." });
         }
 
         if (!string.IsNullOrWhiteSpace(idempotencyKey))
@@ -147,7 +147,7 @@ public class SalesController : ControllerBase
                 {
                     return Ok(previousResult);
                 }
-                return Conflict(new { message = "A request with this idempotency key is already being processed." });
+                return Conflict(new { message = "Ya se está procesando una petición con esta clave de idempotencia." });
             }
             IdempotencyStore.Reserve(idempotencyKey);
         }
@@ -180,7 +180,7 @@ public class SalesController : ControllerBase
                     if (!string.IsNullOrWhiteSpace(idempotencyKey))
                         IdempotencyStore.Remove(idempotencyKey);
                     _logger.LogError(ex, "Failed to process bulk sale photo");
-                    return BadRequest(new { message = "Failed to process photo. Please try again." });
+                    return BadRequest(new { message = "No se pudo procesar la foto. Inténtalo de nuevo." });
                 }
             }
         }
@@ -229,7 +229,7 @@ public class SalesController : ControllerBase
 
         if (sale == null)
         {
-            return NotFound(new { message = "Sale not found or access denied." });
+            return NotFound(new { message = "Venta no encontrada o acceso denegado." });
         }
 
         return Ok(sale);
@@ -316,19 +316,19 @@ public class SalesController : ControllerBase
 
         if (sale == null)
         {
-            return NotFound(new { message = "Sale not found or access denied." });
+            return NotFound(new { message = "Venta no encontrada o acceso denegado." });
         }
 
         if (!sale.HasPhoto)
         {
-            return NotFound(new { message = "This sale does not have a photo." });
+            return NotFound(new { message = "Esta venta no tiene foto adjunta." });
         }
 
         var photoResult = await _salesService.GetSalePhotoStreamAsync(id);
         if (photoResult == null)
         {
             _logger.LogWarning("Photo file not found for sale {SaleId}", id);
-            return NotFound(new { message = "Photo file not found." });
+            return NotFound(new { message = "Archivo de foto no encontrado." });
         }
 
         // Set caching headers

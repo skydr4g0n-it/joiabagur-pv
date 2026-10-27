@@ -1,6 +1,6 @@
 /**
  * Sales Service (EP3)
- * Handles sales registration, history, and image recognition operations.
+ * Handles sales registration and history.
  */
 
 import apiClient from './api.service';
@@ -12,17 +12,9 @@ import type {
   Sale,
   SalesHistoryFilterRequest,
   SalesHistoryResponse,
-  ModelMetadata,
-  ModelHealth,
-  TrainingDataset,
-  ClassLabelsResponse,
-  UploadTrainedModelResult,
-  EmbeddingsIndexResponse,
-  EmbeddingsStatusResponse,
 } from '@/types/sales.types';
 
 const SALES_ENDPOINT = '/sales';
-const IMAGE_RECOGNITION_ENDPOINT = '/image-recognition';
 
 /**
  * Sales API operations.
@@ -85,154 +77,6 @@ export const salesService = {
       `${SALES_ENDPOINT}/bulk`,
       request,
       { headers },
-    );
-    return response.data;
-  },
-};
-
-/**
- * Image Recognition API operations.
- */
-export const imageRecognitionService = {
-  /**
-   * Gets the active model metadata.
-   */
-  getModelMetadata: async (): Promise<ModelMetadata | null> => {
-    try {
-      const response = await apiClient.get<ModelMetadata>(`${IMAGE_RECOGNITION_ENDPOINT}/model/metadata`);
-      return response.data;
-    } catch (error: unknown) {
-      if ((error as { statusCode?: number }).statusCode === 404) {
-        return null; // No model available
-      }
-      throw error;
-    }
-  },
-
-  /**
-   * Gets model health metrics (admin only).
-   */
-  getModelHealth: async (): Promise<ModelHealth> => {
-    const response = await apiClient.get<ModelHealth>(`${IMAGE_RECOGNITION_ENDPOINT}/model/health`);
-    return response.data;
-  },
-
-  /**
-   * Gets all model versions (training history).
-   */
-  getModelVersions: async (): Promise<ModelMetadata[]> => {
-    const response = await apiClient.get<ModelMetadata[]>(`${IMAGE_RECOGNITION_ENDPOINT}/model/versions`);
-    return response.data;
-  },
-
-  /**
-   * Gets the training dataset for browser-based training (admin only).
-   */
-  getTrainingDataset: async (): Promise<TrainingDataset> => {
-    const response = await apiClient.get<TrainingDataset>(`${IMAGE_RECOGNITION_ENDPOINT}/training-dataset`);
-    return response.data;
-  },
-
-  /**
-   * Gets class labels and product mappings for inference (accessible to all users).
-   */
-  getClassLabels: async (): Promise<ClassLabelsResponse> => {
-    const response = await apiClient.get<ClassLabelsResponse>(`${IMAGE_RECOGNITION_ENDPOINT}/model/class-labels`);
-    return response.data;
-  },
-
-  /**
-   * Uploads a browser-trained model.
-   */
-  uploadTrainedModel: async (
-    version: string,
-    modelTopologyJson: string,
-    trainingAccuracy: number,
-    validationAccuracy: number,
-    totalPhotosUsed: number,
-    totalProductsUsed: number,
-    trainingDurationSeconds: number,
-    weightFiles: File[]
-  ): Promise<UploadTrainedModelResult> => {
-    const formData = new FormData();
-    formData.append('version', version);
-    formData.append('modelTopologyJson', modelTopologyJson);
-    formData.append('trainingAccuracy', trainingAccuracy.toString());
-    formData.append('validationAccuracy', validationAccuracy.toString());
-    formData.append('totalPhotosUsed', totalPhotosUsed.toString());
-    formData.append('totalProductsUsed', totalProductsUsed.toString());
-    formData.append('trainingDurationSeconds', trainingDurationSeconds.toString());
-    
-    weightFiles.forEach(file => {
-      formData.append('weightFiles', file);
-    });
-
-    const response = await apiClient.post<UploadTrainedModelResult>(
-      `${IMAGE_RECOGNITION_ENDPOINT}/upload-trained-model`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
-    return response.data;
-  },
-
-  /**
-   * Gets the model file URL for downloading.
-   */
-  getModelUrl: (version: string, fileName: string): string => {
-    return `${apiClient.defaults.baseURL}${IMAGE_RECOGNITION_ENDPOINT}/model/files/${version}/${fileName}`;
-  },
-
-  /**
-   * Saves (or updates) the MobileNetV2 embedding for a product photo.
-   */
-  saveEmbedding: async (
-    photoId: string,
-    productId: string,
-    sku: string,
-    vector: number[]
-  ): Promise<void> => {
-    await apiClient.post(`${IMAGE_RECOGNITION_ENDPOINT}/embeddings`, {
-      photoId,
-      productId,
-      sku,
-      vector,
-    });
-  },
-
-  /**
-   * Deletes the embedding for a specific product photo.
-   */
-  deleteEmbedding: async (photoId: string): Promise<void> => {
-    await apiClient.delete(`${IMAGE_RECOGNITION_ENDPOINT}/embeddings/${photoId}`);
-  },
-
-  /**
-   * Deletes all stored embeddings.
-   */
-  deleteAllEmbeddings: async (): Promise<void> => {
-    await apiClient.delete(`${IMAGE_RECOGNITION_ENDPOINT}/embeddings`);
-  },
-
-  /**
-   * Returns all stored embeddings for client-side similarity search.
-   */
-  getAllEmbeddings: async (): Promise<EmbeddingsIndexResponse> => {
-    const response = await apiClient.get<EmbeddingsIndexResponse>(
-      `${IMAGE_RECOGNITION_ENDPOINT}/embeddings`
-    );
-    return response.data;
-  },
-
-  /**
-   * Returns the count and last-updated timestamp of the embeddings index.
-   */
-  getEmbeddingsStatus: async (): Promise<EmbeddingsStatusResponse> => {
-    const response = await apiClient.get<EmbeddingsStatusResponse>(
-      `${IMAGE_RECOGNITION_ENDPOINT}/embeddings/status`
     );
     return response.data;
   },

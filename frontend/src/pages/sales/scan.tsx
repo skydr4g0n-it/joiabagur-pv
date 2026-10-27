@@ -69,13 +69,14 @@ export function ScanningPage() {
       const sku = result.value.trim();
 
       if (sku.toUpperCase().startsWith('GC-')) {
+        const code = sku.toUpperCase();
         if (!pointOfSaleId) {
-          toast.error('Añade productos al carrito con un punto de venta antes de escanear tarjetas');
+          navigate(ROUTES.SALES.NEW, { state: { giftCardCode: code } });
           return;
         }
         try {
-          await giftCardService.getByCode(sku.toUpperCase(), pointOfSaleId);
-          navigate(ROUTES.SALES.CART, { state: { giftCardCode: sku.toUpperCase() } });
+          await giftCardService.getByCode(code, pointOfSaleId);
+          navigate(ROUTES.SALES.CART, { state: { giftCardCode: code } });
         } catch (error: unknown) {
           const message =
             (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
@@ -128,14 +129,14 @@ export function ScanningPage() {
 
     const trimmed = manualSku.trim();
     if (trimmed.toUpperCase().startsWith('GC-')) {
+      const code = trimmed.toUpperCase();
       if (!pointOfSaleId) {
-        toast.error('Añade productos al carrito con un punto de venta antes de escanear tarjetas');
-        setIsSubmittingManual(false);
+        navigate(ROUTES.SALES.NEW, { state: { giftCardCode: code } });
         return;
       }
       try {
-        await giftCardService.getByCode(trimmed.toUpperCase(), pointOfSaleId);
-        navigate(ROUTES.SALES.CART, { state: { giftCardCode: trimmed.toUpperCase() } });
+        await giftCardService.getByCode(code, pointOfSaleId);
+        navigate(ROUTES.SALES.CART, { state: { giftCardCode: code } });
       } catch (error: unknown) {
         const message =
           (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||

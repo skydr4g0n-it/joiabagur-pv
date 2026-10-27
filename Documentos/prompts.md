@@ -1,21 +1,23 @@
+> **Retirado (2026-10-27):** El reconocimiento de productos por foto ya no forma parte del sistema. Este texto es histÛrico.
+
 # Prompts del Usuario
 
-<!-- Nota 2026: conversaciones hist√≥ricas pueden citar App Runner / CloudFront. Producci√≥n actual: EC2 + Docker bundlado ‚Äî Documentos/Guias/deploy-aws-production.md -->
+<!-- Nota 2026: conversaciones histÛricas pueden citar App Runner / CloudFront. ProducciÛn actual: EC2 + Docker bundlado ó Documentos/Guias/deploy-aws-production.md -->
 
-## Prompt Inicial - Descripci√≥n del Proyecto
+## Prompt Inicial - DescripciÛn del Proyecto
 
 Eres un experto en aplicaciones de gestion de puntos de venta.
 
 Tengo una joyeria y algunos puntos de venta de terceros (hoteles, otras tiendas ajenas, etc)
 
-Actualmente tengo un Excel en Google Drive donde est√°n registrados todos los productos con: 
+Actualmente tengo un Excel en Google Drive donde est·n registrados todos los productos con: 
 - Codigo SKU 
 - Precio 
 - Descripcion 
-- Colecci√≥n
+- ColecciÛn
 - otros datos que pueden no ser relevante a nivel de funcionalidad
 
-Adem√°s tengo otro Excel con el stock de cada punto de venta.
+Adem·s tengo otro Excel con el stock de cada punto de venta.
 
 Necesito crear una aplicacion para gestionar el stock y las ventas de cada punto de venta.
 
@@ -23,7 +25,7 @@ Ademas para facilitar el trabajo en el punto de venta, debido a ventas erroneas 
 
 - se detecte a que producto corresponde 
 - genere 3-5 posibilidades de producto, ordenadas por "accuracy" 
-- una vez que el usuario haya escogido el producto correcto, a√±ada la venta a la lista de ventas, introduciendo la siguiente informacion: 
+- una vez que el usuario haya escogido el producto correcto, aÒada la venta a la lista de ventas, introduciendo la siguiente informacion: 
  - Punto de venta (diferente por cada punto de venta) 
  - SKU 
  - Precio 
@@ -32,8 +34,8 @@ Ademas para facilitar el trabajo en el punto de venta, debido a ventas erroneas 
 Teniendo en cuenta lo siguiente:
 
 - Todo (DBMS, hosting web, IA para reconocimiento de las fotos) debe poder desplegarse en una capa free-tier de una plataforma Cloud como AWS o Azure.
-- La aplicaci√≥n debe tener backend y frontend separados
-- Los operadores de los puntos de venta utilizar√°n la aplicacion web desde el movil
+- La aplicaciÛn debe tener backend y frontend separados
+- Los operadores de los puntos de venta utilizar·n la aplicacion web desde el movil
 - Los administradores podran utilizarla desde cualquier dispositivo
 
 1) Crea una descripcion general del proyecto (sin entrar demasiado en detalles tecnicos)
@@ -44,51 +46,51 @@ Preguntame cualquier tipo de informacion adicional o dudas, sin limites, antes d
 
 ---
 
-## Respuesta a Preguntas sobre Integraci√≥n Excel
+## Respuesta a Preguntas sobre IntegraciÛn Excel
 
 ### Preguntas realizadas:
 
-1. ¬øC√≥mo prefieres manejar la sincronizaci√≥n con los Excel de Google Drive?
-   - a) Importaci√≥n manual peri√≥dica (subir archivos Excel)
-   - b) Integraci√≥n autom√°tica con Google Sheets API
-   - c) Solo importaci√≥n inicial, luego gesti√≥n desde la app
+1. øCÛmo prefieres manejar la sincronizaciÛn con los Excel de Google Drive?
+   - a) ImportaciÛn manual periÛdica (subir archivos Excel)
+   - b) IntegraciÛn autom·tica con Google Sheets API
+   - c) Solo importaciÛn inicial, luego gestiÛn desde la app
 
-2. ¬øQu√© sistema de autenticaci√≥n necesitas?
-   - a) Login simple con usuario/contrase√±a por punto de venta
-   - b) Sistema de roles (admin/operador) con m√∫ltiples usuarios
+2. øQuÈ sistema de autenticaciÛn necesitas?
+   - a) Login simple con usuario/contraseÒa por punto de venta
+   - b) Sistema de roles (admin/operador) con m˙ltiples usuarios
    - c) Un solo administrador, operadores sin login (acceso directo por punto de venta)
 
-3. ¬øC√≥mo debe funcionar la sincronizaci√≥n de stock entre puntos de venta?
-   - a) Stock independiente por punto de venta (sin sincronizaci√≥n)
+3. øCÛmo debe funcionar la sincronizaciÛn de stock entre puntos de venta?
+   - a) Stock independiente por punto de venta (sin sincronizaciÛn)
    - b) Stock centralizado (una venta reduce el stock global)
-   - c) H√≠brido: stock por punto de venta pero con vista centralizada
+   - c) HÌbrido: stock por punto de venta pero con vista centralizada
 
-4. ¬øTienes fotos de entrenamiento de los productos o necesitamos construir el modelo desde cero?
-   - a) S√≠, tengo fotos de los productos para entrenar el modelo
+4. øTienes fotos de entrenamiento de los productos o necesitamos construir el modelo desde cero?
+   - a) SÌ, tengo fotos de los productos para entrenar el modelo
    - b) No, necesitamos construir el dataset desde cero
-   - c) Tengo algunas fotos pero necesitamos m√°s
+   - c) Tengo algunas fotos pero necesitamos m·s
 
-5. ¬øEn qu√© condiciones se tomar√°n las fotos en los puntos de venta?
-   - a) Condiciones controladas (fondo neutro, buena iluminaci√≥n)
-   - b) Condiciones variables (diferentes fondos, iluminaci√≥n, √°ngulos)
+5. øEn quÈ condiciones se tomar·n las fotos en los puntos de venta?
+   - a) Condiciones controladas (fondo neutro, buena iluminaciÛn)
+   - b) Condiciones variables (diferentes fondos, iluminaciÛn, ·ngulos)
    - c) Mixto: intentaremos controlar pero puede variar
 
-6. ¬øQu√© funcionalidades adicionales consideras cr√≠ticas para el MVP? (puedes seleccionar m√∫ltiples)
-   - a) Gesti√≥n de devoluciones
+6. øQuÈ funcionalidades adicionales consideras crÌticas para el MVP? (puedes seleccionar m˙ltiples)
+   - a) GestiÛn de devoluciones
    - b) Alertas de stock bajo
-   - c) Exportaci√≥n de reportes (Excel/PDF)
+   - c) ExportaciÛn de reportes (Excel/PDF)
    - d) Historial detallado de ventas
    - e) Ajustes manuales de inventario
-   - f) Ninguna de las anteriores (solo lo b√°sico)
+   - f) Ninguna de las anteriores (solo lo b·sico)
 
 ### Respuestas del usuario:
 
-1) Un mix entre A y C. Posibilidad de importar datos desde Excel y de editar manualmente desde la plataforma web. En el caso de los Excels se har√≠a de la siguiente manera: 
+1) Un mix entre A y C. Posibilidad de importar datos desde Excel y de editar manualmente desde la plataforma web. En el caso de los Excels se harÌa de la siguiente manera: 
 
 - En el caso del Listado de productos (si ya existen algunos) se actualizan los articulos ya existentes haciendo match por codigo SKU y se crean los nuevos con SKU no existente
-- En el caso del Stock se a√±aden las cantidades desde un Excel sumandolas a las cantidades actuales del stock
+- En el caso del Stock se aÒaden las cantidades desde un Excel sumandolas a las cantidades actuales del stock
 
-2) B. Administradores y usuarios simples asociados a cada punto de venta. Login simple con usuario/contrase√±a
+2) B. Administradores y usuarios simples asociados a cada punto de venta. Login simple con usuario/contraseÒa
 
 3)C
 
@@ -100,15 +102,15 @@ Preguntame cualquier tipo de informacion adicional o dudas, sin limites, antes d
 
 ---
 
-## Prompt sobre Gesti√≥n de Fotos de Productos
+## Prompt sobre GestiÛn de Fotos de Productos
 
-En el apartado "Gesti√≥n de Productos" en los puntos 1 y 2 no se est√° teniendo en cuenta que necesitamos asociar cada producto con una foto del producto para que luego se pueda ejecutar el punto 4 "Registrar venta con reconocimiento de imagen".
+En el apartado "GestiÛn de Productos" en los puntos 1 y 2 no se est· teniendo en cuenta que necesitamos asociar cada producto con una foto del producto para que luego se pueda ejecutar el punto 4 "Registrar venta con reconocimiento de imagen".
 
 ---
 
-## Prompt sobre M√©todos de Pago
+## Prompt sobre MÈtodos de Pago
 
-En el apartado Gesti√≥n de Ventas, cada venta tendr√° tambien asociado un metodo de pago.
+En el apartado GestiÛn de Ventas, cada venta tendr· tambien asociado un metodo de pago.
 
 Los metodos de pago se asignaran (a partir de una lista general) a cada punto de venta.
 
@@ -122,9 +124,9 @@ Los metodos de pago previstos son los siguientes:
 
 ---
 
-## Prompt sobre Asignaci√≥n de M√©todos de Pago
+## Prompt sobre AsignaciÛn de MÈtodos de Pago
 
-En el punto 9 no se est√° teniendo en cuenta que el administrador tiene que asignar los metodos de pago a cada punto de venta
+En el punto 9 no se est· teniendo en cuenta que el administrador tiene que asignar los metodos de pago a cada punto de venta
 
 ---
 
@@ -151,8 +153,8 @@ Necesitas mas informacion para desarrollar esta tarea?
 ### Respuesta del asistente:
 
 Se solicitaron aclaraciones sobre:
-1. Tecnolog√≠a frontend (React/Vue/Angular vs Blazor)
-2. Servicio de IA para reconocimiento de im√°genes
+1. TecnologÌa frontend (React/Vue/Angular vs Blazor)
+2. Servicio de IA para reconocimiento de im·genes
 3. Base de datos preferida
 4. Volumen esperado de usuarios/productos
 
@@ -175,45 +177,45 @@ Contesta al punto uno para que pueda proporcionarte unas aclaraciones completas.
 Se explicaron las tres opciones principales de frontend:
 
 **React/Vue/Angular (SPA):**
-- Ventajas: Ecosistema amplio, mejor soporte para ML en cliente (TensorFlow.js), mejor rendimiento m√≥vil, separaci√≥n clara frontend/backend
+- Ventajas: Ecosistema amplio, mejor soporte para ML en cliente (TensorFlow.js), mejor rendimiento mÛvil, separaciÛn clara frontend/backend
 - Desventajas: Stack diferente (.NET backend, JS/TS frontend), requiere conocimiento de JavaScript/TypeScript
 
 **Blazor Server:**
-- Ventajas: Stack unificado .NET, desarrollo r√°pido con C#
-- Desventajas: Reconocimiento ML en cliente m√°s complejo, requiere conexi√≥n constante, latencia en interacciones, consumo de recursos servidor
+- Ventajas: Stack unificado .NET, desarrollo r·pido con C#
+- Desventajas: Reconocimiento ML en cliente m·s complejo, requiere conexiÛn constante, latencia en interacciones, consumo de recursos servidor
 
 **Blazor WebAssembly:**
-- Ventajas: Stack unificado .NET, ejecuci√≥n en cliente, puede funcionar offline
-- Desventajas: Tiempo de carga inicial mayor, menos librer√≠as disponibles que JS/TS
+- Ventajas: Stack unificado .NET, ejecuciÛn en cliente, puede funcionar offline
+- Desventajas: Tiempo de carga inicial mayor, menos librerÌas disponibles que JS/TS
 
-**Recomendaci√≥n:** React/Vue/Angular o Blazor WebAssembly para este proyecto, siendo React/Vue/Angular la mejor opci√≥n por mejor soporte ML en cliente.
+**RecomendaciÛn:** React/Vue/Angular o Blazor WebAssembly para este proyecto, siendo React/Vue/Angular la mejor opciÛn por mejor soporte ML en cliente.
 
 ---
 
-## Elecci√≥n de Frontend
+## ElecciÛn de Frontend
 
 React/Vue/Angular
 
 ---
 
-## Prompt sobre Profundizaci√≥n de Arquitectura
+## Prompt sobre ProfundizaciÛn de Arquitectura
 
-Usaremos Monol√≠tica Simple con Contenedores.
+Usaremos MonolÌtica Simple con Contenedores.
 
-Profundiza la arquitectura, aclarando las diferencias entre desarrollo y produccion, siempre teniendo en cuenta que el despliegue se har√° en capas free tier.
+Profundiza la arquitectura, aclarando las diferencias entre desarrollo y produccion, siempre teniendo en cuenta que el despliegue se har· en capas free tier.
 
 Una vez generado, exporta el resultado a un archivo Arquitectura.md en la carpeta documentation.
 
 ### Respuesta del asistente:
 
-Se gener√≥ el documento `Arquitectura.md` con:
+Se generÛ el documento `Arquitectura.md` con:
 
-- Stack tecnol√≥gico completo (Backend .NET 10, Frontend React/Vue/Angular, PostgreSQL)
+- Stack tecnolÛgico completo (Backend .NET 10, Frontend React/Vue/Angular, PostgreSQL)
 - Arquitectura detallada con diagramas de componentes
-- Diferencias entre desarrollo (Docker Compose local, hot reload, PostgreSQL local) y producci√≥n (AWS/Azure free-tier, HTTPS, servicios gestionados)
-- Configuraciones espec√≠ficas (Dockerfiles, variables de entorno, Docker Compose)
-- Optimizaciones para free-tier (connection pooling, paginaci√≥n, compresi√≥n, √≠ndices optimizados)
-- Flujos de datos principales (autenticaci√≥n, reconocimiento de im√°genes, importaci√≥n)
+- Diferencias entre desarrollo (Docker Compose local, hot reload, PostgreSQL local) y producciÛn (AWS/Azure free-tier, HTTPS, servicios gestionados)
+- Configuraciones especÌficas (Dockerfiles, variables de entorno, Docker Compose)
+- Optimizaciones para free-tier (connection pooling, paginaciÛn, compresiÛn, Ìndices optimizados)
+- Flujos de datos principales (autenticaciÛn, reconocimiento de im·genes, importaciÛn)
 - Seguridad (JWT, HTTPS, secrets management)
 - Monitoreo y logging (health checks, CloudWatch/Application Insights)
 - CI/CD pipeline (GitHub Actions)
@@ -223,29 +225,29 @@ Se gener√≥ el documento `Arquitectura.md` con:
 
 ## Prompt sobre Modelo de Datos
 
-Eres un experto arquitecto de software especializado en modelaci√≥n  de datos. 
+Eres un experto arquitecto de software especializado en modelaciÛn  de datos. 
 
-A partir de la informaci√≥n contenida en @README.md (casos de uso) y @Arquitectura.md genera en la carpeta ModeloDeDatos un archivo con la siguiente informaci√≥n (en formato markdown y Mermaid):
+A partir de la informaciÛn contenida en @README.md (casos de uso) y @Arquitectura.md genera en la carpeta ModeloDeDatos un archivo con la siguiente informaciÛn (en formato markdown y Mermaid):
 
 - Diagrama del Modelo de Datos 
 
-- Descripci√≥n de Entidades Principales
+- DescripciÛn de Entidades Principales
 
 - Relaciones y Cardinalidades
 
-- √çndices y Optimizaciones
+- Õndices y Optimizaciones
 
 
 
-Ten en cuenta solo los casos de uso para el MVP. Omite la fase 2 en el modelo actual pero realizalo teniendo en cuenta esos casos de uso futuro, para que se m√°s facil de escalar y mantener en el futuro.
+Ten en cuenta solo los casos de uso para el MVP. Omite la fase 2 en el modelo actual pero realizalo teniendo en cuenta esos casos de uso futuro, para que se m·s facil de escalar y mantener en el futuro.
 
 
 
-Necesitas mas informaci√≥n? Preguntame por cualquier duda, sin limites.
+Necesitas mas informaciÛn? Preguntame por cualquier duda, sin limites.
 
 ### Respuesta del asistente:
 
-Se gener√≥ el documento `ModeloDeDatos.md` con:
+Se generÛ el documento `ModeloDeDatos.md` con:
 
 ## Contenido del documento
 
@@ -253,7 +255,7 @@ Se gener√≥ el documento `ModeloDeDatos.md` con:
 - Diagrama ER con todas las entidades y relaciones
 - Incluye campos principales y tipos de datos
 
-### 2. Descripci√≥n de Entidades Principales
+### 2. DescripciÛn de Entidades Principales
 - 12 entidades principales:
   - `User`, `PointOfSale`, `UserPointOfSale`
   - `Product`, `ProductPhoto`, `Collection`
@@ -264,29 +266,29 @@ Se gener√≥ el documento `ModeloDeDatos.md` con:
 
 ### 3. Relaciones y Cardinalidades
 - Tabla de relaciones con cardinalidades
-- Reglas de negocio impl√≠citas
+- Reglas de negocio implÌcitas
 - Restricciones y validaciones
 
-### 4. √çndices y Optimizaciones
-- √çndices √∫nicos para integridad
-- √çndices compuestos para consultas frecuentes
-- Optimizaciones espec√≠ficas para PostgreSQL
+### 4. Õndices y Optimizaciones
+- Õndices ˙nicos para integridad
+- Õndices compuestos para consultas frecuentes
+- Optimizaciones especÌficas para PostgreSQL
 - Estrategias por caso de uso
 - Consideraciones para free-tier
 
-### Caracter√≠sticas destacadas
+### CaracterÌsticas destacadas
 
 - Cubre todos los casos de uso del MVP
 - Preparado para Fase 2: campos y estructuras extensibles
-- Optimizado para free-tier: √≠ndices selectivos, paginaci√≥n, connection pooling
-- Trazabilidad: campos de auditor√≠a y historial completo
+- Optimizado para free-tier: Ìndices selectivos, paginaciÛn, connection pooling
+- Trazabilidad: campos de auditorÌa y historial completo
 - Escalabilidad: preparado para particionamiento, read replicas y caching
 
-El modelo est√° listo para implementaci√≥n con Entity Framework Core y PostgreSQL.
+El modelo est· listo para implementaciÛn con Entity Framework Core y PostgreSQL.
 
 ---
 
-## Prompt sobre Generaci√≥n de User Stories
+## Prompt sobre GeneraciÛn de User Stories
 
 Genera las historias de usuario como descrito en el archivo de epicas, siguiendo el @Procedimiento-UserStories.md.
 
@@ -300,45 +302,45 @@ Antes de generar las 40 User Stories, propuse las siguientes aclaraciones y deci
 - **Administrador**: Acceso completo, gestiona productos, inventario, usuarios y puntos de venta
 - **Operador**: Acceso restringido a sus puntos de venta asignados, registra ventas y consulta inventario
 
-#### 2. Formato de importaci√≥n Excel
-- ¬øHay un formato est√°ndar de Excel para productos y stock, o debemos definir uno?
-- ¬øQu√© columnas son obligatorias vs opcionales?
-- ¬øC√≥mo manejar errores de formato o datos inv√°lidos?
+#### 2. Formato de importaciÛn Excel
+- øHay un formato est·ndar de Excel para productos y stock, o debemos definir uno?
+- øQuÈ columnas son obligatorias vs opcionales?
+- øCÛmo manejar errores de formato o datos inv·lidos?
 
-#### 3. Reconocimiento de im√°genes
-- ¬øQu√© servicio de IA prefieres? (Azure Computer Vision, AWS Rekognition, o modelo custom)
-- ¬øCu√°ntas sugerencias mostrar? (mencionas 3-5)
-- ¬øQu√© hacer si ninguna sugerencia tiene confianza suficiente?
+#### 3. Reconocimiento de im·genes
+- øQuÈ servicio de IA prefieres? (Azure Computer Vision, AWS Rekognition, o modelo custom)
+- øCu·ntas sugerencias mostrar? (mencionas 3-5)
+- øQuÈ hacer si ninguna sugerencia tiene confianza suficiente?
 
-#### 4. Gesti√≥n de fotos
-- ¬øL√≠mite de tama√±o por foto?
-- ¬øFormatos permitidos? (JPG, PNG, etc.)
-- ¬øAlmacenamiento en S3/Blob Storage desde el inicio o despu√©s?
+#### 4. GestiÛn de fotos
+- øLÌmite de tamaÒo por foto?
+- øFormatos permitidos? (JPG, PNG, etc.)
+- øAlmacenamiento en S3/Blob Storage desde el inicio o despuÈs?
 
-#### 5. Priorizaci√≥n inicial
+#### 5. PriorizaciÛn inicial
 Propuse empezar por:
-1. Autenticaci√≥n y usuarios (EP7) ‚Äî base del sistema
-2. Puntos de venta (EP8) ‚Äî necesario para el resto
-3. M√©todos de pago (EP6) ‚Äî necesario para ventas
-4. Productos (EP1) ‚Äî necesario para ventas e inventario
-5. Inventario (EP2) ‚Äî necesario para ventas
-6. Ventas (EP3) ‚Äî funcionalidad principal
-7. Reconocimiento de im√°genes (EP4) ‚Äî mejora de ventas
-8. Devoluciones (EP5) ‚Äî complemento
-9. Consultas y reportes (EP9) ‚Äî an√°lisis
+1. AutenticaciÛn y usuarios (EP7) ó base del sistema
+2. Puntos de venta (EP8) ó necesario para el resto
+3. MÈtodos de pago (EP6) ó necesario para ventas
+4. Productos (EP1) ó necesario para ventas e inventario
+5. Inventario (EP2) ó necesario para ventas
+6. Ventas (EP3) ó funcionalidad principal
+7. Reconocimiento de im·genes (EP4) ó mejora de ventas
+8. Devoluciones (EP5) ó complemento
+9. Consultas y reportes (EP9) ó an·lisis
 
 #### 6. Alcance de algunas historias
-- HU-EP3-003 (Validar stock disponible): ¬ødebe ser una historia separada o parte de HU-EP3-001 y HU-EP3-002?
-- HU-EP3-004 (Seleccionar m√©todo de pago): ¬ødebe ser una historia separada o parte de las historias de venta?
-- HU-EP4-001 a HU-EP4-004: ¬ødeben ser historias separadas o una sola historia de reconocimiento con m√∫ltiples criterios de aceptaci√≥n?
+- HU-EP3-003 (Validar stock disponible): ødebe ser una historia separada o parte de HU-EP3-001 y HU-EP3-002?
+- HU-EP3-004 (Seleccionar mÈtodo de pago): ødebe ser una historia separada o parte de las historias de venta?
+- HU-EP4-001 a HU-EP4-004: ødeben ser historias separadas o una sola historia de reconocimiento con m˙ltiples criterios de aceptaciÛn?
 
 Propuse consolidar:
 - HU-EP3-003 y HU-EP3-004 dentro de las historias de venta (HU-EP3-001 y HU-EP3-002)
-- HU-EP4-001 a HU-EP4-004 en una sola historia de reconocimiento de im√°genes
+- HU-EP4-001 a HU-EP4-004 en una sola historia de reconocimiento de im·genes
 
-#### 7. Gesti√≥n de colecciones
-- ¬øLas colecciones son obligatorias o opcionales?
-- ¬øDebemos incluir creaci√≥n/edici√≥n de colecciones en el MVP o solo asignar productos a colecciones existentes?
+#### 7. GestiÛn de colecciones
+- øLas colecciones son obligatorias o opcionales?
+- øDebemos incluir creaciÛn/ediciÛn de colecciones en el MVP o solo asignar productos a colecciones existentes?
 
 Propuse: en el MVP, las colecciones son opcionales y se gestionan manualmente (crear/editar colecciones fuera del alcance inicial).
 
@@ -346,7 +348,7 @@ Propuse: en el MVP, las colecciones son opcionales y se gestionan manualmente (c
 
 ### Respuestas del Usuario - Aclaraciones Finales
 
-1) Confirmados los roles. Ten en cuenta que el operador podr√° tambien gestionar las devoluciones en la fase 2 de desarrollo.
+1) Confirmados los roles. Ten en cuenta que el operador podr· tambien gestionar las devoluciones en la fase 2 de desarrollo.
 
 2) Puedes definir uno, teniendo en cuenta el @Documentos/modelo-de-datos.md propuesto. 
 
@@ -364,7 +366,7 @@ Propuse: en el MVP, las colecciones son opcionales y se gestionan manualmente (c
 
 4)
 
-- No limitar tama√±o de momento o aplicar un limite elevado 
+- No limitar tamaÒo de momento o aplicar un limite elevado 
 
 - Todos los formatos de imagen mas comunes (JPG, PNG). Excluir formatos RAW y Bitmap.
 
@@ -374,9 +376,9 @@ Propuse: en el MVP, las colecciones son opcionales y se gestionan manualmente (c
 
 6) 
 
-- HU-EP3-003 y HU-EP3-004 son checks que tienen que aplicarse a ambas historias HU-EP3-001 y HU-EP3-002. Validar stock disponible antes de venta y Seleccionar m√©todo de pago en venta es un proceso obligatorio en cualquier metodo de registro de una nueva venta (manual y con reconocimiento de foto). Consolida las historias pero ten en cuenta en la implementacion de no duplicar esos checks por cada procedimiento de venta.
+- HU-EP3-003 y HU-EP3-004 son checks que tienen que aplicarse a ambas historias HU-EP3-001 y HU-EP3-002. Validar stock disponible antes de venta y Seleccionar mÈtodo de pago en venta es un proceso obligatorio en cualquier metodo de registro de una nueva venta (manual y con reconocimiento de foto). Consolida las historias pero ten en cuenta en la implementacion de no duplicar esos checks por cada procedimiento de venta.
 
-- HU-EP4-001 a HU-EP4-004: deben ser  una sola historia de reconocimiento con m√∫ltiples criterios de aceptaci√≥n.
+- HU-EP4-001 a HU-EP4-004: deben ser  una sola historia de reconocimiento con m˙ltiples criterios de aceptaciÛn.
 
 7) las colecciones son opcionales. gestionarlas manualmente en el MVP.
 
@@ -384,21 +386,21 @@ Antes de crear las historias tenemos que aclarar los puntos pendientes.
 
 ---
 
-### Respuesta del Asistente - Aclaraciones T√©cnicas Detalladas
+### Respuesta del Asistente - Aclaraciones TÈcnicas Detalladas
 
-Cre√© el documento `Documentos/aclaraciones-tecnicas.md` con las siguientes decisiones t√©cnicas:
+CreÈ el documento `Documentos/aclaraciones-tecnicas.md` con las siguientes decisiones tÈcnicas:
 
 #### 1. Roles y Permisos
 - **Administrador**: Acceso completo al sistema
-- **Operador**: Acceso restringido a puntos de venta asignados. En Fase 2 tambi√©n podr√° gestionar devoluciones.
+- **Operador**: Acceso restringido a puntos de venta asignados. En Fase 2 tambiÈn podr· gestionar devoluciones.
 
-#### 2. Formato de Importaci√≥n Excel
+#### 2. Formato de ImportaciÛn Excel
 
 **Productos:**
-- Columnas: SKU (obligatorio, √∫nico), Name (obligatorio), Description (opcional), Price (obligatorio, > 0), Collection (opcional)
+- Columnas: SKU (obligatorio, ˙nico), Name (obligatorio), Description (opcional), Price (obligatorio, > 0), Collection (opcional)
 - Si SKU existe: actualizar producto
 - Si SKU no existe: crear nuevo producto
-- Si Collection no existe: crear autom√°ticamente
+- Si Collection no existe: crear autom·ticamente
 
 **Stock (Inventario):**
 - Columnas: SKU (obligatorio, debe existir), Quantity (obligatorio, >= 0)
@@ -406,119 +408,119 @@ Cre√© el documento `Documentos/aclaraciones-tecnicas.md` con las siguientes deci
 - Si producto tiene stock: sumar cantidad
 - Si producto no tiene stock: crear registro
 
-#### 3. Reconocimiento de Im√°genes con IA
+#### 3. Reconocimiento de Im·genes con IA
 
-**Estrategia: Procesamiento en Cliente (M√≥vil)**
-- Tecnolog√≠a: TensorFlow.js / ONNX.js
+**Estrategia: Procesamiento en Cliente (MÛvil)**
+- TecnologÌa: TensorFlow.js / ONNX.js
 - Modelo se descarga una vez y se ejecuta localmente
-- Generaci√≥n de 3 sugerencias ordenadas por confianza/precisi√≥n
+- GeneraciÛn de 3 sugerencias ordenadas por confianza/precisiÛn
 - Umbral de confianza: 60% (configurable)
 - Si confianza < 60%: mostrar error y ofrecer tomar otra foto o registrar venta manual
 
-#### 4. Gesti√≥n de Fotos
+#### 4. GestiÛn de Fotos
 
 **Especificaciones:**
 - Formatos: JPG, PNG (excluir RAW, Bitmap)
-- Tama√±o: Sin l√≠mite inicial o l√≠mite elevado (ej: 50MB)
+- TamaÒo: Sin lÌmite inicial o lÌmite elevado (ej: 50MB)
 
 **Estrategia de Almacenamiento:**
 - **Desarrollo Local**: Sistema de archivos local (`/uploads`)
-- **Producci√≥n**: S3/Blob Storage (AWS S3, Azure Blob Storage)
-- Implementar abstracci√≥n (patr√≥n Strategy/Repository) para cambiar entre almacenamientos sin modificar c√≥digo
-- Configuraci√≥n mediante variable de entorno `STORAGE_TYPE=local|s3|azure`
+- **ProducciÛn**: S3/Blob Storage (AWS S3, Azure Blob Storage)
+- Implementar abstracciÛn (patrÛn Strategy/Repository) para cambiar entre almacenamientos sin modificar cÛdigo
+- ConfiguraciÛn mediante variable de entorno `STORAGE_TYPE=local|s3|azure`
 
-#### 5. Consolidaci√≥n de User Stories
+#### 5. ConsolidaciÛn de User Stories
 
-**√âpica 3 - Registro de Ventas:**
-- ‚úÖ HU-EP3-001: Registrar venta con reconocimiento de imagen (incluye validaci√≥n de stock + selecci√≥n de m√©todo de pago)
-- ‚úÖ HU-EP3-002: Registrar venta manual (incluye validaci√≥n de stock + selecci√≥n de m√©todo de pago)
-- ‚ùå HU-EP3-003: ~~Validar stock disponible antes de venta~~ (consolidada)
-- ‚ùå HU-EP3-004: ~~Seleccionar m√©todo de pago en venta~~ (consolidada)
+**…pica 3 - Registro de Ventas:**
+- ? HU-EP3-001: Registrar venta con reconocimiento de imagen (incluye validaciÛn de stock + selecciÛn de mÈtodo de pago)
+- ? HU-EP3-002: Registrar venta manual (incluye validaciÛn de stock + selecciÛn de mÈtodo de pago)
+- ? HU-EP3-003: ~~Validar stock disponible antes de venta~~ (consolidada)
+- ? HU-EP3-004: ~~Seleccionar mÈtodo de pago en venta~~ (consolidada)
 
-**√âpica 4 - Reconocimiento de Im√°genes:**
-- ‚úÖ HU-EP4-001: Reconocimiento de productos mediante imagen (consolida HU-EP4-001, HU-EP4-002, HU-EP4-003, HU-EP4-004)
+**…pica 4 - Reconocimiento de Im·genes:**
+- ? HU-EP4-001: Reconocimiento de productos mediante imagen (consolida HU-EP4-001, HU-EP4-002, HU-EP4-003, HU-EP4-004)
 
 **Total:** 35 User Stories (5 consolidadas de las 40 originales)
 
-#### 6. Gesti√≥n de Colecciones
+#### 6. GestiÛn de Colecciones
 - Colecciones opcionales en el MVP
-- Gesti√≥n manual fuera del sistema o mediante scripts SQL
-- En importaci√≥n: si se especifica colecci√≥n que no existe, crear autom√°ticamente
+- GestiÛn manual fuera del sistema o mediante scripts SQL
+- En importaciÛn: si se especifica colecciÛn que no existe, crear autom·ticamente
 
-#### 7. Priorizaci√≥n Confirmada
-Orden de implementaci√≥n:
-1. EP7: Autenticaci√≥n y Gesti√≥n de Usuarios
-2. EP8: Gesti√≥n de Puntos de Venta
-3. EP6: Gesti√≥n de M√©todos de Pago
-4. EP1: Gesti√≥n de Productos
-5. EP2: Gesti√≥n de Inventario
+#### 7. PriorizaciÛn Confirmada
+Orden de implementaciÛn:
+1. EP7: AutenticaciÛn y GestiÛn de Usuarios
+2. EP8: GestiÛn de Puntos de Venta
+3. EP6: GestiÛn de MÈtodos de Pago
+4. EP1: GestiÛn de Productos
+5. EP2: GestiÛn de Inventario
 6. EP3: Registro de Ventas
-7. EP4: Reconocimiento de Im√°genes con IA
-8. EP5: Gesti√≥n de Devoluciones
+7. EP4: Reconocimiento de Im·genes con IA
+8. EP5: GestiÛn de Devoluciones
 9. EP9: Consultas y Reportes
 
 ---
 
 ### Decisiones Tomadas por el Asistente
 
-Durante la generaci√≥n de las historias, tom√© las siguientes decisiones t√©cnicas y de estructura:
+Durante la generaciÛn de las historias, tomÈ las siguientes decisiones tÈcnicas y de estructura:
 
 #### 1. Estructura de las Historias
-- **Formato completo** para historias cr√≠ticas (√âpicas 7, 8, 6, 1, 2, 3, 4)
-- **Formato m√°s conciso pero completo** para historias complementarias (√âpicas 5, 9)
-- Todas las historias incluyen: formato est√°ndar, descripci√≥n, criterios de aceptaci√≥n (Given/When/Then), notas adicionales, tareas y secci√≥n de estimaciones
+- **Formato completo** para historias crÌticas (…picas 7, 8, 6, 1, 2, 3, 4)
+- **Formato m·s conciso pero completo** para historias complementarias (…picas 5, 9)
+- Todas las historias incluyen: formato est·ndar, descripciÛn, criterios de aceptaciÛn (Given/When/Then), notas adicionales, tareas y secciÛn de estimaciones
 
 #### 2. Servicios Compartidos
-- Propuse crear servicios compartidos para evitar duplicaci√≥n:
-  - `IStockValidationService`: Validaci√≥n de stock disponible
-  - `IPaymentMethodValidationService`: Validaci√≥n de m√©todos de pago asignados
-  - `IFileStorageService`: Abstracci√≥n para almacenamiento de archivos (local/S3)
+- Propuse crear servicios compartidos para evitar duplicaciÛn:
+  - `IStockValidationService`: ValidaciÛn de stock disponible
+  - `IPaymentMethodValidationService`: ValidaciÛn de mÈtodos de pago asignados
+  - `IFileStorageService`: AbstracciÛn para almacenamiento de archivos (local/S3)
 
 #### 3. Validaciones y Reglas de Negocio
-- **Stock no negativo**: Validaci√≥n a nivel de aplicaci√≥n (no constraint de BD para flexibilidad)
-- **Username inmutable**: No se puede cambiar despu√©s de creaci√≥n (integridad hist√≥rica)
-- **SKU inmutable**: No se puede cambiar despu√©s de creaci√≥n
-- **Operador debe tener al menos una asignaci√≥n**: Validaci√≥n antes de desasignar √∫ltima asignaci√≥n
+- **Stock no negativo**: ValidaciÛn a nivel de aplicaciÛn (no constraint de BD para flexibilidad)
+- **Username inmutable**: No se puede cambiar despuÈs de creaciÛn (integridad histÛrica)
+- **SKU inmutable**: No se puede cambiar despuÈs de creaciÛn
+- **Operador debe tener al menos una asignaciÛn**: ValidaciÛn antes de desasignar ˙ltima asignaciÛn
 
 #### 4. Transacciones y Atomicidad
-- Propuse usar transacciones para operaciones cr√≠ticas:
+- Propuse usar transacciones para operaciones crÌticas:
   - Venta + movimiento de inventario (atomicidad)
-  - Devoluci√≥n + movimiento de inventario (atomicidad)
-  - Importaci√≥n de productos (todo o nada)
+  - DevoluciÛn + movimiento de inventario (atomicidad)
+  - ImportaciÛn de productos (todo o nada)
 
-#### 5. Paginaci√≥n y Optimizaci√≥n
-- Todas las listas paginadas: m√°ximo 50 items por p√°gina (optimizaci√≥n para free-tier)
-- √çndices compuestos en `Sale` para consultas frecuentes
-- Filtrado autom√°tico seg√∫n asignaciones para operadores
+#### 5. PaginaciÛn y OptimizaciÛn
+- Todas las listas paginadas: m·ximo 50 items por p·gina (optimizaciÛn para free-tier)
+- Õndices compuestos en `Sale` para consultas frecuentes
+- Filtrado autom·tico seg˙n asignaciones para operadores
 
 #### 6. Manejo de Errores
-- Mensajes de error claros y espec√≠ficos
-- Validaci√≥n en cliente y servidor
-- Manejo de casos edge (stock insuficiente, m√©todos de pago no asignados, etc.)
+- Mensajes de error claros y especÌficos
+- ValidaciÛn en cliente y servidor
+- Manejo de casos edge (stock insuficiente, mÈtodos de pago no asignados, etc.)
 
-#### 7. Auditor√≠a y Trazabilidad
+#### 7. AuditorÌa y Trazabilidad
 - Campos `CreatedAt`, `UpdatedAt` en todas las entidades principales
-- `LastLoginAt` para usuarios (auditor√≠a)
+- `LastLoginAt` para usuarios (auditorÌa)
 - `AssignedAt` / `UnassignedAt` para asignaciones (historial)
-- `DeactivatedAt` para m√©todos de pago en puntos de venta
+- `DeactivatedAt` para mÈtodos de pago en puntos de venta
 
 #### 8. Seguridad
-- Rate limiting para endpoint de login (m√°x 5 intentos en 15 minutos)
-- Tokens JWT con expiraci√≥n (8 horas sugerido)
-- Refresh tokens para renovar sesi√≥n
-- Validaci√≥n de permisos siempre en backend (nunca solo en frontend)
+- Rate limiting para endpoint de login (m·x 5 intentos en 15 minutos)
+- Tokens JWT con expiraciÛn (8 horas sugerido)
+- Refresh tokens para renovar sesiÛn
+- ValidaciÛn de permisos siempre en backend (nunca solo en frontend)
 
 #### 9. UX y Flujos
-- Confirmaciones antes de acciones cr√≠ticas (desactivar usuario, desasignar √∫ltima asignaci√≥n)
+- Confirmaciones antes de acciones crÌticas (desactivar usuario, desasignar ˙ltima asignaciÛn)
 - Indicadores de carga durante operaciones
 - Preview antes de confirmar importaciones
-- Opci√≥n "Mostrar/Ocultar contrase√±a" en login
+- OpciÛn "Mostrar/Ocultar contraseÒa" en login
 
 #### 10. Consideraciones Fase 2
 - Campos preparados para funcionalidades futuras:
   - `Email` en User (notificaciones)
   - `MinimumThreshold` en Inventory (alertas de stock bajo)
-  - `LastLoginAt` para auditor√≠a avanzada
+  - `LastLoginAt` para auditorÌa avanzada
 
 ---
 
@@ -526,53 +528,53 @@ Durante la generaci√≥n de las historias, tom√© las siguientes decisiones t√©cnic
 
 Se generaron **35 User Stories** completas siguiendo el formato de `Procedimiento-UserStories.md`:
 
-- **√âpica 7**: 6 historias (Autenticaci√≥n y Gesti√≥n de Usuarios)
-- **√âpica 8**: 4 historias (Gesti√≥n de Puntos de Venta)
-- **√âpica 6**: 3 historias (Gesti√≥n de M√©todos de Pago)
-- **√âpica 1**: 7 historias (Gesti√≥n de Productos)
-- **√âpica 2**: 5 historias (Gesti√≥n de Inventario)
-- **√âpica 3**: 2 historias consolidadas (Registro de Ventas)
-- **√âpica 4**: 1 historia consolidada (Reconocimiento de Im√°genes)
-- **√âpica 5**: 3 historias (Gesti√≥n de Devoluciones)
-- **√âpica 9**: 4 historias (Consultas y Reportes)
+- **…pica 7**: 6 historias (AutenticaciÛn y GestiÛn de Usuarios)
+- **…pica 8**: 4 historias (GestiÛn de Puntos de Venta)
+- **…pica 6**: 3 historias (GestiÛn de MÈtodos de Pago)
+- **…pica 1**: 7 historias (GestiÛn de Productos)
+- **…pica 2**: 5 historias (GestiÛn de Inventario)
+- **…pica 3**: 2 historias consolidadas (Registro de Ventas)
+- **…pica 4**: 1 historia consolidada (Reconocimiento de Im·genes)
+- **…pica 5**: 3 historias (GestiÛn de Devoluciones)
+- **…pica 9**: 4 historias (Consultas y Reportes)
 
-Todas las historias est√°n documentadas en `Documentos/Historias/` con el formato `HU-EP[X]-[NNN].md` y est√°n listas para ser refinadas y estimadas en sesiones con el equipo.
+Todas las historias est·n documentadas en `Documentos/Historias/` con el formato `HU-EP[X]-[NNN].md` y est·n listas para ser refinadas y estimadas en sesiones con el equipo.
 
 ---
 
-## Prompt sobre Orden de Implementaci√≥n en √âpicas
+## Prompt sobre Orden de ImplementaciÛn en …picas
 
-En @Documentos/epicas.md est√° especificado el Orden de implementaci√≥n como decidido en @Documentos/Propuestas/aclaraciones-tecnicas.md:224-237 ?
+En @Documentos/epicas.md est· especificado el Orden de implementaciÛn como decidido en @Documentos/Propuestas/aclaraciones-tecnicas.md:224-237 ?
 
-En el caso que no haya esa secci√≥n a√±adela. Ser√° fundamental para generar los tickets de trabajo en el orden correcto de desarrollo.
+En el caso que no haya esa secciÛn aÒadela. Ser· fundamental para generar los tickets de trabajo en el orden correcto de desarrollo.
 
 ### Respuesta del asistente:
 
-Verifiqu√© el archivo `Documentos/epicas.md` y confirm√© que no conten√≠a la secci√≥n de orden de implementaci√≥n. A√±ad√≠ una nueva secci√≥n completa titulada **"Orden de Implementaci√≥n"** que incluye:
+VerifiquÈ el archivo `Documentos/epicas.md` y confirmÈ que no contenÌa la secciÛn de orden de implementaciÛn. AÒadÌ una nueva secciÛn completa titulada **"Orden de ImplementaciÛn"** que incluye:
 
-1. **Orden completo de las 9 √©picas** seg√∫n lo acordado en `aclaraciones-tecnicas.md`:
-   - EP7: Autenticaci√≥n y Gesti√≥n de Usuarios (base del sistema)
-   - EP8: Gesti√≥n de Puntos de Venta (necesario para el resto)
-   - EP6: Gesti√≥n de M√©todos de Pago (necesario para ventas)
-   - EP1: Gesti√≥n de Productos (necesario para ventas e inventario)
-   - EP2: Gesti√≥n de Inventario (necesario para ventas)
+1. **Orden completo de las 9 Èpicas** seg˙n lo acordado en `aclaraciones-tecnicas.md`:
+   - EP7: AutenticaciÛn y GestiÛn de Usuarios (base del sistema)
+   - EP8: GestiÛn de Puntos de Venta (necesario para el resto)
+   - EP6: GestiÛn de MÈtodos de Pago (necesario para ventas)
+   - EP1: GestiÛn de Productos (necesario para ventas e inventario)
+   - EP2: GestiÛn de Inventario (necesario para ventas)
    - EP3: Registro de Ventas (funcionalidad principal)
-   - EP4: Reconocimiento de Im√°genes con IA (mejora de ventas)
-   - EP5: Gesti√≥n de Devoluciones (complemento)
-   - EP9: Consultas y Reportes (an√°lisis)
+   - EP4: Reconocimiento de Im·genes con IA (mejora de ventas)
+   - EP5: GestiÛn de Devoluciones (complemento)
+   - EP9: Consultas y Reportes (an·lisis)
 
-2. **Justificaci√≥n detallada** de cada posici√≥n en el orden, explicando:
-   - Por qu√© cada √©pica debe implementarse en ese orden espec√≠fico
-   - Las dependencias entre √©picas
-   - Qu√© funcionalidades requiere cada √©pica antes de poder implementarse
+2. **JustificaciÛn detallada** de cada posiciÛn en el orden, explicando:
+   - Por quÈ cada Èpica debe implementarse en ese orden especÌfico
+   - Las dependencias entre Èpicas
+   - QuÈ funcionalidades requiere cada Èpica antes de poder implementarse
 
-3. **Nota importante** sobre respetar este orden al generar los tickets de trabajo para asegurar que las dependencias est√©n resueltas antes de implementar funcionalidades que las requieren.
+3. **Nota importante** sobre respetar este orden al generar los tickets de trabajo para asegurar que las dependencias estÈn resueltas antes de implementar funcionalidades que las requieren.
 
-La secci√≥n se ubic√≥ estrat√©gicamente despu√©s del "Resumen de √âpicas" y antes de "Notas" para facilitar su consulta durante la generaci√≥n de tickets de trabajo. Esta documentaci√≥n es fundamental para mantener el orden correcto de desarrollo y evitar problemas por dependencias no resueltas.
+La secciÛn se ubicÛ estratÈgicamente despuÈs del "Resumen de …picas" y antes de "Notas" para facilitar su consulta durante la generaciÛn de tickets de trabajo. Esta documentaciÛn es fundamental para mantener el orden correcto de desarrollo y evitar problemas por dependencias no resueltas.
 
 ---
 
-## Prompt sobre Creaci√≥n del Modelo C4
+## Prompt sobre CreaciÛn del Modelo C4
 
 Eres un experto en arquitectura del software.
 
@@ -586,47 +588,47 @@ Necesito crear el modelo C4 de este proyecto.
 
 - Preguntame para aclarar cualquier duda
 
-### Respuesta del asistente - Preguntas de Aclaraci√≥n
+### Respuesta del asistente - Preguntas de AclaraciÛn
 
-Antes de generar el modelo C4, solicit√© las siguientes aclaraciones mediante preguntas m√∫ltiples:
+Antes de generar el modelo C4, solicitÈ las siguientes aclaraciones mediante preguntas m˙ltiples:
 
-1. **¬øQu√© niveles del modelo C4 quieres incluir?**
+1. **øQuÈ niveles del modelo C4 quieres incluir?**
    - a) Niveles 1-2: Contexto del Sistema y Contenedores
    - b) Niveles 1-3: Contexto, Contenedores y Componentes
-   - c) Todos los niveles (1-4): Incluyendo nivel de C√≥digo
+   - c) Todos los niveles (1-4): Incluyendo nivel de CÛdigo
 
-2. **¬øQuieres diagramas separados para desarrollo y producci√≥n, o solo producci√≥n?**
-   - a) Ambos entornos (desarrollo y producci√≥n)
-   - b) Solo producci√≥n
-   - c) Solo producci√≥n con notas sobre diferencias de desarrollo
+2. **øQuieres diagramas separados para desarrollo y producciÛn, o solo producciÛn?**
+   - a) Ambos entornos (desarrollo y producciÛn)
+   - b) Solo producciÛn
+   - c) Solo producciÛn con notas sobre diferencias de desarrollo
 
-3. **¬øExisten sistemas externos con los que el sistema interact√∫a que no est√©n documentados? (ej: sistemas de contabilidad, proveedores, APIs de terceros)**
+3. **øExisten sistemas externos con los que el sistema interact˙a que no estÈn documentados? (ej: sistemas de contabilidad, proveedores, APIs de terceros)**
    - a) No, no hay sistemas externos en el MVP
-   - b) S√≠, hay sistemas externos que debo documentar
+   - b) SÌ, hay sistemas externos que debo documentar
 
 ### Respuestas del Usuario
 
 1. **Niveles del modelo C4:** Niveles 1-3 (Contexto, Contenedores y Componentes)
 
-2. **Entornos:** Solo producci√≥n con notas sobre diferencias de desarrollo
+2. **Entornos:** Solo producciÛn con notas sobre diferencias de desarrollo
 
 3. **Sistemas externos:** No, no hay sistemas externos en el MVP
 
 ---
 
-### Respuesta del asistente - Plan de Generaci√≥n
+### Respuesta del asistente - Plan de GeneraciÛn
 
-Tras recibir las aclaraciones, cre√© un plan estructurado para generar el modelo C4:
+Tras recibir las aclaraciones, creÈ un plan estructurado para generar el modelo C4:
 
-**Plan: Generaci√≥n del Modelo C4 del Sistema**
+**Plan: GeneraciÛn del Modelo C4 del Sistema**
 
-**Objetivo:** Crear un modelo C4 completo (niveles 1-3) que documente la arquitectura del sistema de gesti√≥n de puntos de venta para joyer√≠a, proporcionando una visi√≥n clara y estructurada del sistema desde diferentes niveles de abstracci√≥n.
+**Objetivo:** Crear un modelo C4 completo (niveles 1-3) que documente la arquitectura del sistema de gestiÛn de puntos de venta para joyerÌa, proporcionando una visiÛn clara y estructurada del sistema desde diferentes niveles de abstracciÛn.
 
 **Estructura del documento:**
 
 1. **Nivel 1: Contexto del Sistema**
    - Actores: Administrador y Operador
-   - Sistema: Sistema de Gesti√≥n de Puntos de Venta para Joyer√≠a
+   - Sistema: Sistema de GestiÛn de Puntos de Venta para JoyerÌa
    - Sistemas externos: Ninguno en el MVP
    - Diagrama Mermaid del contexto
 
@@ -639,25 +641,25 @@ Tras recibir las aclaraciones, cre√© un plan estructurado para generar el modelo
 
 3. **Nivel 3: Componentes**
    - **Backend:** 9 servicios de dominio, 4 servicios compartidos, componentes de infraestructura
-   - **Frontend:** 10 m√≥dulos funcionales, 5 componentes compartidos
+   - **Frontend:** 10 mÛdulos funcionales, 5 componentes compartidos
    - Diagramas Mermaid de componentes
 
-4. **Notas sobre Desarrollo vs Producci√≥n**
+4. **Notas sobre Desarrollo vs ProducciÛn**
    - Diferencias en almacenamiento, base de datos, frontend, seguridad, monitoreo
 
 ---
 
-### Respuesta del asistente - Ejecuci√≥n del Plan
+### Respuesta del asistente - EjecuciÛn del Plan
 
-Se ejecut√≥ el plan completo y se gener√≥ el documento `Documentos/modelo-c4.md` con el siguiente contenido:
+Se ejecutÛ el plan completo y se generÛ el documento `Documentos/modelo-c4.md` con el siguiente contenido:
 
 #### Nivel 1: Contexto del Sistema
 
 - **Actores identificados:**
-  - **Administrador**: Usuario con acceso completo al sistema. Puede gestionar productos, inventario, usuarios, puntos de venta, m√©todos de pago y consultar reportes de todos los puntos de venta.
+  - **Administrador**: Usuario con acceso completo al sistema. Puede gestionar productos, inventario, usuarios, puntos de venta, mÈtodos de pago y consultar reportes de todos los puntos de venta.
   - **Operador**: Usuario con acceso restringido a puntos de venta asignados. Puede registrar ventas, consultar inventario y gestionar devoluciones en sus puntos de venta asignados.
 
-- **Sistema:** Sistema de Gesti√≥n de Puntos de Venta para Joyer√≠a
+- **Sistema:** Sistema de GestiÛn de Puntos de Venta para JoyerÌa
 - **Sistemas externos:** Ninguno en el MVP
 - **Diagrama C4 de contexto** en formato Mermaid
 
@@ -666,79 +668,79 @@ Se ejecut√≥ el plan completo y se gener√≥ el documento `Documentos/modelo-c4.md`
 Se documentaron 4 contenedores principales:
 
 1. **Frontend Web Application**
-   - Tecnolog√≠a: React/Vue/Angular (SPA), TypeScript
-   - Responsabilidades: Interfaz de usuario, reconocimiento de im√°genes en cliente, gesti√≥n de sesi√≥n
-   - Despliegue: CDN en producci√≥n, servidor de desarrollo local en desarrollo
+   - TecnologÌa: React/Vue/Angular (SPA), TypeScript
+   - Responsabilidades: Interfaz de usuario, reconocimiento de im·genes en cliente, gestiÛn de sesiÛn
+   - Despliegue: CDN en producciÛn, servidor de desarrollo local en desarrollo
 
 2. **Backend API**
-   - Tecnolog√≠a: ASP.NET Core Web API (.NET 10), C#
-   - Responsabilidades: L√≥gica de negocio, autenticaci√≥n, procesamiento de importaciones Excel
+   - TecnologÌa: ASP.NET Core Web API (.NET 10), C#
+   - Responsabilidades: LÛgica de negocio, autenticaciÛn, procesamiento de importaciones Excel
    - Despliegue: Contenedor Docker en ECS Fargate/App Runner (AWS) o Azure App Service
 
 3. **PostgreSQL Database**
-   - Tecnolog√≠a: PostgreSQL 15+
+   - TecnologÌa: PostgreSQL 15+
    - Responsabilidades: Almacenamiento persistente de todos los datos del sistema
-   - Despliegue: RDS PostgreSQL (AWS) o Azure Database for PostgreSQL en producci√≥n
+   - Despliegue: RDS PostgreSQL (AWS) o Azure Database for PostgreSQL en producciÛn
 
 4. **Object Storage**
-   - Tecnolog√≠a: AWS S3 / Azure Blob Storage
+   - TecnologÌa: AWS S3 / Azure Blob Storage
    - Responsabilidades: Almacenamiento de fotos de productos y ventas
-   - Despliegue: S3 bucket (AWS) o Blob Storage container (Azure) en producci√≥n
+   - Despliegue: S3 bucket (AWS) o Blob Storage container (Azure) en producciÛn
 
 - **Diagrama C4 de contenedores** con relaciones entre contenedores
-- **Flujos principales documentados:** Autenticaci√≥n, Reconocimiento de Im√°genes y Venta, Importaci√≥n de Productos
+- **Flujos principales documentados:** AutenticaciÛn, Reconocimiento de Im·genes y Venta, ImportaciÛn de Productos
 
 #### Nivel 3: Componentes
 
 **Componentes del Backend:**
 
 **Servicios de Dominio (9):**
-- Authentication Service - Autenticaci√≥n y generaci√≥n de tokens JWT
-- User Service - Gesti√≥n de usuarios y asignaciones
-- Product Service - Gesti√≥n del cat√°logo de productos
-- Inventory Service - Gesti√≥n de stock e inventario
-- Sale Service - Registro y gesti√≥n de ventas
-- Return Service - Gesti√≥n de devoluciones
-- Payment Method Service - Gesti√≥n de m√©todos de pago
-- Point of Sale Service - Gesti√≥n de puntos de venta
+- Authentication Service - AutenticaciÛn y generaciÛn de tokens JWT
+- User Service - GestiÛn de usuarios y asignaciones
+- Product Service - GestiÛn del cat·logo de productos
+- Inventory Service - GestiÛn de stock e inventario
+- Sale Service - Registro y gestiÛn de ventas
+- Return Service - GestiÛn de devoluciones
+- Payment Method Service - GestiÛn de mÈtodos de pago
+- Point of Sale Service - GestiÛn de puntos de venta
 - Report Service - Consultas y reportes
 
 **Servicios Compartidos (4):**
-- File Storage Service - Abstracci√≥n para almacenamiento de archivos
-- Stock Validation Service - Validaci√≥n de stock disponible
-- Payment Method Validation Service - Validaci√≥n de m√©todos de pago
+- File Storage Service - AbstracciÛn para almacenamiento de archivos
+- Stock Validation Service - ValidaciÛn de stock disponible
+- Payment Method Validation Service - ValidaciÛn de mÈtodos de pago
 - Excel Import Service - Procesamiento de archivos Excel
 
 **Componentes de Infraestructura:**
 - Controllers - Endpoints REST API
 - Repositories - Acceso a datos mediante Entity Framework Core
-- DbContext - Configuraci√≥n de Entity Framework Core
+- DbContext - ConfiguraciÛn de Entity Framework Core
 - Middleware - JWT, CORS, logging, rate limiting
 
 **Componentes del Frontend:**
 
-**M√≥dulos Funcionales (10):**
-- Auth Module - Login y gesti√≥n de sesi√≥n
-- Product Module - Gesti√≥n de productos
-- Inventory Module - Visualizaci√≥n de inventario
+**MÛdulos Funcionales (10):**
+- Auth Module - Login y gestiÛn de sesiÛn
+- Product Module - GestiÛn de productos
+- Inventory Module - VisualizaciÛn de inventario
 - Sale Module - Registro de ventas
-- Image Recognition Module - Reconocimiento de im√°genes con IA
-- Return Module - Gesti√≥n de devoluciones
-- Payment Method Module - Gesti√≥n de m√©todos de pago
-- Point of Sale Module - Gesti√≥n de puntos de venta
-- User Module - Gesti√≥n de usuarios
+- Image Recognition Module - Reconocimiento de im·genes con IA
+- Return Module - GestiÛn de devoluciones
+- Payment Method Module - GestiÛn de mÈtodos de pago
+- Point of Sale Module - GestiÛn de puntos de venta
+- User Module - GestiÛn de usuarios
 - Report Module - Consultas y reportes
 
 **Componentes Compartidos (5):**
-- API Client - Cliente HTTP para comunicaci√≥n con backend
-- ML Model Handler - Gesti√≥n y ejecuci√≥n del modelo de IA
-- State Management - Gesti√≥n de estado global (Redux/Vuex/NgRx)
-- Routing - Navegaci√≥n y protecci√≥n de rutas
+- API Client - Cliente HTTP para comunicaciÛn con backend
+- ML Model Handler - GestiÛn y ejecuciÛn del modelo de IA
+- State Management - GestiÛn de estado global (Redux/Vuex/NgRx)
+- Routing - NavegaciÛn y protecciÛn de rutas
 - UI Components - Componentes reutilizables
 
 - **Diagramas C4 de componentes** para backend y frontend con relaciones detalladas
 
-#### Notas sobre Desarrollo vs Producci√≥n
+#### Notas sobre Desarrollo vs ProducciÛn
 
 Se documentaron diferencias clave en:
 - **Almacenamiento de Archivos:** Sistema de archivos local vs S3/Blob Storage
@@ -748,9 +750,9 @@ Se documentaron diferencias clave en:
 - **Monitoreo:** Logging en consola vs CloudWatch/Application Insights
 - **Modelo de IA:** Modelo local vs distribuido mediante CDN
 
-#### Resumen de Componentes por √âpica
+#### Resumen de Componentes por …pica
 
-Se mapearon todas las 9 √©picas (EP1-EP9) a sus componentes correspondientes:
+Se mapearon todas las 9 Èpicas (EP1-EP9) a sus componentes correspondientes:
 - **EP1:** Product Service, Excel Import Service, File Storage Service (Backend) | Product Module (Frontend)
 - **EP2:** Inventory Service, Excel Import Service (Backend) | Inventory Module (Frontend)
 - **EP3:** Sale Service, Stock Validation Service, Payment Method Validation Service, File Storage Service (Backend) | Sale Module, Image Recognition Module (Frontend)
@@ -763,15 +765,15 @@ Se mapearon todas las 9 √©picas (EP1-EP9) a sus componentes correspondientes:
 
 ### Resultado Final
 
-Se gener√≥ el documento completo `Documentos/modelo-c4.md` con:
+Se generÛ el documento completo `Documentos/modelo-c4.md` con:
 
-‚úÖ **Nivel 1:** Contexto del Sistema con actores y diagrama C4  
-‚úÖ **Nivel 2:** Contenedores con diagrama C4 y descripciones detalladas  
-‚úÖ **Nivel 3:** Componentes del Backend y Frontend con diagramas C4  
-‚úÖ **Notas:** Diferencias entre desarrollo y producci√≥n  
-‚úÖ **Validaci√≥n:** Todas las 9 √©picas representadas correctamente  
+? **Nivel 1:** Contexto del Sistema con actores y diagrama C4  
+? **Nivel 2:** Contenedores con diagrama C4 y descripciones detalladas  
+? **Nivel 3:** Componentes del Backend y Frontend con diagramas C4  
+? **Notas:** Diferencias entre desarrollo y producciÛn  
+? **ValidaciÛn:** Todas las 9 Èpicas representadas correctamente  
 
-El modelo C4 est√° completo y listo para usar. Los diagramas est√°n en formato Mermaid y pueden visualizarse en cualquier visor compatible (GitHub, GitLab, VS Code con extensi√≥n Mermaid, etc.).
+El modelo C4 est· completo y listo para usar. Los diagramas est·n en formato Mermaid y pueden visualizarse en cualquier visor compatible (GitHub, GitLab, VS Code con extensiÛn Mermaid, etc.).
 
 ---
 
@@ -781,29 +783,29 @@ Quiero editar el @Documentos/Procedimientos/Procedimiento-TicketsTrabajo.md para
 
 Que cambios sugieres?
 
-Tienes alguna propuesta para mejorar el procedimiento, teniendo en cuenta que el desarrollo del codigo se har√° a partir de los tickets de trabajo?
+Tienes alguna propuesta para mejorar el procedimiento, teniendo en cuenta que el desarrollo del codigo se har· a partir de los tickets de trabajo?
 
 No hagas cambios.
 
-### Respuesta del Asistente - An√°lisis y Propuestas de Mejora
+### Respuesta del Asistente - An·lisis y Propuestas de Mejora
 
-El asistente realiz√≥ un an√°lisis completo del procedimiento actual y propuso las siguientes mejoras:
+El asistente realizÛ un an·lisis completo del procedimiento actual y propuso las siguientes mejoras:
 
 #### Cambios sugeridos para adaptar el procedimiento:
 
 1. **Adaptar las capas al modelo C4 del proyecto**
-   - Actualizar las capas gen√©ricas con las espec√≠ficas del proyecto seg√∫n `modelo-c4.md`
-   - Incluir referencias espec√≠ficas a tecnolog√≠as del stack
+   - Actualizar las capas genÈricas con las especÌficas del proyecto seg˙n `modelo-c4.md`
+   - Incluir referencias especÌficas a tecnologÌas del stack
 
-2. **Agregar secci√≥n sobre orden de implementaci√≥n de √©picas**
+2. **Agregar secciÛn sobre orden de implementaciÛn de Èpicas**
    - Incluir nota sobre el orden definido en `epicas.md`
    - Asegurar que los tickets respeten este orden
 
-3. **Mejorar la secci√≥n de Tags con ejemplos espec√≠ficos**
+3. **Mejorar la secciÛn de Tags con ejemplos especÌficos**
    - Actualizar tags con ejemplos del proyecto (EP1, HU-EP1-001, product-module, etc.)
-   - Incluir tags de tecnolog√≠a espec√≠fica
+   - Incluir tags de tecnologÌa especÌfica
 
-4. **Agregar secci√≥n sobre integraci√≥n con User Stories**
+4. **Agregar secciÛn sobre integraciÛn con User Stories**
    - Vincular tickets con User Story origen
    - Facilitar trazabilidad
 
@@ -812,34 +814,34 @@ El asistente realiz√≥ un an√°lisis completo del procedimiento actual y propuso l
    - Tickets independientes
    - Testing como parte del desarrollo
 
-6. **Agregar gu√≠a para tickets de infraestructura/DevOps**
-   - Configuraci√≥n de entorno de desarrollo
+6. **Agregar guÌa para tickets de infraestructura/DevOps**
+   - ConfiguraciÛn de entorno de desarrollo
    - Migraciones de base de datos
-   - Configuraci√≥n de CI/CD
-   - Configuraci√≥n de almacenamiento
+   - ConfiguraciÛn de CI/CD
+   - ConfiguraciÛn de almacenamiento
 
-7. **Mejorar la gesti√≥n de dependencias**
-   - Dependencias t√©cnicas entre tickets
-   - Dependencias de √©pica
-   - Documentaci√≥n de dependencias
+7. **Mejorar la gestiÛn de dependencias**
+   - Dependencias tÈcnicas entre tickets
+   - Dependencias de Èpica
+   - DocumentaciÛn de dependencias
 
-8. **Agregar gu√≠a de estimaci√≥n espec√≠fica del proyecto**
+8. **Agregar guÌa de estimaciÛn especÌfica del proyecto**
    - Factores a considerar (stack, integraciones, free-tier)
    - Escala sugerida de Story Points
 
 9. **Actualizar ejemplos con casos del proyecto**
-   - Reemplazar ejemplos gen√©ricos con ejemplos espec√≠ficos (HU-EP1-001)
+   - Reemplazar ejemplos genÈricos con ejemplos especÌficos (HU-EP1-001)
 
-10. **Agregar referencia a documentaci√≥n del proyecto**
-    - Secci√≥n de referencias al inicio del documento
+10. **Agregar referencia a documentaciÛn del proyecto**
+    - SecciÛn de referencias al inicio del documento
 
 ---
 
-## Prompt sobre Aplicaci√≥n de Mejoras al Procedimiento
+## Prompt sobre AplicaciÛn de Mejoras al Procedimiento
 
 Aplica las mejoras propuestas teniendo en cuenta:
 
-1) A√±adir la info del modelo C4 pero solo haciendo referencia al archivo @Documentos/modelo-c4.md , sin duplicar informacion. De este modo si se modifica el archivo de dependencia no hace falta actualizar el procedimiento.
+1) AÒadir la info del modelo C4 pero solo haciendo referencia al archivo @Documentos/modelo-c4.md , sin duplicar informacion. De este modo si se modifica el archivo de dependencia no hace falta actualizar el procedimiento.
 
 2) Incluir una nota sobre el orden definido en @epicas.md pero solo haciendo referencia, no dupliques informacion. De este modo si se modifica el archivo de dependencia no hace falta actualizar el procedimiento.
 
@@ -853,73 +855,73 @@ Aplica las mejoras propuestas teniendo en cuenta:
 
   --- subcarpeta con el codigo de la historia de usuario (HU-EP1-001, HU-EP1-002, etc.)
 
-Pideme mas informaci√≥n para aclarar dudas si lo necesitas.
+Pideme mas informaciÛn para aclarar dudas si lo necesitas.
 
-### Respuesta del Asistente - Aplicaci√≥n de Mejoras
+### Respuesta del Asistente - AplicaciÛn de Mejoras
 
-El asistente aplic√≥ todas las mejoras solicitadas con las consideraciones espec√≠ficas del usuario:
+El asistente aplicÛ todas las mejoras solicitadas con las consideraciones especÌficas del usuario:
 
 #### Cambios Aplicados:
 
-### 1. Referencias sin duplicaci√≥n
-- ‚úÖ Se agreg√≥ secci√≥n "0. Referencias del Proyecto" con enlaces a documentaci√≥n
-- ‚úÖ Referencias al modelo C4 sin duplicar contenido (solo referencias a `Documentos/modelo-c4.md`)
-- ‚úÖ Referencias al orden de √©picas sin duplicar informaci√≥n (solo referencia a `Documentos/epicas.md`)
+### 1. Referencias sin duplicaciÛn
+- ? Se agregÛ secciÛn "0. Referencias del Proyecto" con enlaces a documentaciÛn
+- ? Referencias al modelo C4 sin duplicar contenido (solo referencias a `Documentos/modelo-c4.md`)
+- ? Referencias al orden de Èpicas sin duplicar informaciÛn (solo referencia a `Documentos/epicas.md`)
 
-### 2. Redacci√≥n en ingl√©s
-- ‚úÖ Nota destacada al inicio del documento sobre redacci√≥n en ingl√©s
-- ‚úÖ Indicaci√≥n expl√≠cita en cada secci√≥n del formato est√°ndar
-- ‚úÖ Actualizaci√≥n del checklist para incluir verificaci√≥n de idioma
+### 2. RedacciÛn en inglÈs
+- ? Nota destacada al inicio del documento sobre redacciÛn en inglÈs
+- ? IndicaciÛn explÌcita en cada secciÛn del formato est·ndar
+- ? ActualizaciÛn del checklist para incluir verificaciÛn de idioma
 
 ### 3. Estructura de carpetas
-- ‚úÖ Nueva secci√≥n "4.7. Estructura de almacenamiento de tickets"
-- ‚úÖ Convenci√≥n de nombres: `T-EP[X]-[NNN]-[MMM].md`
-- ‚úÖ Ejemplo completo de estructura de carpetas con jerarqu√≠a:
+- ? Nueva secciÛn "4.7. Estructura de almacenamiento de tickets"
+- ? ConvenciÛn de nombres: `T-EP[X]-[NNN]-[MMM].md`
+- ? Ejemplo completo de estructura de carpetas con jerarquÌa:
   ```
   Tickets/
-  ‚îú‚îÄ‚îÄ EP1/
-  ‚îÇ   ‚îú‚îÄ‚îÄ HU-EP1-001/
-  ‚îÇ   ‚îÇ   ‚îú‚îÄ‚îÄ T-EP1-001-001.md
-  ‚îÇ   ‚îÇ   ‚îî‚îÄ‚îÄ ...
-  ‚îÇ   ‚îî‚îÄ‚îÄ ...
+  +-- EP1/
+  ¶   +-- HU-EP1-001/
+  ¶   ¶   +-- T-EP1-001-001.md
+  ¶   ¶   +-- ...
+  ¶   +-- ...
   ```
 
 ### 4. Mejoras adicionales implementadas
-- ‚úÖ **Capas adaptadas:** Actualizadas seg√∫n modelo C4 del proyecto (Dominio, Infraestructura, Aplicaci√≥n, API, Frontend, Tests)
-- ‚úÖ **Tags actualizados:** Ejemplos espec√≠ficos del proyecto (EP1, HU-EP1-001, product-module, domain, etc.)
-- ‚úÖ **Tickets de infraestructura:** Secci√≥n completa sobre Docker, migraciones, CI/CD, almacenamiento
-- ‚úÖ **Gu√≠a de estimaci√≥n:** Escala espec√≠fica para el proyecto con factores considerados
-- ‚úÖ **Ejemplo de descomposici√≥n:** Actualizado con HU-EP1-001 real del proyecto
-- ‚úÖ **Desarrollo basado en tickets:** Secci√≥n completa con consideraciones de nivel de detalle
-- ‚úÖ **Gesti√≥n de dependencias:** Mejorada con tipos de dependencias y documentaci√≥n
+- ? **Capas adaptadas:** Actualizadas seg˙n modelo C4 del proyecto (Dominio, Infraestructura, AplicaciÛn, API, Frontend, Tests)
+- ? **Tags actualizados:** Ejemplos especÌficos del proyecto (EP1, HU-EP1-001, product-module, domain, etc.)
+- ? **Tickets de infraestructura:** SecciÛn completa sobre Docker, migraciones, CI/CD, almacenamiento
+- ? **GuÌa de estimaciÛn:** Escala especÌfica para el proyecto con factores considerados
+- ? **Ejemplo de descomposiciÛn:** Actualizado con HU-EP1-001 real del proyecto
+- ? **Desarrollo basado en tickets:** SecciÛn completa con consideraciones de nivel de detalle
+- ? **GestiÛn de dependencias:** Mejorada con tipos de dependencias y documentaciÛn
 
 ### Resumen de Estructura Final del Documento:
 
-1. **Secci√≥n 0:** Referencias del Proyecto (nueva)
-2. **Secci√≥n 1:** Objetivo (actualizada con nota sobre ingl√©s)
-3. **Secci√≥n 2:** Formato est√°ndar de Ticket (actualizado con ingl√©s y tags espec√≠ficos)
-4. **Secci√≥n 3:** Procedimiento para generar tickets:
-   - Paso 1: Revisar User Story (con referencias a modelo C4 y √©picas)
-   - Paso 2: Identificar √°reas de trabajo (capas adaptadas + tickets DevOps)
-   - Paso 3: Crear tickets (con ingl√©s y referencias)
+1. **SecciÛn 0:** Referencias del Proyecto (nueva)
+2. **SecciÛn 1:** Objetivo (actualizada con nota sobre inglÈs)
+3. **SecciÛn 2:** Formato est·ndar de Ticket (actualizado con inglÈs y tags especÌficos)
+4. **SecciÛn 3:** Procedimiento para generar tickets:
+   - Paso 1: Revisar User Story (con referencias a modelo C4 y Èpicas)
+   - Paso 2: Identificar ·reas de trabajo (capas adaptadas + tickets DevOps)
+   - Paso 3: Crear tickets (con inglÈs y referencias)
    - Paso 3.5: Vincular con User Story (nueva)
    - Paso 4: Verificar dependencias (mejorada)
-5. **Secci√≥n 4:** Procedimiento para ordenar/priorizar (con referencia a orden de √©picas)
-6. **Secci√≥n 4.5:** Consideraciones para desarrollo basado en tickets (nueva)
-7. **Secci√≥n 4.6:** Gu√≠a de estimaci√≥n para este proyecto (nueva)
-8. **Secci√≥n 4.7:** Estructura de almacenamiento de tickets (nueva)
-9. **Secci√≥n 5:** Checklist r√°pido (actualizado con nuevas verificaciones)
+5. **SecciÛn 4:** Procedimiento para ordenar/priorizar (con referencia a orden de Èpicas)
+6. **SecciÛn 4.5:** Consideraciones para desarrollo basado en tickets (nueva)
+7. **SecciÛn 4.6:** GuÌa de estimaciÛn para este proyecto (nueva)
+8. **SecciÛn 4.7:** Estructura de almacenamiento de tickets (nueva)
+9. **SecciÛn 5:** Checklist r·pido (actualizado con nuevas verificaciones)
 
-### Caracter√≠sticas Clave Implementadas:
+### CaracterÌsticas Clave Implementadas:
 
-- ‚úÖ **Sin duplicaci√≥n:** Todas las referencias apuntan a archivos externos sin copiar contenido
-- ‚úÖ **Idioma ingl√©s:** Especificado claramente en m√∫ltiples lugares del documento
-- ‚úÖ **Estructura de carpetas:** Definida con convenci√≥n de nombres clara
-- ‚úÖ **Adaptado al proyecto:** Ejemplos y referencias espec√≠ficas del proyecto actual
-- ‚úÖ **Trazabilidad:** Vinculaci√≥n clara entre tickets y User Stories
-- ‚úÖ **Orden de √©picas:** Respetado mediante referencias al documento de √©picas
+- ? **Sin duplicaciÛn:** Todas las referencias apuntan a archivos externos sin copiar contenido
+- ? **Idioma inglÈs:** Especificado claramente en m˙ltiples lugares del documento
+- ? **Estructura de carpetas:** Definida con convenciÛn de nombres clara
+- ? **Adaptado al proyecto:** Ejemplos y referencias especÌficas del proyecto actual
+- ? **Trazabilidad:** VinculaciÛn clara entre tickets y User Stories
+- ? **Orden de Èpicas:** Respetado mediante referencias al documento de Èpicas
 
-El documento est√° completamente adaptado al proyecto y listo para ser utilizado en la generaci√≥n de tickets de trabajo.
+El documento est· completamente adaptado al proyecto y listo para ser utilizado en la generaciÛn de tickets de trabajo.
 
 ---
 
@@ -929,33 +931,33 @@ He adquirido el template Metronic para React https://docs.keenthemes.com/metroni
 
 Utilizariamos los Starter kits https://docs.keenthemes.com/metronic-react/getting-started/starter-kits para tener una base lo mas limpia posible.
 
-Quieres que a√±ada al proyecto todos los assets para analizarlos?
+Quieres que aÒada al proyecto todos los assets para analizarlos?
 
 Necesitas mas informacion?
 
 ### Respuesta del asistente:
 
-Se confirm√≥ que Metronic React es adecuado como base para el frontend del proyecto. Se identificaron las siguientes ventajas:
+Se confirmÛ que Metronic React es adecuado como base para el frontend del proyecto. Se identificaron las siguientes ventajas:
 
 **Ventajas del Template Metronic:**
-- ‚úÖ Alineado con el stack tecnol√≥gico (React + TypeScript, Vite, Tailwind CSS)
-- ‚úÖ Adecuado para dashboards/admin (caso de uso del proyecto)
-- ‚úÖ Responsive para operadores m√≥viles
-- ‚úÖ M√∫ltiples layouts disponibles (14 layouts diferentes)
-- ‚úÖ Componentes listos para usar (tablas, formularios, b√∫squedas)
-- ‚úÖ Starter kits limpios para empezar r√°pido
-- ‚úÖ Arquitectura escalable
+- ? Alineado con el stack tecnolÛgico (React + TypeScript, Vite, Tailwind CSS)
+- ? Adecuado para dashboards/admin (caso de uso del proyecto)
+- ? Responsive para operadores mÛviles
+- ? M˙ltiples layouts disponibles (14 layouts diferentes)
+- ? Componentes listos para usar (tablas, formularios, b˙squedas)
+- ? Starter kits limpios para empezar r·pido
+- ? Arquitectura escalable
 
-**Recomendaci√≥n:** S√≠, a√±adir los assets al proyecto para poder analizarlos y dar recomendaciones espec√≠ficas sobre:
+**RecomendaciÛn:** SÌ, aÒadir los assets al proyecto para poder analizarlos y dar recomendaciones especÌficas sobre:
 - Estructura del starter kit
 - Componentes disponibles
-- Qu√© layouts se adaptan mejor a las √©picas
-- Plan de integraci√≥n con backend .NET
+- QuÈ layouts se adaptan mejor a las Èpicas
+- Plan de integraciÛn con backend .NET
 - Estrategia de componentes reutilizables
 
 ---
 
-## Prompt sobre Configuraci√≥n de Metronic
+## Prompt sobre ConfiguraciÛn de Metronic
 
 1. TypeScript + Vite
 
@@ -963,42 +965,42 @@ Se confirm√≥ que Metronic React es adecuado como base para el frontend del proye
 
 3. Solo JWT con backend .NET
 
-4. Solo LTR, la aplicacion ser√° completamente en espa√±ol de Espa√±a
+4. Solo LTR, la aplicacion ser· completamente en espaÒol de EspaÒa
 
 En que carpeta del proyecto seria conveniente poner todos los assets del template?
 
 ### Respuesta del asistente:
 
-Se recomend√≥ la siguiente estructura basada en la arquitectura del proyecto:
+Se recomendÛ la siguiente estructura basada en la arquitectura del proyecto:
 
 **Estructura recomendada:**
 ```
 joyeria-pos/
-‚îú‚îÄ‚îÄ backend/          # Backend .NET (futuro)
-‚îú‚îÄ‚îÄ frontend/         # ‚Üê AQU√ç van los assets de Metronic
-‚îÇ   ‚îú‚îÄ‚îÄ src/          # C√≥digo fuente del starter kit
-‚îÇ   ‚îú‚îÄ‚îÄ public/       # Assets est√°ticos
-‚îÇ   ‚îú‚îÄ‚îÄ package.json
-‚îÇ   ‚îî‚îÄ‚îÄ Dockerfile
-‚îú‚îÄ‚îÄ Documentos/       # Ya existe
-‚îú‚îÄ‚îÄ docker-compose.dev.yml
-‚îî‚îÄ‚îÄ README.md
++-- backend/          # Backend .NET (futuro)
++-- frontend/         # ? AQUÕ van los assets de Metronic
+¶   +-- src/          # CÛdigo fuente del starter kit
+¶   +-- public/       # Assets est·ticos
+¶   +-- package.json
+¶   +-- Dockerfile
++-- Documentos/       # Ya existe
++-- docker-compose.dev.yml
++-- README.md
 ```
 
 **Pasos recomendados:**
-1. Crear la carpeta `frontend/` en la ra√≠z del proyecto (si no existe)
+1. Crear la carpeta `frontend/` en la raÌz del proyecto (si no existe)
 2. Copiar el contenido completo del starter kit TypeScript + Vite dentro de `frontend/`
 3. Mantener la estructura que Metronic trae por defecto
 
 **Consideraciones importantes:**
-- Layout 8: Necesitar√° configurar el routing para usar `layout-8` por defecto
-- Autenticaci√≥n JWT: Reemplazar la autenticaci√≥n de Supabase por JWT con backend .NET
-- Internacionalizaci√≥n: Configurar espa√±ol de Espa√±a como idioma √∫nico
-- RTL: Desactivar si est√° habilitado por defecto
+- Layout 8: Necesitar· configurar el routing para usar `layout-8` por defecto
+- AutenticaciÛn JWT: Reemplazar la autenticaciÛn de Supabase por JWT con backend .NET
+- InternacionalizaciÛn: Configurar espaÒol de EspaÒa como idioma ˙nico
+- RTL: Desactivar si est· habilitado por defecto
 
 ---
 
-## Prompt sobre An√°lisis de Metronic
+## Prompt sobre An·lisis de Metronic
 
 He copiado los assets en la carpeta frontend/src.
 
@@ -1006,7 +1008,7 @@ Sigue los proximos pasos, pero no generes codigos ni adaptes nada.
 
 ### Respuesta del asistente:
 
-Se realiz√≥ un an√°lisis completo del starter kit Metronic React y se gener√≥ el documento `Documentos/Propuestas/analisis-metronic-frontend.md` con el siguiente contenido:
+Se realizÛ un an·lisis completo del starter kit Metronic React y se generÛ el documento `Documentos/Propuestas/analisis-metronic-frontend.md` con el siguiente contenido:
 
 #### Hallazgos principales:
 
@@ -1017,92 +1019,92 @@ Se realiz√≥ un an√°lisis completo del starter kit Metronic React y se gener√≥ el
    - React Router v7 para routing
 
 2. **Componentes relevantes identificados:**
-   - `data-grid.tsx` ‚Üí Tablas avanzadas (productos, inventario, ventas)
-   - `file-upload.tsx` ‚Üí Subida de fotos (productos y ventas)
-   - `form.tsx` ‚Üí Formularios con validaci√≥n
-   - `card.tsx` ‚Üí Cards para mostrar productos/sugerencias
-   - Y 74 componentes m√°s disponibles
+   - `data-grid.tsx` ? Tablas avanzadas (productos, inventario, ventas)
+   - `file-upload.tsx` ? Subida de fotos (productos y ventas)
+   - `form.tsx` ? Formularios con validaciÛn
+   - `card.tsx` ? Cards para mostrar productos/sugerencias
+   - Y 74 componentes m·s disponibles
 
 3. **Estado actual:**
-   - Layout 8 existe pero no est√° configurado como predeterminado
-   - Men√∫ del sidebar es demo (hay que reemplazarlo)
-   - No hay autenticaci√≥n implementada (hay que crearla)
+   - Layout 8 existe pero no est· configurado como predeterminado
+   - Men˙ del sidebar es demo (hay que reemplazarlo)
+   - No hay autenticaciÛn implementada (hay que crearla)
    - Routing actual es para demos (hay que configurarlo)
 
-4. **Mapeo por √©picas:**
-   - Cada √©pica tiene componentes Metronic identificados
-   - Estructura de p√°ginas propuesta
+4. **Mapeo por Èpicas:**
+   - Cada Èpica tiene componentes Metronic identificados
+   - Estructura de p·ginas propuesta
    - Servicios necesarios definidos
 
-#### Contenido del documento de an√°lisis:
+#### Contenido del documento de an·lisis:
 
-**Secci√≥n 1: Estructura del Starter Kit Analizado**
+**SecciÛn 1: Estructura del Starter Kit Analizado**
 - Estructura de carpetas completa
-- Tecnolog√≠as identificadas (React 19, Vite, Tailwind CSS, Radix UI, React Router v7, React Hook Form, TanStack Table, etc.)
+- TecnologÌas identificadas (React 19, Vite, Tailwind CSS, Radix UI, React Router v7, React Hook Form, TanStack Table, etc.)
 
-**Secci√≥n 2: An√°lisis del Layout 8**
-- Caracter√≠sticas del layout (Header, Sidebar, Main, Footer, Toolbar)
-- Caracter√≠sticas responsive
-- Configuraci√≥n actual del layout
+**SecciÛn 2: An·lisis del Layout 8**
+- CaracterÌsticas del layout (Header, Sidebar, Main, Footer, Toolbar)
+- CaracterÌsticas responsive
+- ConfiguraciÛn actual del layout
 
-**Secci√≥n 3: Componentes UI Disponibles Relevantes para el Proyecto**
-- Componentes cr√≠ticos para cada √©pica (EP1-EP9)
+**SecciÛn 3: Componentes UI Disponibles Relevantes para el Proyecto**
+- Componentes crÌticos para cada Èpica (EP1-EP9)
 - Componentes de soporte (alertas, toasts, skeletons, dialogs, tabs, breadcrumbs)
 
-**Secci√≥n 4: An√°lisis de Routing Actual**
-- Configuraci√≥n actual del routing
-- Cambios necesarios (cambiar layout predeterminado, configurar rutas espec√≠ficas, implementar rutas protegidas)
+**SecciÛn 4: An·lisis de Routing Actual**
+- ConfiguraciÛn actual del routing
+- Cambios necesarios (cambiar layout predeterminado, configurar rutas especÌficas, implementar rutas protegidas)
 
-**Secci√≥n 5: An√°lisis de Autenticaci√≥n**
-- Estado actual (no hay implementaci√≥n)
+**SecciÛn 5: An·lisis de AutenticaciÛn**
+- Estado actual (no hay implementaciÛn)
 - Necesidades para JWT con backend .NET (AuthProvider, AuthService, HTTP Client, ProtectedRoute, Login Page)
 
-**Secci√≥n 6: Mapeo de Componentes por √âpica**
-- P√°ginas necesarias para cada √©pica
+**SecciÛn 6: Mapeo de Componentes por …pica**
+- P·ginas necesarias para cada Èpica
 - Componentes Metronic a usar para cada funcionalidad
 
-**Secci√≥n 7: Plan de Adaptaci√≥n Requerido**
-- Configuraci√≥n inicial (cambiar layout predeterminado, configurar men√∫ sidebar, configurar internacionalizaci√≥n)
-- Autenticaci√≥n JWT (componentes a crear, servicios necesarios)
-- Estructura de p√°ginas por √©pica
+**SecciÛn 7: Plan de AdaptaciÛn Requerido**
+- ConfiguraciÛn inicial (cambiar layout predeterminado, configurar men˙ sidebar, configurar internacionalizaciÛn)
+- AutenticaciÛn JWT (componentes a crear, servicios necesarios)
+- Estructura de p·ginas por Èpica
 - Servicios y hooks personalizados
-- Integraci√≥n con backend .NET
+- IntegraciÛn con backend .NET
 
-**Secci√≥n 8: Consideraciones Especiales**
-- Reconocimiento de Im√°genes (integraci√≥n con TensorFlow.js/ONNX.js)
+**SecciÛn 8: Consideraciones Especiales**
+- Reconocimiento de Im·genes (integraciÛn con TensorFlow.js/ONNX.js)
 - Responsive Design
 - Dark Mode
 - Performance
 
-**Secci√≥n 9: Dependencias Adicionales Necesarias**
+**SecciÛn 9: Dependencias Adicionales Necesarias**
 - Para funcionalidad core (Axios/Fetch, date-fns/dayjs, zod/yup)
-- Para reconocimiento de im√°genes (@tensorflow/tfjs o onnxruntime-web)
-- Para importaci√≥n Excel (xlsx o exceljs, papaparse)
+- Para reconocimiento de im·genes (@tensorflow/tfjs o onnxruntime-web)
+- Para importaciÛn Excel (xlsx o exceljs, papaparse)
 - Para manejo de estado (Zustand/Jotai opcional)
 
-**Secci√≥n 10: Pr√≥ximos Pasos Recomendados**
-- Fase 1: Configuraci√≥n Base (sin c√≥digo, solo planificaci√≥n)
-- Fase 2: Setup Inicial (primera implementaci√≥n)
-- Fase 3: Autenticaci√≥n
-- Fase 4: Desarrollo por √âpicas (seg√∫n orden de implementaci√≥n)
+**SecciÛn 10: PrÛximos Pasos Recomendados**
+- Fase 1: ConfiguraciÛn Base (sin cÛdigo, solo planificaciÛn)
+- Fase 2: Setup Inicial (primera implementaciÛn)
+- Fase 3: AutenticaciÛn
+- Fase 4: Desarrollo por …picas (seg˙n orden de implementaciÛn)
 
-**Secci√≥n 11: Observaciones Finales**
+**SecciÛn 11: Observaciones Finales**
 - Ventajas del template Metronic
-- Desaf√≠os identificados
+- DesafÌos identificados
 - Recomendaciones
 
-**Secci√≥n 12: Archivos Clave a Modificar/Crear**
+**SecciÛn 12: Archivos Clave a Modificar/Crear**
 - Archivos a modificar (routing, config, App.tsx)
 - Archivos a crear (providers, services, components, pages, types)
 
 #### Conclusiones:
 
-- ‚úÖ Metronic React es adecuado como base para el frontend
-- ‚ö†Ô∏è Requiere configuraci√≥n inicial (routing, men√∫, autenticaci√≥n)
-- ‚úÖ Los componentes UI cubren las necesidades del proyecto
-- ‚úÖ La estructura es escalable y mantenible
+- ? Metronic React es adecuado como base para el frontend
+- ?? Requiere configuraciÛn inicial (routing, men˙, autenticaciÛn)
+- ? Los componentes UI cubren las necesidades del proyecto
+- ? La estructura es escalable y mantenible
 
-El documento completo est√° disponible en `Documentos/Propuestas/analisis-metronic-frontend.md` y est√° listo para guiar la implementaci√≥n del frontend.
+El documento completo est· disponible en `Documentos/Propuestas/analisis-metronic-frontend.md` y est· listo para guiar la implementaciÛn del frontend.
 
 ---
 
@@ -1114,34 +1116,34 @@ Eres un experto en testing de backend en .Net 10. Basandote en la @Documentos/ar
 - Muestra una comparacion de todas en formato tabla 
 - Preguntame para aclarar cualquier duda
 
-### Respuesta del asistente - Preguntas de Aclaraci√≥n
+### Respuesta del asistente - Preguntas de AclaraciÛn
 
-Antes de proponer las opciones, solicit√© las siguientes aclaraciones:
+Antes de proponer las opciones, solicitÈ las siguientes aclaraciones:
 
-1. **¬øCu√°l es tu nivel de experiencia con testing en .NET?**
+1. **øCu·l es tu nivel de experiencia con testing en .NET?**
    - a) Principiante
    - b) Intermedio
    - c) Avanzado
 
-2. **¬øQu√© tipo de tests priorizas para el MVP?**
+2. **øQuÈ tipo de tests priorizas para el MVP?**
    - a) Solo tests unitarios
-   - b) Solo tests de integraci√≥n
+   - b) Solo tests de integraciÛn
    - c) Ambos, pero priorizamos tests unitarios
-   - d) Ambos, pero priorizamos tests de integraci√≥n
+   - d) Ambos, pero priorizamos tests de integraciÛn
 
-3. **¬øTienes preferencia por alguna librer√≠a de mocking?**
+3. **øTienes preferencia por alguna librerÌa de mocking?**
    - a) Moq
    - b) NSubstitute
    - c) FakeItEasy
    - d) No tengo preferencia
 
-4. **¬øQu√© herramienta de CI/CD planeas usar?**
+4. **øQuÈ herramienta de CI/CD planeas usar?**
    - a) GitHub Actions
    - b) Azure DevOps
    - c) Otra
-   - d) No lo he decidido a√∫n
+   - d) No lo he decidido a˙n
 
-5. **¬øEl equipo ya tiene experiencia con alg√∫n framework de testing espec√≠fico?**
+5. **øEl equipo ya tiene experiencia con alg˙n framework de testing especÌfico?**
 
 ---
 
@@ -1157,25 +1159,25 @@ Antes de proponer las opciones, solicit√© las siguientes aclaraciones:
 
 5) No
 
-### Respuesta del Asistente - Aclaraci√≥n sobre CI/CD
+### Respuesta del Asistente - AclaraciÛn sobre CI/CD
 
-Expliqu√© las diferencias entre GitHub Actions y Azure DevOps:
+ExpliquÈ las diferencias entre GitHub Actions y Azure DevOps:
 
 **GitHub Actions:**
-- ‚úÖ 2,000 minutos/mes gratis (repos privados), ilimitado en p√∫blicos
-- ‚úÖ Integraci√≥n nativa con GitHub
-- ‚úÖ Curva de aprendizaje baja
-- ‚úÖ Marketplace con actions predefinidos
-- ‚ö†Ô∏è Menos features avanzados que Azure DevOps
+- ? 2,000 minutos/mes gratis (repos privados), ilimitado en p˙blicos
+- ? IntegraciÛn nativa con GitHub
+- ? Curva de aprendizaje baja
+- ? Marketplace con actions predefinidos
+- ?? Menos features avanzados que Azure DevOps
 
 **Azure DevOps:**
-- ‚úÖ 1,800 minutos/mes gratis
-- ‚úÖ M√°s features (boards, artifacts, test plans)
-- ‚úÖ Mejor integraci√≥n con Azure
-- ‚ö†Ô∏è M√°s complejo de configurar
-- ‚ö†Ô∏è Requiere cuenta Azure DevOps separada
+- ? 1,800 minutos/mes gratis
+- ? M·s features (boards, artifacts, test plans)
+- ? Mejor integraciÛn con Azure
+- ?? M·s complejo de configurar
+- ?? Requiere cuenta Azure DevOps separada
 
-**Recomendaci√≥n:** GitHub Actions para este proyecto (ya usamos GitHub, curva baja, minutos suficientes).
+**RecomendaciÛn:** GitHub Actions para este proyecto (ya usamos GitHub, curva baja, minutos suficientes).
 
 ---
 
@@ -1183,88 +1185,88 @@ Expliqu√© las diferencias entre GitHub Actions y Azure DevOps:
 
 Se presentaron 3 opciones de stack de testing:
 
-**Opci√≥n 1: xUnit + Moq + FluentAssertions (Recomendada)**
+**OpciÛn 1: xUnit + Moq + FluentAssertions (Recomendada)**
 - Framework: xUnit
 - Mocking: Moq
 - Assertions: FluentAssertions
-- Pros: Est√°ndar de facto, comunidad amplia, sintaxis clara
+- Pros: Est·ndar de facto, comunidad amplia, sintaxis clara
 - Contras: Requiere paquetes adicionales
 
-**Opci√≥n 2: NUnit + NSubstitute + Shouldly**
+**OpciÛn 2: NUnit + NSubstitute + Shouldly**
 - Framework: NUnit
 - Mocking: NSubstitute
 - Assertions: Shouldly
 - Pros: Muy legible, menos boilerplate
 - Contras: Comunidad menor que xUnit
 
-**Opci√≥n 3: MSTest v2 + FakeItEasy + FluentAssertions**
+**OpciÛn 3: MSTest v2 + FakeItEasy + FluentAssertions**
 - Framework: MSTest v2
 - Mocking: FakeItEasy
 - Assertions: FluentAssertions
-- Pros: Integraci√≥n VS nativa, sintaxis amigable
+- Pros: IntegraciÛn VS nativa, sintaxis amigable
 - Contras: Menos popular en comunidad open source
 
-**Tabla comparativa** con criterios: Curva de aprendizaje, Documentaci√≥n, Comunidad, Integraci√≥n VS, Rendimiento, Sintaxis, Free-tier compatible.
+**Tabla comparativa** con criterios: Curva de aprendizaje, DocumentaciÛn, Comunidad, IntegraciÛn VS, Rendimiento, Sintaxis, Free-tier compatible.
 
-**Recomendaci√≥n final:** Opci√≥n 1 (xUnit + Moq + FluentAssertions) por ser est√°ndar de facto, abundante documentaci√≥n y compatibilidad total con free-tier.
+**RecomendaciÛn final:** OpciÛn 1 (xUnit + Moq + FluentAssertions) por ser est·ndar de facto, abundante documentaciÛn y compatibilidad total con free-tier.
 
 ---
 
-## Prompt sobre Confirmaci√≥n de Stack de Testing
+## Prompt sobre ConfirmaciÛn de Stack de Testing
 
-Confirmo la eleccion de xUnit + Moq + FluentAssertions y Github Actions para CI/CD. Documenta en Documentos/testing-backend.md toda la informaci√≥n necesaria que has generado.
+Confirmo la eleccion de xUnit + Moq + FluentAssertions y Github Actions para CI/CD. Documenta en Documentos/testing-backend.md toda la informaciÛn necesaria que has generado.
 
-### Respuesta del Asistente - Documentaci√≥n Generada
+### Respuesta del Asistente - DocumentaciÛn Generada
 
-Se cre√≥ el documento `Documentos/testing-backend.md` con:
+Se creÛ el documento `Documentos/testing-backend.md` con:
 
-1. **Visi√≥n General:** Stack completo con versiones
-2. **¬øPor qu√© esta Combinaci√≥n?:** Justificaci√≥n de cada herramienta
-3. **Paquetes NuGet:** Configuraci√≥n de `.csproj` para tests unitarios e integraci√≥n
+1. **VisiÛn General:** Stack completo con versiones
+2. **øPor quÈ esta CombinaciÛn?:** JustificaciÛn de cada herramienta
+3. **Paquetes NuGet:** ConfiguraciÛn de `.csproj` para tests unitarios e integraciÛn
 4. **Estructura de Proyecto:** Carpetas recomendadas para tests
-5. **Ejemplos de C√≥digo:**
-   - Test unitario b√°sico con Moq
+5. **Ejemplos de CÛdigo:**
+   - Test unitario b·sico con Moq
    - Tests parametrizados con [Theory]
    - Tests con excepciones
    - Generador de datos con Bogus (TestDataBuilder)
-6. **Tests de Integraci√≥n:**
+6. **Tests de IntegraciÛn:**
    - DatabaseFixture con Testcontainers
    - ApiFixture con WebApplicationFactory
    - Tests de repositorio y controller
-   - Tests de autenticaci√≥n JWT
+   - Tests de autenticaciÛn JWT
 7. **GitHub Actions CI/CD:** Workflows para tests y PR checks
-8. **Comandos √ötiles:** CLI para ejecutar tests
-9. **Convenciones de Nomenclatura:** `M√©todo_Escenario_ResultadoEsperado`
-10. **Checklist de Implementaci√≥n:** Fases 1-5
-11. **Recursos de Aprendizaje:** Enlaces a documentaci√≥n oficial
+8. **Comandos ⁄tiles:** CLI para ejecutar tests
+9. **Convenciones de Nomenclatura:** `MÈtodo_Escenario_ResultadoEsperado`
+10. **Checklist de ImplementaciÛn:** Fases 1-5
+11. **Recursos de Aprendizaje:** Enlaces a documentaciÛn oficial
 
 ---
 
-## Prompt sobre Profundizaci√≥n de Aspectos de Testing
+## Prompt sobre ProfundizaciÛn de Aspectos de Testing
 
 Profundiza los siguientes aspectos y actualiza el archivo @testing-backend.md si hace falta.
 
 1. Testcontainers + PostgreSQL
 2. Mockear Entity Framework Core
-3. Testing de Autenticaci√≥n JWT
+3. Testing de AutenticaciÛn JWT
 4. GitHub Actions avanzado
-5. Cobertura de c√≥digo
+5. Cobertura de cÛdigo
 6. Testing de validaciones
 7. Testing de archivos/uploads
 
-### Respuesta del Usuario - Selecci√≥n de Aspectos
+### Respuesta del Usuario - SelecciÛn de Aspectos
 
 1, 2, 3, 4, 5, 6, 7
 
-### Respuesta del Asistente - Profundizaci√≥n de 7 Aspectos
+### Respuesta del Asistente - ProfundizaciÛn de 7 Aspectos
 
-Se a√±adieron secciones detalladas al documento `testing-backend.md`:
+Se aÒadieron secciones detalladas al documento `testing-backend.md`:
 
 1. **Testcontainers + PostgreSQL (Avanzado):**
-   - Configuraci√≥n detallada del contenedor
-   - Optimizaci√≥n de performance para tests
+   - ConfiguraciÛn detallada del contenedor
+   - OptimizaciÛn de performance para tests
    - Seeding de datos iniciales
-   - Ejecuci√≥n de scripts SQL
+   - EjecuciÛn de scripts SQL
    - Compartir contenedor entre tests (ICollectionFixture)
    - Clase base DatabaseTestBase
 
@@ -1275,122 +1277,122 @@ Se a√±adieron secciones detalladas al documento `testing-backend.md`:
    - Mockear Includes y Navigation Properties
    - Alternativa: InMemory Database
 
-3. **Testing de Autenticaci√≥n JWT (Avanzado):**
+3. **Testing de AutenticaciÛn JWT (Avanzado):**
    - JwtTestHelper para generar tokens de test
-   - AuthenticatedApiFixture con configuraci√≥n de JWT
-   - Tests de login, tokens v√°lidos/inv√°lidos/expirados
+   - AuthenticatedApiFixture con configuraciÛn de JWT
+   - Tests de login, tokens v·lidos/inv·lidos/expirados
    - Tests de roles (Admin vs Operador)
    - Tests de refresh tokens
 
 4. **GitHub Actions Avanzado:**
    - Workflow con matriz de tests
-   - Cach√© de NuGet packages
+   - CachÈ de NuGet packages
    - Artifacts para resultados de tests
    - Jobs paralelos
    - Security scanning
    - Badges para README
-   - Configuraci√≥n de secrets
+   - ConfiguraciÛn de secrets
 
-5. **Cobertura de C√≥digo:**
-   - Configuraci√≥n de Coverlet en `.csproj`
+5. **Cobertura de CÛdigo:**
+   - ConfiguraciÛn de Coverlet en `.csproj`
    - Archivo `coverlet.runsettings`
    - Comandos para generar reportes HTML
-   - Excluir c√≥digo con `[ExcludeFromCodeCoverage]`
-   - Verificaci√≥n de umbral m√≠nimo en CI
-   - Integraci√≥n con Codecov
+   - Excluir cÛdigo con `[ExcludeFromCodeCoverage]`
+   - VerificaciÛn de umbral mÌnimo en CI
+   - IntegraciÛn con Codecov
 
 6. **Testing de Validaciones:**
    - FluentValidation.TestHelper
    - Tests de DataAnnotations
-   - Validaciones as√≠ncronas
-   - Tests de integraci√≥n para validaci√≥n de modelo
+   - Validaciones asÌncronas
+   - Tests de integraciÛn para validaciÛn de modelo
 
 7. **Testing de Archivos y Uploads:**
-   - Importaci√≥n Excel con ClosedXML
+   - ImportaciÛn Excel con ClosedXML
    - MockFileSystem para almacenamiento local
    - Tests de API para uploads
    - Tests de almacenamiento en la nube (S3)
 
 ---
 
-## Prompt sobre Divisi√≥n del Archivo de Testing
+## Prompt sobre DivisiÛn del Archivo de Testing
 
-El archivo `testing-backend.md` hab√≠a crecido a m√°s de 4000 l√≠neas, lo que dificultaba su mantenimiento y navegaci√≥n.
+El archivo `testing-backend.md` habÌa crecido a m·s de 4000 lÌneas, lo que dificultaba su mantenimiento y navegaciÛn.
 
-Procede con la divisi√≥n
+Procede con la divisiÛn
 
-### Respuesta del Asistente - Divisi√≥n en Sub-archivos
+### Respuesta del Asistente - DivisiÛn en Sub-archivos
 
-Se dividi√≥ el archivo en 9 documentos especializados m√°s un √≠ndice:
+Se dividiÛ el archivo en 9 documentos especializados m·s un Ìndice:
 
 **Nueva estructura:**
 ```
 Documentos/
-‚îú‚îÄ‚îÄ testing-backend.md              ‚Üê √çndice principal
-‚îî‚îÄ‚îÄ Testing/
-    ‚îî‚îÄ‚îÄ Backend/
-        ‚îú‚îÄ‚îÄ 01-configuracion.md      (Stack, NuGet, estructura)
-        ‚îú‚îÄ‚îÄ 02-tests-unitarios.md    (Ejemplos, Bogus, excepciones)
-        ‚îú‚îÄ‚îÄ 03-testcontainers.md     (PostgreSQL, fixtures)
-        ‚îú‚îÄ‚îÄ 04-mocking-efcore.md     (DbContext, transacciones)
-        ‚îú‚îÄ‚îÄ 05-autenticacion-jwt.md  (Tokens, roles)
-        ‚îú‚îÄ‚îÄ 06-github-actions.md     (CI/CD, workflows)
-        ‚îú‚îÄ‚îÄ 07-cobertura-codigo.md   (Coverlet, reportes)
-        ‚îú‚îÄ‚îÄ 08-validaciones.md       (FluentValidation)
-        ‚îî‚îÄ‚îÄ 09-archivos-uploads.md   (Excel, S3)
++-- testing-backend.md              ? Õndice principal
++-- Testing/
+    +-- Backend/
+        +-- 01-configuracion.md      (Stack, NuGet, estructura)
+        +-- 02-tests-unitarios.md    (Ejemplos, Bogus, excepciones)
+        +-- 03-testcontainers.md     (PostgreSQL, fixtures)
+        +-- 04-mocking-efcore.md     (DbContext, transacciones)
+        +-- 05-autenticacion-jwt.md  (Tokens, roles)
+        +-- 06-github-actions.md     (CI/CD, workflows)
+        +-- 07-cobertura-codigo.md   (Coverlet, reportes)
+        +-- 08-validaciones.md       (FluentValidation)
+        +-- 09-archivos-uploads.md   (Excel, S3)
 ```
 
-**Caracter√≠sticas:**
-- Cada archivo incluye enlace de retorno al √≠ndice
-- El √≠ndice principal (`testing-backend.md`) contiene tabla de navegaci√≥n
-- Contenido sin duplicaci√≥n
-- F√°cil mantenimiento y navegaci√≥n
+**CaracterÌsticas:**
+- Cada archivo incluye enlace de retorno al Ìndice
+- El Ìndice principal (`testing-backend.md`) contiene tabla de navegaciÛn
+- Contenido sin duplicaciÛn
+- F·cil mantenimiento y navegaciÛn
 
 ---
 
-## Prompt sobre Integraci√≥n con Procedimiento de Tickets
+## Prompt sobre IntegraciÛn con Procedimiento de Tickets
 
-Deberiamos integrar esta informacion (haciendo referencia, sin duplicar) en el @Documentos/Procedimientos/Procedimiento-TicketsTrabajo.md, para mejorar la calidad de los tickets que est√©n relacionados con el desarrollo de backend?
+Deberiamos integrar esta informacion (haciendo referencia, sin duplicar) en el @Documentos/Procedimientos/Procedimiento-TicketsTrabajo.md, para mejorar la calidad de los tickets que estÈn relacionados con el desarrollo de backend?
 
 Que opciones hay?
 
-### Respuesta del Asistente - Opciones de Integraci√≥n
+### Respuesta del Asistente - Opciones de IntegraciÛn
 
 Se propusieron 4 opciones:
 
-1. **Referencia Simple en Secci√≥n 0** (M√≠nimo impacto)
-2. **Expandir Secci√≥n de Tests en Paso 2** (Moderado)
-3. **Nueva Subsecci√≥n "Consideraciones para Tickets de Testing Backend"** (Recomendado)
-4. **Combinaci√≥n de 1 + 3** (M√°s completo)
+1. **Referencia Simple en SecciÛn 0** (MÌnimo impacto)
+2. **Expandir SecciÛn de Tests en Paso 2** (Moderado)
+3. **Nueva SubsecciÛn "Consideraciones para Tickets de Testing Backend"** (Recomendado)
+4. **CombinaciÛn de 1 + 3** (M·s completo)
 
 ---
 
-### Respuesta del Usuario - Selecci√≥n de Opci√≥n
+### Respuesta del Usuario - SelecciÛn de OpciÛn
 
 4
 
-### Respuesta del Asistente - Implementaci√≥n de Opci√≥n 4
+### Respuesta del Asistente - ImplementaciÛn de OpciÛn 4
 
 Se aplicaron 3 cambios al archivo `Procedimiento-TicketsTrabajo.md`:
 
-1. **Referencia en Secci√≥n 0:**
+1. **Referencia en SecciÛn 0:**
    ```markdown
-   - **Testing Backend:** `Documentos/testing-backend.md` - Stack de testing (xUnit, Moq, FluentAssertions), gu√≠as detalladas por tema en `Documentos/Testing/Backend/`.
+   - **Testing Backend:** `Documentos/testing-backend.md` - Stack de testing (xUnit, Moq, FluentAssertions), guÌas detalladas por tema en `Documentos/Testing/Backend/`.
    ```
 
-2. **Nueva Subsecci√≥n "Consideraciones espec√≠ficas para tickets de Testing Backend":**
-   - Tipos de test necesarios (unitarios, integraci√≥n, autenticaci√≥n)
+2. **Nueva SubsecciÛn "Consideraciones especÌficas para tickets de Testing Backend":**
+   - Tipos de test necesarios (unitarios, integraciÛn, autenticaciÛn)
    - Stack y convenciones del proyecto
-   - Tabla de gu√≠as por tema con 9 documentos
+   - Tabla de guÌas por tema con 9 documentos
    - Tags recomendados para tickets de testing
-   - Criterios de aceptaci√≥n t√≠picos
+   - Criterios de aceptaciÛn tÌpicos
 
 3. **Checklist Actualizado:**
-   - Verificar consulta de gu√≠a de testing
-   - Verificar referencia a gu√≠a espec√≠fica del tema
-   - Verificar criterios de aceptaci√≥n (nomenclatura, cobertura de casos)
+   - Verificar consulta de guÌa de testing
+   - Verificar referencia a guÌa especÌfica del tema
+   - Verificar criterios de aceptaciÛn (nomenclatura, cobertura de casos)
 
-**Resultado:** El procedimiento de tickets ahora tiene el mismo nivel de detalle para testing backend que para frontend con Metronic, manteniendo consistencia y facilitando la creaci√≥n de tickets de calidad.
+**Resultado:** El procedimiento de tickets ahora tiene el mismo nivel de detalle para testing backend que para frontend con Metronic, manteniendo consistencia y facilitando la creaciÛn de tickets de calidad.
 
 ---
 
@@ -1408,72 +1410,72 @@ Basandote en @Documentos/arquitectura.md y en @Documentos/Propuestas/analisis-me
 
 - Preguntame para aclarar cualquier duda
 
-### Respuesta del asistente - Aclaraci√≥n Necesaria
+### Respuesta del asistente - AclaraciÛn Necesaria
 
-Se detect√≥ una inconsistencia en la pregunta: el usuario mencionaba "experto en testing de frontend en React" pero preguntaba por "librer√≠as de testing para el backend". Se solicit√≥ aclaraci√≥n sobre si se refer√≠a a:
+Se detectÛ una inconsistencia en la pregunta: el usuario mencionaba "experto en testing de frontend en React" pero preguntaba por "librerÌas de testing para el backend". Se solicitÛ aclaraciÛn sobre si se referÌa a:
 
-1. üé® **Testing de Frontend (React)** - Tests unitarios, de componentes y E2E para la SPA
-2. ‚öôÔ∏è **Testing de Backend (.NET)** - Tests unitarios, integraci√≥n con EF Core, etc.
-3. üì¶ **Ambos** - Una propuesta integral
+1. ?? **Testing de Frontend (React)** - Tests unitarios, de componentes y E2E para la SPA
+2. ?? **Testing de Backend (.NET)** - Tests unitarios, integraciÛn con EF Core, etc.
+3. ?? **Ambos** - Una propuesta integral
 
 ---
 
-## Prompt sobre Confirmaci√≥n de Testing Frontend
+## Prompt sobre ConfirmaciÛn de Testing Frontend
 
 1
 
 ### Respuesta del asistente - Propuesta de 3 Opciones
 
-Se confirm√≥ que el usuario quer√≠a testing de **Frontend (React)**. Se presentaron 3 opciones:
+Se confirmÛ que el usuario querÌa testing de **Frontend (React)**. Se presentaron 3 opciones:
 
-**Opci√≥n 1: Vitest + React Testing Library + Playwright (Recomendada)**
+**OpciÛn 1: Vitest + React Testing Library + Playwright (Recomendada)**
 - Test Runner: Vitest (nativo para Vite)
 - Testing de Componentes: React Testing Library
 - Mocking de API: MSW (Mock Service Worker)
 - Tests E2E: Playwright
-- Pros: Integraci√≥n nativa con Vite, velocidad excepcional (2-10x m√°s r√°pido que Jest), multi-navegador real con Playwright, TypeScript nativo
-- Contras: Ecosistema m√°s joven que Jest, Playwright m√°s complejo que Cypress
+- Pros: IntegraciÛn nativa con Vite, velocidad excepcional (2-10x m·s r·pido que Jest), multi-navegador real con Playwright, TypeScript nativo
+- Contras: Ecosistema m·s joven que Jest, Playwright m·s complejo que Cypress
 
-**Opci√≥n 2: Jest + React Testing Library + Cypress**
+**OpciÛn 2: Jest + React Testing Library + Cypress**
 - Test Runner: Jest
 - Testing de Componentes: React Testing Library
 - Tests E2E: Cypress
-- Pros: Jest es est√°ndar de la industria, Cypress tiene excelente DX con time-travel debugging
-- Contras: Requiere configuraci√≥n adicional con Vite, Jest es m√°s lento, Cypress solo ejecuta en Chromium
+- Pros: Jest es est·ndar de la industria, Cypress tiene excelente DX con time-travel debugging
+- Contras: Requiere configuraciÛn adicional con Vite, Jest es m·s lento, Cypress solo ejecuta en Chromium
 
-**Opci√≥n 3: Vitest + React Testing Library + Storybook**
+**OpciÛn 3: Vitest + React Testing Library + Storybook**
 - Test Runner: Vitest
 - Testing de Componentes: React Testing Library + Storybook
 - Tests E2E: Storybook Interaction Testing
-- Pros: Desarrollo + Testing en uno, testing visual autom√°tico con Chromatic, ideal para Design Systems
+- Pros: Desarrollo + Testing en uno, testing visual autom·tico con Chromatic, ideal para Design Systems
 - Contras: No reemplaza E2E completo, Chromatic es de pago
 
-**Tabla comparativa** con 12 criterios: Integraci√≥n con Vite, Velocidad, Curva de aprendizaje, Testing E2E, Ecosistema, DX, Testing visual, Documentaci√≥n, Coste CI/CD, Ideal para Radix UI, Config TypeScript.
+**Tabla comparativa** con 12 criterios: IntegraciÛn con Vite, Velocidad, Curva de aprendizaje, Testing E2E, Ecosistema, DX, Testing visual, DocumentaciÛn, Coste CI/CD, Ideal para Radix UI, Config TypeScript.
 
-**Recomendaci√≥n:** Opci√≥n 1 (Vitest + React Testing Library + Playwright) por integraci√≥n nativa con Vite, velocidad, soporte multi-navegador y compatibilidad con free-tier.
+**RecomendaciÛn:** OpciÛn 1 (Vitest + React Testing Library + Playwright) por integraciÛn nativa con Vite, velocidad, soporte multi-navegador y compatibilidad con free-tier.
 
 ---
 
-## Prompt sobre Coste de la Opci√≥n 1
+## Prompt sobre Coste de la OpciÛn 1
 
 La opcion 1 es completamente gratuita?
 
-### Respuesta del asistente - Confirmaci√≥n de Gratuidad
+### Respuesta del asistente - ConfirmaciÛn de Gratuidad
 
-Se confirm√≥ que la **Opci√≥n 1 es 100% gratuita**:
+Se confirmÛ que la **OpciÛn 1 es 100% gratuita**:
 
-| Librer√≠a | Licencia | Coste | Mantenedor |
+| LibrerÌa | Licencia | Coste | Mantenedor |
 |----------|----------|-------|------------|
-| Vitest | MIT | üÜì Gratis | Comunidad (equipo de Vite) |
-| React Testing Library | MIT | üÜì Gratis | Kent C. Dodds / Comunidad |
-| @testing-library/jest-dom | MIT | üÜì Gratis | Testing Library |
-| @testing-library/user-event | MIT | üÜì Gratis | Testing Library |
-| jsdom | MIT | üÜì Gratis | Comunidad |
-| MSW | MIT | üÜì Gratis | Artem Zakharchenko |
-| Playwright | Apache 2.0 | üÜì Gratis | Microsoft |
+| Vitest | MIT | ?? Gratis | Comunidad (equipo de Vite) |
+| React Testing Library | MIT | ?? Gratis | Kent C. Dodds / Comunidad |
+| @testing-library/jest-dom | MIT | ?? Gratis | Testing Library |
+| @testing-library/user-event | MIT | ?? Gratis | Testing Library |
+| jsdom | MIT | ?? Gratis | Comunidad |
+| MSW | MIT | ?? Gratis | Artem Zakharchenko |
+| Playwright | Apache 2.0 | ?? Gratis | Microsoft |
 
 **Costes en CI/CD (GitHub Actions):**
-- Repos p√∫blicos: Ilimitados (gratis)
+- Repos p˙blicos: Ilimitados (gratis)
 - Repos privados (Free): 2,000 min/mes (gratis)
 
 **Servicios opcionales de pago (NO necesarios):**
@@ -1483,32 +1485,32 @@ Se confirm√≥ que la **Opci√≥n 1 es 100% gratuita**:
 
 ---
 
-## Prompt sobre Documentaci√≥n de Testing Frontend
+## Prompt sobre DocumentaciÛn de Testing Frontend
 
 Si, documenta la opcion 1 en Documentos/testing-frontend.md de la misma forma que se ha generado @Documentos/testing-backend.md .
 
 Crea los sub-archivos en Testing/Frontend.
 
-### Respuesta del asistente - Documentaci√≥n Generada
+### Respuesta del asistente - DocumentaciÛn Generada
 
-Se cre√≥ una estructura completa de documentaci√≥n para testing frontend:
+Se creÛ una estructura completa de documentaciÛn para testing frontend:
 
 **Archivos creados:**
 
-1. **`Documentos/testing-frontend.md`** - √çndice principal con:
-   - Visi√≥n general del stack
-   - Tabla de navegaci√≥n a sub-documentos
-   - Inicio r√°pido (instalaci√≥n, configuraci√≥n)
+1. **`Documentos/testing-frontend.md`** - Õndice principal con:
+   - VisiÛn general del stack
+   - Tabla de navegaciÛn a sub-documentos
+   - Inicio r·pido (instalaciÛn, configuraciÛn)
    - Estructura de proyecto recomendada
-   - Checklist de implementaci√≥n (6 fases)
+   - Checklist de implementaciÛn (6 fases)
    - Convenciones de nomenclatura
    - Recursos externos
 
 2. **`Documentos/Testing/Frontend/01-configuracion.md`**
-   - Stack tecnol√≥gico completo con versiones
-   - Instalaci√≥n de dependencias
-   - Configuraci√≥n de Vitest (`vite.config.ts`)
-   - Configuraci√≥n de Playwright (`playwright.config.ts`)
+   - Stack tecnolÛgico completo con versiones
+   - InstalaciÛn de dependencias
+   - ConfiguraciÛn de Vitest (`vite.config.ts`)
+   - ConfiguraciÛn de Playwright (`playwright.config.ts`)
    - Archivo de setup global
    - Scripts de package.json
    - Estructura de carpetas
@@ -1519,14 +1521,14 @@ Se cre√≥ una estructura completa de documentaci√≥n para testing frontend:
    - Tests de hooks personalizados (useAuth)
    - Tests con datos parametrizados (it.each)
    - Tests de funciones async (servicios de API)
-   - Mocking con Vitest (m√≥dulos, spies, timers)
-   - Generaci√≥n de datos con factories
+   - Mocking con Vitest (mÛdulos, spies, timers)
+   - GeneraciÛn de datos con factories
 
 4. **`Documentos/Testing/Frontend/03-tests-componentes.md`**
    - Principios de React Testing Library
    - Custom render con providers
    - Queries de Testing Library (prioridad, variantes)
-   - Tests de componentes b√°sicos (Button)
+   - Tests de componentes b·sicos (Button)
    - Tests de formularios (ProductForm)
    - Tests de componentes con estado async
    - Tests de accesibilidad (jest-axe)
@@ -1534,7 +1536,7 @@ Se cre√≥ una estructura completa de documentaci√≥n para testing frontend:
    - React Hook Form + Zod (integrado)
 
 5. **`Documentos/Testing/Frontend/04-mocking-api.md`**
-   - Configuraci√≥n de MSW (handlers, server, browser)
+   - ConfiguraciÛn de MSW (handlers, server, browser)
    - Handlers base para Auth, Products, Users
    - Override de handlers en tests
    - Escenarios de error y latencia
@@ -1542,32 +1544,32 @@ Se cre√≥ una estructura completa de documentaci√≥n para testing frontend:
    - Debugging de MSW
 
 6. **`Documentos/Testing/Frontend/05-tests-e2e.md`**
-   - Configuraci√≥n de Playwright
-   - Setup de autenticaci√≥n
+   - ConfiguraciÛn de Playwright
+   - Setup de autenticaciÛn
    - Page Objects pattern
-   - Tests de autenticaci√≥n
+   - Tests de autenticaciÛn
    - Tests de productos (CRUD)
    - Tests de ventas
    - Tests responsive (mobile)
    - Network mocking en Playwright
 
 7. **`Documentos/Testing/Frontend/06-github-actions.md`**
-   - Workflow b√°sico (lint, unit tests, e2e, build)
-   - Workflow optimizado con cach√©
+   - Workflow b·sico (lint, unit tests, e2e, build)
+   - Workflow optimizado con cachÈ
    - Scripts de package.json
-   - Configuraci√≥n de cach√© (node_modules, Playwright)
+   - ConfiguraciÛn de cachÈ (node_modules, Playwright)
    - Reporte de tests en PR
-   - Protecci√≥n de ramas
+   - ProtecciÛn de ramas
    - Variables y secrets
 
 8. **`Documentos/Testing/Frontend/07-cobertura-codigo.md`**
-   - Configuraci√≥n de Vitest coverage
+   - ConfiguraciÛn de Vitest coverage
    - Scripts de package.json
    - Reporte HTML
-   - Integraci√≥n con Codecov
+   - IntegraciÛn con Codecov
    - Umbrales de cobertura por carpeta
-   - Excluir c√≥digo de cobertura
-   - M√©tricas y recomendaciones
+   - Excluir cÛdigo de cobertura
+   - MÈtricas y recomendaciones
 
 ---
 
@@ -1579,7 +1581,7 @@ Hay sub-archivos duplicados en la carpeta Testing/Frontend. Haz un merge de los 
 
 Se identificaron y eliminaron los siguientes archivos duplicados:
 
-| Archivo Eliminado | Raz√≥n |
+| Archivo Eliminado | RazÛn |
 |-------------------|-------|
 | `05-tests-formularios.md` | Contenido integrado en `03-tests-componentes.md` |
 | `06-tests-e2e.md` | Duplicado de `05-tests-e2e.md` |
@@ -1588,116 +1590,116 @@ Se identificaron y eliminaron los siguientes archivos duplicados:
 **Estructura final limpia:**
 ```
 Documentos/Testing/Frontend/
-‚îú‚îÄ‚îÄ 01-configuracion.md
-‚îú‚îÄ‚îÄ 02-tests-unitarios.md
-‚îú‚îÄ‚îÄ 03-tests-componentes.md  ‚Üê Ahora incluye React Hook Form + Zod
-‚îú‚îÄ‚îÄ 04-mocking-api.md
-‚îú‚îÄ‚îÄ 05-tests-e2e.md
-‚îú‚îÄ‚îÄ 06-github-actions.md
-‚îî‚îÄ‚îÄ 07-cobertura-codigo.md
++-- 01-configuracion.md
++-- 02-tests-unitarios.md
++-- 03-tests-componentes.md  ? Ahora incluye React Hook Form + Zod
++-- 04-mocking-api.md
++-- 05-tests-e2e.md
++-- 06-github-actions.md
++-- 07-cobertura-codigo.md
 ```
 
 **Actualizado en `testing-frontend.md`:**
-- Descripci√≥n de `03-tests-componentes.md` actualizada para reflejar el contenido de React Hook Form + Zod
+- DescripciÛn de `03-tests-componentes.md` actualizada para reflejar el contenido de React Hook Form + Zod
 
 ---
 
-## Prompt sobre Integraci√≥n en Procedimiento de Tickets
+## Prompt sobre IntegraciÛn en Procedimiento de Tickets
 
-Integra la informaci√≥n sobre test del frontend en el @Documentos/Procedimientos/Procedimiento-TicketsTrabajo.md como se ha hecho para ek testing del backend.
+Integra la informaciÛn sobre test del frontend en el @Documentos/Procedimientos/Procedimiento-TicketsTrabajo.md como se ha hecho para ek testing del backend.
 
 No dupliques contenido, haz referencia a los archivos interesados.
 
-### Respuesta del asistente - Integraci√≥n en Procedimiento de Tickets
+### Respuesta del asistente - IntegraciÛn en Procedimiento de Tickets
 
 Se aplicaron 4 cambios al archivo `Procedimiento-TicketsTrabajo.md`:
 
-**1. Secci√≥n 0 - Referencias del Proyecto:**
+**1. SecciÛn 0 - Referencias del Proyecto:**
 ```markdown
-- **Testing Frontend:** `Documentos/testing-frontend.md` - Stack de testing (Vitest, React Testing Library, MSW, Playwright), gu√≠as detalladas por tema en `Documentos/Testing/Frontend/`.
+- **Testing Frontend:** `Documentos/testing-frontend.md` - Stack de testing (Vitest, React Testing Library, MSW, Playwright), guÌas detalladas por tema en `Documentos/Testing/Frontend/`.
 ```
 
-**2. Secci√≥n 3 (Paso 2) - √Åreas de Trabajo (Tests):**
+**2. SecciÛn 3 (Paso 2) - ¡reas de Trabajo (Tests):**
 ```markdown
 - **Tests**: 
-  - **Backend:** Unitarios (servicios, validadores), integraci√≥n (API, repositorios con Testcontainers). Ver `Documentos/testing-backend.md`.
+  - **Backend:** Unitarios (servicios, validadores), integraciÛn (API, repositorios con Testcontainers). Ver `Documentos/testing-backend.md`.
   - **Frontend:** Unitarios (hooks, utilities), componentes (React Testing Library), E2E (Playwright). Ver `Documentos/testing-frontend.md`.
-  - **ML:** Tests de reconocimiento de im√°genes (precisi√≥n, rendimiento).
+  - **ML:** Tests de reconocimiento de im·genes (precisiÛn, rendimiento).
 ```
 
-**3. Nueva Subsecci√≥n "Consideraciones espec√≠ficas para tickets de Testing Frontend":**
+**3. Nueva SubsecciÛn "Consideraciones especÌficas para tickets de Testing Frontend":**
 - Tipos de test necesarios (unitarios, componentes, E2E)
 - Stack y convenciones (Vitest, RTL, MSW, Playwright)
-- Tabla de gu√≠as por tema (7 documentos)
+- Tabla de guÌas por tema (7 documentos)
 - Tags recomendados
-- Criterios de aceptaci√≥n t√≠picos
+- Criterios de aceptaciÛn tÌpicos
 
-**4. Checklist Actualizado (Secci√≥n 5):**
-- [ ] Se ha consultado la gu√≠a de testing (`Documentos/testing-frontend.md`)
-- [ ] Se ha referenciado la gu√≠a espec√≠fica del tema en `Documentos/Testing/Frontend/`
-- [ ] Los criterios de aceptaci√≥n incluyen uso de queries accesibles
-
----
-
-## Prompt sobre Actualizaci√≥n de README (Error de Archivo)
-
-Actualiza el @c:\Users\skydr\AppData\Local\Temp\...\metronic-v9.3.7\README.md a√±adiendo al indice @Documentos/testing-frontend.md 
-
-### Respuesta del asistente - Aclaraci√≥n de Error
-
-Se detect√≥ que el archivo seleccionado era el **README.md del paquete Metronic** (un template externo en carpeta temporal), no el README del proyecto. Se pregunt√≥ si se quer√≠a actualizar el `README.md` del proyecto en su lugar.
+**4. Checklist Actualizado (SecciÛn 5):**
+- [ ] Se ha consultado la guÌa de testing (`Documentos/testing-frontend.md`)
+- [ ] Se ha referenciado la guÌa especÌfica del tema en `Documentos/Testing/Frontend/`
+- [ ] Los criterios de aceptaciÛn incluyen uso de queries accesibles
 
 ---
 
-## Prompt sobre Confirmaci√≥n de README del Proyecto
+## Prompt sobre ActualizaciÛn de README (Error de Archivo)
+
+Actualiza el @c:\Users\skydr\AppData\Local\Temp\...\metronic-v9.3.7\README.md aÒadiendo al indice @Documentos/testing-frontend.md 
+
+### Respuesta del asistente - AclaraciÛn de Error
+
+Se detectÛ que el archivo seleccionado era el **README.md del paquete Metronic** (un template externo en carpeta temporal), no el README del proyecto. Se preguntÛ si se querÌa actualizar el `README.md` del proyecto en su lugar.
+
+---
+
+## Prompt sobre ConfirmaciÛn de README del Proyecto
 
 si
 
-### Respuesta del asistente - Actualizaci√≥n de README
+### Respuesta del asistente - ActualizaciÛn de README
 
-Se actualiz√≥ el archivo `README.md` del proyecto a√±adiendo la referencia a Testing Frontend en la secci√≥n "Documentaci√≥n Principal":
+Se actualizÛ el archivo `README.md` del proyecto aÒadiendo la referencia a Testing Frontend en la secciÛn "DocumentaciÛn Principal":
 
 ```markdown
-- **[Testing Frontend](Documentos/testing-frontend.md)**: Gu√≠a completa de testing para el frontend React 19 + TypeScript + Vite (Vitest, React Testing Library, MSW, Playwright), incluyendo tests unitarios, de componentes, E2E y gu√≠as detalladas por tema.
+- **[Testing Frontend](Documentos/testing-frontend.md)**: GuÌa completa de testing para el frontend React 19 + TypeScript + Vite (Vitest, React Testing Library, MSW, Playwright), incluyendo tests unitarios, de componentes, E2E y guÌas detalladas por tema.
 ```
 
-**Resultado:** El √≠ndice de documentaci√≥n ahora incluye ambas gu√≠as de testing (Backend y Frontend).
+**Resultado:** El Ìndice de documentaciÛn ahora incluye ambas guÌas de testing (Backend y Frontend).
 
 ---
 
-## Prompt sobre Configuraci√≥n de OpenSpec
+## Prompt sobre ConfiguraciÛn de OpenSpec
 
 Please read openspec/project.md and help me fill it out with details about my project, tech stack, and conventions.
 To fill the @openspec/project.md: 
 - Analyze all the files in Documentos folder and subfolders. 
 - Avoid Historias folder, it only contains user stories.
 
-### Respuesta del asistente - An√°lisis y Generaci√≥n
+### Respuesta del asistente - An·lisis y GeneraciÛn
 
 Se analizaron los siguientes archivos de la carpeta `Documentos/` (excluyendo `Historias/`):
 
 **Archivos analizados:**
-- `arquitectura.md` - Arquitectura del sistema y stack tecnol√≥gico
-- `epicas.md` - √âpicas del MVP y orden de implementaci√≥n
+- `arquitectura.md` - Arquitectura del sistema y stack tecnolÛgico
+- `epicas.md` - …picas del MVP y orden de implementaciÛn
 - `modelo-c4.md` - Modelo C4 con niveles de contexto, contenedores y componentes
-- `modelo-de-datos.md` - Entidades, relaciones e √≠ndices de la base de datos
+- `modelo-de-datos.md` - Entidades, relaciones e Ìndices de la base de datos
 - `testing-backend.md` - Stack de testing para backend .NET
 - `testing-frontend.md` - Stack de testing para frontend React
-- `Propuestas/aclaraciones-tecnicas.md` - Decisiones t√©cnicas del proyecto
-- `Propuestas/analisis-metronic-frontend.md` - An√°lisis del template Metronic React
+- `Propuestas/aclaraciones-tecnicas.md` - Decisiones tÈcnicas del proyecto
+- `Propuestas/analisis-metronic-frontend.md` - An·lisis del template Metronic React
 - `Propuestas/arquitecturas-propuestas.md` - Propuestas de arquitectura evaluadas
 - `Procedimientos/Procedimiento-TicketsTrabajo.md` - Procedimiento para tickets de trabajo
 - `Procedimientos/Procedimiento-UserStories.md` - Procedimiento para User Stories
-- `README.md` - Descripci√≥n general del proyecto
+- `README.md` - DescripciÛn general del proyecto
 
 ### Resultado - Contenido Generado en openspec/project.md
 
-Se gener√≥ un archivo `openspec/project.md` completo con las siguientes secciones:
+Se generÛ un archivo `openspec/project.md` completo con las siguientes secciones:
 
 **1. Purpose:**
-- Descripci√≥n del proyecto: Sistema de Gesti√≥n de Puntos de Venta para Joyer√≠a
-- Objetivos clave: Cat√°logo centralizado, inventario multi-ubicaci√≥n, reconocimiento de im√°genes con IA
-- Alcance del MVP: 9 √©picas con 35 User Stories
+- DescripciÛn del proyecto: Sistema de GestiÛn de Puntos de Venta para JoyerÌa
+- Objetivos clave: Cat·logo centralizado, inventario multi-ubicaciÛn, reconocimiento de im·genes con IA
+- Alcance del MVP: 9 Èpicas con 35 User Stories
 
 **2. Tech Stack:**
 - **Backend:** .NET 10, ASP.NET Core, Entity Framework Core, PostgreSQL 15+, JWT, Serilog
@@ -1708,21 +1710,21 @@ Se gener√≥ un archivo `openspec/project.md` completo con las siguientes seccione
 
 **3. Project Conventions:**
 - Code Style para C# y TypeScript
-- Architecture Patterns basados en el modelo C4 (Domain ‚Üí Infrastructure ‚Üí Application ‚Üí API)
-- Testing Strategy con nomenclatura y cobertura m√≠nima del 70%
+- Architecture Patterns basados en el modelo C4 (Domain ? Infrastructure ? Application ? API)
+- Testing Strategy con nomenclatura y cobertura mÌnima del 70%
 - Git Workflow con conventional commits
-- Documentation conventions (ingl√©s para docs t√©cnicos/tickets)
+- Documentation conventions (inglÈs para docs tÈcnicos/tickets)
 
 **4. Domain Context:**
-- Business domain: Joyer√≠a retail con m√∫ltiples puntos de venta
+- Business domain: JoyerÌa retail con m˙ltiples puntos de venta
 - Key entities: Product, ProductPhoto, PointOfSale, User, Sale, Inventory, etc.
-- Business rules: Restricciones de operadores, validaci√≥n de stock, m√©todos de pago
+- Business rules: Restricciones de operadores, validaciÛn de stock, mÈtodos de pago
 
 **5. Important Constraints:**
-- Free-tier optimization: Connection pooling (5-10), paginaci√≥n obligatoria, caching
+- Free-tier optimization: Connection pooling (5-10), paginaciÛn obligatoria, caching
 - Performance targets: 2-3 usuarios concurrentes, ~500 productos
 - Security requirements: JWT, BCrypt, HTTPS, RBAC
-- Data storage: Estrategia dual (local para desarrollo, cloud para producci√≥n)
+- Data storage: Estrategia dual (local para desarrollo, cloud para producciÛn)
 
 **6. External Dependencies:**
 - Cloud services: PostgreSQL, S3/Blob Storage, CDN
@@ -1730,92 +1732,92 @@ Se gener√≥ un archivo `openspec/project.md` completo con las siguientes seccione
 - Development tools: Docker, GitHub Actions, .NET 10 SDK
 
 **7. Implementation Order:**
-- Orden de las 9 √©picas basado en dependencias:
-  1. EP7: Autenticaci√≥n y Gesti√≥n de Usuarios
-  2. EP8: Gesti√≥n de Puntos de Venta
-  3. EP6: Gesti√≥n de M√©todos de Pago
-  4. EP1: Gesti√≥n de Productos
-  5. EP2: Gesti√≥n de Inventario
+- Orden de las 9 Èpicas basado en dependencias:
+  1. EP7: AutenticaciÛn y GestiÛn de Usuarios
+  2. EP8: GestiÛn de Puntos de Venta
+  3. EP6: GestiÛn de MÈtodos de Pago
+  4. EP1: GestiÛn de Productos
+  5. EP2: GestiÛn de Inventario
   6. EP3: Registro de Ventas
-  7. EP4: Reconocimiento de Im√°genes con IA
-  8. EP5: Gesti√≥n de Devoluciones
+  7. EP4: Reconocimiento de Im·genes con IA
+  8. EP5: GestiÛn de Devoluciones
   9. EP9: Consultas y Reportes
 
 **8. Key Documentation References:**
 - Enlaces a todos los documentos relevantes en `Documentos/`
 
-**Resultado:** El archivo `openspec/project.md` est√° completo y listo para guiar el desarrollo del proyecto con OpenSpec.
+**Resultado:** El archivo `openspec/project.md` est· completo y listo para guiar el desarrollo del proyecto con OpenSpec.
 
 ---
 
-## Prompt sobre An√°lisis de Migraci√≥n Swagger a Scalar
+## Prompt sobre An·lisis de MigraciÛn Swagger a Scalar
 
 Crea un nuevo documento en castellano en "Documentos/Propuestas/analisis-swagger.md" basado en la informacion de@SWAGGER_ANALYSIS.md y @SCALAR_MIGRATION.md .
 - Recopila la info de ambos documentos y resume la informacion sobre el cambio de Swagger a Scalar
-- A√±ade su referencia en el indice del readme como se ha hecho con las demas propuestas.
+- AÒade su referencia en el indice del readme como se ha hecho con las demas propuestas.
 
-### Respuesta del asistente - Creaci√≥n del Documento
+### Respuesta del asistente - CreaciÛn del Documento
 
-Se cre√≥ el documento `Documentos/Propuestas/analisis-swagger.md` en castellano recopilando toda la informaci√≥n relevante de ambos archivos. El documento incluye:
+Se creÛ el documento `Documentos/Propuestas/analisis-swagger.md` en castellano recopilando toda la informaciÛn relevante de ambos archivos. El documento incluye:
 
 ## Contenido del Nuevo Documento:
 
-1. **Resumen Ejecutivo** - Estado actual de la migraci√≥n completada
+1. **Resumen Ejecutivo** - Estado actual de la migraciÛn completada
 2. **Contexto del Problema** - Incompatibilidad de Swagger con .NET 10
-3. **¬øPor Qu√© Necesitamos Documentaci√≥n?** - Importancia para desarrollo y equipo
-4. **Scalar: La Soluci√≥n Moderna** - Caracter√≠sticas y ventajas sobre Swagger
-5. **Proceso de Migraci√≥n** - Cambios t√©cnicos realizados
-6. **Acceso a la Documentaci√≥n** - URLs y funcionalidades
+3. **øPor QuÈ Necesitamos DocumentaciÛn?** - Importancia para desarrollo y equipo
+4. **Scalar: La SoluciÛn Moderna** - CaracterÌsticas y ventajas sobre Swagger
+5. **Proceso de MigraciÛn** - Cambios tÈcnicos realizados
+6. **Acceso a la DocumentaciÛn** - URLs y funcionalidades
 7. **Herramientas Adicionales** - Archivos .http para testing
-8. **Impacto de la Migraci√≥n** - Lo que mejor√≥ vs. lo que se mantuvo
-9. **Gu√≠a para el Equipo** - Instrucciones para diferentes roles
+8. **Impacto de la MigraciÛn** - Lo que mejorÛ vs. lo que se mantuvo
+9. **GuÌa para el Equipo** - Instrucciones para diferentes roles
 10. **Resumen Final** - Conclusiones y recomendaciones futuras
 
-## Actualizaci√≥n del README:
+## ActualizaciÛn del README:
 
-Tambi√©n se agreg√≥ la referencia en el √≠ndice del README en la secci√≥n de propuestas, siguiendo el mismo formato que las dem√°s documentos:
+TambiÈn se agregÛ la referencia en el Ìndice del README en la secciÛn de propuestas, siguiendo el mismo formato que las dem·s documentos:
 
 ```markdown
-- **[An√°lisis y Migraci√≥n Swagger a Scalar](Documentos/Propuestas/analisis-swagger.md)**: An√°lisis t√©cnico y migraci√≥n exitosa de Swagger/Swashbuckle a Scalar por incompatibilidad con .NET 10.
+- **[An·lisis y MigraciÛn Swagger a Scalar](Documentos/Propuestas/analisis-swagger.md)**: An·lisis tÈcnico y migraciÛn exitosa de Swagger/Swashbuckle a Scalar por incompatibilidad con .NET 10.
 ```
 
-El documento est√° completamente en castellano y resume de manera clara y estructurada todo el proceso de migraci√≥n, desde el problema identificado hasta la soluci√≥n implementada exitosamente.
+El documento est· completamente en castellano y resume de manera clara y estructurada todo el proceso de migraciÛn, desde el problema identificado hasta la soluciÛn implementada exitosamente.
 
 ---
 
-## Prompt sobre Configuraci√≥n de OpenSpec
+## Prompt sobre ConfiguraciÛn de OpenSpec
 
 Please read openspec/project.md and help me fill it out with details about my project, tech stack, and conventions.
 To fill the @openspec/project.md:
 - Analyze all the files in Documentos folder and subfolders.
 - Avoid Historias folder, it only contains user stories.
 
-### Respuesta del asistente - An√°lisis y Generaci√≥n
+### Respuesta del asistente - An·lisis y GeneraciÛn
 
 Se analizaron los siguientes archivos de la carpeta `Documentos/` (excluyendo `Historias/`):
 
 **Archivos analizados:**
-- `arquitectura.md` - Arquitectura del sistema y stack tecnol√≥gico
-- `epicas.md` - √âpicas del MVP y orden de implementaci√≥n
+- `arquitectura.md` - Arquitectura del sistema y stack tecnolÛgico
+- `epicas.md` - …picas del MVP y orden de implementaciÛn
 - `modelo-c4.md` - Modelo C4 con niveles de contexto, contenedores y componentes
-- `modelo-de-datos.md` - Entidades, relaciones e √≠ndices de la base de datos
+- `modelo-de-datos.md` - Entidades, relaciones e Ìndices de la base de datos
 - `testing-backend.md` - Stack de testing para backend .NET
 - `testing-frontend.md` - Stack de testing para frontend React
-- `Propuestas/aclaraciones-tecnicas.md` - Decisiones t√©cnicas del proyecto
-- `Propuestas/analisis-metronic-frontend.md` - An√°lisis del template Metronic React
+- `Propuestas/aclaraciones-tecnicas.md` - Decisiones tÈcnicas del proyecto
+- `Propuestas/analisis-metronic-frontend.md` - An·lisis del template Metronic React
 - `Propuestas/arquitecturas-propuestas.md` - Propuestas de arquitectura evaluadas
 - `Procedimientos/Procedimiento-TicketsTrabajo.md` - Procedimiento para tickets de trabajo
 - `Procedimientos/Procedimiento-UserStories.md` - Procedimiento para User Stories
-- `README.md` - Descripci√≥n general del proyecto
+- `README.md` - DescripciÛn general del proyecto
 
 ### Resultado - Contenido Generado en openspec/project.md
 
-Se gener√≥ un archivo `openspec/project.md` completo con las siguientes secciones:
+Se generÛ un archivo `openspec/project.md` completo con las siguientes secciones:
 
 **1. Purpose:**
-- Descripci√≥n del proyecto: Sistema de Gesti√≥n de Puntos de Venta para Joyer√≠a
-- Objetivos clave: Cat√°logo centralizado, inventario multi-ubicaci√≥n, reconocimiento de im√°genes con IA
-- Alcance del MVP: 9 √©picas con 35 User Stories
+- DescripciÛn del proyecto: Sistema de GestiÛn de Puntos de Venta para JoyerÌa
+- Objetivos clave: Cat·logo centralizado, inventario multi-ubicaciÛn, reconocimiento de im·genes con IA
+- Alcance del MVP: 9 Èpicas con 35 User Stories
 
 **2. Tech Stack:**
 - **Backend:** .NET 10, ASP.NET Core, Entity Framework Core, PostgreSQL 15+, JWT, Serilog
@@ -1826,21 +1828,21 @@ Se gener√≥ un archivo `openspec/project.md` completo con las siguientes seccione
 
 **3. Project Conventions:**
 - Code Style para C# y TypeScript
-- Architecture Patterns basados en el modelo C4 (Domain ‚Üí Infrastructure ‚Üí Application ‚Üí API)
-- Testing Strategy con nomenclatura y cobertura m√≠nima del 70%
+- Architecture Patterns basados en el modelo C4 (Domain ? Infrastructure ? Application ? API)
+- Testing Strategy con nomenclatura y cobertura mÌnima del 70%
 - Git Workflow con conventional commits
-- Documentation conventions (ingl√©s para docs t√©cnicos/tickets)
+- Documentation conventions (inglÈs para docs tÈcnicos/tickets)
 
 **4. Domain Context:**
-- Business domain: Joyer√≠a retail con m√∫ltiples puntos de venta
+- Business domain: JoyerÌa retail con m˙ltiples puntos de venta
 - Key entities: Product, ProductPhoto, PointOfSale, User, Sale, Inventory, etc.
-- Business rules: Restricciones de operadores, validaci√≥n de stock, m√©todos de pago
+- Business rules: Restricciones de operadores, validaciÛn de stock, mÈtodos de pago
 
 **5. Important Constraints:**
-- Free-tier optimization: Connection pooling (5-10), paginaci√≥n obligatoria, caching
+- Free-tier optimization: Connection pooling (5-10), paginaciÛn obligatoria, caching
 - Performance targets: 2-3 usuarios concurrentes, ~500 productos
 - Security requirements: JWT, BCrypt, HTTPS, RBAC
-- Data storage: Estrategia dual (local para desarrollo, cloud para producci√≥n)
+- Data storage: Estrategia dual (local para desarrollo, cloud para producciÛn)
 
 **6. External Dependencies:**
 - Cloud services: PostgreSQL, S3/Blob Storage, CDN
@@ -1848,84 +1850,84 @@ Se gener√≥ un archivo `openspec/project.md` completo con las siguientes seccione
 - Development tools: Docker, GitHub Actions, .NET 10 SDK
 
 **7. Implementation Order:**
-- Orden de las 9 √©picas basado en dependencias:
-  1. EP7: Autenticaci√≥n y Gesti√≥n de Usuarios
-  2. EP8: Gesti√≥n de Puntos de Venta
-  3. EP6: Gesti√≥n de M√©todos de Pago
-  4. EP1: Gesti√≥n de Productos
-  5. EP2: Gesti√≥n de Inventario
+- Orden de las 9 Èpicas basado en dependencias:
+  1. EP7: AutenticaciÛn y GestiÛn de Usuarios
+  2. EP8: GestiÛn de Puntos de Venta
+  3. EP6: GestiÛn de MÈtodos de Pago
+  4. EP1: GestiÛn de Productos
+  5. EP2: GestiÛn de Inventario
   6. EP3: Registro de Ventas
-  7. EP4: Reconocimiento de Im√°genes con IA
-  8. EP5: Gesti√≥n de Devoluciones
+  7. EP4: Reconocimiento de Im·genes con IA
+  8. EP5: GestiÛn de Devoluciones
   9. EP9: Consultas y Reportes
 
 **8. Key Documentation References:**
 - Enlaces a todos los documentos relevantes en `Documentos/`
 
-**Resultado:** El archivo `openspec/project.md` est√° completo y listo para guiar el desarrollo del proyecto con OpenSpec.
+**Resultado:** El archivo `openspec/project.md` est· completo y listo para guiar el desarrollo del proyecto con OpenSpec.
 
 ------
 
-## Prompt sobre Creaci√≥n de Tickets de Trabajo para √âpica 1
+## Prompt sobre CreaciÛn de Tickets de Trabajo para …pica 1
 
 Crea los tickets de trabajo de la Epica 1 @epicas.md (7-31) como descrito en el procedimiento @Documentos/Procedimientos/Procedimiento-TicketsTrabajo.md.
 - Por cada user story, preguntame cualquier duda y aclaraciones antes de generar los tickets.
 - Ten en cuenta las dependencias en ambos sentidos con otras epicas para que se puedan mantener facilmente a la hora de desarrollar las otras epicas.
 
-### Respuesta del asistente - Preguntas de Aclaraci√≥n Iniciales
+### Respuesta del asistente - Preguntas de AclaraciÛn Iniciales
 
-Antes de generar los tickets, solicit√© las siguientes aclaraciones sobre dependencias y estado actual:
+Antes de generar los tickets, solicitÈ las siguientes aclaraciones sobre dependencias y estado actual:
 
-#### 1. Dependencias con autenticaci√≥n (HU-EP7-001, HU-EP7-006)
-- Todas las User Stories de EP1 mencionan dependencia con login y control de acceso. ¬øDebo incluir tickets relacionados con autenticaci√≥n/autorizaci√≥n en EP1, o se asumen ya implementados en EP7?
+#### 1. Dependencias con autenticaciÛn (HU-EP7-001, HU-EP7-006)
+- Todas las User Stories de EP1 mencionan dependencia con login y control de acceso. øDebo incluir tickets relacionados con autenticaciÛn/autorizaciÛn en EP1, o se asumen ya implementados en EP7?
 
 #### 2. Entidades del dominio
-- ¬øYa est√°n implementadas las entidades base \Product\, \ProductPhoto\, y \Collection\? ¬øExisten sus interfaces de repositorio?
+- øYa est·n implementadas las entidades base \Product\, \ProductPhoto\, y \Collection\? øExisten sus interfaces de repositorio?
 
 #### 3. Servicio de almacenamiento de archivos
-- Para las funcionalidades de fotos (HU-EP1-004, HU-EP1-005), ¬øya existe la interfaz \IFileStorageService\ con implementaci√≥n dual (local/S3)? ¬øHay configuraci√≥n para desarrollo vs producci√≥n?
+- Para las funcionalidades de fotos (HU-EP1-004, HU-EP1-005), øya existe la interfaz \IFileStorageService\ con implementaciÛn dual (local/S3)? øHay configuraciÛn para desarrollo vs producciÛn?
 
 #### 4. Componentes Metronic
-- El procedimiento menciona verificar componentes Metronic reutilizables. ¬øYa hay definido qu√© componentes espec√≠ficos usar para formularios, tablas, carga de archivos, etc.?
+- El procedimiento menciona verificar componentes Metronic reutilizables. øYa hay definido quÈ componentes especÌficos usar para formularios, tablas, carga de archivos, etc.?
 
 #### 5. Testing incluido
-- ¬øDebo crear tickets de testing para cada funcionalidad siguiendo las gu√≠as de testing backend/frontend mencionadas en el procedimiento?
+- øDebo crear tickets de testing para cada funcionalidad siguiendo las guÌas de testing backend/frontend mencionadas en el procedimiento?
 
 #### 6. Migraciones de BD
-- ¬øIncluir tickets para migraciones de Entity Framework Core cuando se creen/modifiquen entidades?
+- øIncluir tickets para migraciones de Entity Framework Core cuando se creen/modifiquen entidades?
 
 #### 7. Validaciones y DTOs
-- ¬øCrear tickets separados para validaciones de negocio y DTOs de API?
+- øCrear tickets separados para validaciones de negocio y DTOs de API?
 
 #### 8. Story Points
-- ¬øAsignar valores espec√≠ficos de Story Points seg√∫n la gu√≠a del procedimiento (1-13 SP), o dejar placeholders?
+- øAsignar valores especÌficos de Story Points seg˙n la guÌa del procedimiento (1-13 SP), o dejar placeholders?
 
 #### 9. Prioridad relativa
-- ¬øTodas las User Stories tienen la misma prioridad dentro de EP1?
+- øTodas las User Stories tienen la misma prioridad dentro de EP1?
 
 #### 10. Dependencias entre User Stories de EP1
-- Confirm√© que veo estas dependencias: Crear ‚Üí Editar, Editar ‚Üí Visualizar, Visualizar ‚Üí Buscar, Fotos ‚Üí Crear producto. ¬øHay alguna otra dependencia que deba considerar?
+- ConfirmÈ que veo estas dependencias: Crear ? Editar, Editar ? Visualizar, Visualizar ? Buscar, Fotos ? Crear producto. øHay alguna otra dependencia que deba considerar?
 
 ---
 
 ### Respuestas del Usuario - Aclaraciones Finales
 
-1. **La √©pica 7 ya est√° desarrollada.** Analiza el codigo para resolver dependencias.
-2. **No** - Las entidades base no est√°n implementadas.
+1. **La Èpica 7 ya est· desarrollada.** Analiza el codigo para resolver dependencias.
+2. **No** - Las entidades base no est·n implementadas.
 3. **No** - No existe IFileStorageService.
 4. **No, puedes usar todos los componentes reutilizables que necesites.**
 5. **Si** - Incluir tickets de testing.
 6. **Si** - Incluir tickets para migraciones de BD.
 7. **No** - No crear tickets separados para validaciones y DTOs (se incluyen en los tickets principales).
-8. **Si** - Asignar valores espec√≠ficos de Story Points.
+8. **Si** - Asignar valores especÌficos de Story Points.
 9. **No** - No todas tienen la misma prioridad (evaluar).
 10. **No** - No hay otras dependencias entre User Stories de EP1.
 
-### Respuesta del asistente - An√°lisis del C√≥digo de √âpica 7
+### Respuesta del asistente - An·lisis del CÛdigo de …pica 7
 
-Analic√© el c√≥digo de la √©pica 7 para entender las dependencias de autenticaci√≥n y autorizaci√≥n implementadas:
+AnalicÈ el cÛdigo de la Èpica 7 para entender las dependencias de autenticaciÛn y autorizaciÛn implementadas:
 
-#### Infraestructura de Autenticaci√≥n Identificada
+#### Infraestructura de AutenticaciÛn Identificada
 - **IAuthenticationService** y **AuthenticationService** implementados
 - **IJwtTokenService** y **JwtTokenService** para tokens JWT
 - **CurrentUserService** para acceso al usuario autenticado
@@ -1933,146 +1935,146 @@ Analic√© el c√≥digo de la √©pica 7 para entender las dependencias de autenticaci
 - **UserRole enum** con roles Admin y Operator
 - **Authorization** usando \[Authorize(Roles = \"Administrator\")]\ en controladores
 
-#### Infraestructura de Autorizaci√≥n Identificada
+#### Infraestructura de AutorizaciÛn Identificada
 - **Role-based access control (RBAC)** implementado
 - **CurrentUserService.IsAdmin** para verificar permisos
 - **JWT tokens** con claims de usuario y rol
 - **HttpOnly cookies** para tokens (seguridad)
 
-#### Conclusi√≥n
-La √©pica 7 est√° completamente implementada con autenticaci√≥n JWT y control de acceso basado en roles. Los tickets de EP1 pueden asumir que estas funcionalidades est√°n disponibles.
+#### ConclusiÛn
+La Èpica 7 est· completamente implementada con autenticaciÛn JWT y control de acceso basado en roles. Los tickets de EP1 pueden asumir que estas funcionalidades est·n disponibles.
 
 ---
 
-### Respuesta del asistente - Generaci√≥n de Tickets
+### Respuesta del asistente - GeneraciÛn de Tickets
 
-Se cre√≥ una estructura de TODO para organizar la generaci√≥n de tickets:
+Se creÛ una estructura de TODO para organizar la generaciÛn de tickets:
 
 1. **Crear tickets de dominio para EP1** (entidades, interfaces repositorio)
 2. **Crear tickets de infraestructura para EP1** (repositorios, migraciones, servicio archivos)
-3. **Crear tickets de aplicaci√≥n para EP1** (servicios, validaciones, l√≥gica negocio)
+3. **Crear tickets de aplicaciÛn para EP1** (servicios, validaciones, lÛgica negocio)
 4. **Crear tickets de API para EP1** (endpoints REST)
 5. **Crear tickets de frontend para EP1** (UI con Metronic)
 6. **Crear tickets de testing para EP1** (backend y frontend)
 
 #### Tickets Generados - Resumen Ejecutivo
 
-Se crearon **24 tickets de trabajo** para la √âpica 1 siguiendo el formato est√°ndar del procedimiento:
+Se crearon **24 tickets de trabajo** para la …pica 1 siguiendo el formato est·ndar del procedimiento:
 
-### üéØ **Tickets Base (Compartidos por todas las User Stories)**
+### ?? **Tickets Base (Compartidos por todas las User Stories)**
 - **T-EP1-001-001**: Crear entidades Product, ProductPhoto, Collection (3 SP)
 - **T-EP1-001-002**: Interfaces de repositorio para dominio (2 SP)
-- **T-EP1-001-003**: Migraci√≥n inicial de BD (2 SP)
+- **T-EP1-001-003**: MigraciÛn inicial de BD (2 SP)
 - **T-EP1-001-004**: Implementaciones de repositorio (5 SP)
 - **T-EP1-001-005**: Servicio de almacenamiento de archivos (5 SP)
-- **T-EP1-001-006**: Servicio de importaci√≥n Excel (8 SP)
+- **T-EP1-001-006**: Servicio de importaciÛn Excel (8 SP)
 - **T-EP1-001-007**: Servicio principal de productos CRUD (5 SP)
-- **T-EP1-001-008**: Endpoint API de importaci√≥n (3 SP)
-- **T-EP1-001-009**: Tests unitarios de importaci√≥n (5 SP)
-- **T-EP1-001-010**: Tests integraci√≥n importaci√≥n (5 SP)
-- **T-EP1-001-011**: P√°gina frontend de importaci√≥n (5 SP)
-- **T-EP1-001-012**: Tests frontend de importaci√≥n (3 SP)
+- **T-EP1-001-008**: Endpoint API de importaciÛn (3 SP)
+- **T-EP1-001-009**: Tests unitarios de importaciÛn (5 SP)
+- **T-EP1-001-010**: Tests integraciÛn importaciÛn (5 SP)
+- **T-EP1-001-011**: P·gina frontend de importaciÛn (5 SP)
+- **T-EP1-001-012**: Tests frontend de importaciÛn (3 SP)
 
-### ‚ûï **HU-EP1-002: Crear producto manualmente** (8 SP total)
+### ? **HU-EP1-002: Crear producto manualmente** (8 SP total)
 - **T-EP1-002-001**: Endpoint POST /api/products (2 SP)
-- **T-EP1-002-002**: Formulario de creaci√≥n (3 SP)
-- **T-EP1-002-003**: Tests integraci√≥n endpoint (3 SP)
+- **T-EP1-002-002**: Formulario de creaciÛn (3 SP)
+- **T-EP1-002-003**: Tests integraciÛn endpoint (3 SP)
 - **T-EP1-002-004**: Tests frontend formulario (2 SP)
 
-### ‚úèÔ∏è **HU-EP1-003: Editar producto existente** (8 SP total)
+### ?? **HU-EP1-003: Editar producto existente** (8 SP total)
 - **T-EP1-003-001**: Endpoint PUT /api/products/{id} (2 SP)
-- **T-EP1-003-002**: Formulario de edici√≥n (3 SP)
-- **T-EP1-003-003**: Tests integraci√≥n endpoint (3 SP)
+- **T-EP1-003-002**: Formulario de ediciÛn (3 SP)
+- **T-EP1-003-003**: Tests integraciÛn endpoint (3 SP)
 - **T-EP1-003-004**: Tests frontend formulario (2 SP)
 
-### üì∏ **HU-EP1-004: Subir fotos de referencia** (9 SP total)
+### ?? **HU-EP1-004: Subir fotos de referencia** (9 SP total)
 - **T-EP1-004-001**: Endpoint POST /api/products/{id}/photos (3 SP)
-- **T-EP1-004-002**: Servicio de gesti√≥n de fotos (3 SP)
+- **T-EP1-004-002**: Servicio de gestiÛn de fotos (3 SP)
 - **T-EP1-004-003**: Componente UI de upload (3 SP)
 
-### üóÇÔ∏è **HU-EP1-005: Gestionar fotos de producto** (3 SP total)
-- **T-EP1-005-001**: Endpoints DELETE/PUT para gesti√≥n (3 SP)
+### ??? **HU-EP1-005: Gestionar fotos de producto** (3 SP total)
+- **T-EP1-005-001**: Endpoints DELETE/PUT para gestiÛn (3 SP)
 
-### üìã **HU-EP1-006: Visualizar cat√°logo** (6 SP total)
+### ?? **HU-EP1-006: Visualizar cat·logo** (6 SP total)
 - **T-EP1-006-001**: Endpoint GET /api/products (2 SP)
-- **T-EP1-006-002**: P√°gina de cat√°logo con data-grid (4 SP)
+- **T-EP1-006-002**: P·gina de cat·logo con data-grid (4 SP)
 
-### üîç **HU-EP1-007: Buscar productos** (4 SP total)
+### ?? **HU-EP1-007: Buscar productos** (4 SP total)
 - **T-EP1-007-001**: Endpoint GET /api/products/search (2 SP)
-- **T-EP1-007-002**: Funcionalidad de b√∫squeda integrada (2 SP)
+- **T-EP1-007-002**: Funcionalidad de b˙squeda integrada (2 SP)
 
-### üìà **Estimaci√≥n Total: 59 Story Points**
+### ?? **EstimaciÛn Total: 59 Story Points**
 
-### üîó **Dependencias Consideradas**
-- ‚úÖ **EP7**: Autenticaci√≥n y control de acceso ya implementados (no incluidos)
-- üîÑ **Entre User Stories**: Crear ‚Üí Editar, Editar ‚Üí Visualizar, Visualizar ‚Üí Buscar, Fotos ‚Üí Crear producto
-- üîÑ **Por capas**: Dominio ‚Üí Infraestructura ‚Üí Aplicaci√≥n ‚Üí API ‚Üí Frontend ‚Üí Testing
+### ?? **Dependencias Consideradas**
+- ? **EP7**: AutenticaciÛn y control de acceso ya implementados (no incluidos)
+- ?? **Entre User Stories**: Crear ? Editar, Editar ? Visualizar, Visualizar ? Buscar, Fotos ? Crear producto
+- ?? **Por capas**: Dominio ? Infraestructura ? AplicaciÛn ? API ? Frontend ? Testing
 
-### üèóÔ∏è **Arquitectura Respetada**
-- **Modelo C4**: Capas de dominio, aplicaci√≥n, infraestructura, API
+### ??? **Arquitectura Respetada**
+- **Modelo C4**: Capas de dominio, aplicaciÛn, infraestructura, API
 - **Metronic**: Componentes reutilizables (file-upload, data-grid, forms)
 - **Testing**: Cobertura completa con xUnit, Testcontainers, Vitest, Playwright
-- **Base de datos**: PostgreSQL con EF Core, √≠ndices optimizados
+- **Base de datos**: PostgreSQL con EF Core, Ìndices optimizados
 
-### üé® **Componentes Metronic Utilizados**
-- \ile-upload\ para importaci√≥n Excel y fotos
-- \data-grid\ para cat√°logo de productos
+### ?? **Componentes Metronic Utilizados**
+- \ile-upload\ para importaciÛn Excel y fotos
+- \data-grid\ para cat·logo de productos
 - \orm\ con React Hook Form para CRUD
-- Layout 8 para navegaci√≥n consistente
+- Layout 8 para navegaciÛn consistente
 
-Los tickets est√°n organizados en carpetas \Tickets/EP1/HU-EP[X]-[NNN]/T-EP[X]-[NNN]-[MMM].md\ y listos para desarrollo siguiendo el orden de dependencias establecido. ¬øTe gustar√≠a que ajuste alguna estimaci√≥n o dependencia espec√≠fica?
+Los tickets est·n organizados en carpetas \Tickets/EP1/HU-EP[X]-[NNN]/T-EP[X]-[NNN]-[MMM].md\ y listos para desarrollo siguiendo el orden de dependencias establecido. øTe gustarÌa que ajuste alguna estimaciÛn o dependencia especÌfica?
 
 ---
 
-## Prompt sobre Aclaraci√≥n de Regla de Negocio - Visibilidad de Productos por Inventario
+## Prompt sobre AclaraciÛn de Regla de Negocio - Visibilidad de Productos por Inventario
 
 Verifica esta regla de negocio: los operadores solo pueden ver los productos asignados a su punto de venta
 
-### Respuesta del asistente - Identificaci√≥n de Contradicci√≥n
+### Respuesta del asistente - IdentificaciÛn de ContradicciÛn
 
-Se identific√≥ una contradicci√≥n cr√≠tica entre documentos:
+Se identificÛ una contradicciÛn crÌtica entre documentos:
 
-**HU-EP1-006 dec√≠a:**
-> "Los operadores ven todos los productos (no hay restricci√≥n por punto de venta en el cat√°logo)."
+**HU-EP1-006 decÌa:**
+> "Los operadores ven todos los productos (no hay restricciÛn por punto de venta en el cat·logo)."
 
-**Pero la especificaci√≥n de access-control establec√≠a:**
+**Pero la especificaciÛn de access-control establecÌa:**
 - Operadores ven inventario filtrado por POS asignados
 - Operadores ven historial de ventas filtrado por POS asignados
 
-**Preguntas de aclaraci√≥n realizadas:**
+**Preguntas de aclaraciÛn realizadas:**
 
-1. **Q1.1**: ¬øC√≥mo se asignan productos a POS?
-   - Opci√≥n A: Durante import Excel se especifica POS
-   - Opci√≥n B: Productos globales, luego admin asigna a POS
-   - Opci√≥n C: Todos los productos a todos los POS autom√°ticamente
+1. **Q1.1**: øCÛmo se asignan productos a POS?
+   - OpciÛn A: Durante import Excel se especifica POS
+   - OpciÛn B: Productos globales, luego admin asigna a POS
+   - OpciÛn C: Todos los productos a todos los POS autom·ticamente
 
-2. **Q1.2**: ¬øExiste UI para asignar/desasignar productos?
-   - Si es as√≠, ¬øes parte del alcance actual o futuro (EP2)?
+2. **Q1.2**: øExiste UI para asignar/desasignar productos?
+   - Si es asÌ, øes parte del alcance actual o futuro (EP2)?
 
-3. **Q1.3**: ¬øPuede existir un producto en `Product` sin registros en `Inventory`?
+3. **Q1.3**: øPuede existir un producto en `Product` sin registros en `Inventory`?
 
-4. **Q2.1**: Cuando operador registra venta, ¬ødebe mostrar:
+4. **Q2.1**: Cuando operador registra venta, ødebe mostrar:
    - Solo productos en su inventario POS (incluso con qty=0)?
    - O solo productos con qty > 0?
 
-5. **Q2.2**: ¬øSe puede vender producto con qty=0?
+5. **Q2.2**: øSe puede vender producto con qty=0?
 
-6. **Q2.3**: ¬øOperadores pueden ver detalles de productos NO en su inventario?
+6. **Q2.3**: øOperadores pueden ver detalles de productos NO en su inventario?
 
-7. **Q3.1**: Gesti√≥n de fotos (eliminar, reordenar, marcar principal):
-   - ¬øEs admin-only o tambi√©n operadores?
+7. **Q3.1**: GestiÛn de fotos (eliminar, reordenar, marcar principal):
+   - øEs admin-only o tambiÈn operadores?
 
-8. **Q4.1**: Cat√°logo/b√∫squeda para operadores:
-   - ¬øProductos con registro `Inventory` (cualquier cantidad)?
-   - ¬øO solo productos con `Inventory.Quantity > 0`?
+8. **Q4.1**: Cat·logo/b˙squeda para operadores:
+   - øProductos con registro `Inventory` (cualquier cantidad)?
+   - øO solo productos con `Inventory.Quantity > 0`?
 
-9. **Q5.1**: ¬øA√±adir √≠ndice `(PointOfSaleId, ProductId)` en Inventory?
+9. **Q5.1**: øAÒadir Ìndice `(PointOfSaleId, ProductId)` en Inventory?
 
 ### Respuestas del Usuario - Aclaraciones Definitivas
 
-1.1) Opci√≥n B.
+1.1) OpciÛn B.
 
-1.2) Es parte de la gesti√≥n de inventario
+1.2) Es parte de la gestiÛn de inventario
 
 1.3) Un producto puede existir en la tabla Product global pero NO tener registros en Inventory
 
@@ -2086,55 +2088,55 @@ Se identific√≥ una contradicci√≥n cr√≠tica entre documentos:
 
 4.1) Productos con registros Inventory en sus POS asignados
 
-4.2) S√≠
+4.2) SÌ
 
-5.1) S√≠
+5.1) SÌ
 
-### Respuesta del asistente - Implementaci√≥n de Cambios
+### Respuesta del asistente - ImplementaciÛn de Cambios
 
-Se realizaron actualizaciones completas en toda la documentaci√≥n y especificaciones:
+Se realizaron actualizaciones completas en toda la documentaciÛn y especificaciones:
 
 **Archivos actualizados:**
 
-1. **`Documentos/Historias/HU-EP1-006.md`** - Cat√°logo de productos
+1. **`Documentos/Historias/HU-EP1-006.md`** - Cat·logo de productos
    - Actualizado para especificar filtrado por rol
-   - Administradores ven cat√°logo global completo
+   - Administradores ven cat·logo global completo
    - Operadores ven solo productos con registros en Inventory para sus POS
    - Agregados escenarios para operadores sin productos asignados
 
-2. **`Documentos/Historias/HU-EP1-007.md`** - B√∫squeda de productos
-   - Actualizado para especificar b√∫squeda filtrada por rol
-   - Administradores buscan en cat√°logo global
+2. **`Documentos/Historias/HU-EP1-007.md`** - B˙squeda de productos
+   - Actualizado para especificar b˙squeda filtrada por rol
+   - Administradores buscan en cat·logo global
    - Operadores buscan solo en productos de su inventario
-   - Agregado escenario de b√∫squeda de producto no asignado
+   - Agregado escenario de b˙squeda de producto no asignado
 
 3. **`Documentos/modelo-de-datos.md`**
    - Actualizada entidad Inventory con campo `IsActive` para soft delete
    - Agregadas reglas de visibilidad basadas en inventario
-   - Agregado √≠ndice compuesto `(PointOfSaleId, ProductId, IsActive)`
-   - Documentada la l√≥gica: presencia de registro Inventory = producto asignado
+   - Agregado Ìndice compuesto `(PointOfSaleId, ProductId, IsActive)`
+   - Documentada la lÛgica: presencia de registro Inventory = producto asignado
 
 4. **`openspec/specs/access-control/spec.md`**
    - Agregado nuevo requerimiento: Product Catalog Filtering by Inventory Assignment
    - 6 nuevos escenarios cubriendo acceso admin vs operador
    - Reglas de visibilidad de productos
-   - Prevenci√≥n de acceso directo a productos no asignados
+   - PrevenciÛn de acceso directo a productos no asignados
    - Manejo de productos con cantidad cero
 
 5. **`openspec/changes/extend-product-catalog-search/`**
    - Actualizado `proposal.md` con requisitos de filtrado por rol
    - Actualizado `specs/product-management/spec.md` con escenarios de filtrado
-   - Actualizado `tasks.md` con tareas de implementaci√≥n de filtros (81 tareas totales)
-   - Agregadas tareas para extracci√≥n de contexto de usuario desde JWT
+   - Actualizado `tasks.md` con tareas de implementaciÛn de filtros (81 tareas totales)
+   - Agregadas tareas para extracciÛn de contexto de usuario desde JWT
    - Agregadas tareas para JOIN con Inventory y UserPointOfSale
 
 6. **Tickets actualizados:**
-   - `T-EP1-006-001.md` - Backend cat√°logo API con filtrado por rol
-   - `T-EP1-006-002.md` - Frontend cat√°logo con indicadores de cantidad
-   - `T-EP1-007-001.md` - Backend b√∫squeda API con filtrado por rol
-   - `T-EP1-007-002.md` - Frontend b√∫squeda con advertencias de stock
+   - `T-EP1-006-001.md` - Backend cat·logo API con filtrado por rol
+   - `T-EP1-006-002.md` - Frontend cat·logo con indicadores de cantidad
+   - `T-EP1-007-001.md` - Backend b˙squeda API con filtrado por rol
+   - `T-EP1-007-002.md` - Frontend b˙squeda con advertencias de stock
 
-**Patr√≥n de consulta especificado:**
+**PatrÛn de consulta especificado:**
 ```csharp
 // Para operadores: filtrar por inventario
 var operatorProducts = from p in Products
@@ -2146,53 +2148,53 @@ var operatorProducts = from p in Products
                        select p;
 ```
 
-**Validaci√≥n:** Todos los cambios validados con `openspec validate extend-product-catalog-search --strict` ‚úÖ
+**ValidaciÛn:** Todos los cambios validados con `openspec validate extend-product-catalog-search --strict` ?
 
 ---
 
-## Prompt sobre Verificaci√≥n de √âpica de Inventario
+## Prompt sobre VerificaciÛn de …pica de Inventario
 
-Verifica si la √©pica de Inventario (y las historias de usuario) necesitan alguna actualizaci√≥n debido a la nueva regla de negocio.
+Verifica si la Èpica de Inventario (y las historias de usuario) necesitan alguna actualizaciÛn debido a la nueva regla de negocio.
 
-### Respuesta del asistente - An√°lisis de EP2 y Problemas Identificados
+### Respuesta del asistente - An·lisis de EP2 y Problemas Identificados
 
-Se realiz√≥ un an√°lisis exhaustivo de la √âpica 2 (Gesti√≥n de Inventario) y se identificaron **problemas cr√≠ticos**:
+Se realizÛ un an·lisis exhaustivo de la …pica 2 (GestiÛn de Inventario) y se identificaron **problemas crÌticos**:
 
-**Documento de an√°lisis creado:** `openspec/INVENTORY_EPIC_ANALYSIS.md` (posteriormente eliminado tras implementar cambios)
+**Documento de an·lisis creado:** `openspec/INVENTORY_EPIC_ANALYSIS.md` (posteriormente eliminado tras implementar cambios)
 
 **Problemas identificados:**
 
-1. **‚ùå MISSING USER STORY** - No existe historia para asignar/desasignar productos a POS
-   - Seg√∫n Q1.2: "It's part of inventory management"
-   - Pero EP2 no tiene ninguna historia para esta funcionalidad cr√≠tica
+1. **? MISSING USER STORY** - No existe historia para asignar/desasignar productos a POS
+   - Seg˙n Q1.2: "It's part of inventory management"
+   - Pero EP2 no tiene ninguna historia para esta funcionalidad crÌtica
 
-2. **‚ö†Ô∏è HU-EP2-001 conflata dos operaciones:**
-   - Importar cantidades (actualizaci√≥n de stock)
-   - Asignaci√≥n de productos a POS (crear registros Inventory)
+2. **?? HU-EP2-001 conflata dos operaciones:**
+   - Importar cantidades (actualizaciÛn de stock)
+   - AsignaciÛn de productos a POS (crear registros Inventory)
    - No hay forma de asignar productos con qty=0 sin importar Excel
 
-3. **‚ö†Ô∏è HU-EP2-004 incompleto:**
+3. **?? HU-EP2-004 incompleto:**
    - Solo cubre ajustes de cantidad
-   - No cubre asignaci√≥n/desasignaci√≥n de productos
+   - No cubre asignaciÛn/desasignaciÛn de productos
 
-4. **‚ö†Ô∏è Descripci√≥n de √©pica no menciona asignaci√≥n de productos**
+4. **?? DescripciÛn de Èpica no menciona asignaciÛn de productos**
 
 **Preguntas realizadas al usuario:**
 
-1. **Q1: Comportamiento de importaci√≥n de stock (HU-EP2-001)**
-   - ¬øDebe permitir asignaci√≥n impl√≠cita (crear registros Inventory)?
-   - Opciones: A) S√≠, B) No (requiere asignaci√≥n expl√≠cita primero)
+1. **Q1: Comportamiento de importaciÛn de stock (HU-EP2-001)**
+   - øDebe permitir asignaciÛn implÌcita (crear registros Inventory)?
+   - Opciones: A) SÌ, B) No (requiere asignaciÛn explÌcita primero)
 
-2. **Q2: Reglas de desasignaci√≥n**
-   - ¬øSe puede desasignar producto con qty > 0?
-   - Opciones: A) S√≠ con advertencia, B) No (requiere qty=0 primero)
+2. **Q2: Reglas de desasignaciÛn**
+   - øSe puede desasignar producto con qty > 0?
+   - Opciones: A) SÌ con advertencia, B) No (requiere qty=0 primero)
 
-3. **Q3: Implementaci√≥n de desasignaci√≥n**
-   - ¬øSoft delete (`IsActive=false`) o hard delete?
+3. **Q3: ImplementaciÛn de desasignaciÛn**
+   - øSoft delete (`IsActive=false`) o hard delete?
    - Opciones: A) Soft delete, B) Hard delete
 
 4. **Q4: Prioridad de la nueva historia**
-   - Recomendaci√≥n: HIGH (cr√≠tico para workflows de operadores)
+   - RecomendaciÛn: HIGH (crÌtico para workflows de operadores)
 
 ### Respuestas del Usuario
 
@@ -2204,45 +2206,45 @@ Se realiz√≥ un an√°lisis exhaustivo de la √âpica 2 (Gesti√≥n de Inventario) y se
 
 4. Alta
 
-### Respuesta del asistente - Implementaci√≥n de Cambios en EP2
+### Respuesta del asistente - ImplementaciÛn de Cambios en EP2
 
-Se cre√≥ e implement√≥ completamente la nueva funcionalidad:
+Se creÛ e implementÛ completamente la nueva funcionalidad:
 
 **1. Nuevo archivo creado: `Documentos/Historias/HU-EP2-006.md`**
 
-**T√≠tulo:** Asignar/desasignar productos a puntos de venta
+**TÌtulo:** Asignar/desasignar productos a puntos de venta
 
 **Funcionalidad principal:**
-- Asignar productos del cat√°logo global a inventarios de POS espec√≠ficos
+- Asignar productos del cat·logo global a inventarios de POS especÌficos
 - Crear registros en `Inventory` con `Quantity=0` y `IsActive=true`
 - Desasignar productos (soft delete: `IsActive=false`)
-- Asignaci√≥n masiva (m√∫ltiples productos a un POS)
-- Validaci√≥n: no desasignar si `Quantity > 0`
-- Reasignaci√≥n de productos previamente desasignados
+- AsignaciÛn masiva (m˙ltiples productos a un POS)
+- ValidaciÛn: no desasignar si `Quantity > 0`
+- ReasignaciÛn de productos previamente desasignados
 
-**8 escenarios de aceptaci√≥n:**
+**8 escenarios de aceptaciÛn:**
 1. Asignar producto a POS (qty=0)
-2. Asignaci√≥n masiva
-3. Prevenci√≥n de asignaci√≥n duplicada
+2. AsignaciÛn masiva
+3. PrevenciÛn de asignaciÛn duplicada
 4. Desasignar con qty=0
 5. Error al desasignar con qty>0
 6. Visualizar productos asignados
 7. Error al asignar producto inactivo
 8. Reasignar producto previamente desasignado
 
-**Prioridad:** Alta - Funcionalidad cr√≠tica para visibilidad de operadores
+**Prioridad:** Alta - Funcionalidad crÌtica para visibilidad de operadores
 
 **2. Actualizado: `Documentos/epicas.md`**
-- Descripci√≥n de EP2 actualizada incluyendo asignaci√≥n/desasignaci√≥n
+- DescripciÛn de EP2 actualizada incluyendo asignaciÛn/desasignaciÛn
 - Regla de negocio clave agregada sobre registros Inventory
-- Lista de User Stories actualizada (5 ‚Üí 6 historias)
-- Conteo total de historias MVP: 35 ‚Üí 36
+- Lista de User Stories actualizada (5 ? 6 historias)
+- Conteo total de historias MVP: 35 ? 36
 
 **3. Actualizado: `Documentos/Historias/HU-EP2-001.md`**
-- Clarificada asignaci√≥n impl√≠cita durante importaci√≥n Excel
-- Nuevo Escenario 2: Asignaci√≥n impl√≠cita con mensaje claro
-- Nuevo Escenario 4: Relaci√≥n con asignaci√≥n manual HU-EP2-006
-- Nota sobre dos workflows posibles (import con asignaci√≥n impl√≠cita vs asignaci√≥n manual primero)
+- Clarificada asignaciÛn implÌcita durante importaciÛn Excel
+- Nuevo Escenario 2: AsignaciÛn implÌcita con mensaje claro
+- Nuevo Escenario 4: RelaciÛn con asignaciÛn manual HU-EP2-006
+- Nota sobre dos workflows posibles (import con asignaciÛn implÌcita vs asignaciÛn manual primero)
 
 **4. Actualizado: `Documentos/Historias/HU-EP2-004.md`**
 - Agregada nota: solo funciona en productos ya asignados
@@ -2251,74 +2253,74 @@ Se cre√≥ e implement√≥ completamente la nueva funcionalidad:
 
 **5. Actualizado: `Documentos/modelo-de-datos.md`**
 - Campo `IsActive` agregado a diagrama de entidad Inventory
-- Descripci√≥n extendida del campo IsActive y su prop√≥sito
+- DescripciÛn extendida del campo IsActive y su propÛsito
 - Documentado comportamiento de soft delete
-- √çndices actualizados: `indexed(PointOfSaleId, ProductId, IsActive)`
-- √çndice parcial sugerido: `WHERE IsActive = true`
+- Õndices actualizados: `indexed(PointOfSaleId, ProductId, IsActive)`
+- Õndice parcial sugerido: `WHERE IsActive = true`
 
 **Workflows de operador documentados:**
 
-**Workflow Opci√≥n 1 (Asignaci√≥n manual primero):**
-1. Admin importa productos a cat√°logo global (EP1)
+**Workflow OpciÛn 1 (AsignaciÛn manual primero):**
+1. Admin importa productos a cat·logo global (EP1)
 2. Admin asigna 50 productos a POS-A con qty=0 (HU-EP2-006)
 3. Operador ve 50 productos con "Sin stock"
-4. Admin importa cantidades v√≠a Excel (HU-EP2-001)
+4. Admin importa cantidades vÌa Excel (HU-EP2-001)
 5. Operador puede vender productos
 
-**Workflow Opci√≥n 2 (Import con asignaci√≥n impl√≠cita):**
-1. Admin importa productos a cat√°logo global (EP1)
-2. Admin importa stock v√≠a Excel (HU-EP2-001)
-3. Sistema crea registros Inventory (asignaci√≥n impl√≠cita)
+**Workflow OpciÛn 2 (Import con asignaciÛn implÌcita):**
+1. Admin importa productos a cat·logo global (EP1)
+2. Admin importa stock vÌa Excel (HU-EP2-001)
+3. Sistema crea registros Inventory (asignaciÛn implÌcita)
 4. Operador ve productos con cantidades
 
 **Resultado final:**
-- ‚úÖ EP2 ahora tiene 6 historias (era 5)
-- ‚úÖ MVP completo ahora tiene 36 historias (era 35)
-- ‚úÖ Funcionalidad cr√≠tica de asignaci√≥n de productos documentada
-- ‚úÖ Regla de negocio de visibilidad correctamente implementada
-- ‚úÖ Soft delete con `IsActive` para auditor√≠a
-- ‚úÖ Todos los workflows de operador cubiertos
+- ? EP2 ahora tiene 6 historias (era 5)
+- ? MVP completo ahora tiene 36 historias (era 35)
+- ? Funcionalidad crÌtica de asignaciÛn de productos documentada
+- ? Regla de negocio de visibilidad correctamente implementada
+- ? Soft delete con `IsActive` para auditorÌa
+- ? Todos los workflows de operador cubiertos
 
 ---
 
-## Prompt sobre Integraci√≥n entre √âpica 1 y √âpica 4
+## Prompt sobre IntegraciÛn entre …pica 1 y …pica 4
 
-En estas funcionalidades @epicas.md (28-29) no se est√° teniendo en cuenta la funcionalidad de la @epicas.md (93-115).
+En estas funcionalidades @epicas.md (28-29) no se est· teniendo en cuenta la funcionalidad de la @epicas.md (93-115).
 
-Cuando subimos las imagenes se deberia actualizar la "base de datos" sobre la cual se har√° el match a la hora de buscar productos a traves de una foto.
+Cuando subimos las imagenes se deberia actualizar la "base de datos" sobre la cual se har· el match a la hora de buscar productos a traves de una foto.
 
 Actualmente no hay nada desarrollado. Deberiamos delegar toda esta gestion a la epica 4 o actualizar la epica 1?
 
-### Respuesta del asistente - An√°lisis del Problema
+### Respuesta del asistente - An·lisis del Problema
 
-Bas√°ndome en el an√°lisis de las √©picas y las historias de usuario, tienes raz√≥n en identificar este problema de integraci√≥n. Vamos a analizar las opciones:
+Bas·ndome en el an·lisis de las Èpicas y las historias de usuario, tienes razÛn en identificar este problema de integraciÛn. Vamos a analizar las opciones:
 
-## An√°lisis del Problema
+## An·lisis del Problema
 
-**√âpica 1 (HU-EP1-004)** menciona expl√≠citamente que subir fotos es "para **permitir el reconocimiento de im√°genes mediante IA**", pero actualmente no hay ning√∫n mecanismo para actualizar el modelo de IA cuando se agregan nuevas fotos.
+**…pica 1 (HU-EP1-004)** menciona explÌcitamente que subir fotos es "para **permitir el reconocimiento de im·genes mediante IA**", pero actualmente no hay ning˙n mecanismo para actualizar el modelo de IA cuando se agregan nuevas fotos.
 
-**√âpica 4 (HU-EP4-001)** describe un sistema donde:
+**…pica 4 (HU-EP4-001)** describe un sistema donde:
 - El modelo de IA se ejecuta en cliente (TensorFlow.js/ONNX.js)
 - Se descarga una vez y se ejecuta localmente
 - Necesita fotos de referencia para funcionar
 - **No hay mecanismo actual para actualizar el modelo** cuando se suben nuevas fotos
 
-## Recomendaci√≥n: Delegar a la √âpica 4
+## RecomendaciÛn: Delegar a la …pica 4
 
-**Recomiendo delegar toda la gesti√≥n del modelo de IA a la √âpica 4** por estas razones:
+**Recomiendo delegar toda la gestiÛn del modelo de IA a la …pica 4** por estas razones:
 
-### 1. **Separaci√≥n de Responsabilidades**
-- **EP1**: Gestiona el cat√°logo de productos y sus fotos (persistencia en BD)
-- **EP4**: Gestiona todo lo relacionado con IA (entrenamiento, actualizaci√≥n, distribuci√≥n del modelo)
+### 1. **SeparaciÛn de Responsabilidades**
+- **EP1**: Gestiona el cat·logo de productos y sus fotos (persistencia en BD)
+- **EP4**: Gestiona todo lo relacionado con IA (entrenamiento, actualizaciÛn, distribuciÛn del modelo)
 
-### 2. **Complejidad T√©cnica**
-El entrenamiento y actualizaci√≥n de modelos de IA es una funcionalidad compleja que requiere:
+### 2. **Complejidad TÈcnica**
+El entrenamiento y actualizaciÛn de modelos de IA es una funcionalidad compleja que requiere:
 - Conocimientos especializados en ML
 - Infraestructura de entrenamiento
-- Gesti√≥n de versiones de modelos
-- Estrategias de actualizaci√≥n incremental
+- GestiÛn de versiones de modelos
+- Estrategias de actualizaciÛn incremental
 
-Esta complejidad deber√≠a estar centralizada en EP4, no distribuida en EP1.
+Esta complejidad deberÌa estar centralizada en EP4, no distribuida en EP1.
 
 ### 3. **Dependencias ya establecidas**
 La HU-EP4-001 ya declara dependencia de HU-EP1-004:
@@ -2326,36 +2328,36 @@ La HU-EP4-001 ya declara dependencia de HU-EP1-004:
 Dependencias: HU-EP1-004 (fotos de productos), modelo de IA entrenado
 ```
 
-### 4. **Arquitectura m√°s limpia**
+### 4. **Arquitectura m·s limpia**
 - EP1 solo guarda fotos y notifica que hay cambios
 - EP4 se subscribe a estos cambios y actualiza el modelo
 - El modelo de IA se convierte en un servicio independiente gestionado por EP4
 
-### 5. **Evoluci√≥n del sistema**
-Si en el futuro se cambia la tecnolog√≠a de IA (de TensorFlow.js a otra), solo EP4 se ver√≠a afectada.
+### 5. **EvoluciÛn del sistema**
+Si en el futuro se cambia la tecnologÌa de IA (de TensorFlow.js a otra), solo EP4 se verÌa afectada.
 
-## Implementaci√≥n sugerida
+## ImplementaciÛn sugerida
 
-**Opci√≥n A: Event-driven (recomendada)**
+**OpciÛn A: Event-driven (recomendada)**
 - EP1 emite eventos cuando se suben/eliminar fotos
-- EP4 se subscribe y actualiza el modelo autom√°ticamente
+- EP4 se subscribe y actualiza el modelo autom·ticamente
 
-**Opci√≥n B: API expl√≠cita**
+**OpciÛn B: API explÌcita**
 - EP4 expone endpoint `/api/ai/model/update`
-- EP1 llama a este endpoint despu√©s de guardar fotos
+- EP1 llama a este endpoint despuÈs de guardar fotos
 
-**Opci√≥n C: Batch updates**
-- EP4 tiene un proceso programado que verifica cambios en fotos peri√≥dicamente
+**OpciÛn C: Batch updates**
+- EP4 tiene un proceso programado que verifica cambios en fotos periÛdicamente
 
-## Conclusi√≥n
+## ConclusiÛn
 
-**Actualizar la √âpica 1 ser√≠a un error de arquitectura** porque mezclar√≠a responsabilidades de negocio (gesti√≥n de productos) con infraestructura t√©cnica compleja (IA).
+**Actualizar la …pica 1 serÌa un error de arquitectura** porque mezclarÌa responsabilidades de negocio (gestiÛn de productos) con infraestructura tÈcnica compleja (IA).
 
-La **√âpica 4 ya deber√≠a incluir la l√≥gica de actualizaci√≥n del modelo** como parte de su alcance, ya que es un requerimiento impl√≠cito para que el reconocimiento funcione correctamente en un entorno din√°mico donde se agregan nuevos productos constantemente.
+La **…pica 4 ya deberÌa incluir la lÛgica de actualizaciÛn del modelo** como parte de su alcance, ya que es un requerimiento implÌcito para que el reconocimiento funcione correctamente en un entorno din·mico donde se agregan nuevos productos constantemente.
 
 ---
 
-## Prompt sobre An√°lisis y propuesta de Sales Registration con AI Image Recognition
+## Prompt sobre An·lisis y propuesta de Sales Registration con AI Image Recognition
 
 /openspec-proposal @epicas.md (67-119) 
 Antes de crear la propuesta
@@ -2365,51 +2367,51 @@ Antes de crear la propuesta
 
 ---
 
-### Respuesta del asistente - An√°lisis Previo
+### Respuesta del asistente - An·lisis Previo
 
-Se realiz√≥ un an√°lisis exhaustivo de las √âpicas 3 (Registro de Ventas) y 4 (Reconocimiento de Im√°genes con IA) antes de crear la propuesta OpenSpec.
+Se realizÛ un an·lisis exhaustivo de las …picas 3 (Registro de Ventas) y 4 (Reconocimiento de Im·genes con IA) antes de crear la propuesta OpenSpec.
 
-**10+ Preguntas de Aclaraci√≥n formuladas:**
+**10+ Preguntas de AclaraciÛn formuladas:**
 
 Sobre Registro de Ventas (EP3):
-1. Validaci√≥n de cantidad: ¬øPermite vender m√∫ltiples unidades del mismo producto?
-2. M√©todo de pago desactivado: ¬øQu√© ocurre si se selecciona un m√©todo asignado pero inactivo?
-3. Foto en venta manual: ¬øSe puede adjuntar foto opcionalmente?
-4. Transaccionalidad: ¬øRollback completo si falla creaci√≥n de InventoryMovement?
-5. Validaci√≥n de producto asignado: ¬øValidar solo stock > 0 o tambi√©n asignaci√≥n al POS?
-6. Notas en venta: ¬øCasos de uso espec√≠ficos para el campo Notes?
+1. ValidaciÛn de cantidad: øPermite vender m˙ltiples unidades del mismo producto?
+2. MÈtodo de pago desactivado: øQuÈ ocurre si se selecciona un mÈtodo asignado pero inactivo?
+3. Foto en venta manual: øSe puede adjuntar foto opcionalmente?
+4. Transaccionalidad: øRollback completo si falla creaciÛn de InventoryMovement?
+5. ValidaciÛn de producto asignado: øValidar solo stock > 0 o tambiÈn asignaciÛn al POS?
+6. Notas en venta: øCasos de uso especÌficos para el campo Notes?
 
-Sobre Reconocimiento de Im√°genes (EP4):
-7. Formato de sugerencias: ¬øScore de confianza visible o solo ordenamiento?
-8. Umbral m√≠nimo: ¬øExiste umbral m√≠nimo de confianza para mostrar sugerencias?
-9. Almacenamiento de fotos: ¬øGuardar siempre o solo si venta completa?
-10. Re-entrenamiento: ¬øIncluido en MVP o modelo est√°tico?
-11. Tama√±o/compresi√≥n: ¬øRestricciones de tama√±o? ¬øComprimir antes de procesar?
-12. Flujo de navegaci√≥n: ¬øRedirecci√≥n autom√°tica a venta manual si baja confianza?
-13. Cancelaci√≥n: ¬øQu√© ocurre con la foto si se cancela el proceso?
-14. Productos sin fotos: ¬øValidaci√≥n previa o mensaje de error?
+Sobre Reconocimiento de Im·genes (EP4):
+7. Formato de sugerencias: øScore de confianza visible o solo ordenamiento?
+8. Umbral mÌnimo: øExiste umbral mÌnimo de confianza para mostrar sugerencias?
+9. Almacenamiento de fotos: øGuardar siempre o solo si venta completa?
+10. Re-entrenamiento: øIncluido en MVP o modelo est·tico?
+11. TamaÒo/compresiÛn: øRestricciones de tamaÒo? øComprimir antes de procesar?
+12. Flujo de navegaciÛn: øRedirecciÛn autom·tica a venta manual si baja confianza?
+13. CancelaciÛn: øQuÈ ocurre con la foto si se cancela el proceso?
+14. Productos sin fotos: øValidaciÛn previa o mensaje de error?
 
 **3 Propuestas de Mejora:**
 
-1. **Validaci√≥n de Stock Cr√≠tico:** Advertencia no bloqueante cuando stock <= MinimumThreshold
-2. **Modo de Fallback Inteligente:** Si confianza <40%, mostrar sugerencias + opci√≥n "Ninguno coincide" con foto preservada
-3. **Registro Offline (Fase 2):** Cola de ventas offline con sincronizaci√≥n posterior
+1. **ValidaciÛn de Stock CrÌtico:** Advertencia no bloqueante cuando stock <= MinimumThreshold
+2. **Modo de Fallback Inteligente:** Si confianza <40%, mostrar sugerencias + opciÛn "Ninguno coincide" con foto preservada
+3. **Registro Offline (Fase 2):** Cola de ventas offline con sincronizaciÛn posterior
 
 **Incongruencias Detectadas:**
-- Cantidad por defecto vs validaci√≥n (aclarar si es editable)
-- Fotos requeridas para IA (validaci√≥n preventiva faltante)
-- Filtrado de productos por rol (confirmar aplicaci√≥n en venta manual)
+- Cantidad por defecto vs validaciÛn (aclarar si es editable)
+- Fotos requeridas para IA (validaciÛn preventiva faltante)
+- Filtrado de productos por rol (confirmar aplicaciÛn en venta manual)
 
 **Dependencias No Desarrolladas:**
-- **Cr√≠tico:** EP2 (Gesti√≥n de Inventario) sin spec en openspec/specs/
+- **CrÌtico:** EP2 (GestiÛn de Inventario) sin spec en openspec/specs/
 - Se necesita IStockValidationService e IInventoryService.CreateSaleMovement
 - IFileStorageService mencionado en backend spec pero no verificado
 
 ---
 
-## Prompt sobre Respuestas a Preguntas de Aclaraci√≥n
+## Prompt sobre Respuestas a Preguntas de AclaraciÛn
 
-Respuestas a Preguntas de Aclaraci√≥n:
+Respuestas a Preguntas de AclaraciÛn:
 1. Se puede vender mas de una unidad en la misma transaccion.
 2. No debe permitirse seleccionar el metodo de pago desactivado. SI por alguna razon llegase a seleccionarlo (por ejemplo antes de desactivarlo) devolver un error.
 3. Es posible adjuntar una foto.
@@ -2419,71 +2421,71 @@ Respuestas a Preguntas de Aclaraci√≥n:
 7. Mostrar el score de confianza
 8. No estoy seguro, el 40% seria un buen porcentaje entre seguridad y operatividad? 
 9. solo si la venta se completa
-10. Si, tiene que poder entrenarse de nuevo. Seria muy costoso reentrenarlo cada vez que se sube una foto? Hay una alternativa que mantenga el modelo siempre actualizado cuando se a√±ade o elimina una foto de un producto?
+10. Si, tiene que poder entrenarse de nuevo. Seria muy costoso reentrenarlo cada vez que se sube una foto? Hay una alternativa que mantenga el modelo siempre actualizado cuando se aÒade o elimina una foto de un producto?
 11. No hay limites pero estaria bien comprimirla antes de guardarla. Seria conveniente comprimirla antes de procesarla o perjudicaria el reconocimeinto de imagenes?
 12. Viene redirigido
 13. No se guarda y viene descartada
-14. Si ningun producto asignado tiene fotos se ense√±a un mensaje de error y un enlace a la funcionalidad de venta manual
+14. Si ningun producto asignado tiene fotos se enseÒa un mensaje de error y un enlace a la funcionalidad de venta manual
 
 Propuestas de Mejora:
 1. Ok
 2. Ok
 3. Esta mejora la dejamos para la fase 2.
 
-An√°lisis de Incongruencias y Dependencias:
+An·lisis de Incongruencias y Dependencias:
 1. Quantity es editable.
 2. Ya se ha aclarado previamente en la respuesta a la pregunta 14 de aclaraciones.
 3. Confirmo, solo pueden manejar los productos asignados.
 
 Incongruencias:
-En openspec hay la spec add-inventory-management. Si en esa spec no se hay la parte de control de inventario que se requiere para esta propuesta, a√±adir la parte flatante a las specs de add-inventory-management.
+En openspec hay la spec add-inventory-management. Si en esa spec no se hay la parte de control de inventario que se requiere para esta propuesta, aÒadir la parte flatante a las specs de add-inventory-management.
 
 ---
 
 ### Respuesta del asistente - Propuesta OpenSpec Creada
 
-Se cre√≥ la propuesta OpenSpec completa `add-sales-and-image-recognition` con:
+Se creÛ la propuesta OpenSpec completa `add-sales-and-image-recognition` con:
 
 **Estructura completa:**
 - `proposal.md` - Why, What, Impact, Scope Clarifications
-- `design.md` - 7 decisiones t√©cnicas cr√≠ticas detalladas
+- `design.md` - 7 decisiones tÈcnicas crÌticas detalladas
 - `tasks.md` - 223 tareas organizadas en 20 secciones
 - `specs/sales-management/spec.md` - 8 requirements, 40+ scenarios
 - `specs/image-recognition/spec.md` - 9 requirements, 30+ scenarios
 
-**Decisiones t√©cnicas clave:**
+**Decisiones tÈcnicas clave:**
 
 1. **Client-Side ML Inference:** TensorFlow.js con MobileNetV2 (~14MB, <500ms inferencia)
-2. **Umbral de Confianza:** 40% (equilibrio precisi√≥n/operatividad)
-3. **Transacciones At√≥micas:** Sale + SalePhoto + InventoryMovement + Stock Update
-4. **Compresi√≥n de Fotos:** JPEG 80%, max 1920x1920px, <= 2MB
+2. **Umbral de Confianza:** 40% (equilibrio precisiÛn/operatividad)
+3. **Transacciones AtÛmicas:** Sale + SalePhoto + InventoryMovement + Stock Update
+4. **CompresiÛn de Fotos:** JPEG 80%, max 1920x1920px, <= 2MB
 5. **Re-entrenamiento:** Trigger manual via POST /api/image-recognition/retrain (5-30 min)
 6. **Versionado:** Timestamp-based v{num}_{YYYYMMDD}
-7. **Check de Versi√≥n:** SIEMPRE cuando hay conectividad (no restricci√≥n de 24h)
+7. **Check de VersiÛn:** SIEMPRE cuando hay conectividad (no restricciÛn de 24h)
 
 **Actualizaciones a add-inventory-management:**
-- A√±adido: IStockValidationService para validaci√≥n de stock
-- A√±adido: IInventoryService.CreateSaleMovement para movimientos autom√°ticos
-- A√±adido: Validaci√≥n de asignaci√≥n producto al POS
-- A√±adido: Advertencia de stock bajo despu√©s de venta
+- AÒadido: IStockValidationService para validaciÛn de stock
+- AÒadido: IInventoryService.CreateSaleMovement para movimientos autom·ticos
+- AÒadido: ValidaciÛn de asignaciÛn producto al POS
+- AÒadido: Advertencia de stock bajo despuÈs de venta
 
-**Validaci√≥n:** ‚úÖ `openspec validate add-sales-and-image-recognition --strict` pasado
+**ValidaciÛn:** ? `openspec validate add-sales-and-image-recognition --strict` pasado
 
 ---
 
 ## Prompt sobre Control de Versiones del Modelo Local
 
-Si el modelo est√° guardado en el dispositivo movil, como se controla si el modelo local es la ultima version? Hay un check de versiones sobre el modelo local respecto al modelo remoto?
+Si el modelo est· guardado en el dispositivo movil, como se controla si el modelo local es la ultima version? Hay un check de versiones sobre el modelo local respecto al modelo remoto?
 
 ---
 
 ### Respuesta del asistente - Estrategia de Versionado Detallada
 
-S√≠, el mecanismo de control de versiones est√° incluido en la propuesta. Se actualiz√≥ con detalles completos:
+SÌ, el mecanismo de control de versiones est· incluido en la propuesta. Se actualizÛ con detalles completos:
 
 **Formato de Versionado:**
 ```
-v{n√∫mero}_{YYYYMMDD}
+v{n˙mero}_{YYYYMMDD}
 Ejemplo: "v2_20260111"
 ```
 
@@ -2501,31 +2503,31 @@ Ejemplo: "v2_20260111"
 }
 ```
 
-**Estrategia de Verificaci√≥n:**
+**Estrategia de VerificaciÛn:**
 - Check en cada acceso a la funcionalidad (cuando hay conectividad)
-- Comparaci√≥n de versi√≥n cacheada vs servidor
-- Descarga autom√°tica en background si hay nueva versi√≥n
+- ComparaciÛn de versiÛn cacheada vs servidor
+- Descarga autom·tica en background si hay nueva versiÛn
 - Uso de modelo cacheado mientras se verifica
 
-**6 Nuevos Escenarios a√±adidos a la spec:**
-1. Version check with network connectivity (verificaci√≥n con red)
+**6 Nuevos Escenarios aÒadidos a la spec:**
+1. Version check with network connectivity (verificaciÛn con red)
 2. Version check without network connectivity (uso cacheado sin red)
 3. Version check frequency (cada acceso cuando online)
-4. Outdated model notification (notificaci√≥n si >7 d√≠as desactualizado)
-5. Manual model update trigger (actualizaci√≥n manual por usuario)
+4. Outdated model notification (notificaciÛn si >7 dÌas desactualizado)
+5. Manual model update trigger (actualizaciÛn manual por usuario)
 6. Model metadata response format (formato JSON del metadata)
 
 ---
 
-## Prompt sobre Check de Versi√≥n Sin Restricci√≥n de Tiempo
+## Prompt sobre Check de VersiÛn Sin RestricciÛn de Tiempo
 
 No. En el escenario conectado, el check de version se tiene que ejecutar siempre, no solo si han pasado mas de 24 horas. El resto de escenarios son correctos. Modifica la propuesta.
 
 ---
 
-### Respuesta del asistente - Actualizaci√≥n de Estrategia
+### Respuesta del asistente - ActualizaciÛn de Estrategia
 
-Se modific√≥ la propuesta para eliminar la restricci√≥n de 24 horas:
+Se modificÛ la propuesta para eliminar la restricciÛn de 24 horas:
 
 **Cambio en specs/image-recognition/spec.md:**
 ```markdown
@@ -2535,63 +2537,63 @@ Se modific√≥ la propuesta para eliminar la restricci√≥n de 24 horas:
 - **NOTE**: Version check executes on every access when online to ensure latest model
 ```
 
-**Eliminado:** Escenario "Version check frequency" con restricci√≥n de 24 horas
+**Eliminado:** Escenario "Version check frequency" con restricciÛn de 24 horas
 
 **Nuevo Diagrama de Flujo:**
 ```
 Operator opens image recognition
-         ‚Üì
+         ?
 Load model from IndexedDB cache
-         ‚Üì
+         ?
 Network available?
-         ‚Üì
-    Yes ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ No
-     ‚Üì                        ‚Üì
+         ?
+    Yes -------------------- No
+     ?                        ?
 Fetch metadata (background)  Use cached model
-     ‚Üì                        (offline mode)
+     ?                        (offline mode)
 Compare versions
-     ‚Üì
-Same? ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ Different?
-  ‚Üì              ‚Üì
+     ?
+Same? ------ Different?
+  ?              ?
 Use cached    Download new model (background)
 ```
 
 **Estrategia simplificada:**
-- Con red: SIEMPRE verifica versi√≥n (sin l√≥gica de timestamps)
+- Con red: SIEMPRE verifica versiÛn (sin lÛgica de timestamps)
 - Sin red: Usa modelo cacheado silenciosamente
 
-**Validaci√≥n:** ‚úÖ Propuesta actualizada y validada
+**ValidaciÛn:** ? Propuesta actualizada y validada
 
 ---
 
 ## Prompt sobre Escenarios Offline No Implementados en MVP
 
-Perfecto. Los escenarios offline no est√°n contemplados en esta fase. Aunque est√©n documentados no quiero incluirlos en el desarrollo actual.
+Perfecto. Los escenarios offline no est·n contemplados en esta fase. Aunque estÈn documentados no quiero incluirlos en el desarrollo actual.
 
 ---
 
 ### Respuesta del asistente - Alcance MVP Clarificado
 
-Se actualiz√≥ la propuesta para clarificar que **escenarios offline est√°n documentados pero NO se implementan en MVP:**
+Se actualizÛ la propuesta para clarificar que **escenarios offline est·n documentados pero NO se implementan en MVP:**
 
-**A√±adido a proposal.md - Secci√≥n "Scope Clarifications":**
+**AÒadido a proposal.md - SecciÛn "Scope Clarifications":**
 
 **MVP Scope (This Phase):**
-- ‚úÖ Sales registration (manual and with image recognition)
-- ‚úÖ Image recognition with online model version check
-- ‚úÖ Model retraining capability
-- ‚úÖ Transaction-based inventory updates
-- ‚úÖ Photo compression and storage
+- ? Sales registration (manual and with image recognition)
+- ? Image recognition with online model version check
+- ? Model retraining capability
+- ? Transaction-based inventory updates
+- ? Photo compression and storage
 
 **Deferred to Phase 2 (Documented but NOT Implemented):**
-- ‚è≠Ô∏è Offline model usage (cached model when no network)
-- ‚è≠Ô∏è Progressive Web App offline capabilities
-- ‚è≠Ô∏è Push notifications for new model versions
-- ‚è≠Ô∏è Automatic model retraining triggers
+- ?? Offline model usage (cached model when no network)
+- ?? Progressive Web App offline capabilities
+- ?? Push notifications for new model versions
+- ?? Automatic model retraining triggers
 
 **Cambios en design.md:**
-- T√≠tulo actualizado: "Model Versioning and Update Strategy (MVP: Online-Only)"
-- Network Error Behavior: Display error "Se requiere conexi√≥n a internet", redirect to manual entry
+- TÌtulo actualizado: "Model Versioning and Update Strategy (MVP: Online-Only)"
+- Network Error Behavior: Display error "Se requiere conexiÛn a internet", redirect to manual entry
 - Fase 2 enhancements documentados pero diferidos
 
 **Cambios en tasks.md:**
@@ -2611,15 +2613,15 @@ requires network connectivity for image recognition.
 **Comportamiento MVP Final:**
 | Escenario | Comportamiento |
 |-----------|----------------|
-| Usuario CON red | ‚úÖ Descarga/verifica modelo, ejecuta inferencia |
-| Usuario SIN red | ‚ö†Ô∏è Error "Se requiere conexi√≥n", bot√≥n "Registrar venta manual" |
-| Nueva versi√≥n | ‚úÖ Descarga autom√°tica desde servidor |
-| Modelo cacheado | ‚ùå NO implementado en MVP |
-| Uso offline | ‚ùå NO implementado en MVP |
+| Usuario CON red | ? Descarga/verifica modelo, ejecuta inferencia |
+| Usuario SIN red | ?? Error "Se requiere conexiÛn", botÛn "Registrar venta manual" |
+| Nueva versiÛn | ? Descarga autom·tica desde servidor |
+| Modelo cacheado | ? NO implementado en MVP |
+| Uso offline | ? NO implementado en MVP |
 
-**Validaci√≥n:** ‚úÖ `openspec validate add-sales-and-image-recognition --strict` pasado
+**ValidaciÛn:** ? `openspec validate add-sales-and-image-recognition --strict` pasado
 
-**Propuesta lista para aprobaci√≥n e implementaci√≥n del MVP (online-only).**
+**Propuesta lista para aprobaciÛn e implementaciÛn del MVP (online-only).**
 
 ---
 
@@ -2629,37 +2631,37 @@ No me queda claro como se decide cuando re-entrenar el modelo. Como se haria y c
 
 ---
 
-### Respuesta del asistente - An√°lisis y Propuesta de Sistema de Scoring
+### Respuesta del asistente - An·lisis y Propuesta de Sistema de Scoring
 
-Se identific√≥ que la propuesta no detallaba suficientemente los criterios de re-entrenamiento. Se propuso una soluci√≥n completa:
+Se identificÛ que la propuesta no detallaba suficientemente los criterios de re-entrenamiento. Se propuso una soluciÛn completa:
 
-**Sistema de Scoring para Decidir Cu√°ndo Re-entrenar:**
+**Sistema de Scoring para Decidir Cu·ndo Re-entrenar:**
 
-| Criterio | Condici√≥n | Nivel de Alerta | Ejemplo |
+| Criterio | CondiciÛn | Nivel de Alerta | Ejemplo |
 |----------|-----------|-----------------|---------|
-| Precisi√≥n baja | Top-3 accuracy <70% | üî¥ CR√çTICO | Operadores seleccionan fuera de top-3 |
-| Muchos productos nuevos | ‚â•20% productos a√±adidos | üî¥ CR√çTICO | 100 nuevos de 500 = 20% |
-| Productos moderados | ‚â•10% productos a√±adidos | üü† ALTA PRIORIDAD | 50 nuevos de 500 = 10% |
-| Muchos cambios de fotos | ‚â•20% fotos a√±adidas | üü† ALTA PRIORIDAD | 500 de 2,500 = 20% |
-| Fotos eliminadas | ‚â•10% fotos eliminadas | üü† ALTA PRIORIDAD | 250 de 2,500 = 10% |
-| Modelo antiguo + cambios | >30 d√≠as + cambios | üü† ALTA PRIORIDAD | 45 d√≠as + 30 productos nuevos |
-| Modelo muy antiguo | >60 d√≠as | üü° RECOMENDADO | Modelo de hace 2 meses |
+| PrecisiÛn baja | Top-3 accuracy <70% | ?? CRÕTICO | Operadores seleccionan fuera de top-3 |
+| Muchos productos nuevos | =20% productos aÒadidos | ?? CRÕTICO | 100 nuevos de 500 = 20% |
+| Productos moderados | =10% productos aÒadidos | ?? ALTA PRIORIDAD | 50 nuevos de 500 = 10% |
+| Muchos cambios de fotos | =20% fotos aÒadidas | ?? ALTA PRIORIDAD | 500 de 2,500 = 20% |
+| Fotos eliminadas | =10% fotos eliminadas | ?? ALTA PRIORIDAD | 250 de 2,500 = 10% |
+| Modelo antiguo + cambios | >30 dÌas + cambios | ?? ALTA PRIORIDAD | 45 dÌas + 30 productos nuevos |
+| Modelo muy antiguo | >60 dÌas | ?? RECOMENDADO | Modelo de hace 2 meses |
 
 **Dashboard de Administrador Propuesto (/admin/ai-model):**
-- Estado del modelo (versi√≥n, fecha, precisi√≥n, alerta)
-- M√©tricas de cat√°logo (productos con/sin fotos, nuevos no en modelo)
-- M√©tricas de fotos (a√±adidas, eliminadas, cambio neto)
-- M√©tricas de precisi√≥n (Fase 2 opcional)
+- Estado del modelo (versiÛn, fecha, precisiÛn, alerta)
+- MÈtricas de cat·logo (productos con/sin fotos, nuevos no en modelo)
+- MÈtricas de fotos (aÒadidas, eliminadas, cambio neto)
+- MÈtricas de precisiÛn (Fase 2 opcional)
 - Botones: "Re-entrenar Modelo Ahora", "Ver Historial"
 
 **Notificaciones Propuestas:**
-- Toast en login admin si estado CR√çTICO o ALTA PRIORIDAD
-- Badge en men√∫ lateral si ALTA PRIORIDAD
+- Toast en login admin si estado CRÕTICO o ALTA PRIORIDAD
+- Badge en men˙ lateral si ALTA PRIORIDAD
 - Email semanal con resumen (opcional)
 
-**C√°lculo de Costes con Vol√∫menes del Proyecto:**
+**C·lculo de Costes con Vol˙menes del Proyecto:**
 
-Datos: ~500 productos, ~2,500 fotos, augmentation √ó3 = ~7,500 im√°genes
+Datos: ~500 productos, ~2,500 fotos, augmentation ◊3 = ~7,500 im·genes
 
 | Fase | CPU (sin GPU) | GPU (T4) | GPU (A100) |
 |------|---------------|----------|------------|
@@ -2672,108 +2674,108 @@ Datos: ~500 productos, ~2,500 fotos, augmentation √ó3 = ~7,500 im√°genes
 
 **Opciones de Infraestructura:**
 1. **CPU en backend existente:** $0, 30-45 min (recomendado MVP)
-2. **Lambda/Functions CPU:** $0.10-0.50/ejecuci√≥n (timeout corto)
-3. **Spot Instance GPU:** $0.05-0.15/ejecuci√≥n, 15 min (recomendado producci√≥n)
-4. **SageMaker/Azure ML:** $0.15-0.50/ejecuci√≥n (costoso para free-tier)
+2. **Lambda/Functions CPU:** $0.10-0.50/ejecuciÛn (timeout corto)
+3. **Spot Instance GPU:** $0.05-0.15/ejecuciÛn, 15 min (recomendado producciÛn)
+4. **SageMaker/Azure ML:** $0.15-0.50/ejecuciÛn (costoso para free-tier)
 
-**Recomendaci√≥n MVP:** CPU en backend existente ($0 adicional, ejecutar de noche)
+**RecomendaciÛn MVP:** CPU en backend existente ($0 adicional, ejecutar de noche)
 
 ---
 
-## Prompt sobre Aprobaci√≥n de Propuesta con Cambios
+## Prompt sobre AprobaciÛn de Propuesta con Cambios
 
 Propuesta aprobada pero con los siguientes cambios:
 - Notificacion Toast para estado critico y tambien para alta prioridad. Elimina la notificacion con badge y el email semanal
-- Utiliza la Opci√≥n 1: CPU en backend existente. No se utilizar√°n servicios externos.
+- Utiliza la OpciÛn 1: CPU en backend existente. No se utilizar·n servicios externos.
 
 ---
 
-### Respuesta del asistente - Actualizaci√≥n Final de Propuesta
+### Respuesta del asistente - ActualizaciÛn Final de Propuesta
 
 Se aplicaron los cambios solicitados a la propuesta:
 
-**A√±adido a design.md - Decision 8: Model Retraining Triggers and Admin Notifications:**
+**AÒadido a design.md - Decision 8: Model Retraining Triggers and Admin Notifications:**
 
 **Infraestructura de Training:**
-- ‚úÖ CPU en backend existente (BackgroundService)
-- ‚ùå Sin servicios externos (Lambda, Spot, SageMaker)
+- ? CPU en backend existente (BackgroundService)
+- ? Sin servicios externos (Lambda, Spot, SageMaker)
 - **Coste:** $0 adicional
-- **Duraci√≥n:** 30-45 minutos promedio
-- **Ejecuci√≥n:** As√≠ncrona, no bloquea API
-- **Recomendaci√≥n:** Ejecutar fuera de horario (noche)
+- **DuraciÛn:** 30-45 minutos promedio
+- **EjecuciÛn:** AsÌncrona, no bloquea API
+- **RecomendaciÛn:** Ejecutar fuera de horario (noche)
 
 **Estrategia de Notificaciones:**
-- ‚úÖ Toast en login admin para CR√çTICO y ALTA PRIORIDAD
-- ‚ùå Badge eliminado (simplificaci√≥n UX)
-- ‚ùå Email eliminado (admin revisa dashboard cuando necesita)
+- ? Toast en login admin para CRÕTICO y ALTA PRIORIDAD
+- ? Badge eliminado (simplificaciÛn UX)
+- ? Email eliminado (admin revisa dashboard cuando necesita)
 
-**A√±adido a specs/image-recognition/spec.md - Nuevo Requirement:**
+**AÒadido a specs/image-recognition/spec.md - Nuevo Requirement:**
 
 **Admin Dashboard for Model Health Monitoring** con 8 escenarios:
-1. Display model health dashboard (m√©tricas completas)
-2. Calculate retraining alert level (l√≥gica de scoring)
-3. Show toast on admin login (CR√çTICO y ALTA)
+1. Display model health dashboard (mÈtricas completas)
+2. Calculate retraining alert level (lÛgica de scoring)
+3. Show toast on admin login (CRÕTICO y ALTA)
 4. Critical alert for low precision (<70%)
 5. High priority alert for catalog changes
 6. OK status when model current
 7. Precision metrics unavailable MVP (Fase 2)
 8. Hide dashboard from operators (solo admin)
 
-**A√±adido a tasks.md:**
-- Nueva secci√≥n 8A: Backend Model Health Service (11 tareas)
-- Secci√≥n 8: +2 tareas (endpoint /model/health, /retrain/status)
-- Secci√≥n 15: +6 tareas (dashboard cards, toast, scoring)
-- Secci√≥n 6: Detalles de duraci√≥n por fase del training
+**AÒadido a tasks.md:**
+- Nueva secciÛn 8A: Backend Model Health Service (11 tareas)
+- SecciÛn 8: +2 tareas (endpoint /model/health, /retrain/status)
+- SecciÛn 15: +6 tareas (dashboard cards, toast, scoring)
+- SecciÛn 6: Detalles de duraciÛn por fase del training
 
 **Total tareas actualizado:** 234 tareas (antes: 223)
 
-**Validaci√≥n:** ‚úÖ `openspec validate add-sales-and-image-recognition --strict` pasado
+**ValidaciÛn:** ? `openspec validate add-sales-and-image-recognition --strict` pasado
 
-**Propuesta final lista para implementaci√≥n con:**
-- Dashboard completo con m√©tricas automatizadas
+**Propuesta final lista para implementaciÛn con:**
+- Dashboard completo con mÈtricas automatizadas
 - Sistema de scoring con criterios claros
-- Toast notifications para CR√çTICO y ALTA PRIORIDAD
+- Toast notifications para CRÕTICO y ALTA PRIORIDAD
 - Training en CPU backend ($0 adicional, 30-45 min)
 - Sin servicios externos
 
 ---
 
-## Prompt about Despliegue en producci√≥n, an√°lisis y decisi√≥n de entrenamiento ML
+## Prompt about Despliegue en producciÛn, an·lisis y decisiÛn de entrenamiento ML
 
-### Prompt 1: Comparaci√≥n AWS vs Azure
+### Prompt 1: ComparaciÛn AWS vs Azure
 
 Eres experto en AWS, Azure y deploy de aplicaciones en esas plataformas. Crea una comparacion con pros y contras de ambas plataformas para efectuar el deploy de backen y frontend de este proyecto. Ten en cuenta:
 - Facilidad de configuracion e implementacion de la infraestructura
 - Capa free-tier para las primeras fase del proyecto (MVP)
-- Implementaciones no realizadas especificas para la plataforma que se eligir√°. Por ejemplo File Storage actualmente utiliza el filesystem de la maquina; valorar como cambia segun la plataforma y averiguar si hace falta hacer implementaciones especificas.
+- Implementaciones no realizadas especificas para la plataforma que se eligir·. Por ejemplo File Storage actualmente utiliza el filesystem de la maquina; valorar como cambia segun la plataforma y averiguar si hace falta hacer implementaciones especificas.
 
 Hazme al menos 5 preguntas para aclarar dudas antes de hacer el analisis.
 
 ---
 
-**Respuesta:** Se realizaron 7 preguntas de clarificaci√≥n sobre experiencia previa, presupuesto, ubicaci√≥n de inferencia ML, regiones, DevOps, escalabilidad y tolerancia a downtime.
+**Respuesta:** Se realizaron 7 preguntas de clarificaciÛn sobre experiencia previa, presupuesto, ubicaciÛn de inferencia ML, regiones, DevOps, escalabilidad y tolerancia a downtime.
 
 ---
 
-### Prompt 2: Respuestas a preguntas de clarificaci√≥n
+### Prompt 2: Respuestas a preguntas de clarificaciÛn
 
 1. Experiencia en AWS pero dispuesto a aprender Azure si es la mejor opcion por otros factores.
 2. No hay presupuesto definido pero la idea es gastar lo menos posible.
-3. El reconocimeinto se har√° client side. El modelo se crear√° en la misma instancia donde corre el backend.
+3. El reconocimeinto se har· client side. El modelo se crear· en la misma instancia donde corre el backend.
 4. No
-5. Realmente las DevOps son opcionales y no hay una eleccion clara. Puedes proponer la que mejor se adapte (siempre teniendo en cuenta los costos). Github se eligi√≥ por ser gratis, si no me equivoco.
-6. La aplicacion nose preve√© que escale en usuarios.
+5. Realmente las DevOps son opcionales y no hay una eleccion clara. Puedes proponer la que mejor se adapte (siempre teniendo en cuenta los costos). Github se eligiÛ por ser gratis, si no me equivoco.
+6. La aplicacion nose preveÈ que escale en usuarios.
 7. Es aceptable un downtime planificado para mantenimiento
 
-Adem√°s ten en cuenta que se necesita tener un backup diario al menos de la base de datos, manteniendo al menos los ultimos 7 dias.
+Adem·s ten en cuenta que se necesita tener un backup diario al menos de la base de datos, manteniendo al menos los ultimos 7 dias.
 
 ---
 
-**Respuesta:** An√°lisis completo AWS vs Azure creado en `Documentos/Propuestas/comparacion-aws-azure-deploy.md`:
-- **Recomendaci√≥n:** AWS (experiencia del equipo, menor curva de aprendizaje)
+**Respuesta:** An·lisis completo AWS vs Azure creado en `Documentos/Propuestas/comparacion-aws-azure-deploy.md`:
+- **RecomendaciÛn:** AWS (experiencia del equipo, menor curva de aprendizaje)
 - **Servicios AWS:** App Runner, RDS PostgreSQL, S3, CloudFront, Secrets Manager
 - **Costos estimados:** $0-5/mes free-tier, ~$25-45/mes post free-tier
-- **Backup:** RDS con retenci√≥n 7 d√≠as incluido
+- **Backup:** RDS con retenciÛn 7 dÌas incluido
 
 ---
 
@@ -2781,26 +2783,26 @@ Adem√°s ten en cuenta que se necesita tener un backup diario al menos de la base
 
 Perfecto. Elegimos AWS.
 - Crea openspec proposal para implementar el File Storage en AWS S3 para produccion.
-- A√±ade al analisis tambien el deploy de la base de datos en produccion, teniendo en cuenta como y donde definir credenciales de acceso (igual que las de AWS no pueden estar en claro en Github).
-- Crea una guia detallada para el deploy en Documentos y actualiza la documentacion y sus referencias. A√±ade tambien la referencia de este analisis a la documentacion donde sea necesario.
+- AÒade al analisis tambien el deploy de la base de datos en produccion, teniendo en cuenta como y donde definir credenciales de acceso (igual que las de AWS no pueden estar en claro en Github).
+- Crea una guia detallada para el deploy en Documentos y actualiza la documentacion y sus referencias. AÒade tambien la referencia de este analisis a la documentacion donde sea necesario.
 
 ---
 
 **Respuesta:** Creada propuesta OpenSpec `add-aws-production-deployment`:
 - **proposal.md:** S3FileStorageService, Secrets Manager, RDS PostgreSQL con backups
-- **design.md:** 5 decisiones t√©cnicas (S3, Secrets Manager, RDS, App Runner, GitHub Actions)
-- **tasks.md:** 52 tareas de implementaci√≥n
+- **design.md:** 5 decisiones tÈcnicas (S3, Secrets Manager, RDS, App Runner, GitHub Actions)
+- **tasks.md:** 52 tareas de implementaciÛn
 - **specs/backend/spec.md:** Delta de requisitos
 
-Documentaci√≥n creada:
-- `Documentos/Guias/deploy-aws-production.md` - Gu√≠a completa de despliegue
-- Actualizado `README.md` con referencias a nueva documentaci√≥n
+DocumentaciÛn creada:
+- `Documentos/Guias/deploy-aws-production.md` - GuÌa completa de despliegue
+- Actualizado `README.md` con referencias a nueva documentaciÛn
 
 ---
 
-### Prompt 4: Consideraci√≥n de Python para ML
+### Prompt 4: ConsideraciÛn de Python para ML
 
-Has considerado que el backend necesita ejecutar codigo Pyton para la cracion del modelo para el reconocimiento de fotos? Esto est√° contemplado en la propuesta actual de arquitectura?
+Has considerado que el backend necesita ejecutar codigo Pyton para la cracion del modelo para el reconocimiento de fotos? Esto est· contemplado en la propuesta actual de arquitectura?
 
 ---
 
@@ -2809,12 +2811,12 @@ Has considerado que el backend necesita ejecutar codigo Pyton para la cracion de
 - App Runner original: 0.5GB RAM (insuficiente)
 
 **Dos opciones propuestas:**
-- **Opci√≥n A:** Multi-runtime Docker (Python + .NET en mismo contenedor, 2GB RAM)
-- **Opci√≥n B:** Servicio separado ECS Fargate Spot (solo para training)
+- **OpciÛn A:** Multi-runtime Docker (Python + .NET en mismo contenedor, 2GB RAM)
+- **OpciÛn B:** Servicio separado ECS Fargate Spot (solo para training)
 
 ---
 
-### Prompt 5: Elegir opci√≥n A
+### Prompt 5: Elegir opciÛn A
 
 Ok, la opcion A es la mejor solucion. Actualiza la propuesta.
 
@@ -2823,89 +2825,89 @@ Ok, la opcion A es la mejor solucion. Actualiza la propuesta.
 **Respuesta:** Propuesta actualizada con:
 - Multi-runtime Dockerfile (Python 3.11 + .NET 10 + TensorFlow)
 - App Runner: 2GB RAM (vs 0.5GB original)
-- Tama√±o imagen: ~2-3GB
+- TamaÒo imagen: ~2-3GB
 - Costo estimado: $10-15/mes (excede parcialmente free-tier)
 - BackgroundService para invocar Python training via Process.Start
 
 ---
 
-### Prompt 6: An√°lisis de burst mode para mantener free-tier
+### Prompt 6: An·lisis de burst mode para mantener free-tier
 
-Teniendo en cuenta que el modelo de ML se ejecuta con poca frecuencia, seria posible dejar las especificaciones de AWS como antes, sin salirse de la capa de free-tier? Las instancias de App Runner tienen un burst mode para picos de trabajo, como las de EC2? De ese modo podemos mantener la instancia peque√±a y aprovechar el Burst mode solo para esos picos de trabajo que coinciden con la creacion del modelo. Analiza todos los aspectos y dame un verdicto. Segun tu respuesta decidiremos como abordar el tema.
+Teniendo en cuenta que el modelo de ML se ejecuta con poca frecuencia, seria posible dejar las especificaciones de AWS como antes, sin salirse de la capa de free-tier? Las instancias de App Runner tienen un burst mode para picos de trabajo, como las de EC2? De ese modo podemos mantener la instancia pequeÒa y aprovechar el Burst mode solo para esos picos de trabajo que coinciden con la creacion del modelo. Analiza todos los aspectos y dame un verdicto. Segun tu respuesta decidiremos como abordar el tema.
 
 ---
 
-**Respuesta:** An√°lisis exhaustivo de opciones:
+**Respuesta:** An·lisis exhaustivo de opciones:
 
-**App Runner NO tiene burst mode.** A diferencia de EC2 (T3 con CPU credits), App Runner escala horizontalmente (m√°s instancias), no verticalmente.
+**App Runner NO tiene burst mode.** A diferencia de EC2 (T3 con CPU credits), App Runner escala horizontalmente (m·s instancias), no verticalmente.
 
 **Alternativas analizadas:**
-| Opci√≥n | Costo | Complejidad | Free-tier |
+| OpciÛn | Costo | Complejidad | Free-tier |
 |--------|-------|-------------|-----------|
-| A. Multi-runtime 2GB RAM | ~$15-25/mes | Baja | ‚ùå No |
-| B. Lambda + Layer | $0.50-1/training | Media | ‚ùå Timeout 15min |
-| C. ECS Fargate Spot | $0.50-1/training | Alta | ‚ùå No |
-| D. EC2 Spot manual | ~$0.10-0.20/training | Muy alta | ‚ö†Ô∏è Parcial |
-| **E. Training Local** | **$0** | **M√≠nima** | **‚úÖ S√≠** |
+| A. Multi-runtime 2GB RAM | ~$15-25/mes | Baja | ? No |
+| B. Lambda + Layer | $0.50-1/training | Media | ? Timeout 15min |
+| C. ECS Fargate Spot | $0.50-1/training | Alta | ? No |
+| D. EC2 Spot manual | ~$0.10-0.20/training | Muy alta | ?? Parcial |
+| **E. Training Local** | **$0** | **MÌnima** | **? SÌ** |
 
-**Veredicto: Opci√≥n E - Entrenamiento Local**
-- Admin ejecuta Python en su laptop (8-16GB RAM t√≠pico)
+**Veredicto: OpciÛn E - Entrenamiento Local**
+- Admin ejecuta Python en su laptop (8-16GB RAM tÌpico)
 - App Runner se mantiene en 0.5GB RAM (free-tier)
 - Scripts proporcionados: download_photos.py, train_model.py, upload_model.py
 - Dashboard para upload de modelo entrenado
-- Duraci√≥n training: 10-20 min GPU, 30-50 min CPU
+- DuraciÛn training: 10-20 min GPU, 30-50 min CPU
 
 ---
 
 ### Prompt 7: Sincronizar propuestas OpenSpec
 
-Elegimos entrenamiento local. EL desarrollo ya est√° definido en la propuesta openspec "add-sales-and-image-recognition". Actualiza esta propuesta para sincronizar especificaciones y evitar incongruencias.
+Elegimos entrenamiento local. EL desarrollo ya est· definido en la propuesta openspec "add-sales-and-image-recognition". Actualiza esta propuesta para sincronizar especificaciones y evitar incongruencias.
 
 ---
 
-**Respuesta:** Sincronizaci√≥n completa de ambas propuestas:
+**Respuesta:** SincronizaciÛn completa de ambas propuestas:
 
 **Propuesta `add-sales-and-image-recognition`:**
 - `proposal.md`: Actualizado a entrenamiento local, eliminado dual-mode
-- `design.md`: Decision 7 ‚Üí Local training workflow, Decision 8 ‚Üí Dashboard m√©tricas, Decision 16 ‚Üí Local-only
+- `design.md`: Decision 7 ? Local training workflow, Decision 8 ? Dashboard mÈtricas, Decision 16 ? Local-only
 - `specs/image-recognition/spec.md`: Requisitos actualizados para upload modelo
-- `tasks.md`: Nota explicativa a√±adida, secciones 17B, 19, 20, 21 actualizadas
+- `tasks.md`: Nota explicativa aÒadida, secciones 17B, 19, 20, 21 actualizadas
 - Eliminados: `CLIENT_SIDE_TRAINING_NOW_IN_MVP.md`, `PHASE2_CLIENT_SIDE_TRAINING.md`
 
 **Propuesta `add-aws-production-deployment`:**
 - `proposal.md`: Revertido a .NET only, 0.5GB RAM, Docker ~200MB
-- `design.md`: Decision 6 ‚Üí Local training, Decision 7 ‚Üí Free-tier App Runner
+- `design.md`: Decision 6 ? Local training, Decision 7 ? Free-tier App Runner
 - `specs/backend/spec.md`: Eliminados requisitos multi-runtime
 - `tasks.md`: Secciones reescritas para .NET-only
 
-**Documentaci√≥n actualizada:**
+**DocumentaciÛn actualizada:**
 - `deploy-aws-production.md`: App Runner 0.5GB, costos $1-6/mes
 - `comparacion-aws-azure-deploy.md`: Tabla costos actualizada
 
 **Arquitectura final MVP:**
 ```
-PRODUCCI√ìN (AWS):
-  App Runner (.NET only, 0.5GB) ‚Üê CloudFront
-         ‚Üì
-  RDS PostgreSQL ‚Üê‚Üí S3 (photos, models)
-                     ‚Üë Upload model
+PRODUCCI”N (AWS):
+  App Runner (.NET only, 0.5GB) ? CloudFront
+         ?
+  RDS PostgreSQL ?? S3 (photos, models)
+                     ? Upload model
 LOCAL (Admin Laptop):
-  scripts/ml/*.py ‚Üí Training ‚Üí Upload S3
+  scripts/ml/*.py ? Training ? Upload S3
 ```
 
 **Beneficios:**
-- ‚úÖ AWS 100% free-tier
-- ‚úÖ Docker ~200MB (deploy r√°pido)
-- ‚úÖ Training en hardware potente del admin
-- ‚úÖ $0 adicional por training
+- ? AWS 100% free-tier
+- ? Docker ~200MB (deploy r·pido)
+- ? Training en hardware potente del admin
+- ? $0 adicional por training
 
-**Validaci√≥n:** ‚úÖ Ambas propuestas OpenSpec v√°lidas
+**ValidaciÛn:** ? Ambas propuestas OpenSpec v·lidas
 
 ---
 
-## Prompt sobre Refactorizaci√≥n de Tests de Integraci√≥n con Respawn, Mother Object y Bogus
+## Prompt sobre RefactorizaciÛn de Tests de IntegraciÛn con Respawn, Mother Object y Bogus
 
-### Prompt 1: Refactorizar tests de integraci√≥n
+### Prompt 1: Refactorizar tests de integraciÛn
 
 For integration test we should:
 - use Respawn instead of manual truncate queries.
@@ -2916,9 +2918,9 @@ If is not documented in specs for integration testing, add to spec to avoid this
 
 ---
 
-**Respuesta:** Refactorizaci√≥n completa de tests de integraci√≥n:
+**Respuesta:** RefactorizaciÛn completa de tests de integraciÛn:
 
-**1. Eliminaci√≥n de TRUNCATEs manuales:**
+**1. EliminaciÛn de TRUNCATEs manuales:**
 - Eliminados todos los `ExecuteSqlRawAsync` con TRUNCATE de:
   - `ReturnsControllerTests.cs`
   - `SalesControllerTests.cs`
@@ -2926,28 +2928,28 @@ If is not documented in specs for integration testing, add to spec to avoid this
   - `ImageRecognitionControllerTests.cs`
 - Ahora solo usan `_factory.ResetDatabaseAsync()` (Respawn)
 
-**2. Creaci√≥n de Mother Objects:**
+**2. CreaciÛn de Mother Objects:**
 
 ```
 TestHelpers/Mothers/
-‚îú‚îÄ‚îÄ TestDataMother.cs     # Factory principal
-‚îú‚îÄ‚îÄ SaleMother.cs         # Builder para Sales
-‚îî‚îÄ‚îÄ ReturnMother.cs       # Builder para Returns
++-- TestDataMother.cs     # Factory principal
++-- SaleMother.cs         # Builder para Sales
++-- ReturnMother.cs       # Builder para Returns
 ```
 
 Cada Mother Object incluye:
 - `ProductMother` - Crear productos
 - `PointOfSaleMother` - Crear puntos de venta
-- `PaymentMethodMother` - Crear m√©todos de pago
+- `PaymentMethodMother` - Crear mÈtodos de pago
 - `InventoryMother` - Crear inventarios
 - `UserMother` - Crear usuarios con asignaciones POS
 - `SaleMother` - Crear ventas
 - `ReturnMother` - Crear devoluciones
 
-**3. Actualizaci√≥n de spec `backend-testing`:**
-- A√±adido escenario "Prohibited Manual Truncation"
-- A√±adido requisito "Mother Object Pattern for Integration Tests"
-- A√±adido requisito "Integration Test Structure"
+**3. ActualizaciÛn de spec `backend-testing`:**
+- AÒadido escenario "Prohibited Manual Truncation"
+- AÒadido requisito "Mother Object Pattern for Integration Tests"
+- AÒadido requisito "Integration Test Structure"
 
 ---
 
@@ -2959,21 +2961,21 @@ Do not apply changes.
 
 ---
 
-**Respuesta:** S√≠, existe un conflicto potencial:
+**Respuesta:** SÌ, existe un conflicto potencial:
 
 **Problema:**
 | Aspecto | Bogus (TestDataGenerator) | Mother Objects |
 |---------|--------------------------|----------------|
-| Prop√≥sito | Entidades in-memory para unit tests | Entidades persistidas para integration tests |
+| PropÛsito | Entidades in-memory para unit tests | Entidades persistidas para integration tests |
 | Datos | Valores aleatorios realistas | Valores fijos por defecto |
 | Persistencia | Ninguna | Guarda en base de datos |
 
 **Conflictos identificados:**
-1. **Duplicaci√≥n de l√≥gica**: Ambos crean las mismas entidades con diferentes patrones
+1. **DuplicaciÛn de lÛgica**: Ambos crean las mismas entidades con diferentes patrones
 2. **Valores inconsistentes**: Bogus usa datos aleatorios, Mother Objects usaban valores fijos
-3. **C√≥digo redundante**: M√©todos de configuraci√≥n similares duplicados
+3. **CÛdigo redundante**: MÈtodos de configuraciÛn similares duplicados
 
-**Soluci√≥n recomendada: Composici√≥n**
+**SoluciÛn recomendada: ComposiciÛn**
 Mother Objects deben usar Bogus internamente via `TestDataGenerator`:
 
 ```csharp
@@ -2983,7 +2985,7 @@ public class ProductMother
     private string _name = "Test Product";  // Fijo, no realista
 }
 
-// Despu√©s (Bogus via TestDataGenerator)
+// DespuÈs (Bogus via TestDataGenerator)
 public class ProductMother
 {
     public ProductMother(ApplicationDbContext context)
@@ -2994,21 +2996,21 @@ public class ProductMother
 ```
 
 **Beneficios:**
-- Single source of truth para generaci√≥n de entidades
+- Single source of truth para generaciÛn de entidades
 - Datos realistas en todos los tests
-- Sin duplicaci√≥n de l√≥gica
+- Sin duplicaciÛn de lÛgica
 
 ---
 
-### Prompt 3: Implementar refactorizaci√≥n
+### Prompt 3: Implementar refactorizaciÛn
 
 Yes, implement the refactoring. Then update spec and documentation for testing.
 
 ---
 
-**Respuesta:** Implementaci√≥n completa de la arquitectura unificada:
+**Respuesta:** ImplementaciÛn completa de la arquitectura unificada:
 
-**1. Refactorizaci√≥n de Mother Objects:**
+**1. RefactorizaciÛn de Mother Objects:**
 
 Todos los Mother Objects ahora usan `TestDataGenerator` internamente:
 
@@ -3034,55 +3036,55 @@ public class ProductMother
 
 **3. Spec actualizado (`backend-testing/spec.md`):**
 
-Nuevos escenarios a√±adidos:
+Nuevos escenarios aÒadidos:
 - "Test Data Generation with Bogus" - Single source of truth
-- "TestDataGenerator as Single Source" - Previene duplicaci√≥n futura
+- "TestDataGenerator as Single Source" - Previene duplicaciÛn futura
 - "Mother Object Default Values via Bogus" - Mother Objects DEBEN usar TestDataGenerator
-- "Unified Test Data Architecture" - Documenta el patr√≥n de composici√≥n
+- "Unified Test Data Architecture" - Documenta el patrÛn de composiciÛn
 
 **Arquitectura final:**
 ```
 TestDataGenerator (Bogus Fakers)
-       ‚Üë usa internamente
+       ? usa internamente
    Mother Objects
-       ‚Üë usa
+       ? usa
 Integration Tests    Unit Tests (usan TestDataGenerator directamente)
 ```
 
-**Validaci√≥n:**
-- ‚úÖ Build exitoso (0 errores)
-- ‚úÖ 16 tests de ReturnService pasan
-- ‚úÖ Spec v√°lido (`openspec validate backend-testing --strict`)
+**ValidaciÛn:**
+- ? Build exitoso (0 errores)
+- ? 16 tests de ReturnService pasan
+- ? Spec v·lido (`openspec validate backend-testing --strict`)
 
 ---
 
-## Prompt sobre Gesti√≥n de componentes de joyas y costes de producci√≥n
+## Prompt sobre GestiÛn de componentes de joyas y costes de producciÛn
 
 Actua como experto en gestion de costes de produccion de joyas.
-Quiero a√±adir a los productos (joyas) unos componentes que se establecer√°n en una tabla maestra de Componentes de las joyas. Cada uno tendr√° los siguientes campos:
-1. Descripci√≥n (texto, obligatorio, max 35 caracteres)
+Quiero aÒadir a los productos (joyas) unos componentes que se establecer·n en una tabla maestra de Componentes de las joyas. Cada uno tendr· los siguientes campos:
+1. DescripciÛn (texto, obligatorio, max 35 caracteres)
 2. Precio de coste (decimal positivo, opcional)
 3. Precio de venta (decimal positivo, opcional)
 
-Estos componentes se asignar√°n a cada producto a traves de la interfaz de "Editar producto".
-Se podr√°n a√±adir dinamicamente los componentes (a traves de una busqueda autocomplete) y se especificar√° una "cantidad" (decimal positivo) de cada componente. Adem√°s se cargar√°n los datos de Precio de coste y Precio de venta (si est√°n definidos) y se podr√°n modificar especificamente por cada producto (es decir, esos valores son el default pero se pueden modificar SOLO en ese producto en concreto).
+Estos componentes se asignar·n a cada producto a traves de la interfaz de "Editar producto".
+Se podr·n aÒadir dinamicamente los componentes (a traves de una busqueda autocomplete) y se especificar· una "cantidad" (decimal positivo) de cada componente. Adem·s se cargar·n los datos de Precio de coste y Precio de venta (si est·n definidos) y se podr·n modificar especificamente por cada producto (es decir, esos valores son el default pero se pueden modificar SOLO en ese producto en concreto).
 
-Una vez establecidos los componentes, se podr√°n calcular el precio de coste y de venta totales (multiplicando cada precio por la cantidad) de ese producto, que formar√°n parte de los datos relativos a ese producto.
+Una vez establecidos los componentes, se podr·n calcular el precio de coste y de venta totales (multiplicando cada precio por la cantidad) de ese producto, que formar·n parte de los datos relativos a ese producto.
 
 Ten en cuenta lo siguiente:
 - Modificar un precio de compra/venta en un producto no modifica los valores de la tabla maestra
 - Modificar un precio de compra/venta en la tabla maestra no modifica los valores de los productos ya definidos
-- Todo la gestion est√° diponible solo para administradores
-- Los campos que a√±adiremos solo ser√°n visibles para los administradores
+- Todo la gestion est· diponible solo para administradores
+- Los campos que aÒadiremos solo ser·n visibles para los administradores
 
-Ejemplos de componentes (Descripci√≥n/Precio de coste/Precio de venta):
+Ejemplos de componentes (DescripciÛn/Precio de coste/Precio de venta):
 Oro/150/200
 Plata/10/20
 Hora de trabajo/50/50
 Diamante/null/null
 Soldadura/null/null
 
-Ejemplo de componente que definen un producto "Anillo erizo de mar plata" (Descripci√≥n/Precio de coste/Precio de venta/Cantidad):
+Ejemplo de componente que definen un producto "Anillo erizo de mar plata" (DescripciÛn/Precio de coste/Precio de venta/Cantidad):
 Plata/10/25/3
 Hora de trabajo/50/50/1
 Soldadura/0/1/1
@@ -3094,42 +3096,42 @@ Hazme al menos 15 preguntas para aclarar dudas: Una vez aclaradas las dudas, haz
 
 ### Respuesta del asistente (resumida):
 
-Explor√≥ el codebase (epicas, specs, modelo de datos, Product, edit.tsx, autorizaci√≥n). Cre√≥ plan con modelo ER (ProductComponent, ProductComponentAssignment), 17 preguntas de aclaraci√≥n y esqueleto de implementaci√≥n.
+ExplorÛ el codebase (epicas, specs, modelo de datos, Product, edit.tsx, autorizaciÛn). CreÛ plan con modelo ER (ProductComponent, ProductComponentAssignment), 17 preguntas de aclaraciÛn y esqueleto de implementaciÛn.
 
 ---
 
 ### Respuestas del usuario a las 17 preguntas:
 
 1. Si, el precio de venta generado por los componentes es solo una sugerencia. No se modifica el precio "oficial" ya establecido.
-2. No (no crear componentes on-the-fly desde edici√≥n)
+2. No (no crear componentes on-the-fly desde ediciÛn)
 3. 4 (decimales)
-4. Unidad gen√©rica
-5. El override del precio es obligatorio. No puede haber una asignaci√≥n de componentes sin precios de compra y de venta.
+4. Unidad genÈrica
+5. El override del precio es obligatorio. No puede haber una asignaciÛn de componentes sin precios de compra y de venta.
 6. De momento solo desde la interfaz.
-7. Si (asignar en creaci√≥n)
+7. Si (asignar en creaciÛn)
 8. Se pueden desactivar. Los asignados se mantienen; solo se evita asignar en el futuro.
 9. Integrada dentro de productos
 10. Se prerellenan
 11. Puede existir sin componentes asignados
-12. No se permite asignar un mismo componente m√°s de una vez
+12. No se permite asignar un mismo componente m·s de una vez
 13. En tiempo real para mejor UX
 14. Si (EUR)
 15. Si, orden con drag-and-drop
-16. Solo por descripci√≥n
+16. Solo por descripciÛn
 17. Ocultos para todos.
 
 ---
 
 ### Respuesta del asistente (resumida):
 
-Propuso 5 mejoras: 1) Sincronizar precios desde maestro, 2) Plantillas de componentes, 3) Reporte de m√°rgenes, 4) Advertencia desviaci√≥n precio 10%, 5) Copiar componentes desde otro producto.
+Propuso 5 mejoras: 1) Sincronizar precios desde maestro, 2) Plantillas de componentes, 3) Reporte de m·rgenes, 4) Advertencia desviaciÛn precio 10%, 5) Copiar componentes desde otro producto.
 
 ---
 
 ### Respuestas del usuario sobre mejoras:
 
 1. Ok
-2. Ok pero ser√≠an solo plantillas de componentes. Se especificar√°n obligatoriamente solo una lista de componentes y sus cantidades. Los precios override son opcionales (se usar√°n los precios de la tabla maestra)
+2. Ok pero serÌan solo plantillas de componentes. Se especificar·n obligatoriamente solo una lista de componentes y sus cantidades. Los precios override son opcionales (se usar·n los precios de la tabla maestra)
 3. Ok.
 4. Ok, utilizaremos una desviacion max del 10% para dar el warning.
 5. Me parece redundante si aplicamos la mejora 2.
@@ -3138,24 +3140,24 @@ Propuso 5 mejoras: 1) Sincronizar precios desde maestro, 2) Plantillas de compon
 
 ### Respuesta del asistente (resumida):
 
-Formul√≥ 16 preguntas adicionales sobre: sincronizaci√≥n (todos o solo sin override, confirmaci√≥n), plantillas (override opcional, quien crea, almacenamiento, aplicar en crear/editar, fusionar o reemplazar, duplicados), reportes (ubicaci√≥n, contenido, productos sin componentes), advertencia (ubicaci√≥n, acci√≥n r√°pida, cu√°ndo calcular), y caso de precios vac√≠os (bloquear guardado).
+FormulÛ 16 preguntas adicionales sobre: sincronizaciÛn (todos o solo sin override, confirmaciÛn), plantillas (override opcional, quien crea, almacenamiento, aplicar en crear/editar, fusionar o reemplazar, duplicados), reportes (ubicaciÛn, contenido, productos sin componentes), advertencia (ubicaciÛn, acciÛn r·pida, cu·ndo calcular), y caso de precios vacÌos (bloquear guardado).
 
 ---
 
 ### Respuestas del usuario:
 
 1. Se actualizan todos los precios
-2. Mostramos un di√°logo de confirmaci√≥n antes de aplicar (con resumen de cambios)
-3. El override es opcional solo en las plantillas. En ese caso, a la hora de asignar esa plantilla a un producto, se cargar√°n los precios de default.
-4. Solo los administradores. Las plantillas ser√°n una subsecci√≥n de Productos.
+2. Mostramos un di·logo de confirmaciÛn antes de aplicar (con resumen de cambios)
+3. El override es opcional solo en las plantillas. En ese caso, a la hora de asignar esa plantilla a un producto, se cargar·n los precios de default.
+4. Solo los administradores. Las plantillas ser·n una subsecciÛn de Productos.
 5. Si (tabla ComponentTemplates)
 6. En ambos casos (crear y editar)
-7. Se fusionan. Si un componente ya est√° a√±adido no se sobrescribe.
+7. Se fusionan. Si un componente ya est· aÒadido no se sobrescribe.
 8. No, solo una vez por componente
-9. En la secci√≥n de Reportes que aun no se ha implementado.
+9. En la secciÛn de Reportes que aun no se ha implementado.
 10. Todo lo especificado (tabla, filtros, totales, export Excel)
-11. Se muestran en un reporte separado de productos sin componentes. Cada linea tendr√° un bot√≥n para ir a editar producto.
-12. En la pantalla de edici√≥n
+11. Se muestran en un reporte separado de productos sin componentes. Cada linea tendr· un botÛn para ir a editar producto.
+12. En la pantalla de ediciÛn
 13. Tambien incluir una accion rapida
 14. Solo cuando tiene al menos un componente asignado.
 15. Se bloquea el guardado hasta que no se cumplimenten
@@ -3165,19 +3167,19 @@ Formul√≥ 16 preguntas adicionales sobre: sincronizaci√≥n (todos o solo sin overr
 
 ### Respuesta del asistente (resumida):
 
-Orden de implementaci√≥n: Fase 1 Core (tabla maestra, asignaciones, CRUD, edit/create, totales, validaci√≥n) ‚Üí Fase 2 Sync precios ‚Üí Fase 3 Warning 10% ‚Üí Fase 4 Plantillas ‚Üí Fase 5 Reportes (m√°rgenes + productos sin componentes).
+Orden de implementaciÛn: Fase 1 Core (tabla maestra, asignaciones, CRUD, edit/create, totales, validaciÛn) ? Fase 2 Sync precios ? Fase 3 Warning 10% ? Fase 4 Plantillas ? Fase 5 Reportes (m·rgenes + productos sin componentes).
 
 ---
 
 ### Prompt del usuario:
 
 Actualiza las @Documentos/epicas.md y crea las historias de usuarios.
-Especifica bien todas las decisiones tomadas, los criterios de aceptaci√≥n, los requisitos funcionales y no funcionales y la correlaci√≥n y las dependencias entre historias.
+Especifica bien todas las decisiones tomadas, los criterios de aceptaciÛn, los requisitos funcionales y no funcionales y la correlaciÛn y las dependencias entre historias.
 
 ---
 
 ### Respuesta del asistente (resumida):
 
-Actualiz√≥ epicas.md con √âpica 10 "Gesti√≥n de Componentes de Joyas", decisiones de dise√±o, matriz de dependencias y orden de implementaci√≥n. Cre√≥ 8 historias de usuario (HU-EP10-001 a HU-EP10-008) con formato completo: RF, RNF, criterios Given/When/Then, tareas y dependencias. Total de historias en el proyecto: 44.
+ActualizÛ epicas.md con …pica 10 "GestiÛn de Componentes de Joyas", decisiones de diseÒo, matriz de dependencias y orden de implementaciÛn. CreÛ 8 historias de usuario (HU-EP10-001 a HU-EP10-008) con formato completo: RF, RNF, criterios Given/When/Then, tareas y dependencias. Total de historias en el proyecto: 44.
 
 ---

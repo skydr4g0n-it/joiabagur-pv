@@ -2,16 +2,14 @@
 
 ## Purpose
 Define how annual POS sales commission tiers are applied to sales and returns for reporting, including VAT-aware commission amounts on gross sale prices.
-
 ## Requirements
-
 ### Requirement: Calendar-Year Commission Per Sale From Pre-Sale YTD
 
-The system SHALL calculate POS commission using the commission tier that applies to return-adjusted year-to-date (YTD) sales **immediately before** each sale. The calendar year is UTC (1 January–31 December). YTD resets at the start of each UTC calendar year. YTD and tier bounds SHALL use gross amounts (`Price × Quantity`, VAT included, including manual price overrides). Returns SHALL subtract gross `ReturnSale.Quantity × ReturnSale.UnitPrice`. Each sale SHALL use a single tier rate on the full sale (no marginal/progressive split).
+The system SHALL calculate POS commission using the commission tier that applies to return-adjusted year-to-date (YTD) sales **immediately before** each sale. The calendar year is UTC (1 January–31 December). YTD resets at the start of each UTC calendar year. For jewelry sales with no gift-card coverage, YTD and tier bounds SHALL use gross amounts (`Price × Quantity`, VAT included, including manual price overrides), and returns SHALL subtract gross `ReturnSale.Quantity × ReturnSale.UnitPrice`. For a gift-card issuance sale, the economic amount SHALL be the nominal. For a product sale with gift-card coverage, the economic amount SHALL be `Price × Quantity` minus coverage on that sale. A return of that sale SHALL subtract the economic amount that was added for the returned quantity, not the full catalog gross. Gift-card coverage changes on an exchange SHALL adjust YTD by the same delta as revenue. Each sale SHALL use a single tier rate on its full economic amount (no marginal/progressive split).
 
 The commission amount SHALL NOT be `gross × CommissionPercent`. Using the shared domain VAT rate constant of 21% (`VatRate = 0.21`), the system SHALL compute, rounding each step to 2 decimal places with midpoint away from zero:
 
-1. `netBase = Round(grossSaleAmount / (1 + VatRate), 2)`
+1. `netBase = Round(economicAmount / (1 + VatRate), 2)`
 2. `commissionNet = Round(netBase × CommissionPercent / 100, 2)`
 3. `commission = Round(commissionNet × (1 + VatRate), 2)`
 
@@ -46,8 +44,9 @@ There is no per-line VAT rate. Tiers are the currently configured tiers for the 
 
 - **GIVEN** sales and returns for a POS in the same UTC year
 - **WHEN** commission YTD is computed
-- **THEN** return amounts use `ReturnDate` (UTC) and subtract `ReturnSale.Quantity × ReturnSale.UnitPrice`
-- **AND** sale amounts added to YTD use `SaleDate` (UTC) and gross `Price × Quantity` (VAT included)
+- **THEN** return amounts use `ReturnDate` (UTC) and subtract `ReturnSale.Quantity × ReturnSale.UnitPrice` for sales with no gift-card coverage
+- **AND** sale amounts added to YTD use `SaleDate` (UTC)
+- **AND** jewelry sales with no gift-card coverage add gross `Price × Quantity` (VAT included)
 
 #### Scenario: Calendar year reset
 
@@ -85,3 +84,19 @@ There is no per-line VAT rate. Tiers are the currently configured tiers for the 
 - **WHEN** a sales report is requested after the July change
 - **THEN** commission uses the tier rows stored at request time
 - **AND** January sales are recomputed with the July tier percentages
+
+#### Scenario: Covered product commissions only the cash portion
+
+- **GIVEN** a POS whose applicable tier rate is 10%
+- **AND** a 150.00 EUR product sale with 100.00 EUR gift-card coverage
+- **WHEN** commission is calculated for that sale
+- **THEN** the economic amount is 50.00 EUR
+- **AND** the three-step formula uses 50.00 EUR, not 150.00 EUR
+
+#### Scenario: Issuance commissions the nominal
+
+- **GIVEN** a POS whose applicable tier rate is 10%
+- **WHEN** a 100.00 EUR gift card is issued
+- **THEN** the economic amount added to YTD is 100.00 EUR
+- **AND** the three-step formula uses 100.00 EUR
+

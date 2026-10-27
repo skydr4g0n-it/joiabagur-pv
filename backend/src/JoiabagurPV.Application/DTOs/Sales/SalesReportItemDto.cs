@@ -17,4 +17,5 @@ public class SalesReportItemDto
     public string OperatorName { get; set; } = string.Empty;
     public string? Notes { get; set; }
     public bool HasPhoto { get; set; }
+    public bool HasReturn { get; set; }
 }

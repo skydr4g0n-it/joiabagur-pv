@@ -3,12 +3,10 @@
 ## Purpose
 
 Expose filtered sales reporting with global totals and Excel export so administrators can review revenue, quantities, and sale attributes across points of sale.
-
 ## Requirements
-
 ### Requirement: Sales Report API with Extended Filters and Global Aggregates
 
-The system SHALL provide a REST API endpoint at `GET /api/reports/sales` that returns paginated sales data with extended filtering and global aggregate totals computed over the entire filtered result set (not just the current page). Aggregates SHALL include `totalAmount` (filtered gross sale amounts minus return amounts in the filter window and scope; amounts stay VAT-inclusive), `totalCommission` (sum of per-sale commissions from `pos-commission-tiers`, including VAT applied to the net commission), and `totalAmountNet` (`totalAmount` minus that commission). Tier selection uses calendar-year UTC return-adjusted gross YTD. When the filtered set includes more than one point of sale, the response SHALL include per-POS aggregate breakdown with the same three amounts per POS. Only authenticated users can access this endpoint; administrators see all POS, operators see only assigned POS.
+The system SHALL provide a REST API endpoint at `GET /api/reports/sales` that returns paginated sales data with extended filtering and global aggregate totals computed over the entire filtered result set (not just the current page). Aggregates SHALL include `totalAmount` (filtered gross sale amounts minus return amounts in the filter window and scope, minus gift-card coverage dated in that same window and scope; amounts stay VAT-inclusive), `totalCommission` (sum of per-sale commissions from `pos-commission-tiers`, including VAT applied to the net commission), and `totalAmountNet` (`totalAmount` minus that commission). Tier selection uses calendar-year UTC return-adjusted economic YTD from `pos-commission-tiers`. When the filtered set includes more than one point of sale, the response SHALL include per-POS aggregate breakdown with the same three amounts per POS. Only authenticated users can access this endpoint; administrators see all POS, operators see only assigned POS.
 
 #### Scenario: Administrator retrieves sales report with default filters
 
@@ -83,6 +81,13 @@ The system SHALL provide a REST API endpoint at `GET /api/reports/sales` that re
 
 - **WHEN** an unauthenticated user requests `GET /api/reports/sales`
 - **THEN** the system returns 401 Unauthorized
+
+#### Scenario: Gift card coverage reduces the window total
+
+- **GIVEN** a 100.00 EUR gift-card sale on 1 March at POS A
+- **AND** a 150.00 EUR product sale on 15 March at POS A with 100.00 EUR coverage dated 15 March
+- **WHEN** an administrator requests the sales report for 15 March through 15 March at POS A
+- **THEN** `totalAmount` equals 50.00 EUR
 
 ### Requirement: Sales Report Item Data Shape
 
@@ -215,3 +220,4 @@ The system SHALL provide a frontend page at `/reports/sales` accessible from the
 - **WHEN** an operator is logged in
 - **THEN** the "Reportes" menu entry is not visible in the sidebar
 - **AND** the operator cannot navigate to `/reports/sales`
+

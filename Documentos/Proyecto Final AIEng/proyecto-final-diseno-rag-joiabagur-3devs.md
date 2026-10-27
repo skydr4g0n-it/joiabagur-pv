@@ -1,15 +1,17 @@
-> ‚ö†Ô∏è **VARIANTE PARA EQUIPO DE 3 DESARROLLADORES ‚Äî NO ES EL PLAN VIGENTE.**
-> ‚ö†Ô∏è **DESACTUALIZADA desde la v3 (3 ago 2026):** no incorpora el consenso con la revisi√≥n de la PR #4 ni las especificaciones v2 (`materials[]`, `ProductFamily`, inventario asistido, prefiltro blando). Si el equipo creciera a tres personas, hay que rehacerla partiendo de la v3, no usarla tal cual.
+> **Retirado (2026-10-27):** El reconocimiento de productos por foto ya no forma parte del sistema. Este texto es histÛrico.
+
+> ?? **VARIANTE PARA EQUIPO DE 3 DESARROLLADORES ó NO ES EL PLAN VIGENTE.**
+> ?? **DESACTUALIZADA desde la v3 (3 ago 2026):** no incorpora el consenso con la revisiÛn de la PR #4 ni las especificaciones v2 (`materials[]`, `ProductFamily`, inventario asistido, prefiltro blando). Si el equipo creciera a tres personas, hay que rehacerla partiendo de la v3, no usarla tal cual.
 > El documento a seguir es [proyecto-final-diseno-rag-joiabagur.md](proyecto-final-diseno-rag-joiabagur.md), dimensionado para **2 desarrolladores**.
-> Esta variante se conserva por si el equipo creciera a tres personas. Su descomposici√≥n en changes es [proyecto-final-plan-changes-openspec-3devs.md](proyecto-final-plan-changes-openspec-3devs.md).
-> **Diferencias principales frente al plan vigente:** incluye argumentario por POS como servicio, agente de reposici√≥n opcional, medici√≥n del reranking, cach√© sem√°ntico, `AiUsageLog` como entidad .NET, trazado con LangSmith/Logfire, golden set de 80-100 consultas y despliegue en la semana 4 (no en la 2).
+> Esta variante se conserva por si el equipo creciera a tres personas. Su descomposiciÛn en changes es [proyecto-final-plan-changes-openspec-3devs.md](proyecto-final-plan-changes-openspec-3devs.md).
+> **Diferencias principales frente al plan vigente:** incluye argumentario por POS como servicio, agente de reposiciÛn opcional, mediciÛn del reranking, cachÈ sem·ntico, `AiUsageLog` como entidad .NET, trazado con LangSmith/Logfire, golden set de 80-100 consultas y despliegue en la semana 4 (no en la 2).
 
 ---
 
-# Proyecto Final de M√°ster ‚Äî Dise√±o del sistema de IA para Joiabagur PV
+# Proyecto Final de M·ster ó DiseÒo del sistema de IA para Joiabagur PV
 
-**Documento:** dise√±o conceptual + estrategia de datos + plan de ejecuci√≥n
-**Dominio:** Joiabagur PV (gesti√≥n de puntos de venta de joyer√≠a)
+**Documento:** diseÒo conceptual + estrategia de datos + plan de ejecuciÛn
+**Dominio:** Joiabagur PV (gestiÛn de puntos de venta de joyerÌa)
 **Fecha de entrega del PF:** 3 de septiembre de 2026
 **Rama de entrega:** `finalproject-[INICIALES]` *(placeholder: sustituir por las iniciales del equipo)*
 **Equipo:** *(placeholder: nombres completos de los integrantes, obligatorio en el README)*
@@ -18,123 +20,123 @@
 
 ## 0. Resumen ejecutivo
 
-Construimos un **buscador sem√°ntico de cat√°logo con venta asistida** para operadores de joyer√≠a, servido por un **microservicio RAG en Python** sobre **pgvector**, integrado en el backend .NET existente de Joiabagur PV y desplegado en la misma infraestructura AWS que ya tiene la aplicaci√≥n en producci√≥n.
+Construimos un **buscador sem·ntico de cat·logo con venta asistida** para operadores de joyerÌa, servido por un **microservicio RAG en Python** sobre **pgvector**, integrado en el backend .NET existente de Joiabagur PV y desplegado en la misma infraestructura AWS que ya tiene la aplicaciÛn en producciÛn.
 
-Cuatro decisiones estructurales, todas justificadas m√°s abajo:
+Cuatro decisiones estructurales, todas justificadas m·s abajo:
 
-1. **El corpus no existe todav√≠a y ese es el verdadero proyecto.** El cat√°logo real de una joyer√≠a es texto pobre (`"Anillo plata 925 T12"`). Un RAG sobre eso no aporta nada. La fase de **enriquecimiento de cat√°logo** no es un pre√°mbulo: es la construcci√≥n del corpus, y es donde vive la ingenier√≠a de prompts y la extracci√≥n estructurada.
-2. **Dos √≠ndices, no uno.** √çndice de **entidades** (1 producto = 1 documento, sin chunking) para b√∫squeda/desambiguaci√≥n, e √≠ndice de **conocimiento comercial** (materiales, cuidados, tallas, guiones de venta, pol√≠ticas ‚Äî s√≠ chunkeado) para que la capa de generaci√≥n responda con citas verificables. Enrutado entre ambos.
-3. **La IA nunca es fuente de verdad de stock ni de precio.** El servicio Python devuelve identificadores, scores y razones; el backend .NET **hidrata** precio, stock y permisos desde PostgreSQL antes de responder al operador. Esto no es solo un principio: se convierte en un **test autom√°tico** del harness de evaluaci√≥n.
-4. **CAG entra, pero acotado.** No como camino de producci√≥n, sino como **baseline v0 medible** (cat√°logo de un POS entero en contexto) contra el que demostrar emp√≠ricamente que el RAG compensa, m√°s un **cach√© sem√°ntico** de consultas frecuentes. Ver ¬ß6.7.
+1. **El corpus no existe todavÌa y ese es el verdadero proyecto.** El cat·logo real de una joyerÌa es texto pobre (`"Anillo plata 925 T12"`). Un RAG sobre eso no aporta nada. La fase de **enriquecimiento de cat·logo** no es un pre·mbulo: es la construcciÛn del corpus, y es donde vive la ingenierÌa de prompts y la extracciÛn estructurada.
+2. **Dos Ìndices, no uno.** Õndice de **entidades** (1 producto = 1 documento, sin chunking) para b˙squeda/desambiguaciÛn, e Ìndice de **conocimiento comercial** (materiales, cuidados, tallas, guiones de venta, polÌticas ó sÌ chunkeado) para que la capa de generaciÛn responda con citas verificables. Enrutado entre ambos.
+3. **La IA nunca es fuente de verdad de stock ni de precio.** El servicio Python devuelve identificadores, scores y razones; el backend .NET **hidrata** precio, stock y permisos desde PostgreSQL antes de responder al operador. Esto no es solo un principio: se convierte en un **test autom·tico** del harness de evaluaciÛn.
+4. **CAG entra, pero acotado.** No como camino de producciÛn, sino como **baseline v0 medible** (cat·logo de un POS entero en contexto) contra el que demostrar empÌricamente que el RAG compensa, m·s un **cachÈ sem·ntico** de consultas frecuentes. Ver ß6.7.
 
-**Veredicto sobre las especificaciones funcionales existentes:** se **adaptan con redise√±o arquitect√≥nico**. El criterio de dominio es bueno y se conserva casi entero; la capa t√©cnica propuesta (m√≥dulo IA dentro del monolito .NET) es incompatible con el Proyecto Final y se sustituye; faltan dos piezas obligatorias (agentes y evaluaci√≥n) y sobra ~60 % del alcance funcional para el plazo disponible.
+**Veredicto sobre las especificaciones funcionales existentes:** se **adaptan con rediseÒo arquitectÛnico**. El criterio de dominio es bueno y se conserva casi entero; la capa tÈcnica propuesta (mÛdulo IA dentro del monolito .NET) es incompatible con el Proyecto Final y se sustituye; faltan dos piezas obligatorias (agentes y evaluaciÛn) y sobra ~60 % del alcance funcional para el plazo disponible.
 
-**Restricci√≥n dura que condiciona todo el plan:** quedan **~4,7 semanas** desde hoy (1 de agosto) hasta el 3 de septiembre, en agosto. El plan de ¬ß11 est√° construido con l√≠neas de corte expl√≠citas.
+**RestricciÛn dura que condiciona todo el plan:** quedan **~4,7 semanas** desde hoy (1 de agosto) hasta el 3 de septiembre, en agosto. El plan de ß11 est· construido con lÌneas de corte explÌcitas.
 
 ---
 
 ## 1. Punto de partida verificado en el repositorio
 
-Todo lo siguiente est√° comprobado en el c√≥digo, no asumido.
+Todo lo siguiente est· comprobado en el cÛdigo, no asumido.
 
-| √Årea | Estado real | Implicaci√≥n para el PF |
+| ¡rea | Estado real | ImplicaciÛn para el PF |
 |---|---|---|
-| Backend | .NET 10, arquitectura en capas (Domain / Infrastructure / Application / API), EF Core, PostgreSQL, JWT, Serilog, 18 controllers | Base s√≥lida; el servicio de IA se acopla por HTTP, no por c√≥digo |
-| Modelo de dominio | `Product` (SKU, Name, Description, Price, CollectionId, IsActive), `Collection`, `Inventory` (Product√óPOS, Quantity, IsActive), `InventoryMovement`, `Sale` (precio congelado, POS, operador, m√©todo de pago), `PointOfSale`, `User`/`UserPointOfSale`, `Return`, `ProductPhoto` | Todas las se√±ales que necesita el RAG (stock por POS, rotaci√≥n, ventas) ya existen y son consultables |
-| B√∫squeda actual | `GET /api/products/search` ‚Üí SKU exacto + nombre parcial, m√°x. 50 resultados, filtrado por POS asignados para operadores ([ProductsController.cs:92](../../backend/src/JoiabagurPV.API/Controllers/ProductsController.cs#L92)) | Es el **baseline l√©xico** contra el que mediremos, y el **fallback** cuando la IA no responda |
-| IA existente | Reconocimiento **visual** de producto: `ProductPhotoEmbedding` (MobileNetV2, 1280 dims, guardado como **JSON en texto**), inferencia con TensorFlow.js en el navegador, entrenamiento y `ModelMetadata`/`ModelTrainingJob` | **No se toca.** Es otro problema (imagen) y otro espacio vectorial. Coexisten dos √≠ndices; el README debe explicar por qu√© |
-| pgvector | **No instalado.** No hay ninguna referencia en el backend | Instalarlo es trabajo nuevo (extensi√≥n en RDS + esquema propio del servicio Python) |
-| Datos en el repo | El seeder solo crea el admin y los m√©todos de pago. **No hay datos de cat√°logo, inventario ni ventas versionados** | Sin export de producci√≥n anonimizado, **todo el corpus es sint√©tico**. Ver ¬ß7 |
-| Despliegue | AWS EC2 + nginx (TLS) + Docker + RDS PostgreSQL + S3 + ECR + GitHub Actions con OIDC. Producci√≥n viva en `pv.joiabagur.com` | El requisito de "URL p√∫blica" del PF est√° pr√°cticamente resuelto: a√±adimos un contenedor m√°s |
-| Metodolog√≠a | OpenSpec (`openspec/specs`, `openspec/changes`) ya en uso por el equipo | El trabajo del PF puede entregarse como *changes* OpenSpec: coherencia y evidencia de proceso |
-| Frontend | React 19 + Vite + TypeScript + Metronic, `src/pages/sales/` con flujo manual y `scan.tsx` | Punto de inserci√≥n natural del panel "Buscar con ayuda" |
+| Backend | .NET 10, arquitectura en capas (Domain / Infrastructure / Application / API), EF Core, PostgreSQL, JWT, Serilog, 18 controllers | Base sÛlida; el servicio de IA se acopla por HTTP, no por cÛdigo |
+| Modelo de dominio | `Product` (SKU, Name, Description, Price, CollectionId, IsActive), `Collection`, `Inventory` (Product◊POS, Quantity, IsActive), `InventoryMovement`, `Sale` (precio congelado, POS, operador, mÈtodo de pago), `PointOfSale`, `User`/`UserPointOfSale`, `Return`, `ProductPhoto` | Todas las seÒales que necesita el RAG (stock por POS, rotaciÛn, ventas) ya existen y son consultables |
+| B˙squeda actual | `GET /api/products/search` ? SKU exacto + nombre parcial, m·x. 50 resultados, filtrado por POS asignados para operadores ([ProductsController.cs:92](../../backend/src/JoiabagurPV.API/Controllers/ProductsController.cs#L92)) | Es el **baseline lÈxico** contra el que mediremos, y el **fallback** cuando la IA no responda |
+| IA existente | Reconocimiento **visual** de producto: `ProductPhotoEmbedding` (MobileNetV2, 1280 dims, guardado como **JSON en texto**), inferencia con TensorFlow.js en el navegador, entrenamiento y `ModelMetadata`/`ModelTrainingJob` | **No se toca.** Es otro problema (imagen) y otro espacio vectorial. Coexisten dos Ìndices; el README debe explicar por quÈ |
+| pgvector | **No instalado.** No hay ninguna referencia en el backend | Instalarlo es trabajo nuevo (extensiÛn en RDS + esquema propio del servicio Python) |
+| Datos en el repo | El seeder solo crea el admin y los mÈtodos de pago. **No hay datos de cat·logo, inventario ni ventas versionados** | Sin export de producciÛn anonimizado, **todo el corpus es sintÈtico**. Ver ß7 |
+| Despliegue | AWS EC2 + nginx (TLS) + Docker + RDS PostgreSQL + S3 + ECR + GitHub Actions con OIDC. ProducciÛn viva en `pv.joiabagur.com` | El requisito de "URL p˙blica" del PF est· pr·cticamente resuelto: aÒadimos un contenedor m·s |
+| MetodologÌa | OpenSpec (`openspec/specs`, `openspec/changes`) ya en uso por el equipo | El trabajo del PF puede entregarse como *changes* OpenSpec: coherencia y evidencia de proceso |
+| Frontend | React 19 + Vite + TypeScript + Metronic, `src/pages/sales/` con flujo manual y `scan.tsx` | Punto de inserciÛn natural del panel "Buscar con ayuda" |
 
-**Lo que no he podido verificar (asunci√≥n a validar en la semana 0):** el volumen y la riqueza del cat√°logo real en producci√≥n, y si es posible exportarlo. El dise√±o de datos de ¬ß7 **no depende** de ello: funciona 100 % sint√©tico y mejora si hay export real.
+**Lo que no he podido verificar (asunciÛn a validar en la semana 0):** el volumen y la riqueza del cat·logo real en producciÛn, y si es posible exportarlo. El diseÒo de datos de ß7 **no depende** de ello: funciona 100 % sintÈtico y mejora si hay export real.
 
 ---
 
-## 2. An√°lisis cr√≠tico de [`joiabagur-ia-especificaciones-funcionales.md`](joiabagur-ia-especificaciones-funcionales.md)
+## 2. An·lisis crÌtico de [`joiabagur-ia-especificaciones-funcionales.md`](joiabagur-ia-especificaciones-funcionales.md)
 
-Esta secci√≥n precede deliberadamente al dise√±o porque lo condiciona.
+Esta secciÛn precede deliberadamente al diseÒo porque lo condiciona.
 
-### 2.1. Lo que es √∫til y se conserva tal cual
+### 2.1. Lo que es ˙til y se conserva tal cual
 
-| Idea de las specs | Por qu√© es valiosa para el PF |
+| Idea de las specs | Por quÈ es valiosa para el PF |
 |---|---|
-| **Principio 2**: la IA no es fuente de verdad de stock ni precio | Es la decisi√≥n arquitect√≥nica m√°s importante del proyecto y la que separa un demo de un sistema. La convertimos en el patr√≥n *retrieve ‚Üí hydrate* (¬ß6.8) y en un eval determinista (¬ß9.3) |
+| **Principio 2**: la IA no es fuente de verdad de stock ni precio | Es la decisiÛn arquitectÛnica m·s importante del proyecto y la que separa un demo de un sistema. La convertimos en el patrÛn *retrieve ? hydrate* (ß6.8) y en un eval determinista (ß9.3) |
 | **Principio 5**: control por POS | Ya implementado en el repo; se traslada al retriever como filtro **pre-ranking obligatorio**, no como post-filtro. Es el "filtrado contextual" de S10 aplicado a seguridad |
-| **`ProductAiProfile` con `AiConfidence`, `ReviewStatus`, `SourceHash`** | Es exactamente extracci√≥n estructurada + guardrails + idempotencia (S4/S11). `SourceHash` da reindexado incremental gratis. Se adopta entero |
-| **`SourceText` controlado y reproducible + modelo de embedding versionado** | Es la disciplina de reindexaci√≥n/versionado de S11. Se adopta entero |
-| **Variantes S/M/L y `VariantGroupKey`** | Es *el* caso donde el sistema aporta valor diferencial y medible (error de selecci√≥n de talla en hoteles). Se convierte en una categor√≠a propia del golden set |
-| **`ProductSearchEvent`** | Telemetr√≠a de consulta‚Üíselecci√≥n. Base de la evaluaci√≥n online y del futuro reranking aprendido |
-| **Ranking h√≠brido** (¬ß5.5 specs) | Alineado con b√∫squeda h√≠brida (S10), aunque la f√≥rmula concreta hay que recortarla |
-| **Tabla 7.3** (cu√°ndo generativa, cu√°ndo embeddings, cu√°ndo reglas SQL) | Criterio excelente y poco com√∫n. Se conserva √≠ntegra como matriz de decisi√≥n del proyecto |
-| **`AiUsageLog`** | Control de coste por feature; alineado con "cu√°nto cuesta un agente" (S12) |
+| **`ProductAiProfile` con `AiConfidence`, `ReviewStatus`, `SourceHash`** | Es exactamente extracciÛn estructurada + guardrails + idempotencia (S4/S11). `SourceHash` da reindexado incremental gratis. Se adopta entero |
+| **`SourceText` controlado y reproducible + modelo de embedding versionado** | Es la disciplina de reindexaciÛn/versionado de S11. Se adopta entero |
+| **Variantes S/M/L y `VariantGroupKey`** | Es *el* caso donde el sistema aporta valor diferencial y medible (error de selecciÛn de talla en hoteles). Se convierte en una categorÌa propia del golden set |
+| **`ProductSearchEvent`** | TelemetrÌa de consulta?selecciÛn. Base de la evaluaciÛn online y del futuro reranking aprendido |
+| **Ranking hÌbrido** (ß5.5 specs) | Alineado con b˙squeda hÌbrida (S10), aunque la fÛrmula concreta hay que recortarla |
+| **Tabla 7.3** (cu·ndo generativa, cu·ndo embeddings, cu·ndo reglas SQL) | Criterio excelente y poco com˙n. Se conserva Ìntegra como matriz de decisiÛn del proyecto |
+| **`AiUsageLog`** | Control de coste por feature; alineado con "cu·nto cuesta un agente" (S12) |
 
-### 2.2. Lo que es parcialmente √∫til: qu√© se conserva y qu√© se recorta
+### 2.2. Lo que es parcialmente ˙til: quÈ se conserva y quÈ se recorta
 
 | Idea | Se conserva | Se recorta / difiere | Motivo |
 |---|---|---|---|
-| Ranking h√≠brido de 7 t√©rminos (¬ß5.5 specs) | 3 se√±ales: l√©xico/SKU, sem√°ntica, disponibilidad en POS + 2 penalizaciones (stock 0, variante ambigua) | `score_rotacion_pos`, `score_prioridad_comercial` como pesos libres | No hay datos para calibrar 7 pesos en 5 semanas. Con golden set se calibran 3; siete pesos sin evidencia es numerolog√≠a |
-| Funcionalidad 3 completa (6 subfuncionalidades de inventario) | **Sustitutos** (reutiliza el retriever, coste marginal ‚âà 0) y **argumentario por POS** (1 documento por POS, alimenta el contexto del asistente) | Reposici√≥n y packing list ‚Üí opcionales con l√≠nea de corte; **traslados y liquidaci√≥n ‚Üí fuera** | Sustitutos y argumentario multiplican el valor del √≠ndice ya construido. Traslados/liquidaci√≥n son un producto de anal√≠tica de inventario, no de RAG |
-| Modelo de datos (14 tablas propuestas) | 2 tablas nuevas en .NET (`ProductAiProfile`, `ProductSearchEvent`) + esquema `ai` propio del servicio Python | `ProductFamily`, `ProductFamilyMember`, `ProductRecommendation`, `InventoryPolicy`, `InventoryPackingList*`, `InventoryRecommendationAlternative` | Sobreespecificaci√≥n. `VariantGroupKey` en el perfil + agrupaci√≥n en tiempo de consulta cubre el 100 % del caso sin dos tablas y sin migraci√≥n adicional (resuelve la "decisi√≥n abierta 4") |
-| ~25 endpoints sugeridos | 6 endpoints .NET + 5 del servicio Python (¬ß6.8) | El resto | Un contrato peque√±o y estable se defiende mejor ante un evaluador que 25 firmas sin implementar |
-| `ProductRecommendation` persistida y precomputada | Solo para *overrides* manuales del admin | Precomputar similitudes producto√óproducto | El retriever ya calcula similitud en l√≠nea en milisegundos sobre ~1-2k filas. Precomputar es cach√© prematura con coste de invalidaci√≥n |
-| KPIs de negocio (¬ß4.10, ¬ß5.11, ¬ß6.9 specs) | Se **instrumentan** (eventos, latencias, rank de selecci√≥n) | Se **no se miden** como resultado del PF | Sin tr√°fico real ni A/B, "ticket medio asistido vs no asistido" no es medible en 5 semanas. Instrumentar s√≠; prometer n√∫meros, no |
+| Ranking hÌbrido de 7 tÈrminos (ß5.5 specs) | 3 seÒales: lÈxico/SKU, sem·ntica, disponibilidad en POS + 2 penalizaciones (stock 0, variante ambigua) | `score_rotacion_pos`, `score_prioridad_comercial` como pesos libres | No hay datos para calibrar 7 pesos en 5 semanas. Con golden set se calibran 3; siete pesos sin evidencia es numerologÌa |
+| Funcionalidad 3 completa (6 subfuncionalidades de inventario) | **Sustitutos** (reutiliza el retriever, coste marginal ò 0) y **argumentario por POS** (1 documento por POS, alimenta el contexto del asistente) | ReposiciÛn y packing list ? opcionales con lÌnea de corte; **traslados y liquidaciÛn ? fuera** | Sustitutos y argumentario multiplican el valor del Ìndice ya construido. Traslados/liquidaciÛn son un producto de analÌtica de inventario, no de RAG |
+| Modelo de datos (14 tablas propuestas) | 2 tablas nuevas en .NET (`ProductAiProfile`, `ProductSearchEvent`) + esquema `ai` propio del servicio Python | `ProductFamily`, `ProductFamilyMember`, `ProductRecommendation`, `InventoryPolicy`, `InventoryPackingList*`, `InventoryRecommendationAlternative` | SobreespecificaciÛn. `VariantGroupKey` en el perfil + agrupaciÛn en tiempo de consulta cubre el 100 % del caso sin dos tablas y sin migraciÛn adicional (resuelve la "decisiÛn abierta 4") |
+| ~25 endpoints sugeridos | 6 endpoints .NET + 5 del servicio Python (ß6.8) | El resto | Un contrato pequeÒo y estable se defiende mejor ante un evaluador que 25 firmas sin implementar |
+| `ProductRecommendation` persistida y precomputada | Solo para *overrides* manuales del admin | Precomputar similitudes producto◊producto | El retriever ya calcula similitud en lÌnea en milisegundos sobre ~1-2k filas. Precomputar es cachÈ prematura con coste de invalidaciÛn |
+| KPIs de negocio (ß4.10, ß5.11, ß6.9 specs) | Se **instrumentan** (eventos, latencias, rank de selecciÛn) | Se **no se miden** como resultado del PF | Sin tr·fico real ni A/B, "ticket medio asistido vs no asistido" no es medible en 5 semanas. Instrumentar sÌ; prometer n˙meros, no |
 
 ### 2.3. Lo que no aporta o entra en conflicto
 
-1. **Arquitectura ¬ß7.1 ‚Äî "m√≥dulo IA dentro del monolito .NET" con `IAiTextProvider` / `IAiEmbeddingProvider` en C#.** Conflicto directo con el requisito de implementar los servicios RAG en Python, y con todo el instrumental del m√°ster (pgvector desde Python, RAGAS, LangGraph, trazado con LangSmith/Logfire). Adem√°s obligar√≠a a reimplementar en C# lo que en Python es una dependencia. **Se redise√±a** a microservicio (¬ß6.2).
-2. **"Fuera de alcance: agentes aut√≥nomos" (l√≠nea 6 de las specs).** El PF exige capa ag√©ntica. La tensi√≥n es aparente: lo que las specs proh√≠ben es que un agente **escriba** stock sin aprobaci√≥n humana, no la existencia de un agente. Resoluci√≥n: **agente con tools de solo lectura + human-in-the-loop para toda escritura** (¬ß8). Se respeta el esp√≠ritu de la spec y se cumple el PF.
-3. **Ausencia total de evaluaci√≥n.** Las specs tienen KPIs de negocio pero ni una m√©trica de sistema: no hay golden set, ni recall, ni faithfulness, ni comparaci√≥n entre configuraciones. Es el hueco m√°s grave respecto al PF, donde "evals reales, no solo pruebas manuales" es criterio expl√≠cito de destacar. **Se a√±ade** ¬ß9 como componente de primera clase.
-4. **Ceguera respecto a los datos.** Las specs asumen que el cat√°logo ya contiene texto suficiente para embeber. No es cierto: el `SourceText` de ejemplo de ¬ß4.7 de las specs ya incluye campos que *a√∫n no existen* (`Estilo`, `Ocasiones`, `Aliases`). Es decir, el corpus se crea, no se recupera. Esto reordena las prioridades: **datos primero** (¬ß7).
-5. **Roadmap de 5 fases sin fechas ni criterio de corte.** Inservible con 4,7 semanas. **Se sustituye** por ¬ß11.
-6. **KPIs no medibles y flujo de aprobaci√≥n por lotes en UI de admin.** El flujo "admin revisa producto a producto" de ¬ß4.5 no escala a 1.000 productos ni cabe en el plazo. Se sustituye por **revisi√≥n por excepci√≥n**: se auto-aprueba lo que supera umbral de confianza y validaci√≥n de esquema; solo se enruta a revisi√≥n humana lo dudoso (patr√≥n de guardrails de S4).
+1. **Arquitectura ß7.1 ó "mÛdulo IA dentro del monolito .NET" con `IAiTextProvider` / `IAiEmbeddingProvider` en C#.** Conflicto directo con el requisito de implementar los servicios RAG en Python, y con todo el instrumental del m·ster (pgvector desde Python, RAGAS, LangGraph, trazado con LangSmith/Logfire). Adem·s obligarÌa a reimplementar en C# lo que en Python es una dependencia. **Se rediseÒa** a microservicio (ß6.2).
+2. **"Fuera de alcance: agentes autÛnomos" (lÌnea 6 de las specs).** El PF exige capa agÈntica. La tensiÛn es aparente: lo que las specs prohÌben es que un agente **escriba** stock sin aprobaciÛn humana, no la existencia de un agente. ResoluciÛn: **agente con tools de solo lectura + human-in-the-loop para toda escritura** (ß8). Se respeta el espÌritu de la spec y se cumple el PF.
+3. **Ausencia total de evaluaciÛn.** Las specs tienen KPIs de negocio pero ni una mÈtrica de sistema: no hay golden set, ni recall, ni faithfulness, ni comparaciÛn entre configuraciones. Es el hueco m·s grave respecto al PF, donde "evals reales, no solo pruebas manuales" es criterio explÌcito de destacar. **Se aÒade** ß9 como componente de primera clase.
+4. **Ceguera respecto a los datos.** Las specs asumen que el cat·logo ya contiene texto suficiente para embeber. No es cierto: el `SourceText` de ejemplo de ß4.7 de las specs ya incluye campos que *a˙n no existen* (`Estilo`, `Ocasiones`, `Aliases`). Es decir, el corpus se crea, no se recupera. Esto reordena las prioridades: **datos primero** (ß7).
+5. **Roadmap de 5 fases sin fechas ni criterio de corte.** Inservible con 4,7 semanas. **Se sustituye** por ß11.
+6. **KPIs no medibles y flujo de aprobaciÛn por lotes en UI de admin.** El flujo "admin revisa producto a producto" de ß4.5 no escala a 1.000 productos ni cabe en el plazo. Se sustituye por **revisiÛn por excepciÛn**: se auto-aprueba lo que supera umbral de confianza y validaciÛn de esquema; solo se enruta a revisiÛn humana lo dudoso (patrÛn de guardrails de S4).
 
-### 2.4. Tensiones expl√≠citas y c√≥mo se resuelven
+### 2.4. Tensiones explÌcitas y cÛmo se resuelven
 
-| Tensi√≥n | Resoluci√≥n adoptada |
+| TensiÛn | ResoluciÛn adoptada |
 |---|---|
-| Specs: "IA dentro del monolito .NET" ‚Üî PF: RAG en Python | Microservicio Python (`jbg-ai`), contrato HTTP, sin acoplamiento de c√≥digo |
-| Specs: "fuera de alcance agentes aut√≥nomos" ‚Üî PF: agentes obligatorios | Agente de solo lectura + HITL en escrituras |
-| Specs: amplitud de inventario (6 subfuncionalidades) ‚Üî 4,7 semanas | N√∫cleo = b√∫squeda + venta asistida + sustitutos; inventario recortado con l√≠nea de corte |
-| Specs: 14 tablas y 25 endpoints ‚Üî MVP defendible | 2 tablas .NET + esquema `ai` + 11 endpoints |
-| Specs: "datos reales" ‚Üî repo sin datos y cat√°logo real pobre | Generaci√≥n sint√©tica masiva y documentada como decisi√≥n de ingenier√≠a (¬ß7), no como parche |
-| PF: "datos reales del dominio" ‚Üî corpus sint√©tico | El **dominio** es real (producto en producci√≥n, modelo de datos real, operativa real). Los **datos** son sint√©ticos y trazables, con export real opcional. Se declara abiertamente en el README |
+| Specs: "IA dentro del monolito .NET" ? PF: RAG en Python | Microservicio Python (`jbg-ai`), contrato HTTP, sin acoplamiento de cÛdigo |
+| Specs: "fuera de alcance agentes autÛnomos" ? PF: agentes obligatorios | Agente de solo lectura + HITL en escrituras |
+| Specs: amplitud de inventario (6 subfuncionalidades) ? 4,7 semanas | N˙cleo = b˙squeda + venta asistida + sustitutos; inventario recortado con lÌnea de corte |
+| Specs: 14 tablas y 25 endpoints ? MVP defendible | 2 tablas .NET + esquema `ai` + 11 endpoints |
+| Specs: "datos reales" ? repo sin datos y cat·logo real pobre | GeneraciÛn sintÈtica masiva y documentada como decisiÛn de ingenierÌa (ß7), no como parche |
+| PF: "datos reales del dominio" ? corpus sintÈtico | El **dominio** es real (producto en producciÛn, modelo de datos real, operativa real). Los **datos** son sintÈticos y trazables, con export real opcional. Se declara abiertamente en el README |
 
 ### 2.5. Veredicto
 
-> **Adaptar con redise√±o arquitect√≥nico.** Se conserva el criterio funcional y de producto de las specs (que es bueno y espec√≠fico del dominio), se sustituye √≠ntegramente su capa t√©cnica, se a√±aden las dos piezas obligatorias que faltan (agentes y evaluaci√≥n) y se recorta el alcance funcional a lo que cabe con solidez en el plazo.
+> **Adaptar con rediseÒo arquitectÛnico.** Se conserva el criterio funcional y de producto de las specs (que es bueno y especÌfico del dominio), se sustituye Ìntegramente su capa tÈcnica, se aÒaden las dos piezas obligatorias que faltan (agentes y evaluaciÛn) y se recorta el alcance funcional a lo que cabe con solidez en el plazo.
 
 ---
 
-## 3. Qu√© construimos y qu√© no
+## 3. QuÈ construimos y quÈ no
 
-| # | Capacidad | Estado | Justificaci√≥n |
+| # | Capacidad | Estado | JustificaciÛn |
 |---|---|---|---|
-| 1 | **Enriquecimiento de cat√°logo** (extracci√≥n estructurada ‚Üí `ProductAiProfile` ‚Üí documento indexable) | N√∫cleo | Es la construcci√≥n del corpus. Sin esto no hay RAG |
-| 2 | **B√∫squeda sem√°ntica h√≠brida por POS** (dos √≠ndices, filtros duros, threshold, abstenci√≥n) | N√∫cleo | Coraz√≥n del PF |
-| 3 | **Venta asistida** (desambiguaci√≥n de variantes, argumentario con citas, avisos) | N√∫cleo | Es la capa de generaci√≥n con atribuci√≥n verificable |
-| 4 | **Agente asistente de venta** (tools de solo lectura, enrutado, guardrails, HITL) | N√∫cleo | Requisito del PF; a√±ade la capa de decisi√≥n sobre el pipeline |
-| 5 | **Sustitutos cuando no hay stock** | N√∫cleo (coste marginal) | Reutiliza el mismo retriever con filtro invertido |
-| 6 | **Evaluaci√≥n offline** (golden set, ablations, RAGAS, validador anti-alucinaci√≥n) | N√∫cleo | Requisito del PF y criterio de "destaca" |
+| 1 | **Enriquecimiento de cat·logo** (extracciÛn estructurada ? `ProductAiProfile` ? documento indexable) | N˙cleo | Es la construcciÛn del corpus. Sin esto no hay RAG |
+| 2 | **B˙squeda sem·ntica hÌbrida por POS** (dos Ìndices, filtros duros, threshold, abstenciÛn) | N˙cleo | CorazÛn del PF |
+| 3 | **Venta asistida** (desambiguaciÛn de variantes, argumentario con citas, avisos) | N˙cleo | Es la capa de generaciÛn con atribuciÛn verificable |
+| 4 | **Agente asistente de venta** (tools de solo lectura, enrutado, guardrails, HITL) | N˙cleo | Requisito del PF; aÒade la capa de decisiÛn sobre el pipeline |
+| 5 | **Sustitutos cuando no hay stock** | N˙cleo (coste marginal) | Reutiliza el mismo retriever con filtro invertido |
+| 6 | **EvaluaciÛn offline** (golden set, ablations, RAGAS, validador anti-alucinaciÛn) | N˙cleo | Requisito del PF y criterio de "destaca" |
 | 7 | **Argumentario comercial por POS** | Recomendado | 1 documento por POS; alimenta ranking y contexto. Barato |
-| 8 | **Agente de reposici√≥n** (propuestas batch con aprobaci√≥n) | Opcional, l√≠nea de corte semana 4 | Demuestra segundo agente + HITL. Se cae primero si hay retraso |
-| 9 | Packing list, traslados, liquidaci√≥n, rotaci√≥n | **Fuera** | Anal√≠tica de inventario, no RAG. Se mencionan como pr√≥ximos pasos |
+| 8 | **Agente de reposiciÛn** (propuestas batch con aprobaciÛn) | Opcional, lÌnea de corte semana 4 | Demuestra segundo agente + HITL. Se cae primero si hay retraso |
+| 9 | Packing list, traslados, liquidaciÛn, rotaciÛn | **Fuera** | AnalÌtica de inventario, no RAG. Se mencionan como prÛximos pasos |
 | 10 | Reconocimiento visual, try-on, fine-tuning | **Fuera** | Ya existe (visual) o no aporta al aprobado |
 
 ---
 
-## 4. El problema de recuperaci√≥n, bien planteado
+## 4. El problema de recuperaciÛn, bien planteado
 
-Conviene nombrarlo con precisi√≥n porque cambia el dise√±o respecto al proyecto de referencia del m√°ster (estimador de software sobre presupuestos):
+Conviene nombrarlo con precisiÛn porque cambia el diseÒo respecto al proyecto de referencia del m·ster (estimador de software sobre presupuestos):
 
-- **No hay documentos largos que trocear.** Un producto es una entidad con ~15 atributos y un texto de 40-120 palabras. **Chunking = ninguno** para el √≠ndice de cat√°logo: 1 producto = 1 documento. Trocear aqu√≠ ser√≠a un error importado de otro dominio.
-- **La consulta es corta, coloquial y con jerga mixta** (`"anillo erizo talla M"`, `"algo dorado para regalo de menos de 80"`). Combina intenci√≥n sem√°ntica, restricciones duras (precio, talla, POS) y a veces t√©rminos literales (SKU, nombre propio de la pieza). **B√∫squeda h√≠brida obligatoria** (S10): lo sem√°ntico solo diluir√≠a "ERIZO-M".
-- **El resultado no es una respuesta en prosa: es un conjunto ordenado de entidades** m√°s una explicaci√≥n. La generaci√≥n es la capa fina, no la gruesa.
-- **S√≠ hay un segundo corpus con forma de documento**: conocimiento comercial de joyer√≠a (materiales y alergias, cuidados, equivalencias de talla, guiones de venta, pol√≠tica de devoluciones). Ese s√≠ se trocea, y es lo que permite respuestas fundamentadas **con citas** y medir *faithfulness* de verdad.
+- **No hay documentos largos que trocear.** Un producto es una entidad con ~15 atributos y un texto de 40-120 palabras. **Chunking = ninguno** para el Ìndice de cat·logo: 1 producto = 1 documento. Trocear aquÌ serÌa un error importado de otro dominio.
+- **La consulta es corta, coloquial y con jerga mixta** (`"anillo erizo talla M"`, `"algo dorado para regalo de menos de 80"`). Combina intenciÛn sem·ntica, restricciones duras (precio, talla, POS) y a veces tÈrminos literales (SKU, nombre propio de la pieza). **B˙squeda hÌbrida obligatoria** (S10): lo sem·ntico solo diluirÌa "ERIZO-M".
+- **El resultado no es una respuesta en prosa: es un conjunto ordenado de entidades** m·s una explicaciÛn. La generaciÛn es la capa fina, no la gruesa.
+- **SÌ hay un segundo corpus con forma de documento**: conocimiento comercial de joyerÌa (materiales y alergias, cuidados, equivalencias de talla, guiones de venta, polÌtica de devoluciones). Ese sÌ se trocea, y es lo que permite respuestas fundamentadas **con citas** y medir *faithfulness* de verdad.
 
-De ah√≠ la arquitectura de **multi-√≠ndice con enrutado** (S10): el clasificador de intenci√≥n decide si la consulta va a cat√°logo, a conocimiento, o a ambos.
+De ahÌ la arquitectura de **multi-Ìndice con enrutado** (S10): el clasificador de intenciÛn decide si la consulta va a cat·logo, a conocimiento, o a ambos.
 
 ---
 
@@ -143,24 +145,24 @@ De ah√≠ la arquitectura de **multi-√≠ndice con enrutado** (S10): el clasificador
 ```mermaid
 flowchart TB
     subgraph cliente["Cliente"]
-        SPA["React SPA ¬∑ panel Buscar con ayuda"]
+        SPA["React SPA ∑ panel Buscar con ayuda"]
     end
 
-    subgraph ec2["EC2 ¬∑ nginx TLS"]
+    subgraph ec2["EC2 ∑ nginx TLS"]
         subgraph net["Backend .NET 10 (existente)"]
             API["ASP.NET Core API"]
             HYD["Hidratador: stock, precio, permisos POS"]
-            CB["Circuit breaker + fallback l√©xico"]
+            CB["Circuit breaker + fallback lÈxico"]
         end
-        subgraph py["Servicio jbg-ai (Python ¬∑ FastAPI)"]
+        subgraph py["Servicio jbg-ai (Python ∑ FastAPI)"]
             R1["Router /v1/retrieval"]
             R2["Router /v1/assist (agente)"]
-            R3["Router /v1/index ¬∑ /v1/enrich"]
+            R3["Router /v1/index ∑ /v1/enrich"]
             EV["Harness de evals (offline)"]
         end
     end
 
-    DB[("RDS PostgreSQL ¬∑ esquema public (negocio) + esquema ai (pgvector)")]
+    DB[("RDS PostgreSQL ∑ esquema public (negocio) + esquema ai (pgvector)")]
     LLM["Proveedor LLM + embeddings"]
     OBS["Trazas: LangSmith / Logfire"]
 
@@ -180,59 +182,59 @@ flowchart TB
 
 **Reglas de propiedad de datos, sin excepciones:**
 
-| Recurso | Propietario | Qui√©n escribe | Qui√©n lee |
+| Recurso | Propietario | QuiÈn escribe | QuiÈn lee |
 |---|---|---|---|
-| `public.*` (cat√°logo, stock, ventas, usuarios) | .NET | .NET | .NET |
-| `ProductAiProfile`, `ProductSearchEvent` | .NET | .NET (tras revisi√≥n/auto-aprobaci√≥n) | .NET, y Python v√≠a feed HTTP |
+| `public.*` (cat·logo, stock, ventas, usuarios) | .NET | .NET | .NET |
+| `ProductAiProfile`, `ProductSearchEvent` | .NET | .NET (tras revisiÛn/auto-aprobaciÛn) | .NET, y Python vÌa feed HTTP |
 | `ai.*` (documentos, embeddings, proyecciones, evals) | Python | **Solo** Python | Python |
-| Stock y precio mostrados al operador | .NET | ‚Äî | Siempre desde `public.*`, nunca desde `ai.*` |
+| Stock y precio mostrados al operador | .NET | ó | Siempre desde `public.*`, nunca desde `ai.*` |
 
-Python **nunca** escribe en `public` y **nunca** lee de `public` por SQL: consume feeds HTTP paginados del .NET. Es una regla m√°s estricta de lo necesario, y es deliberada: hace el sistema explicable en una frase y elimina el acoplamiento de esquema entre dos lenguajes.
+Python **nunca** escribe en `public` y **nunca** lee de `public` por SQL: consume feeds HTTP paginados del .NET. Es una regla m·s estricta de lo necesario, y es deliberada: hace el sistema explicable en una frase y elimina el acoplamiento de esquema entre dos lenguajes.
 
 ---
 
-## 6. Dise√±o del sistema RAG
+## 6. DiseÒo del sistema RAG
 
-### 6.1. Pipeline de enriquecimiento (construcci√≥n del corpus)
+### 6.1. Pipeline de enriquecimiento (construcciÛn del corpus)
 
 ```text
-Producto (SKU, nombre, descripci√≥n, precio, colecci√≥n, fotos)
-  ‚Üí normalizaci√≥n determinista (limpieza, unidades, tallas por regex)
-  ‚Üí extracci√≥n estructurada con LLM (JSON schema estricto, temperatura 0)
-  ‚Üí validaci√≥n: esquema + vocabularios cerrados + reglas de coherencia
-  ‚Üí confianza por campo ‚Üí auto-aprobado | revisi√≥n humana | rechazado
-  ‚Üí ProductAiProfile (.NET) + SourceText can√≥nico + SourceHash
-  ‚Üí embedding (solo si cambia SourceHash) ‚Üí ai.product_document
+Producto (SKU, nombre, descripciÛn, precio, colecciÛn, fotos)
+  ? normalizaciÛn determinista (limpieza, unidades, tallas por regex)
+  ? extracciÛn estructurada con LLM (JSON schema estricto, temperatura 0)
+  ? validaciÛn: esquema + vocabularios cerrados + reglas de coherencia
+  ? confianza por campo ? auto-aprobado | revisiÛn humana | rechazado
+  ? ProductAiProfile (.NET) + SourceText canÛnico + SourceHash
+  ? embedding (solo si cambia SourceHash) ? ai.product_document
 ```
 
-Puntos de dise√±o que se defienden en el README:
+Puntos de diseÒo que se defienden en el README:
 
 - **Vocabularios cerrados** para `piece_type`, `material`, `stone_type`: el modelo elige de una lista, no inventa. Reduce la varianza y hace el filtrado estructural fiable.
-- **Confianza por campo, no global.** `AiConfidence` agregada oculta que la talla es dudosa mientras el material es obvio. Se guarda un mapa `{campo: confianza}` y se enruta a revisi√≥n solo por los campos cr√≠ticos (talla, material, precio impl√≠cito).
-- **Revisi√≥n por excepci√≥n** (¬ß2.3.6): con ~1.000 productos, revisar todo a mano no cabe. Auto-aprobaci√≥n con umbral + muestreo humano del 10 % para estimar la tasa de error real.
-- **Idempotencia por `SourceHash`**: reindexar es barato y determinista; regenerar embeddings sin cambio de fuente est√° prohibido por construcci√≥n.
-- **Versionado de embeddings**: `embedding_model` + `embedding_version` por fila; una migraci√≥n de modelo se hace en columna nueva, nunca sobrescribiendo (S11).
+- **Confianza por campo, no global.** `AiConfidence` agregada oculta que la talla es dudosa mientras el material es obvio. Se guarda un mapa `{campo: confianza}` y se enruta a revisiÛn solo por los campos crÌticos (talla, material, precio implÌcito).
+- **RevisiÛn por excepciÛn** (ß2.3.6): con ~1.000 productos, revisar todo a mano no cabe. Auto-aprobaciÛn con umbral + muestreo humano del 10 % para estimar la tasa de error real.
+- **Idempotencia por `SourceHash`**: reindexar es barato y determinista; regenerar embeddings sin cambio de fuente est· prohibido por construcciÛn.
+- **Versionado de embeddings**: `embedding_model` + `embedding_version` por fila; una migraciÛn de modelo se hace en columna nueva, nunca sobrescribiendo (S11).
 
-### 6.2. Esquema conceptual del √≠ndice (`ai`, pgvector)
+### 6.2. Esquema conceptual del Ìndice (`ai`, pgvector)
 
 ```text
 ai.product_document              -- 1 fila por producto, sin chunking
-  product_id (uuid, PK)          -- referencia l√≥gica a public.products
+  product_id (uuid, PK)          -- referencia lÛgica a public.products
   sku, name, collection_name, price, price_band
   piece_type, material, stone_type, size_label, variant_group_key
   color_tags[], style_tags[], occasion_tags[], search_aliases[]
-  doc_text            text       -- SourceText can√≥nico (lo que se embebe)
+  doc_text            text       -- SourceText canÛnico (lo que se embebe)
   source_hash         char(64)
   embedding           vector(1536)
   tsv                 tsvector   -- to_tsvector('spanish', ...)
   is_active           bool
   embedding_model, embedding_version, indexed_at
 
-ai.knowledge_document / ai.knowledge_chunk   -- corpus comercial, s√≠ chunkeado
+ai.knowledge_document / ai.knowledge_chunk   -- corpus comercial, sÌ chunkeado
   doc_type: cuidado | material | talla | guion_venta | politica | faq
   content, chunk_index, metadata jsonb, embedding vector(1536), tsv
 
-ai.pos_projection                -- proyecci√≥n de disponibilidad y rotaci√≥n
+ai.pos_projection                -- proyecciÛn de disponibilidad y rotaciÛn
   pos_id, product_id, is_assigned, qty_bucket (0 | 1-2 | 3+)
   sales_30d, sales_90d, last_sale_at, refreshed_at
 
@@ -242,228 +244,228 @@ ai.pos_profile                   -- argumentario comercial por POS
 ai.query_log, ai.eval_run, ai.eval_case, ai.eval_result
 ```
 
-√çndices: **HNSW con `vector_cosine_ops`** sobre ambas columnas `embedding` (alineado con el operador `<=>` de la query ‚Äî el antipatr√≥n silencioso de S8), **GIN** sobre `tsv` y sobre `metadata`, B-tree sobre `variant_group_key`, `piece_type`, `price_band`.
+Õndices: **HNSW con `vector_cosine_ops`** sobre ambas columnas `embedding` (alineado con el operador `<=>` de la query ó el antipatrÛn silencioso de S8), **GIN** sobre `tsv` y sobre `metadata`, B-tree sobre `variant_group_key`, `piece_type`, `price_band`.
 
-**`qty_bucket`, no cantidad exacta.** La proyecci√≥n se refresca cada N minutos y puede estar desfasada; guardar el n√∫mero exacto invitar√≠a a mostrarlo. Guardando un *bucket* solo puede usarse como **se√±al de ranking**, nunca como dato de pantalla. La cantidad real la pone siempre .NET al hidratar. Es una restricci√≥n de dise√±o que hace imposible el error, en vez de prohibirlo por convenci√≥n.
+**`qty_bucket`, no cantidad exacta.** La proyecciÛn se refresca cada N minutos y puede estar desfasada; guardar el n˙mero exacto invitarÌa a mostrarlo. Guardando un *bucket* solo puede usarse como **seÒal de ranking**, nunca como dato de pantalla. La cantidad real la pone siempre .NET al hidratar. Es una restricciÛn de diseÒo que hace imposible el error, en vez de prohibirlo por convenciÛn.
 
-### 6.3. Recuperaci√≥n
+### 6.3. RecuperaciÛn
 
 Orden de operaciones, y el orden importa:
 
-1. **Filtros duros pre-ranking** (seguridad y correcci√≥n, nunca post-filtro): producto activo, asignado y activo en el POS del solicitante, rol del usuario. Un post-filtro sobre top-k rompe el recall silenciosamente.
-2. **Filtros estructurales** derivados de la consulta: banda de precio, tipo de pieza, talla, colecci√≥n. Extra√≠dos por un **reformulador** que separa la consulta en `{texto_sem√°ntico, filtros}` (S9).
-3. **B√∫squeda h√≠brida**: vectorial (`<=>` sobre HNSW) + l√©xica (`ts_rank` en espa√±ol, m√°s *boost* de coincidencia exacta de SKU/nombre), fusionadas con **RRF** ‚Äî sin necesidad de normalizar escalas incomparables.
-4. **Threshold + abstenci√≥n**: por debajo del umbral de similitud no se devuelve nada y se marca `low_confidence: true`. Devolver cero es informaci√≥n v√°lida, no un fallo. El umbral se fija mirando la distribuci√≥n emp√≠rica de distancias sobre el golden set, no por intuici√≥n.
-5. **Se√±ales de negocio como reordenaci√≥n suave**: disponibilidad en el POS (`qty_bucket`) y rotaci√≥n reciente. Pesos calibrados contra el golden set, no elegidos a ojo.
-6. **Reranking cross-encoder: NO por defecto.** Con ~1.000 entidades y consultas cortas, la hip√≥tesis es que no compensa. Se implementa como *flag* y se **mide** (¬ß9.2). Si el golden set dice que sube nDCG@5 lo suficiente para justificar la latencia, se activa; si no, el README explica por qu√© se descart√≥. Descartarlo con datos vale m√°s que activarlo sin ellos.
+1. **Filtros duros pre-ranking** (seguridad y correcciÛn, nunca post-filtro): producto activo, asignado y activo en el POS del solicitante, rol del usuario. Un post-filtro sobre top-k rompe el recall silenciosamente.
+2. **Filtros estructurales** derivados de la consulta: banda de precio, tipo de pieza, talla, colecciÛn. ExtraÌdos por un **reformulador** que separa la consulta en `{texto_sem·ntico, filtros}` (S9).
+3. **B˙squeda hÌbrida**: vectorial (`<=>` sobre HNSW) + lÈxica (`ts_rank` en espaÒol, m·s *boost* de coincidencia exacta de SKU/nombre), fusionadas con **RRF** ó sin necesidad de normalizar escalas incomparables.
+4. **Threshold + abstenciÛn**: por debajo del umbral de similitud no se devuelve nada y se marca `low_confidence: true`. Devolver cero es informaciÛn v·lida, no un fallo. El umbral se fija mirando la distribuciÛn empÌrica de distancias sobre el golden set, no por intuiciÛn.
+5. **SeÒales de negocio como reordenaciÛn suave**: disponibilidad en el POS (`qty_bucket`) y rotaciÛn reciente. Pesos calibrados contra el golden set, no elegidos a ojo.
+6. **Reranking cross-encoder: NO por defecto.** Con ~1.000 entidades y consultas cortas, la hipÛtesis es que no compensa. Se implementa como *flag* y se **mide** (ß9.2). Si el golden set dice que sube nDCG@5 lo suficiente para justificar la latencia, se activa; si no, el README explica por quÈ se descartÛ. Descartarlo con datos vale m·s que activarlo sin ellos.
 
-### 6.4. Generaci√≥n y atribuci√≥n
+### 6.4. GeneraciÛn y atribuciÛn
 
 La respuesta al operador es **estructurada**, no prosa libre:
 
 - `groups[]`: candidatos agrupados por `variant_group_key`, con la talla destacada.
-- `reason` por candidato: qu√© se√±ales coincidieron (frase corta, plantilla + LLM).
+- `reason` por candidato: quÈ seÒales coincidieron (frase corta, plantilla + LLM).
 - `pitch`: argumentario de venta, **anclado** al perfil del producto y, si aplica, a chunks del corpus de conocimiento, con `citations[]`.
-- `warnings[]`: variantes ambiguas, confirmar talla, stock cr√≠tico.
+- `warnings[]`: variantes ambiguas, confirmar talla, stock crÌtico.
 - `clarification_question`: si la consulta es ambigua, se pregunta en vez de adivinar.
 
-**Toda afirmaci√≥n num√©rica sobre stock o precio se inyecta desde .NET tras la generaci√≥n**, mediante *placeholders* que el modelo no puede rellenar. El validador de ¬ß9.3 comprueba que no aparece ning√∫n n√∫mero que no venga del hidratador.
+**Toda afirmaciÛn numÈrica sobre stock o precio se inyecta desde .NET tras la generaciÛn**, mediante *placeholders* que el modelo no puede rellenar. El validador de ß9.3 comprueba que no aparece ning˙n n˙mero que no venga del hidratador.
 
 ### 6.5. Guardrails
 
 | Riesgo | Control |
 |---|---|
-| Alucinaci√≥n de stock/precio | *Placeholders* + validador determinista + eval autom√°tico |
-| Producto de otro POS filtrado | Filtro duro pre-ranking + test de integraci√≥n con dos operadores distintos |
-| Consulta fuera de dominio ("¬øqu√© tiempo hace?") | Clasificador de intenci√≥n ‚Üí respuesta de rechazo cort√©s, sin llamada al retriever |
-| Inyecci√≥n de prompt en la consulta del operador | Consulta tratada como dato, nunca como instrucci√≥n; salida validada contra JSON schema |
-| Fuga de datos entre POS por cach√© | Clave de cach√© incluye `pos_id` y `role`. Sin excepci√≥n |
-| Coste descontrolado | `AiUsageLog` por feature, l√≠mite por usuario/d√≠a, cach√© sem√°ntico |
+| AlucinaciÛn de stock/precio | *Placeholders* + validador determinista + eval autom·tico |
+| Producto de otro POS filtrado | Filtro duro pre-ranking + test de integraciÛn con dos operadores distintos |
+| Consulta fuera de dominio ("øquÈ tiempo hace?") | Clasificador de intenciÛn ? respuesta de rechazo cortÈs, sin llamada al retriever |
+| InyecciÛn de prompt en la consulta del operador | Consulta tratada como dato, nunca como instrucciÛn; salida validada contra JSON schema |
+| Fuga de datos entre POS por cachÈ | Clave de cachÈ incluye `pos_id` y `role`. Sin excepciÛn |
+| Coste descontrolado | `AiUsageLog` por feature, lÌmite por usuario/dÌa, cachÈ sem·ntico |
 
 ### 6.6. Observabilidad
 
-Trazas por petici√≥n (LangSmith o Logfire, decisi√≥n de la semana 0) con `trace_id` propagado desde .NET: consulta original, consulta reformulada, filtros aplicados, candidatos y scores por rama, decisi√≥n del agente, tools invocadas, tokens y coste, latencia por etapa. Sin esto, depurar "por qu√© sali√≥ ese producto" es imposible, y esa pregunta la har√° el evaluador.
+Trazas por peticiÛn (LangSmith o Logfire, decisiÛn de la semana 0) con `trace_id` propagado desde .NET: consulta original, consulta reformulada, filtros aplicados, candidatos y scores por rama, decisiÛn del agente, tools invocadas, tokens y coste, latencia por etapa. Sin esto, depurar "por quÈ saliÛ ese producto" es imposible, y esa pregunta la har· el evaluador.
 
-### 6.7. CAG: qu√© papel juega y por qu√© acotado
+### 6.7. CAG: quÈ papel juega y por quÈ acotado
 
-El cat√°logo completo (~1.000 productos √ó ~200 tokens) son ~200k tokens: demasiado para meterlo en cada consulta. Pero **el cat√°logo de un solo POS** (100-250 productos) son 20-50k tokens, perfectamente cacheables con *prompt caching*. Eso hace de CAG un **prototipo v0 leg√≠timo y honesto** para este dominio, no un hombre de paja.
+El cat·logo completo (~1.000 productos ◊ ~200 tokens) son ~200k tokens: demasiado para meterlo en cada consulta. Pero **el cat·logo de un solo POS** (100-250 productos) son 20-50k tokens, perfectamente cacheables con *prompt caching*. Eso hace de CAG un **prototipo v0 legÌtimo y honesto** para este dominio, no un hombre de paja.
 
-Se usa en dos sitios, ninguno de ellos el camino de producci√≥n:
+Se usa en dos sitios, ninguno de ellos el camino de producciÛn:
 
-1. **Baseline v0 del harness de evaluaci√≥n.** Mismo golden set, mismas m√©tricas, comparado contra el RAG en calidad, latencia y coste por consulta. Esto convierte la narrativa "escalamos de CAG a RAG" del enunciado en **una tabla con n√∫meros** en vez de una afirmaci√≥n. Es la forma m√°s barata de justificar emp√≠ricamente la arquitectura elegida.
-2. **Cach√© sem√°ntico de consultas frecuentes** (S4): en un hotel, los operadores repiten consultas. Un cach√© por `(pos_id, embedding de consulta)` con umbral de similitud alto ahorra latencia y coste reales.
+1. **Baseline v0 del harness de evaluaciÛn.** Mismo golden set, mismas mÈtricas, comparado contra el RAG en calidad, latencia y coste por consulta. Esto convierte la narrativa "escalamos de CAG a RAG" del enunciado en **una tabla con n˙meros** en vez de una afirmaciÛn. Es la forma m·s barata de justificar empÌricamente la arquitectura elegida.
+2. **CachÈ sem·ntico de consultas frecuentes** (S4): en un hotel, los operadores repiten consultas. Un cachÈ por `(pos_id, embedding de consulta)` con umbral de similitud alto ahorra latencia y coste reales.
 
-CAG **no** se usa como v√≠a de recuperaci√≥n en producci√≥n: no filtra por stock, no escala al cat√°logo completo y su coste por consulta es un orden de magnitud mayor. Eso tambi√©n se dice en el README, con la tabla que lo demuestra.
+CAG **no** se usa como vÌa de recuperaciÛn en producciÛn: no filtra por stock, no escala al cat·logo completo y su coste por consulta es un orden de magnitud mayor. Eso tambiÈn se dice en el README, con la tabla que lo demuestra.
 
-### 6.8. Integraci√≥n Python ‚Üî .NET
+### 6.8. IntegraciÛn Python ? .NET
 
 **Contratos del servicio Python** (todos internos, nunca expuestos al navegador):
 
 | Endpoint | Entrada (resumen) | Salida (resumen) |
 |---|---|---|
 | `POST /v1/retrieval/products` | `query`, `pos_id`, `top_k`, `filters`, `mode` | `results[{product_id, sku, score, match_reasons, debug}]`, `low_confidence`, `trace_id` |
-| `POST /v1/retrieval/substitutes` | `product_id`, `pos_id`, `exclude_out_of_stock` | igual, m√°s `similarity_signals` |
+| `POST /v1/retrieval/substitutes` | `product_id`, `pos_id`, `exclude_out_of_stock` | igual, m·s `similarity_signals` |
 | `POST /v1/assist/sale` | `query`, `pos_id`, `user_role`, `history?` | `intent`, `groups[]`, `pitch`, `citations[]`, `warnings[]`, `clarification_question?`, `usage` |
 | `POST /v1/enrich/products` | lote de productos crudos | lote de perfiles propuestos + confianza por campo |
-| `POST /v1/index/sync` ¬∑ `GET /v1/index/status` | `since` cursor / ‚Äî | contadores de upsert, drift de √≠ndice |
-| `GET /health`, `GET /v1/evals/runs` *(solo dev)* | ‚Äî | estado, √∫ltimos resultados de eval |
+| `POST /v1/index/sync` ∑ `GET /v1/index/status` | `since` cursor / ó | contadores de upsert, drift de Ìndice |
+| `GET /health`, `GET /v1/evals/runs` *(solo dev)* | ó | estado, ˙ltimos resultados de eval |
 
 **Contratos del backend .NET** (los que consume el frontend, con JWT de usuario):
 
-`POST /api/ai/search` ¬∑ `GET /api/ai/products/{id}/substitutes` ¬∑ `GET /api/ai/products/{id}/sales-assist` ¬∑ `POST /api/ai/search-events` ¬∑ `POST /api/ai/catalog/enrich-batch` (admin) ¬∑ `PUT /api/ai/catalog/{id}/profile/review` (admin).
+`POST /api/ai/search` ∑ `GET /api/ai/products/{id}/substitutes` ∑ `GET /api/ai/products/{id}/sales-assist` ∑ `POST /api/ai/search-events` ∑ `POST /api/ai/catalog/enrich-batch` (admin) ∑ `PUT /api/ai/catalog/{id}/profile/review` (admin).
 
-**Reglas de integraci√≥n:**
+**Reglas de integraciÛn:**
 
-- **Autenticaci√≥n**: el frontend nunca habla con Python. .NET ‚Üí Python con un **JWT interno de servicio** (HS256, TTL corto, secreto en SSM) que transporta `user_id`, `role`, `pos_id` y `trace_id`. Python **valida y aplica** ese scope; no conf√≠a en par√°metros sueltos del body. Red interna Docker; el puerto de Python no se publica en nginx.
-- **Hidrataci√≥n**: Python devuelve `product_id` + scores + razones. .NET resuelve precio, stock exacto, foto y permisos, y **descarta** cualquier candidato que ya no cumpla las reglas (la proyecci√≥n puede estar desfasada; la verdad no).
-- **Frescura**: `ai.pos_projection` se refresca cada 5-10 min v√≠a feed HTTP; `ai.product_document` se actualiza por *push* de .NET al aprobar un perfil, m√°s una sincronizaci√≥n completa nocturna. El desfase m√°ximo tolerado se documenta.
+- **AutenticaciÛn**: el frontend nunca habla con Python. .NET ? Python con un **JWT interno de servicio** (HS256, TTL corto, secreto en SSM) que transporta `user_id`, `role`, `pos_id` y `trace_id`. Python **valida y aplica** ese scope; no confÌa en par·metros sueltos del body. Red interna Docker; el puerto de Python no se publica en nginx.
+- **HidrataciÛn**: Python devuelve `product_id` + scores + razones. .NET resuelve precio, stock exacto, foto y permisos, y **descarta** cualquier candidato que ya no cumpla las reglas (la proyecciÛn puede estar desfasada; la verdad no).
+- **Frescura**: `ai.pos_projection` se refresca cada 5-10 min vÌa feed HTTP; `ai.product_document` se actualiza por *push* de .NET al aprobar un perfil, m·s una sincronizaciÛn completa nocturna. El desfase m·ximo tolerado se documenta.
 - **Latencia objetivo**: retrieval p95 < 500 ms; assist p95 < 3,5 s (con *streaming* de la parte generada).
-- **Degradaci√≥n**: timeouts (0,8 s retrieval / 5 s assist), reintento √∫nico, circuit breaker con Polly. Si el circuito abre, .NET responde con el **buscador l√©xico existente** y `ai_available: false`; la UI muestra resultados normales sin bloque de asistencia. **El sistema nunca se cae por culpa de la IA.** Feature flag por POS para despliegue progresivo.
+- **DegradaciÛn**: timeouts (0,8 s retrieval / 5 s assist), reintento ˙nico, circuit breaker con Polly. Si el circuito abre, .NET responde con el **buscador lÈxico existente** y `ai_available: false`; la UI muestra resultados normales sin bloque de asistencia. **El sistema nunca se cae por culpa de la IA.** Feature flag por POS para despliegue progresivo.
 
 ---
 
-## 7. Datos: qu√© es real, qu√© se genera y para qu√©
+## 7. Datos: quÈ es real, quÈ se genera y para quÈ
 
-Esta es la secci√≥n con m√°s peso de ingenier√≠a del proyecto.
+Esta es la secciÛn con m·s peso de ingenierÌa del proyecto.
 
 ### 7.1. Inventario de datos reales
 
 | Fuente | Disponibilidad | Uso |
 |---|---|---|
-| Modelo de datos y sem√°ntica de negocio (entidades, reglas, roles, flujo de venta) | **Real y verificado** en el repo | Define esquemas, filtros, permisos y todo el dise√±o |
-| Cat√°logo de producci√≥n (`pv.joiabagur.com`) | **Probable pero no verificado**; requiere export | Semilla de realismo: distribuci√≥n de precios, nomenclatura real de SKU, colecciones, longitud t√≠pica de descripciones |
-| Fotos de producto (S3) | Reales si hay export | No se usan en este PF (el √≠ndice visual ya existe y es otro problema) |
-| Textos comerciales de la joyer√≠a (cuidados, materiales, garant√≠a) | A pedir al negocio | Semilla del corpus de conocimiento |
+| Modelo de datos y sem·ntica de negocio (entidades, reglas, roles, flujo de venta) | **Real y verificado** en el repo | Define esquemas, filtros, permisos y todo el diseÒo |
+| Cat·logo de producciÛn (`pv.joiabagur.com`) | **Probable pero no verificado**; requiere export | Semilla de realismo: distribuciÛn de precios, nomenclatura real de SKU, colecciones, longitud tÌpica de descripciones |
+| Fotos de producto (S3) | Reales si hay export | No se usan en este PF (el Ìndice visual ya existe y es otro problema) |
+| Textos comerciales de la joyerÌa (cuidados, materiales, garantÌa) | A pedir al negocio | Semilla del corpus de conocimiento |
 
-**Postura declarada:** el sistema se dise√±a para funcionar **sin** el export. Si llega, se usa como *semilla estad√≠stica y de estilo* para el generador sint√©tico, no como corpus directo (evita bloqueos por disponibilidad y por privacidad).
+**Postura declarada:** el sistema se diseÒa para funcionar **sin** el export. Si llega, se usa como *semilla estadÌstica y de estilo* para el generador sintÈtico, no como corpus directo (evita bloqueos por disponibilidad y por privacidad).
 
-### 7.2. Estrategia de generaci√≥n: mundo determinista, texto con IA
+### 7.2. Estrategia de generaciÛn: mundo determinista, texto con IA
 
-El error cl√°sico es pedirle a un LLM que genere ventas e inventario: salen filas plausibles e **internamente incoherentes** (productos que se venden donde no tienen stock, estacionalidad que no cuadra, sumas que no cierran). El criterio adoptado separa dos responsabilidades:
+El error cl·sico es pedirle a un LLM que genere ventas e inventario: salen filas plausibles e **internamente incoherentes** (productos que se venden donde no tienen stock, estacionalidad que no cuadra, sumas que no cierran). El criterio adoptado separa dos responsabilidades:
 
-- **LLM ‚Üí lo textual y lo sem√°ntico**: nombres de pieza, descripciones, alias de b√∫squeda, argumentarios, corpus de conocimiento, consultas de operador en lenguaje natural.
-- **C√≥digo determinista con semilla fija ‚Üí lo num√©rico y lo relacional**: red de POS, matriz de propensi√≥n producto√óPOS, simulaci√≥n de ventas (proceso de Poisson con estacionalidad y perfil por hotel), movimientos de inventario, stock resultante.
+- **LLM ? lo textual y lo sem·ntico**: nombres de pieza, descripciones, alias de b˙squeda, argumentarios, corpus de conocimiento, consultas de operador en lenguaje natural.
+- **CÛdigo determinista con semilla fija ? lo numÈrico y lo relacional**: red de POS, matriz de propensiÛn producto◊POS, simulaciÛn de ventas (proceso de Poisson con estacionalidad y perfil por hotel), movimientos de inventario, stock resultante.
 
-As√≠ el hist√≥rico de ventas es **coherente por construcci√≥n** con el cat√°logo y el stock, que es exactamente lo que necesitan las se√±ales de rotaci√≥n, los sustitutos y el argumentario por POS. Todo el generador vive en `ai-service/data/generators/`, con semilla, versionado y reproducible con un comando.
+AsÌ el histÛrico de ventas es **coherente por construcciÛn** con el cat·logo y el stock, que es exactamente lo que necesitan las seÒales de rotaciÛn, los sustitutos y el argumentario por POS. Todo el generador vive en `ai-service/data/generators/`, con semilla, versionado y reproducible con un comando.
 
 ### 7.3. Datasets a generar
 
 | # | Dataset | Volumen orientativo | Campos conceptuales | Alimenta |
 |---|---|---|---|---|
-| D1 | **Cat√°logo sint√©tico** | 900-1.200 productos, ~350 familias con variantes S/M/L | sku, nombre, descripci√≥n (40-120 pal.), precio (15-450 ‚Ç¨), colecci√≥n (8-12), activo | √çndice de cat√°logo, todo lo dem√°s |
-| D2 | **Perfiles IA de producto** | = D1 | piece_type, material, stone_type, size_label, variant_group_key, color/style/occasion tags, aliases, pitch, hint, cuidados, confianza por campo | Filtros estructurales, desambiguaci√≥n, pitch |
-| D3 | **`SourceText` + embeddings** | = D1 (√ó2 versiones de modelo para probar migraci√≥n) | doc_text can√≥nico, source_hash, vector 1536 | B√∫squeda vectorial |
-| D4 | **Corpus de conocimiento comercial** | 60-120 documentos ‚Üí 300-600 chunks | tipo (cuidado/material/talla/guion/pol√≠tica/faq), t√≠tulo, contenido, metadatos | Generaci√≥n con citas, faithfulness |
-| D5 | **Red de POS** | 10-14 POS (1 tienda central + hoteles) | nombre, c√≥digo, tipo, perfil de clientela, estacionalidad | Filtros, argumentario, simulaci√≥n |
-| D6 | **Inventario por POS** | 5.000-9.000 filas | product_id, pos_id, quantity, is_active | Filtro duro, sustitutos, se√±al de ranking |
-| D7 | **Hist√≥rico de ventas** | 15.000-25.000 ventas sobre 14-18 meses | producto, POS, operador, precio congelado, cantidad, fecha, m√©todo de pago | Rotaci√≥n, argumentario, evals de sustitutos |
-| D8 | **Consultas de operador** | 400-600 sint√©ticas | texto, POS, intenci√≥n, dificultad, ruido (faltas, abreviaturas, jerga) | Calibraci√≥n de umbral, pruebas de carga, cach√© |
-| D9 | **Golden set de evaluaci√≥n** | 80-100 consultas etiquetadas a mano | consulta, POS, productos relevantes (graduado 0-2), respuesta esperada, categor√≠a | Todas las m√©tricas de recuperaci√≥n |
-| D10 | **Casos adversarios** | 30-40 | fuera de dominio, inyecci√≥n, stock 0, consulta imposible, PII | Guardrails, tasa de abstenci√≥n |
-| D11 | **Eventos de b√∫squeda** | 3.000-6.000 | consulta, resultados, producto seleccionado, rank, duraci√≥n | M√©tricas de negocio simuladas, futuro reranking |
+| D1 | **Cat·logo sintÈtico** | 900-1.200 productos, ~350 familias con variantes S/M/L | sku, nombre, descripciÛn (40-120 pal.), precio (15-450 Ä), colecciÛn (8-12), activo | Õndice de cat·logo, todo lo dem·s |
+| D2 | **Perfiles IA de producto** | = D1 | piece_type, material, stone_type, size_label, variant_group_key, color/style/occasion tags, aliases, pitch, hint, cuidados, confianza por campo | Filtros estructurales, desambiguaciÛn, pitch |
+| D3 | **`SourceText` + embeddings** | = D1 (◊2 versiones de modelo para probar migraciÛn) | doc_text canÛnico, source_hash, vector 1536 | B˙squeda vectorial |
+| D4 | **Corpus de conocimiento comercial** | 60-120 documentos ? 300-600 chunks | tipo (cuidado/material/talla/guion/polÌtica/faq), tÌtulo, contenido, metadatos | GeneraciÛn con citas, faithfulness |
+| D5 | **Red de POS** | 10-14 POS (1 tienda central + hoteles) | nombre, cÛdigo, tipo, perfil de clientela, estacionalidad | Filtros, argumentario, simulaciÛn |
+| D6 | **Inventario por POS** | 5.000-9.000 filas | product_id, pos_id, quantity, is_active | Filtro duro, sustitutos, seÒal de ranking |
+| D7 | **HistÛrico de ventas** | 15.000-25.000 ventas sobre 14-18 meses | producto, POS, operador, precio congelado, cantidad, fecha, mÈtodo de pago | RotaciÛn, argumentario, evals de sustitutos |
+| D8 | **Consultas de operador** | 400-600 sintÈticas | texto, POS, intenciÛn, dificultad, ruido (faltas, abreviaturas, jerga) | CalibraciÛn de umbral, pruebas de carga, cachÈ |
+| D9 | **Golden set de evaluaciÛn** | 80-100 consultas etiquetadas a mano | consulta, POS, productos relevantes (graduado 0-2), respuesta esperada, categorÌa | Todas las mÈtricas de recuperaciÛn |
+| D10 | **Casos adversarios** | 30-40 | fuera de dominio, inyecciÛn, stock 0, consulta imposible, PII | Guardrails, tasa de abstenciÛn |
+| D11 | **Eventos de b˙squeda** | 3.000-6.000 | consulta, resultados, producto seleccionado, rank, duraciÛn | MÈtricas de negocio simuladas, futuro reranking |
 
-**Volumen total del √≠ndice vectorial: ~1.500-1.800 vectores.** Peque√±o, y conviene decirlo: pgvector con HNSW aqu√≠ es holgado, la decisi√≥n no se justifica por escala sino por operaci√≥n (una sola base de datos, filtros SQL nativos, cero infraestructura nueva) ‚Äî y el README debe se√±alar d√≥nde estar√≠a el techo si el cat√°logo creciera √ó100.
+**Volumen total del Ìndice vectorial: ~1.500-1.800 vectores.** PequeÒo, y conviene decirlo: pgvector con HNSW aquÌ es holgado, la decisiÛn no se justifica por escala sino por operaciÛn (una sola base de datos, filtros SQL nativos, cero infraestructura nueva) ó y el README debe seÒalar dÛnde estarÌa el techo si el cat·logo creciera ◊100.
 
 ### 7.4. Realismo dirigido: el ruido es el producto
 
-Un cat√°logo sint√©tico "limpio" produce m√©tricas infladas y un sistema que falla el primer d√≠a. Se inyecta deliberadamente lo que hace dif√≠cil el problema real:
+Un cat·logo sintÈtico "limpio" produce mÈtricas infladas y un sistema que falla el primer dÌa. Se inyecta deliberadamente lo que hace difÌcil el problema real:
 
 - **Familias visualmente confundibles**: 3-5 variantes por familia con diferencias solo de talla o acabado (el caso que causa errores de venta).
-- **Descripciones pobres**: ~30 % de productos con descripci√≥n vac√≠a o de 3 palabras, para probar el enriquecimiento con poca se√±al.
-- **Nomenclatura inconsistente de SKU**: 3-4 convenciones mezcladas, como en cualquier cat√°logo con historia.
-- **Colisiones sem√°nticas**: productos distintos con texto casi id√©ntico (se verifica que ning√∫n par supere cosine 0,97; si lo hace, es un duplicado y se corrige).
-- **Consultas realistas**: faltas de ortograf√≠a, abreviaturas, castellano/catal√°n mezclado, consultas de una sola palabra y consultas con tres restricciones a la vez.
+- **Descripciones pobres**: ~30 % de productos con descripciÛn vacÌa o de 3 palabras, para probar el enriquecimiento con poca seÒal.
+- **Nomenclatura inconsistente de SKU**: 3-4 convenciones mezcladas, como en cualquier cat·logo con historia.
+- **Colisiones sem·nticas**: productos distintos con texto casi idÈntico (se verifica que ning˙n par supere cosine 0,97; si lo hace, es un duplicado y se corrige).
+- **Consultas realistas**: faltas de ortografÌa, abreviaturas, castellano/catal·n mezclado, consultas de una sola palabra y consultas con tres restricciones a la vez.
 - **Estacionalidad y perfil por hotel**: el POS de playa vende otra cosa en agosto que la tienda de ciudad en diciembre.
 
 ### 7.5. Calidad, privacidad y trazabilidad
 
-- **Puertas de calidad autom√°ticas** antes de indexar: unicidad de SKU, precio en rango, vocabulario cerrado respetado, cobertura de tags ‚â• 90 %, distribuci√≥n de tipos de pieza dentro de bandas esperadas, sin colisiones sem√°nticas, sin campos vac√≠os obligatorios. Falla la puerta ‚Üí falla el pipeline.
-- **Muestreo humano del 10 %** de los perfiles generados para estimar la tasa de error real del enriquecimiento; ese n√∫mero va al README.
-- **PII**: el modelo de dominio **no almacena datos de cliente final** (`Sale` no tiene cliente), lo que reduce dr√°sticamente el riesgo. Los √∫nicos datos personales son los de operadores; en los datasets sint√©ticos son ficticios, y si se hace export real se anonimizan usuarios y correos antes de salir de producci√≥n. Ning√∫n dato personal entra en el √≠ndice vectorial ni en un prompt. Esto se documenta como decisi√≥n GDPR expl√≠cita, no como omisi√≥n.
+- **Puertas de calidad autom·ticas** antes de indexar: unicidad de SKU, precio en rango, vocabulario cerrado respetado, cobertura de tags = 90 %, distribuciÛn de tipos de pieza dentro de bandas esperadas, sin colisiones sem·nticas, sin campos vacÌos obligatorios. Falla la puerta ? falla el pipeline.
+- **Muestreo humano del 10 %** de los perfiles generados para estimar la tasa de error real del enriquecimiento; ese n˙mero va al README.
+- **PII**: el modelo de dominio **no almacena datos de cliente final** (`Sale` no tiene cliente), lo que reduce dr·sticamente el riesgo. Los ˙nicos datos personales son los de operadores; en los datasets sintÈticos son ficticios, y si se hace export real se anonimizan usuarios y correos antes de salir de producciÛn. Ning˙n dato personal entra en el Ìndice vectorial ni en un prompt. Esto se documenta como decisiÛn GDPR explÌcita, no como omisiÛn.
 - **Trazabilidad**: cada dataset lleva `generator_version`, `seed`, `model`, `generated_at`. Un evaluador debe poder regenerar el corpus entero con un comando y obtener lo mismo.
 
 ---
 
-## 8. Capa ag√©ntica
+## 8. Capa agÈntica
 
-### 8.1. Por qu√© un agente y no solo un pipeline
+### 8.1. Por quÈ un agente y no solo un pipeline
 
-Un pipeline fijo (`reformular ‚Üí recuperar ‚Üí generar`) resuelve la consulta directa. No resuelve estas tres, que son el d√≠a a d√≠a en un hotel:
+Un pipeline fijo (`reformular ? recuperar ? generar`) resuelve la consulta directa. No resuelve estas tres, que son el dÌa a dÌa en un hotel:
 
-- *"Algo parecido a este anillo pero m√°s barato"* ‚Üí requiere resolver el producto de referencia, extraer sus atributos, buscar con filtro de precio invertido.
-- *"El ERIZO-M no tiene stock"* ‚Üí requiere consultar disponibilidad y, seg√∫n el resultado, pivotar a sustitutos o a otra variante.
-- *"Un regalo para una boda, unos 60 euros"* ‚Üí requiere decidir si preguntar (¬øpara qui√©n? ¬øestilo?) o buscar ya.
+- *"Algo parecido a este anillo pero m·s barato"* ? requiere resolver el producto de referencia, extraer sus atributos, buscar con filtro de precio invertido.
+- *"El ERIZO-M no tiene stock"* ? requiere consultar disponibilidad y, seg˙n el resultado, pivotar a sustitutos o a otra variante.
+- *"Un regalo para una boda, unos 60 euros"* ? requiere decidir si preguntar (øpara quiÈn? øestilo?) o buscar ya.
 
-El n√∫mero de pasos y su orden dependen del resultado del paso anterior: es la definici√≥n de cu√°ndo un pipeline necesita capa de decisi√≥n (S12). El agente es **un solo agente con tools**, no un multiagente: no hay dominios suficientemente separados como para justificar supervisor y handoffs, y a√±adirlos ser√≠a complejidad sin retorno.
+El n˙mero de pasos y su orden dependen del resultado del paso anterior: es la definiciÛn de cu·ndo un pipeline necesita capa de decisiÛn (S12). El agente es **un solo agente con tools**, no un multiagente: no hay dominios suficientemente separados como para justificar supervisor y handoffs, y aÒadirlos serÌa complejidad sin retorno.
 
 ### 8.2. Tools (todas de solo lectura)
 
-| Tool | Qu√© hace | Contrato |
+| Tool | QuÈ hace | Contrato |
 |---|---|---|
-| `buscar_catalogo` | B√∫squeda h√≠brida filtrada por POS | `(texto, filtros, top_k) ‚Üí candidatos` |
-| `consultar_disponibilidad` | Stock real v√≠a .NET (fuente de verdad) | `(product_ids, pos_id) ‚Üí disponibilidad` |
-| `listar_variantes` | Familia completa por `variant_group_key` | `(product_id) ‚Üí variantes` |
-| `buscar_sustitutos` | Similitud con filtro de disponibilidad | `(product_id, pos_id) ‚Üí sustitutos + se√±ales` |
-| `consultar_conocimiento` | RAG sobre corpus comercial | `(pregunta) ‚Üí chunks + citas` |
-| `perfil_punto_venta` | Argumentario del POS | `(pos_id) ‚Üí perfil` |
-| `pedir_aclaracion` | Termina el turno preguntando | `(pregunta, opciones) ‚Üí fin` |
+| `buscar_catalogo` | B˙squeda hÌbrida filtrada por POS | `(texto, filtros, top_k) ? candidatos` |
+| `consultar_disponibilidad` | Stock real vÌa .NET (fuente de verdad) | `(product_ids, pos_id) ? disponibilidad` |
+| `listar_variantes` | Familia completa por `variant_group_key` | `(product_id) ? variantes` |
+| `buscar_sustitutos` | Similitud con filtro de disponibilidad | `(product_id, pos_id) ? sustitutos + seÒales` |
+| `consultar_conocimiento` | RAG sobre corpus comercial | `(pregunta) ? chunks + citas` |
+| `perfil_punto_venta` | Argumentario del POS | `(pos_id) ? perfil` |
+| `pedir_aclaracion` | Termina el turno preguntando | `(pregunta, opciones) ? fin` |
 
-Dise√±o de tools seg√∫n S12: nombres en el lenguaje del dominio, esquemas estrictos, descripciones que dicen **cu√°ndo usar y cu√°ndo no**, errores como datos (`{"error": "sin_resultados", "sugerencia": ...}`) y no como excepciones.
+DiseÒo de tools seg˙n S12: nombres en el lenguaje del dominio, esquemas estrictos, descripciones que dicen **cu·ndo usar y cu·ndo no**, errores como datos (`{"error": "sin_resultados", "sugerencia": ...}`) y no como excepciones.
 
 ### 8.3. Control del bucle y HITL
 
-- **Presupuesto duro**: m√°ximo 5 iteraciones y 6 llamadas a tools por consulta; superado, responde con lo que tenga y marca `partial: true`.
-- **Ninguna tool escribe.** La √∫nica acci√≥n con efecto es "seleccionar para venta", que **devuelve un borrador** y lo confirma el operador en el flujo de venta existente del repo. Es el HITL de S14 aplicado con la m√≠nima complejidad posible: la interrupci√≥n es la propia UI.
-- **Agente de reposici√≥n (opcional)**: batch nocturno que genera propuestas `InventoryRecommendation` en estado `Proposed`; el admin aprueba o rechaza. El LLM redacta el motivo; **los n√∫meros los calcula SQL**, siguiendo la tabla 7.3 de las specs.
-- **Orquestaci√≥n**: bucle manual con function calling en la v1; se migra a LangGraph solo si el flujo llega a necesitar ramificaci√≥n con estado y reanudaci√≥n. La decisi√≥n se documenta con el criterio de S13 (no adoptar framework por defecto).
+- **Presupuesto duro**: m·ximo 5 iteraciones y 6 llamadas a tools por consulta; superado, responde con lo que tenga y marca `partial: true`.
+- **Ninguna tool escribe.** La ˙nica acciÛn con efecto es "seleccionar para venta", que **devuelve un borrador** y lo confirma el operador en el flujo de venta existente del repo. Es el HITL de S14 aplicado con la mÌnima complejidad posible: la interrupciÛn es la propia UI.
+- **Agente de reposiciÛn (opcional)**: batch nocturno que genera propuestas `InventoryRecommendation` en estado `Proposed`; el admin aprueba o rechaza. El LLM redacta el motivo; **los n˙meros los calcula SQL**, siguiendo la tabla 7.3 de las specs.
+- **OrquestaciÛn**: bucle manual con function calling en la v1; se migra a LangGraph solo si el flujo llega a necesitar ramificaciÛn con estado y reanudaciÛn. La decisiÛn se documenta con el criterio de S13 (no adoptar framework por defecto).
 
 ---
 
-## 9. Evaluaci√≥n
+## 9. EvaluaciÛn
 
-Sin esta secci√≥n el proyecto no aprueba con solidez. Es tambi√©n donde m√°s barato se compra la diferencia entre "aprueba" y "destaca".
+Sin esta secciÛn el proyecto no aprueba con solidez. Es tambiÈn donde m·s barato se compra la diferencia entre "aprueba" y "destaca".
 
 ### 9.1. Golden set
 
-80-100 consultas etiquetadas **a mano** por dos personas del equipo, con relevancia graduada (0/1/2) sobre un *pool* de candidatos generado por la uni√≥n de todas las configuraciones a comparar (*pooling*: evita premiar a la configuraci√≥n que se us√≥ para construir el set). Distribuci√≥n por categor√≠as:
+80-100 consultas etiquetadas **a mano** por dos personas del equipo, con relevancia graduada (0/1/2) sobre un *pool* de candidatos generado por la uniÛn de todas las configuraciones a comparar (*pooling*: evita premiar a la configuraciÛn que se usÛ para construir el set). DistribuciÛn por categorÌas:
 
-| Categor√≠a | N¬∫ | Qu√© mide |
+| CategorÌa | N∫ | QuÈ mide |
 |---|---:|---|
-| Descripci√≥n natural | 30 | Recuperaci√≥n sem√°ntica pura |
-| Variante / talla | 12 | Desambiguaci√≥n (el caso de negocio cr√≠tico) |
-| Precio / ocasi√≥n / regalo | 12 | Filtros estructurales extra√≠dos de texto |
-| Sustituto / sin stock | 10 | Retriever invertido + se√±al de disponibilidad |
-| L√©xico exacto (SKU, nombre propio) | 8 | Rama l√©xica del h√≠brido |
-| Ambigua ‚Üí requiere aclaraci√≥n | 8 | Decisi√≥n del agente |
-| Fuera de dominio / imposible | 10 | Abstenci√≥n y guardrails |
+| DescripciÛn natural | 30 | RecuperaciÛn sem·ntica pura |
+| Variante / talla | 12 | DesambiguaciÛn (el caso de negocio crÌtico) |
+| Precio / ocasiÛn / regalo | 12 | Filtros estructurales extraÌdos de texto |
+| Sustituto / sin stock | 10 | Retriever invertido + seÒal de disponibilidad |
+| LÈxico exacto (SKU, nombre propio) | 8 | Rama lÈxica del hÌbrido |
+| Ambigua ? requiere aclaraciÛn | 8 | DecisiÛn del agente |
+| Fuera de dominio / imposible | 10 | AbstenciÛn y guardrails |
 
 ### 9.2. Ablations: la tabla que justifica la arquitectura
 
 Mismo golden set, cinco configuraciones, tres ejes (calidad, latencia, coste):
 
-| Config | Descripci√≥n |
+| Config | DescripciÛn |
 |---|---|
-| **v0-lexico** | Buscador actual del repo (SKU + nombre) ‚Äî l√≠nea base honesta |
-| **v0-cag** | Cat√°logo del POS entero en contexto, sin retrieval |
+| **v0-lexico** | Buscador actual del repo (SKU + nombre) ó lÌnea base honesta |
+| **v0-cag** | Cat·logo del POS entero en contexto, sin retrieval |
 | **v1-vectorial** | Solo pgvector + threshold |
-| **v2-hibrido** | Vectorial + l√©xico (RRF) + filtros duros |
-| **v3-hibrido+se√±ales** | v2 + disponibilidad/rotaci√≥n (+ reranking como flag a medir) |
+| **v2-hibrido** | Vectorial + lÈxico (RRF) + filtros duros |
+| **v3-hibrido+seÒales** | v2 + disponibilidad/rotaciÛn (+ reranking como flag a medir) |
 
-M√©tricas: **Recall@5, nDCG@5, MRR, Precision@3**, tasa de abstenci√≥n correcta, % de consultas sin resultado, **p50/p95 de latencia** y **coste por consulta**. Objetivos de aceptaci√≥n para v3: Recall@5 ‚â• 0,85 en categor√≠as 1-3; nDCG@5 ‚â• 0,75; abstenci√≥n correcta ‚â• 0,80; p95 de retrieval < 500 ms.
+MÈtricas: **Recall@5, nDCG@5, MRR, Precision@3**, tasa de abstenciÛn correcta, % de consultas sin resultado, **p50/p95 de latencia** y **coste por consulta**. Objetivos de aceptaciÛn para v3: Recall@5 = 0,85 en categorÌas 1-3; nDCG@5 = 0,75; abstenciÛn correcta = 0,80; p95 de retrieval < 500 ms.
 
-### 9.3. Evaluaci√≥n de la generaci√≥n
+### 9.3. EvaluaciÛn de la generaciÛn
 
 - **RAGAS** (faithfulness, answer relevancy, context precision, context recall) sobre el subconjunto de consultas que producen argumentario con citas.
-- **Validador anti-alucinaci√≥n determinista** (no LLM-as-judge): recorre la respuesta final, extrae toda cifra de precio y stock, y comprueba que coincide exactamente con lo que devolvi√≥ el hidratador .NET. **Umbral de aceptaci√≥n: 0 fallos.** Es el eval que convierte el principio 2 de las specs en garant√≠a verificable, y es barato, r√°pido y no discutible.
-- **Verificaci√≥n de citas**: toda afirmaci√≥n del corpus de conocimiento debe apuntar a un `chunk_id` existente y realmente recuperado.
+- **Validador anti-alucinaciÛn determinista** (no LLM-as-judge): recorre la respuesta final, extrae toda cifra de precio y stock, y comprueba que coincide exactamente con lo que devolviÛ el hidratador .NET. **Umbral de aceptaciÛn: 0 fallos.** Es el eval que convierte el principio 2 de las specs en garantÌa verificable, y es barato, r·pido y no discutible.
+- **VerificaciÛn de citas**: toda afirmaciÛn del corpus de conocimiento debe apuntar a un `chunk_id` existente y realmente recuperado.
 
-### 9.4. Evaluaci√≥n del agente
+### 9.4. EvaluaciÛn del agente
 
-30-40 escenarios multi-turno con √©xito definido (producto correcto, variante correcta, aclaraci√≥n pedida cuando tocaba). M√©tricas: *task success rate*, tools invocadas vs esperadas, n√∫mero de pasos, coste medio por consulta, tasa de escalado a aclaraci√≥n.
+30-40 escenarios multi-turno con Èxito definido (producto correcto, variante correcta, aclaraciÛn pedida cuando tocaba). MÈtricas: *task success rate*, tools invocadas vs esperadas, n˙mero de pasos, coste medio por consulta, tasa de escalado a aclaraciÛn.
 
-### 9.5. Regresi√≥n e iteraci√≥n de prompts
+### 9.5. RegresiÛn e iteraciÛn de prompts
 
-Los prompts viven versionados en `ai-service/prompts/` (`v1`, `v2`, ‚Ä¶), y **cada versi√≥n guarda su ejecuci√≥n del harness**. El README muestra la progresi√≥n (qu√© se cambi√≥, qu√© m√©trica se movi√≥). Eso es exactamente la "evidencia de iteraci√≥n en el c√≥digo" que el enunciado valora, y sale gratis si se hace desde el primer d√≠a. El harness se ejecuta con un comando y en CI sobre el subconjunto barato.
+Los prompts viven versionados en `ai-service/prompts/` (`v1`, `v2`, Ö), y **cada versiÛn guarda su ejecuciÛn del harness**. El README muestra la progresiÛn (quÈ se cambiÛ, quÈ mÈtrica se moviÛ). Eso es exactamente la "evidencia de iteraciÛn en el cÛdigo" que el enunciado valora, y sale gratis si se hace desde el primer dÌa. El harness se ejecuta con un comando y en CI sobre el subconjunto barato.
 
 ---
 
@@ -474,75 +476,75 @@ Reutilizamos la infraestructura existente; no montamos nada nuevo.
 1. `docker-compose` gana un servicio `jbg-ai` (FastAPI + uvicorn), en la red interna de la EC2. **No se publica en nginx**; solo el backend .NET lo alcanza.
 2. RDS: `CREATE EXTENSION vector`, esquema `ai`, usuario propio con permisos solo sobre `ai`. Migraciones con Alembic, independientes de EF Core.
 3. Secretos (API key del proveedor LLM, secreto del JWT interno) en **SSM Parameter Store**, como el resto.
-4. Nuevo workflow de GitHub Actions `deploy-ai-service.yml` siguiendo el patr√≥n OIDC + ECR ya existente.
-5. `GET /health` con verificaci√≥n de conectividad a base de datos, proveedor de embeddings y estado del √≠ndice; expuesto en el dashboard de admin.
-6. **Evidencia para el evaluador**: URL p√∫blica ya viva (`pv.joiabagur.com`) con usuario demo de solo lectura, **m√°s** v√≠deo de 2-3 min del flujo principal, **m√°s** `docker compose up` reproducible en local con corpus sint√©tico incluido. El enunciado pide una; damos las tres, porque un evaluador sin credenciales no puede probar nada.
+4. Nuevo workflow de GitHub Actions `deploy-ai-service.yml` siguiendo el patrÛn OIDC + ECR ya existente.
+5. `GET /health` con verificaciÛn de conectividad a base de datos, proveedor de embeddings y estado del Ìndice; expuesto en el dashboard de admin.
+6. **Evidencia para el evaluador**: URL p˙blica ya viva (`pv.joiabagur.com`) con usuario demo de solo lectura, **m·s** vÌdeo de 2-3 min del flujo principal, **m·s** `docker compose up` reproducible en local con corpus sintÈtico incluido. El enunciado pide una; damos las tres, porque un evaluador sin credenciales no puede probar nada.
 
-**Coste estimado del proyecto entero** (enriquecimiento de ~1.000 productos + embeddings + evals repetidos + demo): del orden de decenas de euros con modelo de embeddings peque√±o y modelo de generaci√≥n econ√≥mico. Se instrumenta con `AiUsageLog` y se reporta en el README.
+**Coste estimado del proyecto entero** (enriquecimiento de ~1.000 productos + embeddings + evals repetidos + demo): del orden de decenas de euros con modelo de embeddings pequeÒo y modelo de generaciÛn econÛmico. Se instrumenta con `AiUsageLog` y se reporta en el README.
 
 ---
 
-## 11. Plan de trabajo (1 agosto ‚Üí 3 septiembre 2026)
+## 11. Plan de trabajo (1 agosto ? 3 septiembre 2026)
 
-Equipo sugerido de 3 personas. Con 2, se cae la fase 8 (agente de reposici√≥n) y se reduce el golden set a 60 consultas.
+Equipo sugerido de 3 personas. Con 2, se cae la fase 8 (agente de reposiciÛn) y se reduce el golden set a 60 consultas.
 
 | Rol | Responsabilidad principal |
 |---|---|
-| **R1 ‚Äî RAG/Python** | Servicio `jbg-ai`, indexaci√≥n, retriever, agente, prompts |
-| **R2 ‚Äî Backend/Integraci√≥n** | Endpoints .NET, hidrataci√≥n, seguridad, degradaci√≥n, despliegue, panel en la SPA |
-| **R3 ‚Äî Datos/Evaluaci√≥n** | Generadores, corpus, golden set, harness, RAGAS, documentaci√≥n |
+| **R1 ó RAG/Python** | Servicio `jbg-ai`, indexaciÛn, retriever, agente, prompts |
+| **R2 ó Backend/IntegraciÛn** | Endpoints .NET, hidrataciÛn, seguridad, degradaciÛn, despliegue, panel en la SPA |
+| **R3 ó Datos/EvaluaciÛn** | Generadores, corpus, golden set, harness, RAGAS, documentaciÛn |
 
 | Semana | Fechas | Objetivo | Hito verificable |
 |---|---|---|---|
 | **S0** | 1-3 ago | Cierre de decisiones (proveedor de embeddings, observabilidad, alcance final). Rama `finalproject-[XX]`. Esqueleto del servicio + docker-compose + pgvector en local. **Contratos congelados** | `GET /health` responde y el equipo trabaja en paralelo sin bloquearse |
-| **S1** | 4-10 ago | **Datos y corpus.** Generadores D1/D5/D6/D7. Pipeline de enriquecimiento (D2). Corpus de conocimiento (D4). Esquema `ai` + indexaci√≥n (D3) | ~1.500 vectores indexados; consulta vectorial devuelve resultados sensatos |
-| **S2** | 11-17 ago | **Recuperaci√≥n y medici√≥n.** H√≠brido + filtros + threshold. Golden set (D9) etiquetado. Harness + baselines v0-lexico y v0-cag | **Tabla de ablations v0‚Üív2 con n√∫meros reales**. Umbral fijado con datos |
-| **S3** | 18-24 ago | **Agente e integraci√≥n.** Tools, guardrails, generaci√≥n con citas. Endpoints .NET + hidrataci√≥n + circuit breaker. Panel "Buscar con ayuda" en la SPA | Flujo extremo a extremo desde la UI, con degradaci√≥n probada apagando el servicio |
-| **S4** | 25-31 ago | **Cierre y despliegue.** Sustitutos + argumentario por POS. Opcional: agente de reposici√≥n. Despliegue en EC2. RAGAS + validador anti-alucinaci√≥n. Iteraci√≥n de prompts v2 | Sistema desplegado y accesible; **tabla final de ablations v0‚Üív3** |
-| **S5** | 1-3 sep | **Congelaci√≥n.** README completo, diagramas, limitaciones, v√≠deo 2-3 min, `v1.0-final-[XX]`, entrega | Entrega enviada el 3 de septiembre |
+| **S1** | 4-10 ago | **Datos y corpus.** Generadores D1/D5/D6/D7. Pipeline de enriquecimiento (D2). Corpus de conocimiento (D4). Esquema `ai` + indexaciÛn (D3) | ~1.500 vectores indexados; consulta vectorial devuelve resultados sensatos |
+| **S2** | 11-17 ago | **RecuperaciÛn y mediciÛn.** HÌbrido + filtros + threshold. Golden set (D9) etiquetado. Harness + baselines v0-lexico y v0-cag | **Tabla de ablations v0?v2 con n˙meros reales**. Umbral fijado con datos |
+| **S3** | 18-24 ago | **Agente e integraciÛn.** Tools, guardrails, generaciÛn con citas. Endpoints .NET + hidrataciÛn + circuit breaker. Panel "Buscar con ayuda" en la SPA | Flujo extremo a extremo desde la UI, con degradaciÛn probada apagando el servicio |
+| **S4** | 25-31 ago | **Cierre y despliegue.** Sustitutos + argumentario por POS. Opcional: agente de reposiciÛn. Despliegue en EC2. RAGAS + validador anti-alucinaciÛn. IteraciÛn de prompts v2 | Sistema desplegado y accesible; **tabla final de ablations v0?v3** |
+| **S5** | 1-3 sep | **CongelaciÛn.** README completo, diagramas, limitaciones, vÌdeo 2-3 min, `v1.0-final-[XX]`, entrega | Entrega enviada el 3 de septiembre |
 
-**L√≠neas de corte, en este orden** (si a final de S3 hay retraso): 1) agente de reposici√≥n ‚Üí fuera; 2) argumentario por POS ‚Üí generado offline y fijo, sin endpoint; 3) reranking ‚Üí no se implementa, se documenta como descartado por medici√≥n; 4) golden set 100 ‚Üí 60 consultas; 5) panel SPA ‚Üí integrado en la b√∫squeda existente en vez de pantalla nueva.
+**LÌneas de corte, en este orden** (si a final de S3 hay retraso): 1) agente de reposiciÛn ? fuera; 2) argumentario por POS ? generado offline y fijo, sin endpoint; 3) reranking ? no se implementa, se documenta como descartado por mediciÛn; 4) golden set 100 ? 60 consultas; 5) panel SPA ? integrado en la b˙squeda existente en vez de pantalla nueva.
 
-**Lo que nunca se recorta**, porque es lo que se eval√∫a: corpus + √≠ndice, retriever h√≠brido con filtros, un agente con tools, el harness de evaluaci√≥n con la tabla de ablations, el despliegue y el README.
+**Lo que nunca se recorta**, porque es lo que se eval˙a: corpus + Ìndice, retriever hÌbrido con filtros, un agente con tools, el harness de evaluaciÛn con la tabla de ablations, el despliegue y el README.
 
 ### Riesgos
 
-| Riesgo | Prob. | Impacto | Mitigaci√≥n |
+| Riesgo | Prob. | Impacto | MitigaciÛn |
 |---|---|---|---|
-| Agosto: vacaciones y disponibilidad irregular del equipo | Alta | Alto | Contratos congelados en S0 ‚Üí trabajo desacoplado; l√≠neas de corte definidas de antemano |
-| Datos sint√©ticos demasiado f√°ciles ‚Üí m√©tricas infladas | Alta | Alto | Ruido dirigido (¬ß7.4); golden set etiquetado por personas distintas de quien gener√≥ los datos |
-| El enriquecimiento produce metadatos pobres con descripciones vac√≠as | Media | Alto | Vocabularios cerrados + confianza por campo + muestreo humano; degradar a nombre+colecci√≥n cuando no hay se√±al |
-| Etiquetar el golden set consume m√°s de lo previsto | Media | Medio | *Pooling* + interfaz m√≠nima de etiquetado + tope de 2 h por persona; recortar a 60 consultas |
-| Latencia del assist inaceptable en m√≥vil | Media | Medio | *Streaming*, retrieval y generaci√≥n desacoplados (los resultados se pintan antes que el argumentario) |
-| Deriva entre `ai.pos_projection` y la realidad | Media | Bajo | `qty_bucket` en vez de cantidad + hidrataci√≥n obligatoria en .NET |
-| Fricci√≥n para instalar pgvector en RDS | Baja | Medio | Verificar en S0; alternativa: contenedor Postgres+pgvector dedicado en la misma EC2 |
-| Coste de LLM por reejecutar evals | Baja | Bajo | Cach√© de resultados por hash de configuraci√≥n; subconjunto barato en CI |
+| Agosto: vacaciones y disponibilidad irregular del equipo | Alta | Alto | Contratos congelados en S0 ? trabajo desacoplado; lÌneas de corte definidas de antemano |
+| Datos sintÈticos demasiado f·ciles ? mÈtricas infladas | Alta | Alto | Ruido dirigido (ß7.4); golden set etiquetado por personas distintas de quien generÛ los datos |
+| El enriquecimiento produce metadatos pobres con descripciones vacÌas | Media | Alto | Vocabularios cerrados + confianza por campo + muestreo humano; degradar a nombre+colecciÛn cuando no hay seÒal |
+| Etiquetar el golden set consume m·s de lo previsto | Media | Medio | *Pooling* + interfaz mÌnima de etiquetado + tope de 2 h por persona; recortar a 60 consultas |
+| Latencia del assist inaceptable en mÛvil | Media | Medio | *Streaming*, retrieval y generaciÛn desacoplados (los resultados se pintan antes que el argumentario) |
+| Deriva entre `ai.pos_projection` y la realidad | Media | Bajo | `qty_bucket` en vez de cantidad + hidrataciÛn obligatoria en .NET |
+| FricciÛn para instalar pgvector en RDS | Baja | Medio | Verificar en S0; alternativa: contenedor Postgres+pgvector dedicado en la misma EC2 |
+| Coste de LLM por reejecutar evals | Baja | Bajo | CachÈ de resultados por hash de configuraciÛn; subconjunto barato en CI |
 
 ---
 
 ## 12. Limitaciones que el README debe declarar
 
-Un proyecto que las nombra vale m√°s que uno que las esconde; el enunciado lo dice expl√≠citamente.
+Un proyecto que las nombra vale m·s que uno que las esconde; el enunciado lo dice explÌcitamente.
 
-1. **El corpus es mayoritariamente sint√©tico.** El dominio, el modelo de datos y la operativa son reales; los productos, ventas y consultas est√°n generados. Se explica el porqu√© y c√≥mo se regenera.
-2. **No hay validaci√≥n con usuarios reales.** Los KPIs de negocio est√°n instrumentados pero no medidos; hacen falta semanas de tr√°fico y un A/B.
-3. **El golden set es peque√±o y hecho por el propio equipo.** Sesgo conocido; mitigado con *pooling* y etiquetado cruzado, no eliminado.
-4. **Dos espacios vectoriales conviven** (visual MobileNetV2 y textual): no se fusionan. La fusi√≥n multimodal es trabajo futuro, no una omisi√≥n.
-5. **El agente no escribe nada.** Toda acci√≥n con efecto pasa por el operador o el admin. Es una decisi√≥n, no una carencia.
-6. **La proyecci√≥n de disponibilidad puede estar desfasada minutos**; por eso nunca se muestra y solo pondera el ranking.
+1. **El corpus es mayoritariamente sintÈtico.** El dominio, el modelo de datos y la operativa son reales; los productos, ventas y consultas est·n generados. Se explica el porquÈ y cÛmo se regenera.
+2. **No hay validaciÛn con usuarios reales.** Los KPIs de negocio est·n instrumentados pero no medidos; hacen falta semanas de tr·fico y un A/B.
+3. **El golden set es pequeÒo y hecho por el propio equipo.** Sesgo conocido; mitigado con *pooling* y etiquetado cruzado, no eliminado.
+4. **Dos espacios vectoriales conviven** (visual MobileNetV2 y textual): no se fusionan. La fusiÛn multimodal es trabajo futuro, no una omisiÛn.
+5. **El agente no escribe nada.** Toda acciÛn con efecto pasa por el operador o el admin. Es una decisiÛn, no una carencia.
+6. **La proyecciÛn de disponibilidad puede estar desfasada minutos**; por eso nunca se muestra y solo pondera el ranking.
 
-**Pr√≥ximos pasos naturales:** reranking aprendido con los `ProductSearchEvent` reales; inventario inteligente completo (traslados, packing list, liquidaci√≥n); fusi√≥n de la se√±al visual con la textual en el mismo ranking; evaluaci√≥n online con A/B por POS.
+**PrÛximos pasos naturales:** reranking aprendido con los `ProductSearchEvent` reales; inventario inteligente completo (traslados, packing list, liquidaciÛn); fusiÛn de la seÒal visual con la textual en el mismo ranking; evaluaciÛn online con A/B por POS.
 
 ---
 
 ## 13. Checklist de entrega del Proyecto Final
 
-- [ ] Rama `finalproject-[INICIALES]` con README y c√≥digo funcional
-- [ ] README con: dominio y problema, diagrama de arquitectura y decisiones justificadas, descripci√≥n de CAG/RAG/agentes/evaluaci√≥n/despliegue, instrucciones de arranque local y acceso p√∫blico, limitaciones y pr√≥ximos pasos, **integrantes del equipo**
-- [ ] URL p√∫blica activa con usuario demo **y** v√≠deo de 2-3 min del flujo principal
-- [ ] Tabla de ablations v0‚Üív3 con m√©tricas, latencia y coste, reproducible con un comando
-- [ ] Prompts versionados con evidencia de iteraci√≥n y su impacto medido
-- [ ] `docker compose up` reproducible con corpus sint√©tico incluido
+- [ ] Rama `finalproject-[INICIALES]` con README y cÛdigo funcional
+- [ ] README con: dominio y problema, diagrama de arquitectura y decisiones justificadas, descripciÛn de CAG/RAG/agentes/evaluaciÛn/despliegue, instrucciones de arranque local y acceso p˙blico, limitaciones y prÛximos pasos, **integrantes del equipo**
+- [ ] URL p˙blica activa con usuario demo **y** vÌdeo de 2-3 min del flujo principal
+- [ ] Tabla de ablations v0?v3 con mÈtricas, latencia y coste, reproducible con un comando
+- [ ] Prompts versionados con evidencia de iteraciÛn y su impacto medido
+- [ ] `docker compose up` reproducible con corpus sintÈtico incluido
 - [ ] Tag de release `v1.0-final-[INICIALES]` (recomendado)
 - [ ] Acceso al TA si el repositorio es privado
 - [ ] Entrega enviada por el canal indicado antes del **3 de septiembre de 2026**

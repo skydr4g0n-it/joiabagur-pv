@@ -1,5 +1,7 @@
 # Modelo C4 - Sistema de Gestión de Puntos de Venta para Joyería
 
+> **Nota (2026-10-27):** Los diagramas y textos que citan reconocimiento de imágenes con IA son históricos. El producto en producción ya no expone ese flujo en la interfaz ni en la API activa de reconocimiento.
+
 Este documento describe la arquitectura del sistema utilizando el modelo C4, proporcionando diferentes niveles de abstracción desde el contexto general hasta los componentes internos.
 
 ---

@@ -1,5 +1,7 @@
 # Arquitectura del Sistema - Monolítica Simple con Contenedores
 
+> **Nota (2026-10-27):** El reconocimiento de productos por foto (TensorFlow.js en cliente) fue retirado. Las secciones que lo mencionan describen el diseño histórico; el flujo operativo actual es venta manual, escaneo y carrito.
+
 ## Visión General
 
 Arquitectura monolítica simple con backend y frontend separados, desplegados en contenedores Docker sobre servicios gestionados de cloud en free-tier.

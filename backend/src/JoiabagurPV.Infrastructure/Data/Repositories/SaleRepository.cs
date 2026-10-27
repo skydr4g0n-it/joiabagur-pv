@@ -228,6 +228,7 @@ public class SaleRepository : Repository<Sale>, ISaleRepository
             .Include(s => s.User)
             .Include(s => s.PaymentMethod)
             .Include(s => s.Photo)
+            .Include(s => s.ReturnSales)
             .AsQueryable();
 
         if (pointOfSaleIds != null)

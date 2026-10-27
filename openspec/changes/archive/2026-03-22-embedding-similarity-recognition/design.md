@@ -1,6 +1,8 @@
+> **Withdrawn (2026-10-27):** Product-photo image recognition was retired. This document is historical. Current behavior is manual sales only, and /api/image-recognition returns 410 Gone.
+
 ## Context
 
-The current image recognition system uses MobileNetV2 as a feature extractor followed by a custom classification head (Dense 256 → 128 → numClasses) trained in the browser. With ~2 photos per product across 170 classes, the classifier cannot learn reliable decision boundaries. Training takes 15+ minutes and produces unreliable predictions.
+The current image recognition system uses MobileNetV2 as a feature extractor followed by a custom classification head (Dense 256 ? 128 ? numClasses) trained in the browser. With ~2 photos per product across 170 classes, the classifier cannot learn reliable decision boundaries. Training takes 15+ minutes and produces unreliable predictions.
 
 MobileNetV2 already produces excellent 1280-dimensional feature vectors where visually similar images cluster together. By comparing these vectors directly via cosine similarity instead of training a classifier, we eliminate the training bottleneck and get naturally better results.
 
@@ -35,7 +37,7 @@ The existing codebase has:
 
 **Decision:** Store 1280-dim float arrays as JSON text in a `text` column rather than using pgvector or a binary format.
 
-**Rationale:** With ~366 rows × 1280 floats × ~8 bytes (JSON) ≈ 3MB, this is trivial for PostgreSQL. The database only needs to bulk-read all embeddings -- no server-side similarity queries. Using `text` avoids adding the pgvector extension (which complicates RDS setup) and keeps the architecture simple.
+**Rationale:** With ~366 rows � 1280 floats � ~8 bytes (JSON) � 3MB, this is trivial for PostgreSQL. The database only needs to bulk-read all embeddings -- no server-side similarity queries. Using `text` avoids adding the pgvector extension (which complicates RDS setup) and keeps the architecture simple.
 
 **Alternatives considered:**
 - **pgvector column:** Overkill -- we never query by similarity on the server. Adds extension dependency to RDS.
@@ -124,11 +126,11 @@ sequenceDiagram
 
 ## Risks / Trade-offs
 
-- **[Cold cache latency]** First inference in a session requires downloading all embeddings (~3MB JSON). → Mitigation: Cache in memory; check staleness via lightweight status endpoint before re-fetching.
-- **[MobileNetV2 load time on photo upload]** First photo upload in a session triggers MobileNetV2 download (~14MB). → Mitigation: Already the case for classifier inference; lazy load with progress indicator.
-- **[Threshold tuning]** The 0.70/0.50 thresholds are educated guesses. Jewelry items (rings, necklaces) may have high intra-class variance. → Mitigation: Start conservative, adjust based on real usage feedback. Thresholds are constants, easy to tune.
-- **[Embedding version drift]** If MobileNetV2 URL changes (TF Hub update), old embeddings become incompatible with new feature vectors. → Mitigation: Pin the exact MobileNetV2 model URL. Full rebuild regenerates all embeddings if needed.
-- **[No offline support for embeddings]** Unlike the classifier model (cached in IndexedDB), embeddings are only cached in memory. → Mitigation: Acceptable for MVP. If offline support is needed, embeddings can be persisted in IndexedDB with the same version-check pattern used for the model.
+- **[Cold cache latency]** First inference in a session requires downloading all embeddings (~3MB JSON). ? Mitigation: Cache in memory; check staleness via lightweight status endpoint before re-fetching.
+- **[MobileNetV2 load time on photo upload]** First photo upload in a session triggers MobileNetV2 download (~14MB). ? Mitigation: Already the case for classifier inference; lazy load with progress indicator.
+- **[Threshold tuning]** The 0.70/0.50 thresholds are educated guesses. Jewelry items (rings, necklaces) may have high intra-class variance. ? Mitigation: Start conservative, adjust based on real usage feedback. Thresholds are constants, easy to tune.
+- **[Embedding version drift]** If MobileNetV2 URL changes (TF Hub update), old embeddings become incompatible with new feature vectors. ? Mitigation: Pin the exact MobileNetV2 model URL. Full rebuild regenerates all embeddings if needed.
+- **[No offline support for embeddings]** Unlike the classifier model (cached in IndexedDB), embeddings are only cached in memory. ? Mitigation: Acceptable for MVP. If offline support is needed, embeddings can be persisted in IndexedDB with the same version-check pattern used for the model.
 
 ## Migration Plan
 

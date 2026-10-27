@@ -1,3 +1,5 @@
+> **Withdrawn (2026-10-27):** Product-photo image recognition was retired. This document is historical. Current behavior is manual sales only, and /api/image-recognition returns 410 Gone.
+
 ## Why
 
 The current image recognition system trains a softmax classification head on top of MobileNetV2 features. With ~2 photos per class across 170 product classes, the classifier cannot learn meaningful decision boundaries -- training takes 15+ minutes and produces unreliable predictions. By switching to cosine similarity over raw MobileNetV2 feature embeddings, we eliminate the training step entirely, reduce "retraining" to a ~30-60 second embedding generation pass, and get naturally better results since the pre-trained feature extractor already produces excellent visual representations.

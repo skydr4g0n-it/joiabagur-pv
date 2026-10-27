@@ -39,7 +39,7 @@ public class FilesController : ControllerBase
             if (result == null)
             {
                 _logger.LogWarning("File not found: {Folder}/{Filename}", folder, filename);
-                return NotFound(new { message = "File not found" });
+                return NotFound(new { message = "Archivo no encontrado" });
             }
 
             var (stream, contentType) = result.Value;
@@ -49,7 +49,7 @@ public class FilesController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving file: {Folder}/{Filename}", folder, filename);
-            return StatusCode(500, new { message = "Error retrieving file" });
+            return StatusCode(500, new { message = "Error al obtener el archivo" });
         }
     }
 
@@ -68,7 +68,7 @@ public class FilesController : ControllerBase
             if (result == null)
             {
                 _logger.LogWarning("File not found: {Filename}", filename);
-                return NotFound(new { message = "File not found" });
+                return NotFound(new { message = "Archivo no encontrado" });
             }
 
             var (stream, contentType) = result.Value;
@@ -78,7 +78,7 @@ public class FilesController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving file: {Filename}", filename);
-            return StatusCode(500, new { message = "Error retrieving file" });
+            return StatusCode(500, new { message = "Error al obtener el archivo" });
         }
     }
 }

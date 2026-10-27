@@ -3,11 +3,10 @@
 ## Purpose
 
 Process customer returns against prior sales within policy rules, restore inventory, and record categorized refund transactions.
-
 ## Requirements
 ### Requirement: Return Registration with Sale Association
 
-The system SHALL allow administrators and operators to register product returns by associating them with one or more original sales from the same point of sale within a 30-day window. Returns automatically increment stock and create inventory movement records.
+The system SHALL allow administrators and operators to register product returns by associating them with one or more original sales from the same point of sale within a 30-day window. Returns automatically increment stock and create inventory movement records. A jewelry sale with gift-card coverage SHALL NOT be accepted by this classic return flow. The gift card issuance sale SHALL NOT be accepted by this classic return flow.
 
 #### Scenario: Create return associated with single sale
 
@@ -72,6 +71,20 @@ The system SHALL allow administrators and operators to register product returns 
 - **THEN** eligible sales shows available = 1 for this sale
 - **AND** user cannot return more than 1 unit from this sale
 
+#### Scenario: Reject classic return of a gift-card-linked sale
+
+- **GIVEN** a product sale with gift-card coverage
+- **WHEN** the user submits that sale to the classic return endpoint
+- **THEN** the system returns 400 Bad Request
+- **AND** does not create a return or change stock
+
+#### Scenario: Reject classic return of a gift card issuance sale
+
+- **GIVEN** a sale that is the issuance sale of a gift card
+- **WHEN** the user submits that sale to the classic return endpoint
+- **THEN** the system returns 400 Bad Request
+- **AND** does not create a return or change stock
+
 ### Requirement: Return Category Classification
 
 The system SHALL require a return category for every return, enabling analytics and pattern detection. Categories are predefined and mandatory, while free-text reason remains optional.
@@ -98,7 +111,7 @@ The system SHALL require a return category for every return, enabling analytics 
 
 ### Requirement: Eligible Sales Query
 
-The system SHALL provide an endpoint to query sales eligible for return association, filtering by product, point of sale, and 30-day window, calculating remaining available quantities.
+The system SHALL provide an endpoint to query sales eligible for return association, filtering by product, point of sale, and 30-day window, calculating remaining available quantities. Jewelry sales with gift-card coverage and gift card issuance sales SHALL be excluded.
 
 #### Scenario: Query eligible sales for product
 
@@ -108,6 +121,8 @@ The system SHALL provide an endpoint to query sales eligible for return associat
   - Same PointOfSaleId
   - SaleDate within last 30 days
   - Available quantity > 0 (Sale.Quantity - already returned quantity)
+  - No gift-card coverage
+  - Not a gift card issuance sale
 - **AND** results include: saleId, saleDate, originalQuantity, availableForReturn, unitPrice, paymentMethod
 - **AND** results ordered by SaleDate descending (most recent first)
 
@@ -131,6 +146,19 @@ The system SHALL provide an endpoint to query sales eligible for return associat
 - **OR** all sales are fully returned
 - **THEN** system returns empty list
 - **AND** frontend displays: "No hay ventas elegibles para devolución"
+
+#### Scenario: Exclude a sale linked to a gift card
+
+- **GIVEN** a sale within 30 days at the requested POS with available quantity
+- **AND** that sale has gift-card coverage
+- **WHEN** the user requests eligible sales for that product and POS
+- **THEN** the sale is absent from the list
+
+#### Scenario: Exclude a gift card issuance sale
+
+- **GIVEN** a gift card issuance sale within 30 days at the requested POS
+- **WHEN** the user requests eligible sales for the system gift-card product at that POS
+- **THEN** that issuance sale is absent from the list
 
 ### Requirement: Transaction-Based Return Processing
 

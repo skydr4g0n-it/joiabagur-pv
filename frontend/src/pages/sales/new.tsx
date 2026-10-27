@@ -2,9 +2,9 @@
  * Manual Sales Registration Page (EP3)
  * Allows operators to register sales by searching for products
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { ArrowLeft, Search, ShoppingCart, AlertTriangle, CheckCircle2, Plus } from 'lucide-react';
+import { ArrowLeft, Search, ShoppingCart, AlertTriangle, CheckCircle2, Plus, Gift } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -31,29 +31,35 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-import { useAuth } from '@/providers/auth-provider';
 import { useCart } from '@/providers/cart-provider';
 import { getImageUrl } from '@/lib/image-url';
+import { formatCurrency } from '@/lib/format-currency';
+import { computeGiftCardCoverageTotal } from '@/lib/gift-card-allocation';
 import { salesService } from '@/services/sales.service';
 import { productService } from '@/services/product.service';
 import { pointOfSaleService } from '@/services/point-of-sale.service';
 import { paymentMethodService } from '@/services/payment-method.service';
 import { inventoryService } from '@/services/inventory.service';
+import { giftCardService } from '@/services/gift-card.service';
 import { ROUTES } from '@/routing/routes';
 import type { Product } from '@/types/product.types';
 import type { PointOfSale } from '@/types/point-of-sale.types';
 import type { PaymentMethod } from '@/types/payment-method.types';
+import type { GiftCardByCode } from '@/types/gift-card.types';
 
-// State passed from image recognition page
+const GIFT_CARD_PAYMENT_CODE = 'GIFT_CARD';
+
+// State passed from image recognition or the sales scanner
 interface LocationState {
   productId?: string;
   photoDataUrl?: string;
+  giftCardCode?: string;
+  giftCardCodes?: string[];
 }
 
 export function ManualSalesPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
   const { addLine, lineCount } = useCart();
   
   // Get pre-selected product from image recognition
@@ -61,6 +67,7 @@ export function ManualSalesPage() {
 
   // Prevent re-search when productSearch is set programmatically after a selection
   const skipNextSearchRef = useRef(false);
+  const consumedScannerCodesRef = useRef(false);
 
   // State
   const [loading, setLoading] = useState(true);
@@ -80,6 +87,10 @@ export function ManualSalesPage() {
   const [notes, setNotes] = useState('');
   const [availableStock, setAvailableStock] = useState<number | null>(null);
   const [stockLoading, setStockLoading] = useState(false);
+  const [attachedCards, setAttachedCards] = useState<GiftCardByCode[]>([]);
+  const [cardCodeInput, setCardCodeInput] = useState('');
+  const [addingCard, setAddingCard] = useState(false);
+  const [giftCardPaymentMethodId, setGiftCardPaymentMethodId] = useState<string | null>(null);
 
   // Confirmation dialog
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -134,19 +145,31 @@ export function ManualSalesPage() {
       try {
         // First try to get payment methods assigned to this point of sale
         const posPaymentMethods = await paymentMethodService.getPointOfSalePaymentMethods(selectedPosId);
+        const gift = posPaymentMethods.find(
+          (pm) => pm.paymentMethod?.code === GIFT_CARD_PAYMENT_CODE,
+        );
+        setGiftCardPaymentMethodId(gift?.paymentMethodId ?? null);
         // Filter to active assignments only and extract the payment method
         methods = posPaymentMethods
-          .filter(pm => pm.isActive && pm.paymentMethod)
-          .map(pm => pm.paymentMethod);
+          .filter(
+            (pm) =>
+              pm.isActive &&
+              pm.paymentMethod &&
+              pm.paymentMethod.code !== GIFT_CARD_PAYMENT_CODE,
+          )
+          .map((pm) => pm.paymentMethod);
       } catch (error) {
         console.error('Error loading payment methods for POS:', error);
+        setGiftCardPaymentMethodId(null);
       }
       
       // If no POS-specific methods, fall back to all payment methods
       if (methods.length === 0) {
         try {
           const allMethods = await paymentMethodService.getPaymentMethods();
-          methods = allMethods.filter(m => m.isActive);
+          methods = allMethods.filter(
+            (m) => m.isActive && m.code !== GIFT_CARD_PAYMENT_CODE,
+          );
         } catch (fallbackError) {
           console.error('Error loading fallback payment methods:', fallbackError);
         }
@@ -160,6 +183,7 @@ export function ManualSalesPage() {
       }
     };
     loadPaymentMethods();
+    setAttachedCards([]);
   }, [selectedPosId]);
 
   // Check stock when product and POS are selected
@@ -203,7 +227,14 @@ export function ManualSalesPage() {
       return;
     }
 
-    if (!productSearch.trim() || productSearch.length < 2) {
+    const trimmedSearch = productSearch.trim();
+    if (trimmedSearch.toUpperCase().startsWith('GC-')) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+
+    if (!trimmedSearch || trimmedSearch.length < 2) {
       setSearchResults([]);
       return;
     }
@@ -211,7 +242,7 @@ export function ManualSalesPage() {
     setSearchLoading(true);
     const timeoutId = setTimeout(async () => {
       try {
-        const results = await productService.searchProducts(productSearch);
+        const results = await productService.searchProducts(trimmedSearch);
         setSearchResults(results.slice(0, 10));
       } catch (error) {
         console.error('Error searching products:', error);
@@ -253,7 +284,77 @@ export function ManualSalesPage() {
     ? parseFloat(manualPrice) || 0
     : selectedProduct?.price ?? 0;
   const total = effectivePrice * quantity;
+  const coverageTotal = useMemo(
+    () =>
+      computeGiftCardCoverageTotal(
+        [{ lineTotal: total }],
+        attachedCards.map((c) => ({ code: c.code, spendableBalance: c.spendableBalance })),
+      ),
+    [total, attachedCards],
+  );
+  const cashDue = Math.max(0, Math.round((total - coverageTotal) * 100) / 100);
   const isPriceOverridden = allowManualPriceEdit && manualPrice !== '' && effectivePrice !== selectedProduct?.price;
+
+  const addGiftCardByCode = async (rawCode: string) => {
+    const code = rawCode.trim().toUpperCase();
+    if (!code.startsWith('GC-')) {
+      toast.error('El código debe empezar por GC-');
+      return;
+    }
+    if (!selectedPosId) {
+      toast.error('Selecciona un punto de venta');
+      return;
+    }
+    setAddingCard(true);
+    try {
+      const card = await giftCardService.getByCode(code, selectedPosId);
+      let duplicated = false;
+      setAttachedCards((prev) => {
+        if (prev.some((c) => c.code === code)) {
+          duplicated = true;
+          return prev;
+        }
+        return [...prev, card];
+      });
+      if (duplicated) {
+        toast.error('Esta tarjeta ya está en la venta');
+        return;
+      }
+      setCardCodeInput('');
+      toast.success(`Tarjeta ${code} añadida`);
+    } catch (error: unknown) {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'No se pudo validar la tarjeta regalo';
+      toast.error(message);
+    } finally {
+      setAddingCard(false);
+    }
+  };
+
+  useEffect(() => {
+    const codes = [
+      ...(locationState?.giftCardCodes ?? []),
+      ...(locationState?.giftCardCode ? [locationState.giftCardCode] : []),
+    ];
+    if (consumedScannerCodesRef.current || codes.length === 0 || !selectedPosId) return;
+    consumedScannerCodesRef.current = true;
+
+    const attach = async () => {
+      for (const code of codes) {
+        await addGiftCardByCode(code);
+      }
+      navigate(location.pathname, {
+        replace: true,
+        state: {
+          productId: locationState?.productId,
+          photoDataUrl: locationState?.photoDataUrl,
+        },
+      });
+    };
+    void attach();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- attach once when scanner navigates here
+  }, [locationState?.giftCardCode, locationState?.giftCardCodes, selectedPosId]);
 
   // Validation
   const isFormValid = 
@@ -269,23 +370,63 @@ export function ManualSalesPage() {
   const handleSubmitSale = async () => {
     if (!selectedProduct || !isFormValid) return;
 
+    const effectivePaymentMethodId =
+      cashDue <= 0 && attachedCards.length > 0 && giftCardPaymentMethodId
+        ? giftCardPaymentMethodId
+        : selectedPaymentMethodId;
+
+    if (cashDue <= 0 && attachedCards.length > 0 && !giftCardPaymentMethodId) {
+      toast.error('Método de pago de tarjeta regalo no configurado en este POS');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const result = await salesService.createSale({
-        productId: selectedProduct.id,
-        pointOfSaleId: selectedPosId,
-        paymentMethodId: selectedPaymentMethodId,
-        quantity,
-        price: isPriceOverridden ? effectivePrice : undefined,
-        notes: notes || undefined,
-      });
+      if (attachedCards.length > 0) {
+        const idempotencyKey = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-manual-gc`;
+        const result = await salesService.createBulkSales(
+          {
+            pointOfSaleId: selectedPosId,
+            paymentMethodId: effectivePaymentMethodId,
+            giftCardCodes: attachedCards.map((c) => c.code),
+            notes: notes || undefined,
+            lines: [
+              {
+                productId: selectedProduct.id,
+                quantity,
+                price: isPriceOverridden ? effectivePrice : undefined,
+              },
+            ],
+          },
+          idempotencyKey,
+        );
 
-      toast.success('Venta registrada exitosamente');
-      
-      if (result.isLowStock) {
-        toast.warning(`⚠️ Stock bajo: quedan ${result.remainingStock} unidades`, {
-          duration: 5000,
+        if (!result.success) {
+          toast.error(result.errorMessage || 'Error al registrar la venta');
+          return;
+        }
+
+        toast.success('Venta registrada exitosamente');
+        result.warnings.forEach((w) => {
+          toast.warning(`${w.productName}: ${w.message}`, { duration: 5000 });
         });
+      } else {
+        const result = await salesService.createSale({
+          productId: selectedProduct.id,
+          pointOfSaleId: selectedPosId,
+          paymentMethodId: selectedPaymentMethodId,
+          quantity,
+          price: isPriceOverridden ? effectivePrice : undefined,
+          notes: notes || undefined,
+        });
+
+        toast.success('Venta registrada exitosamente');
+
+        if (result.isLowStock) {
+          toast.warning(`⚠️ Stock bajo: quedan ${result.remainingStock} unidades`, {
+            duration: 5000,
+          });
+        }
       }
 
       setConfirmDialogOpen(false);
@@ -321,12 +462,17 @@ export function ManualSalesPage() {
 
     if (added) {
       toast.success(`"${selectedProduct.name}" agregado al carrito`);
+      const codes = attachedCards.map((c) => c.code);
       setSelectedProduct(null);
       setProductSearch('');
       setQuantity(1);
       setManualPrice('');
       setNotes('');
       setAvailableStock(null);
+      setAttachedCards([]);
+      if (codes.length > 0) {
+        navigate(ROUTES.SALES.CART, { state: { giftCardCodes: codes } });
+      }
     }
   };
 
@@ -377,6 +523,14 @@ export function ManualSalesPage() {
                 className="pl-10"
                 value={productSearch}
                 onChange={(e) => setProductSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && productSearch.trim().toUpperCase().startsWith('GC-')) {
+                    e.preventDefault();
+                    addGiftCardByCode(productSearch);
+                    skipNextSearchRef.current = true;
+                    setProductSearch('');
+                  }
+                }}
               />
               
               {/* Search Results Dropdown */}
@@ -572,6 +726,51 @@ export function ManualSalesPage() {
               />
             </div>
 
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Gift className="size-4" />
+                Tarjetas regalo
+              </div>
+              {attachedCards.map((card) => (
+                <div key={card.code} className="flex items-center justify-between text-sm">
+                  <span className="font-mono">{card.code}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-destructive"
+                    onClick={() =>
+                      setAttachedCards((prev) => prev.filter((c) => c.code !== card.code))
+                    }
+                  >
+                    Quitar
+                  </Button>
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <Input
+                  placeholder="GC-..."
+                  value={cardCodeInput}
+                  onChange={(e) => setCardCodeInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addGiftCardByCode(cardCodeInput);
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  disabled={addingCard}
+                  onClick={() => addGiftCardByCode(cardCodeInput)}
+                >
+                  <Plus className="size-4" />
+                </Button>
+              </div>
+            </div>
+
             {/* Total */}
             <div className="rounded-lg bg-muted p-4">
               <div className="flex items-center justify-between">
@@ -588,10 +787,16 @@ export function ManualSalesPage() {
                 <span className="text-muted-foreground">Cantidad</span>
                 <span>×{quantity}</span>
               </div>
+              {coverageTotal > 0 && (
+                <div className="flex items-center justify-between text-sm text-emerald-700">
+                  <span>Cobertura tarjeta</span>
+                  <span>-{formatCurrency(coverageTotal)}</span>
+                </div>
+              )}
               <div className="mt-2 flex items-center justify-between border-t pt-2">
-                <span className="font-semibold">Total</span>
+                <span className="font-semibold">Importe a cobrar</span>
                 <span className="text-xl font-bold text-primary">
-                  €{total.toFixed(2)}
+                  {formatCurrency(cashDue)}
                 </span>
               </div>
             </div>
@@ -661,7 +866,7 @@ export function ManualSalesPage() {
                       </p>
                     )}
                     <p><strong>Cantidad:</strong> {quantity}</p>
-                    <p><strong>Total:</strong> €{total.toFixed(2)}</p>
+                    <p><strong>Importe a cobrar:</strong> {formatCurrency(cashDue)}</p>
                   </div>
                 </AlertDescription>
               </Alert>

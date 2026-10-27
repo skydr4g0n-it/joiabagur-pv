@@ -1,5 +1,7 @@
 # Sistema de Gestión de Puntos de Venta para Joyería
 
+> **Nota (2026-10-27):** El reconocimiento de productos por foto fue retirado. Las ventas se registran de forma manual o por escaneo de código; las fotos de catálogo siguen disponibles para gestión de productos. La API `/api/image-recognition` responde HTTP 410 Gone.
+
 ## Índice
 
 0. [Ficha del proyecto](#0-ficha-del-proyecto)
@@ -24,7 +26,7 @@ Sistema de Gestión de Puntos de Venta para Joyería (Joiabagur PV)
 
 ### 0.3. Descripción breve del proyecto
 
-Sistema de gestión integral para una joyería que opera en múltiples puntos de venta (propios y de terceros). Permite gestionar inventario, registrar ventas y facilitar la identificación de productos mediante reconocimiento de imágenes con IA (inferencia y entrenamiento en el navegador con TensorFlow.js).
+Sistema de gestión integral para una joyería que opera en múltiples puntos de venta (propios y de terceros). Permite gestionar inventario, registrar ventas (manual, escaneo de código y carrito) y administrar el catálogo con fotos de producto.
 
 ### 0.4. URL del proyecto
 
@@ -40,21 +42,19 @@ https://github.com/marcello-clearcust/joiabagur-pv
 
 ### 1.1. Objetivo
 
-El producto tiene como propósito ofrecer una solución integral de gestión para una joyería con varios puntos de venta (tiendas propias y ubicaciones de terceros como hoteles). Aporta valor al centralizar el catálogo de productos, el inventario por ubicación, el registro de ventas con método de pago y la identificación de productos mediante IA en el punto de venta, reduciendo errores y agilizando el proceso. Está dirigido a administradores (gestión completa) y operadores (registro de ventas e inventario en sus puntos asignados).
+El producto tiene como propósito ofrecer una solución integral de gestión para una joyería con varios puntos de venta (tiendas propias y ubicaciones de terceros como hoteles). Aporta valor al centralizar el catálogo de productos, el inventario por ubicación y el registro de ventas con método de pago, reduciendo errores y agilizando el proceso. Está dirigido a administradores (gestión completa) y operadores (registro de ventas e inventario en sus puntos asignados).
 
 ### 1.2. Características y funcionalidades principales
 
-- **Gestión de productos e inventario:** Catálogo centralizado (SKU, precio, descripción, colección), gestión de stock por punto de venta con vista centralizada, importación y actualización desde Excel, edición manual de productos e inventario, asociación de fotos de referencia para reconocimiento de imágenes.
-- **Registro de ventas:** Captura de ventas por punto de venta (manual o con IA), foto opcional por transacción, registro de método de pago, historial con trazabilidad, validación de stock en tiempo real, actualización atómica de inventario, alertas de stock bajo no bloqueantes.
-- **Reconocimiento de productos con IA:** Inferencia en el cliente con TensorFlow.js, identificación mediante cámara en el punto de venta, 3–5 sugerencias ordenadas por confianza (umbral 40%), validación manual del operador, fallback a entrada manual si la confianza es baja.
-- **Entrenamiento del modelo de IA:** Entrenamiento en el navegador con TensorFlow.js (sin Python), un clic desde el panel de administración, aceleración GPU vía WebGL 2.0, métricas de salud del modelo y progreso en tiempo real.
+- **Gestión de productos e inventario:** Catálogo centralizado (SKU, precio, descripción, colección), gestión de stock por punto de venta con vista centralizada, importación y actualización desde Excel, edición manual de productos e inventario, fotos de catálogo por producto.
+- **Registro de ventas:** Captura de ventas por punto de venta (manual, escaneo de código o carrito), registro de método de pago, historial con trazabilidad, validación de stock en tiempo real, actualización atómica de inventario, alertas de stock bajo no bloqueantes.
 - **Gestión de métodos de pago:** Lista general (Efectivo, Bizum, Transferencia, Tarjeta TPV propio/punto de venta, PayPal), asignación por punto de venta y registro del método en cada venta.
 - **Gestión de usuarios:** Roles Administrador y Operador, autenticación con usuario y contraseña, operadores asociados a puntos de venta concretos.
 - **Otras funcionalidades:** Devoluciones, ajustes manuales de inventario, historial de ventas y movimientos de stock, dashboard con estadísticas y stock crítico.
 
 ### 1.3. Diseño y experiencia de usuario
 
-El usuario aterriza en la pantalla de login; tras autenticarse, accede al dashboard (estadísticas globales para administradores o por punto de venta para operadores). Desde la navegación puede: registrar ventas de forma manual (`/sales/new`) o con reconocimiento por imagen (`/sales/new/image`), consultar historial de ventas con filtros y paginación, gestionar productos e inventario (catálogo, importación Excel, stock por POS, ajustes), configurar puntos de venta y métodos de pago, y (solo administradores) acceder al dashboard de modelo de IA y al listado de stock crítico con paginación. La interfaz está optimizada para uso en móvil en el punto de venta (cámara, gestos) y es responsive para administradores. La moneda es euro (EUR) con formato español.
+El usuario aterriza en la pantalla de login; tras autenticarse, accede al dashboard (estadísticas globales para administradores o por punto de venta para operadores). Desde la navegación puede: registrar ventas de forma manual (`/sales/new`), por escaneo (`/sales/new/scan`) o mediante carrito, consultar historial de ventas con filtros y paginación, gestionar productos e inventario (catálogo, importación Excel, stock por POS, ajustes) y configurar puntos de venta y métodos de pago. La interfaz está optimizada para uso en móvil en el punto de venta y es responsive para administradores. La moneda es euro (EUR) con formato español.
 
 *Se añadirá un videotutorial en esta sección.*
 

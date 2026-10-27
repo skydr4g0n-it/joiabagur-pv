@@ -1,9 +1,9 @@
 /**
  * Gift card product exchange (cambio de producto vinculado)
  */
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Loader2, Search, ShoppingCart } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,7 @@ import { giftCardService } from '@/services/gift-card.service';
 import { productService } from '@/services/product.service';
 import { paymentMethodService } from '@/services/payment-method.service';
 import { formatCurrency } from '@/lib/format-currency';
+import { getImageUrl } from '@/lib/image-url';
 import { ROUTES } from '@/routing/routes';
 import type { GiftCardDetail } from '@/types/gift-card.types';
 import type { ProductListItem } from '@/types/product.types';
@@ -30,12 +31,17 @@ import { ReturnCategory, ReturnCategoryLabels } from '@/types/returns.types';
 
 export function GiftCardExchangePage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const saleIdFromQuery = searchParams.get('saleId');
   const navigate = useNavigate();
   const [card, setCard] = useState<GiftCardDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedSaleId, setSelectedSaleId] = useState('');
-  const [replacementSku, setReplacementSku] = useState('');
+  const [productSearch, setProductSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<ProductListItem[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const skipNextSearchRef = useRef(false);
   const [replacementProduct, setReplacementProduct] = useState<ProductListItem | null>(null);
   const [category, setCategory] = useState<ReturnCategory>(ReturnCategory.Defectuoso);
   const [paymentMethodId, setPaymentMethodId] = useState('');
@@ -48,13 +54,16 @@ export function GiftCardExchangePage() {
       .getById(id)
       .then((detail) => {
         setCard(detail);
-        if (detail.linkedProducts.length === 1) {
+        const linked = detail.linkedProducts.find((line) => line.saleId === saleIdFromQuery);
+        if (linked) {
+          setSelectedSaleId(linked.saleId);
+        } else if (detail.linkedProducts.length === 1) {
           setSelectedSaleId(detail.linkedProducts[0].saleId);
         }
       })
       .catch(() => toast.error('No se pudo cargar la tarjeta'))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, saleIdFromQuery]);
 
   useEffect(() => {
     if (!card) return;
@@ -75,24 +84,43 @@ export function GiftCardExchangePage() {
     [card, selectedSaleId],
   );
 
-  const lookupReplacement = async () => {
-    const sku = replacementSku.trim();
-    if (!sku) return;
-    try {
-      const products = await productService.searchProducts(sku);
-      const match = products.find((p) => p.sku?.toUpperCase() === sku.toUpperCase());
-      if (!match) {
-        toast.error('Producto no encontrado');
-        setReplacementProduct(null);
-        return;
+  useEffect(() => {
+    if (skipNextSearchRef.current) {
+      skipNextSearchRef.current = false;
+      return;
+    }
+
+    const trimmedSearch = productSearch.trim();
+    if (!trimmedSearch || trimmedSearch.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    setSearchLoading(true);
+    const timeoutId = setTimeout(async () => {
+      try {
+        const results = await productService.searchProducts(trimmedSearch);
+        setSearchResults(results.slice(0, 10));
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
       }
-      setReplacementProduct(match);
-      if (selectedLink) {
-        const diff = Math.max(0, match.price - selectedLink.coverageAmount);
-        setCashDuePreview(diff);
-      }
-    } catch {
-      toast.error('Error al buscar producto');
+    }, 300);
+
+    return () => {
+      clearTimeout(timeoutId);
+      setSearchLoading(false);
+    };
+  }, [productSearch]);
+
+  const handleSelectProduct = (product: ProductListItem) => {
+    skipNextSearchRef.current = true;
+    setReplacementProduct(product);
+    setProductSearch(product.sku);
+    setSearchResults([]);
+    if (selectedLink) {
+      setCashDuePreview(Math.max(0, product.price - selectedLink.coverageAmount));
     }
   };
 
@@ -202,15 +230,54 @@ export function GiftCardExchangePage() {
           <CardTitle>Producto nuevo</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="SKU del producto nuevo"
-              value={replacementSku}
-              onChange={(e) => setReplacementSku(e.target.value)}
+              placeholder="Buscar por SKU o nombre (mín. 2 caracteres)..."
+              className="pl-10"
+              value={productSearch}
+              onChange={(e) => {
+                setProductSearch(e.target.value);
+                setReplacementProduct(null);
+                setCashDuePreview(null);
+              }}
             />
-            <Button type="button" variant="outline" onClick={lookupReplacement}>
-              Buscar
-            </Button>
+            {searchLoading && (
+              <p className="mt-1 text-xs text-muted-foreground">Buscando…</p>
+            )}
+            {searchResults.length > 0 && (
+              <div className="absolute z-10 mt-1 w-full rounded-md border bg-background shadow-lg">
+                {searchResults.map((product) => {
+                  const photoUrl = getImageUrl(product.primaryPhotoUrl);
+                  return (
+                    <button
+                      key={product.id}
+                      type="button"
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted"
+                      onClick={() => handleSelectProduct(product)}
+                    >
+                      {photoUrl ? (
+                        <img
+                          src={photoUrl}
+                          alt={product.name}
+                          className="h-10 w-10 flex-shrink-0 rounded-md object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-muted">
+                          <ShoppingCart className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{product.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          SKU: {product.sku} | {formatCurrency(product.price)}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
           {replacementProduct && (
             <p className="text-sm">

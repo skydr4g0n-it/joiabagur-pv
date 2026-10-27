@@ -2,9 +2,7 @@
 
 ## Purpose
 Defines how the system stores, exposes, auto-generates, and manages MobileNetV2 feature embeddings for product photos, including the REST API, lifecycle hooks (upload/delete), full rebuild, and admin status display.
-
 ## Requirements
-
 ### Requirement: Embedding Data Storage
 
 The system SHALL persist per-photo MobileNetV2 feature embeddings in a PostgreSQL table, linked to the source photo and product.
@@ -26,149 +24,33 @@ The system SHALL persist per-photo MobileNetV2 feature embeddings in a PostgreSQ
 - **THEN** system replaces the existing embedding (upsert behavior)
 - **AND** only one embedding per ProductPhoto exists at any time
 
-### Requirement: Embedding API Endpoints
+### Requirement: Product photos do not generate embeddings
+Uploading or deleting a product photo SHALL complete as catalog management only. The client SHALL NOT load a feature extractor and SHALL NOT call embedding routes.
 
-The system SHALL expose REST endpoints for creating, reading, and deleting embedding records.
+#### Scenario: Upload does not generate an embedding
+- **GIVEN** an administrator on the product edit page
+- **WHEN** the administrator uploads a valid JPG or PNG product photo
+- **THEN** the photo is stored and shown in the gallery
+- **AND** the client does not call `/api/image-recognition/embeddings`
+- **AND** the interface does not show an embedding-generation message
 
-#### Scenario: Save single embedding
+#### Scenario: Delete does not call the embedding API
+- **GIVEN** a product photo exists
+- **WHEN** an administrator deletes that photo
+- **THEN** the photo is removed from the product
+- **AND** the client does not call `/api/image-recognition/embeddings/{photoId}`
 
-- **WHEN** POST /api/image-recognition/embeddings is called
-- **AND** request body contains { photoId, productId, sku, vector: float[1280] }
-- **THEN** system creates or updates ProductPhotoEmbedding record
-- **AND** returns 200 OK on success
+### Requirement: Embedding HTTP API is withdrawn
+Embedding routes under `/api/image-recognition/embeddings` SHALL use the same withdrawal behavior as the rest of `/api/image-recognition`. Existing `ProductPhotoEmbedding` rows SHALL remain stored.
 
-#### Scenario: Save embedding with invalid vector length
+#### Scenario: Authenticated embedding call returns 410
+- **GIVEN** an authenticated caller
+- **WHEN** the caller sends GET, POST, or DELETE to `/api/image-recognition/embeddings` or GET `/api/image-recognition/embeddings/status`
+- **THEN** the response status is 410 Gone
+- **AND** no embedding row is created, updated, or deleted by that call
 
-- **WHEN** POST /api/image-recognition/embeddings is called
-- **AND** vector length is not exactly 1280
-- **THEN** system returns 400 Bad Request
-- **AND** response includes error: "Embedding vector must have exactly 1280 dimensions"
+#### Scenario: Stored embeddings are kept
+- **GIVEN** `ProductPhotoEmbedding` rows already exist
+- **WHEN** this change is deployed
+- **THEN** those rows are not deleted by a migration
 
-#### Scenario: Delete single embedding by photo ID
-
-- **WHEN** DELETE /api/image-recognition/embeddings/{photoId} is called
-- **THEN** system deletes the ProductPhotoEmbedding with matching ProductPhotoId
-- **AND** returns 204 No Content on success
-- **AND** returns 204 No Content if no embedding exists for that photoId (idempotent)
-
-#### Scenario: Delete all embeddings
-
-- **WHEN** DELETE /api/image-recognition/embeddings is called
-- **THEN** system deletes all ProductPhotoEmbedding records
-- **AND** returns 204 No Content
-
-#### Scenario: Get all embeddings (bulk download)
-
-- **WHEN** GET /api/image-recognition/embeddings is called
-- **THEN** system returns all ProductPhotoEmbedding records
-- **AND** response format is:
-  ```json
-  {
-    "embeddings": [
-      { "photoId": "...", "productId": "...", "sku": "SKU01", "vector": [0.023, -0.114, ...] }
-    ],
-    "lastUpdated": "2026-03-22T10:00:00Z",
-    "count": 366
-  }
-  ```
-- **AND** response includes all embeddings in a single payload (no pagination)
-
-#### Scenario: Get embeddings status
-
-- **WHEN** GET /api/image-recognition/embeddings/status is called
-- **THEN** system returns { count, lastUpdated } without embedding vectors
-- **AND** response is lightweight (no vector data transferred)
-
-#### Scenario: Authentication required
-
-- **WHEN** any embedding endpoint is called without valid JWT token
-- **THEN** system returns 401 Unauthorized
-
-### Requirement: Auto-Generate Embedding on Photo Upload
-
-The system SHALL automatically extract and save an embedding when a product photo is uploaded.
-
-#### Scenario: Embedding generated after photo upload
-
-- **WHEN** a product photo is successfully uploaded via the product photo upload flow
-- **AND** backend returns the saved photo with its ID
-- **THEN** frontend loads MobileNetV2 feature extractor (lazy, cached after first load)
-- **AND** preprocesses the uploaded image (resize to 224x224, normalize)
-- **AND** extracts 1280-dimensional feature vector
-- **AND** calls POST /api/image-recognition/embeddings with { photoId, productId, sku, vector }
-- **AND** displays brief indicator "Generando embedding de IA..." during extraction
-
-#### Scenario: Embedding generation failure is non-blocking
-
-- **WHEN** embedding extraction or save fails (model load error, network error)
-- **THEN** photo upload is still considered successful
-- **AND** system logs warning
-- **AND** displays brief toast: "No se pudo generar el embedding. Se generará en la próxima reconstrucción."
-- **AND** missing embedding can be regenerated via full rebuild
-
-### Requirement: Auto-Delete Embedding on Photo Deletion
-
-The system SHALL automatically delete the associated embedding when a product photo is deleted.
-
-#### Scenario: Embedding deleted after photo deletion
-
-- **WHEN** a product photo is successfully deleted
-- **THEN** frontend calls DELETE /api/image-recognition/embeddings/{photoId}
-- **AND** associated ProductPhotoEmbedding record is removed
-
-#### Scenario: Embedding deletion failure is non-blocking
-
-- **WHEN** embedding deletion fails (network error, embedding doesn't exist)
-- **THEN** photo deletion is still considered successful
-- **AND** orphaned embeddings are cleaned up on next full rebuild
-
-### Requirement: Full Embedding Rebuild
-
-The system SHALL provide an admin function to regenerate all embeddings from scratch.
-
-#### Scenario: Admin triggers full rebuild
-
-- **WHEN** administrator clicks "Generar Embeddings" button on /admin/ai-model page
-- **THEN** system calls DELETE /api/image-recognition/embeddings to clear existing
-- **AND** fetches training dataset via GET /api/image-recognition/training-dataset
-- **AND** loads MobileNetV2 feature extractor
-- **AND** processes photos in batches of 8: download, preprocess, extract features, upload embedding
-- **AND** reports progress via callback (X/Y photos processed)
-- **AND** completes in approximately 30-60 seconds for ~366 photos
-
-#### Scenario: Full rebuild progress display
-
-- **WHEN** full rebuild is in progress
-- **THEN** admin page displays progress card with:
-  - Current phase ("Descargando fotos...", "Extrayendo embeddings...")
-  - Progress bar (X/Y photos)
-  - Elapsed time
-- **AND** "Generar Embeddings" button is disabled during rebuild
-
-#### Scenario: Full rebuild error handling
-
-- **WHEN** full rebuild encounters errors on individual photos (download failure, processing error)
-- **THEN** system skips failed photos and continues with remaining
-- **AND** logs warnings for each skipped photo
-- **AND** reports summary at completion: "Completado: X de Y embeddings generados"
-
-### Requirement: Embedding Status Display on Admin Dashboard
-
-The system SHALL display embedding status information on the AI model admin page.
-
-#### Scenario: Display embedding status when embeddings exist
-
-- **WHEN** administrator navigates to /admin/ai-model
-- **AND** embeddings have been generated
-- **THEN** page displays embedding status card with:
-  - Total embedding count
-  - Last updated timestamp
-  - "Generar Embeddings" button
-
-#### Scenario: Display embedding status when no embeddings exist
-
-- **WHEN** administrator navigates to /admin/ai-model
-- **AND** no embeddings exist (count = 0)
-- **THEN** page displays embedding status card with:
-  - Message: "No hay embeddings generados"
-  - "Generar Embeddings" button (prominent, primary style)

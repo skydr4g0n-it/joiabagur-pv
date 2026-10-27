@@ -30,6 +30,7 @@ export interface SalesReportItem {
   operatorName: string;
   notes: string | null;
   hasPhoto: boolean;
+  hasReturn: boolean;
 }
 
 export interface SalesReportPosAggregate {

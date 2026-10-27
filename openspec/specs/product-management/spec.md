@@ -3,7 +3,6 @@
 ## Purpose
 
 Maintain the global jewelry product catalog with CRUD, photos, search, and bulk import to support sales and recognition.
-
 ## Requirements
 ### Requirement: Manual Product Creation UI
 The system SHALL provide a user-friendly form interface for administrators to create individual products with real-time validation and immediate feedback.
@@ -599,33 +598,41 @@ The system SHALL provide business logic for photo management including primary d
 - **AND** if it was the primary photo, another photo is automatically designated as primary
 
 ### Requirement: Product Photo Upload Frontend
-The system SHALL provide a user interface for uploading product photos with drag-and-drop, preview, and validation.
+The system SHALL provide a user interface for uploading product photos with drag-and-drop, preview, and validation. The interface SHALL describe the photos as product catalog images. It SHALL NOT describe them as recognition references and SHALL NOT generate embeddings or load a recognition model while uploading or deleting photos.
 
 #### Scenario: Photo upload component
-- **WHEN** an administrator is on the product edit page
-- **THEN** a photo upload component is displayed with drag-and-drop zone
+- **GIVEN** an administrator on the product edit page
+- **WHEN** the page is shown
+- **THEN** a photo upload component is displayed with a drag-and-drop zone
+- **AND** the visible description does not mention image recognition
 
 #### Scenario: Drag and drop photo upload
-- **WHEN** an administrator drags and drops a JPG or PNG file
+- **GIVEN** an administrator
+- **WHEN** the administrator drags and drops a JPG or PNG file
 - **THEN** the file is validated and uploaded via POST /api/products/{id}/photos
 - **AND** a preview thumbnail is displayed
+- **AND** no request is sent to `/api/image-recognition`
 
 #### Scenario: Multiple photo upload
-- **WHEN** an administrator uploads multiple photos
+- **GIVEN** an administrator
+- **WHEN** the administrator uploads multiple photos
 - **THEN** all photos are uploaded and displayed in the gallery
 - **AND** photos are shown in DisplayOrder
 
 #### Scenario: Photo format validation
-- **WHEN** an administrator attempts to upload an invalid format
+- **GIVEN** an administrator
+- **WHEN** the administrator attempts to upload an invalid format
 - **THEN** an error message is displayed
 - **AND** the upload is prevented
 
 #### Scenario: Primary photo indication
-- **WHEN** photos are displayed in the gallery
-- **THEN** the primary photo is visually indicated (e.g., with a badge or border)
+- **GIVEN** photos displayed in the gallery
+- **WHEN** the gallery renders
+- **THEN** the primary photo is visually indicated (for example with a badge or border)
 
 #### Scenario: Photo upload progress
-- **WHEN** a photo is being uploaded
+- **GIVEN** a photo upload in progress
+- **WHEN** the file is uploading
 - **THEN** a progress indicator is shown
 - **AND** the upload can be cancelled if needed
 
@@ -638,3 +645,28 @@ The system SHALL display all product prices using Euro (EUR) currency format wit
 - **THEN** the € symbol is shown before the numeric value
 - **AND** prices are formatted with 2 decimal places (e.g., €299.99)
 - **AND** Spanish locale (es-ES) formatting is used when using toLocaleString
+
+### Requirement: System products stay out of the jewelry catalog
+The system SHALL store products with a system-product kind. Those products SHALL be excluded from the product catalog, product search, Excel import, and image recognition. They SHALL NOT have inventory rows. Deleting or editing them through the jewelry product screens SHALL be rejected. Sales of system products SHALL occur only through the gift card issuance API, not through bulk checkout.
+
+#### Scenario: Catalog omits the gift-card product
+- **GIVEN** the gift-card system product exists
+- **WHEN** an administrator requests GET /api/products
+- **THEN** the response does not include that product
+
+#### Scenario: Search does not return the gift-card product
+- **GIVEN** the gift-card system product has SKU `SYS-GIFT-CARD`
+- **WHEN** an administrator searches products with query `SYS-GIFT-CARD`
+- **THEN** the system returns an empty array
+
+#### Scenario: Excel import does not create a system product
+- **GIVEN** an import workbook contains a row whose SKU is `SYS-GIFT-CARD`
+- **WHEN** an administrator imports the workbook
+- **THEN** that row is reported as an error
+- **AND** the system product row is unchanged
+
+#### Scenario: Recognition ignores the system product
+- **GIVEN** a recognition request for a POS
+- **WHEN** the system builds the candidate product set
+- **THEN** the set contains no system product
+

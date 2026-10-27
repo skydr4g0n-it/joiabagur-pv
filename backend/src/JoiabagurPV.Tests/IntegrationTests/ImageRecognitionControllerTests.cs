@@ -1,21 +1,15 @@
 using FluentAssertions;
 using JoiabagurPV.Application.DTOs.Auth;
-using JoiabagurPV.Application.DTOs.ImageRecognition;
-using JoiabagurPV.Application.DTOs.Products;
 using JoiabagurPV.Application.DTOs.Users;
-using JoiabagurPV.Domain.Entities;
-using JoiabagurPV.Domain.Interfaces.Services;
-using JoiabagurPV.Infrastructure.Data;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
+using JoiabagurPV.API.Filters;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace JoiabagurPV.Tests.IntegrationTests;
 
 /// <summary>
-/// Integration tests for ImageRecognitionController.
-/// Tests model metadata, health metrics, and training job management.
+/// Integration tests for withdrawn ImageRecognitionController endpoints.
 /// </summary>
 [Collection(IntegrationTestCollection.Name)]
 public class ImageRecognitionControllerTests : IAsyncLifetime
@@ -33,9 +27,7 @@ public class ImageRecognitionControllerTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        // Use Respawn for database cleanup - no manual TRUNCATEs needed
         await _factory.ResetDatabaseAsync();
-        
         _adminClient = await CreateAuthenticatedClientAsync("admin", "Admin123!");
         _operatorClient = await CreateAuthenticatedClientAsync("operator", "Operator123!");
     }
@@ -44,7 +36,6 @@ public class ImageRecognitionControllerTests : IAsyncLifetime
 
     private async Task<HttpClient> CreateAuthenticatedClientAsync(string username, string password)
     {
-        // Check if user exists, if not create (for operator)
         if (username != "admin")
         {
             var adminClient = await CreateAuthenticatedClientAsync("admin", "Admin123!");
@@ -78,724 +69,77 @@ public class ImageRecognitionControllerTests : IAsyncLifetime
         return authClient;
     }
 
-    #region Model Metadata Tests
-
-    [Fact]
-    public async Task GetModelMetadata_WhenNoModel_ReturnsNotFound()
+    private static async Task AssertWithdrawnAsync(HttpResponseMessage response)
     {
-        // Act
-        var response = await _operatorClient!.GetAsync("/api/image-recognition/model/metadata");
+        response.StatusCode.Should().Be(HttpStatusCode.Gone);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("code").GetString().Should().Be(ImageRecognitionWithdrawnFilter.WithdrawalCode);
+        body.GetProperty("message").GetString().Should().Contain("retirado");
+    }
 
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-        var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("No AI model available");
+    [Theory]
+    [InlineData("/api/image-recognition/model/metadata")]
+    [InlineData("/api/image-recognition/model/health")]
+    [InlineData("/api/image-recognition/model/versions")]
+    [InlineData("/api/image-recognition/model")]
+    [InlineData("/api/image-recognition/model/class-labels")]
+    [InlineData("/api/image-recognition/training-dataset")]
+    [InlineData("/api/image-recognition/embeddings")]
+    [InlineData("/api/image-recognition/embeddings/status")]
+    public async Task GetRoute_AsAdmin_ReturnsGone(string path)
+    {
+        var response = await _adminClient!.GetAsync(path);
+        await AssertWithdrawnAsync(response);
     }
 
     [Fact]
-    public async Task GetModelMetadata_WhenModelExists_ReturnsMetadata()
+    public async Task GetModelHealth_AsOperator_ReturnsGone()
     {
-        // Arrange - Create a model
-        await CreateTestModelAsync();
-
-        // Act
-        var response = await _operatorClient!.GetAsync("/api/image-recognition/model/metadata");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var metadata = await response.Content.ReadFromJsonAsync<ModelMetadataDto>();
-        metadata.Should().NotBeNull();
-        metadata!.Version.Should().Be("v1_20260112");
-        metadata.IsActive.Should().BeTrue();
-    }
-
-    #endregion
-
-    #region Model Health Tests
-
-    [Fact]
-    public async Task GetModelHealth_AsAdmin_ReturnsHealthMetrics()
-    {
-        // Arrange - Create test products and model
-        await CreateTestProductsWithPhotosAsync();
-        await CreateTestModelAsync();
-
-        // Act
-        var response = await _adminClient!.GetAsync("/api/image-recognition/model/health");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var health = await response.Content.ReadFromJsonAsync<ModelHealthDto>();
-        health.Should().NotBeNull();
-        health!.AlertLevel.Should().NotBeNullOrEmpty();
-        health.CatalogMetrics.Should().NotBeNull();
-        health.PhotoMetrics.Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task GetModelHealth_AsOperator_ReturnsForbidden()
-    {
-        // Act
         var response = await _operatorClient!.GetAsync("/api/image-recognition/model/health");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        await AssertWithdrawnAsync(response);
     }
 
     [Fact]
-    public async Task GetModelHealth_WhenNoModel_ShowsCriticalAlert()
+    public async Task InitiateRetraining_AsOperator_ReturnsGone()
     {
-        // Act
-        var response = await _adminClient!.GetAsync("/api/image-recognition/model/health");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var health = await response.Content.ReadFromJsonAsync<ModelHealthDto>();
-        health.Should().NotBeNull();
-        health!.AlertLevel.Should().Be("CRITICAL");
-        health.AlertMessage.Should().Contain("No AI model exists");
-    }
-
-    #endregion
-
-    #region Training Job Tests
-
-    [Fact]
-    public async Task InitiateRetraining_WithNoPhotos_ReturnsBadRequest()
-    {
-        // Act
-        var response = await _adminClient!.PostAsync("/api/image-recognition/retrain", null);
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("No products have photos");
-    }
-
-    [Fact]
-    public async Task InitiateRetraining_WithPhotos_ReturnsAccepted()
-    {
-        // Arrange - Create products with photos
-        await CreateTestProductsWithPhotosAsync();
-
-        // Act
-        var response = await _adminClient!.PostAsync("/api/image-recognition/retrain", null);
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Accepted);
-        
-        using var doc = await System.Text.Json.JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-        var jobId = doc.RootElement.GetProperty("jobId").GetGuid();
-        
-        jobId.Should().NotBeEmpty();
-
-        // Verify job was created in database
-        using var scope = _factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var job = await context.ModelTrainingJobs.FindAsync(jobId);
-        job.Should().NotBeNull();
-        job!.Status.Should().Be("Queued");
-    }
-
-    [Fact]
-    public async Task InitiateRetraining_WhenJobInProgress_ReturnsConflict()
-    {
-        // Arrange - Create products and a job in progress
-        await CreateTestProductsWithPhotosAsync();
-        await CreateInProgressJobAsync();
-
-        // Act
-        var response = await _adminClient!.PostAsync("/api/image-recognition/retrain", null);
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("already in progress");
-    }
-
-    [Fact]
-    public async Task InitiateRetraining_AsOperator_ReturnsForbidden()
-    {
-        // Arrange
-        await CreateTestProductsWithPhotosAsync();
-
-        // Act
         var response = await _operatorClient!.PostAsync("/api/image-recognition/retrain", null);
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        await AssertWithdrawnAsync(response);
     }
 
     [Fact]
-    public async Task GetTrainingStatus_ExistingJob_ReturnsStatus()
+    public async Task GetTrainingDataset_AsOperator_ReturnsGone()
     {
-        // Arrange - Create a job
-        var jobId = await CreateQueuedJobAsync();
-
-        // Act
-        var response = await _operatorClient!.GetAsync($"/api/image-recognition/retrain/status/{jobId}");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var status = await response.Content.ReadFromJsonAsync<TrainingJobStatusDto>();
-        status.Should().NotBeNull();
-        status!.JobId.Should().Be(jobId);
-        status.Status.Should().Be("Queued");
-    }
-
-    [Fact]
-    public async Task GetTrainingStatus_NonExistentJob_ReturnsNotFound()
-    {
-        // Act
-        var response = await _operatorClient!.GetAsync($"/api/image-recognition/retrain/status/{Guid.NewGuid()}");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
-
-    #endregion
-
-    #region Model File Tests
-
-    [Fact]
-    public async Task GetModel_WhenNoModel_ReturnsNotFound()
-    {
-        // Act
-        var response = await _operatorClient!.GetAsync("/api/image-recognition/model");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
-
-    [Fact]
-    public async Task GetModel_WhenModelExists_ReturnsModelPath()
-    {
-        // Arrange
-        await CreateTestModelAsync();
-
-        // Act
-        var response = await _operatorClient!.GetAsync("/api/image-recognition/model");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        
-        using var doc = await System.Text.Json.JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-        var modelPath = doc.RootElement.GetProperty("modelPath").GetString();
-        var version = doc.RootElement.GetProperty("version").GetString();
-        var modelJsonUrl = doc.RootElement.GetProperty("modelJsonUrl").GetString();
-        
-        modelPath.Should().NotBeNullOrEmpty();
-        modelPath.Should().Contain("models/v1_20260112");
-        version.Should().Be("v1_20260112");
-        modelJsonUrl.Should().Contain("/api/image-recognition/model/files/v1_20260112/model.json");
-    }
-
-    [Fact]
-    public async Task GetModelFile_WithValidFile_ReturnsFile()
-    {
-        // Arrange - Create model and mock files
-        await CreateTestModelAsync();
-        await CreateMockModelFilesAsync("v1_20260112");
-
-        // Act
-        var response = await _operatorClient!.GetAsync("/api/image-recognition/model/files/v1_20260112/model.json");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        response.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
-        
-        var content = await response.Content.ReadAsStringAsync();
-        content.Should().NotBeNullOrEmpty();
-    }
-
-    [Fact]
-    public async Task GetModelFile_WithInvalidFileName_ReturnsBadRequest()
-    {
-        // Arrange
-        await CreateTestModelAsync();
-
-        // Act - Try directory traversal in fileName parameter
-        var response = await _operatorClient!.GetAsync("/api/image-recognition/model/files/v1_20260112/..%2F..%2Fsecrets.txt");
-
-        // Assert
-        // Should be BadRequest or NotFound (both are acceptable for security)
-        response.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.NotFound);
-    }
-
-    [Fact]
-    public async Task GetModelFile_WithNonExistentVersion_ReturnsNotFound()
-    {
-        // Act
-        var response = await _operatorClient!.GetAsync("/api/image-recognition/model/files/v999_20991231/model.json");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
-
-    #endregion
-
-    #region Model File Serving Tests
-
-    [Fact]
-    public async Task ModelFileServing_CachingHeaders_ShouldBeSet()
-    {
-        // Arrange
-        await CreateTestModelAsync();
-        await CreateMockModelFilesAsync("v1_20260112");
-
-        // Act
-        var response = await _operatorClient!.GetAsync("/api/image-recognition/model/files/v1_20260112/model.json");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        response.Headers.CacheControl?.NoStore.Should().BeTrue();
-    }
-
-    #endregion
-
-    #region Browser-Trained Model Upload Tests
-
-    [Fact]
-    public async Task UploadTrainedModel_AsAdmin_WithValidData_ReturnsSuccess()
-    {
-        // Arrange - Create products with photos first
-        await CreateTestProductsWithPhotosAsync();
-
-        var modelTopology = System.Text.Json.JsonSerializer.Serialize(new
-        {
-            format = "graph-model",
-            generatedBy = "tensorflow.js-2.0.0",
-            modelTopology = new
-            {
-                node = new[] { new { name = "input" }, new { name = "output" } }
-            },
-            weightsManifest = new[]
-            {
-                new
-                {
-                    paths = new[] { "group1-shard1of1.bin" },
-                    weights = new[] { new { name = "dense/kernel", dtype = "float32", shape = new[] { 128, 10 } } }
-                }
-            }
-        });
-
-        var weightData = new byte[128 * 10 * 4]; // Mock weight data
-        for (int i = 0; i < weightData.Length; i++)
-        {
-            weightData[i] = (byte)(i % 256);
-        }
-
-        using var form = new MultipartFormDataContent();
-        form.Add(new StringContent("v1_20260112_browser"), "Version");
-        form.Add(new StringContent(modelTopology), "ModelTopologyJson");
-        form.Add(new StringContent("85.5"), "TrainingAccuracy");
-        form.Add(new StringContent("82.3"), "ValidationAccuracy");
-        form.Add(new StringContent("10"), "TotalPhotosUsed");
-        form.Add(new StringContent("5"), "TotalProductsUsed");
-        form.Add(new StringContent("900"), "TrainingDurationSeconds");
-
-        var weightFile = new ByteArrayContent(weightData);
-        weightFile.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
-        form.Add(weightFile, "WeightFiles", "group1-shard1of1.bin");
-
-        // Act
-        var response = await _adminClient!.PostAsync("/api/image-recognition/upload-trained-model", form);
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        
-        var result = await response.Content.ReadFromJsonAsync<UploadTrainedModelResult>();
-        result.Should().NotBeNull();
-        result!.Success.Should().BeTrue();
-        result.Version.Should().Be("v1_20260112_browser");
-        result.Metadata.Should().NotBeNull();
-        result.Metadata!.IsActive.Should().BeTrue();
-
-        // Verify model was saved to database
-        using var scope = _factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var savedModel = await context.ModelMetadata.FirstOrDefaultAsync(m => m.Version == "v1_20260112_browser");
-        savedModel.Should().NotBeNull();
-        savedModel!.IsActive.Should().BeTrue();
-        savedModel.TotalPhotosUsed.Should().Be(10);
-        savedModel.TotalProductsUsed.Should().Be(5);
-        
-        // Verify model files were saved via file storage service
-        var fileStorage = scope.ServiceProvider.GetRequiredService<IFileStorageService>();
-        var modelFile = await fileStorage.DownloadAsync("model.json", "models/v1_20260112_browser");
-        modelFile.Should().NotBeNull();
-        modelFile!.Value.Stream.Dispose();
-        var weightFile2 = await fileStorage.DownloadAsync("group1-shard1of1.bin", "models/v1_20260112_browser");
-        weightFile2.Should().NotBeNull();
-        weightFile2!.Value.Stream.Dispose();
-    }
-
-    [Fact]
-    public async Task UploadTrainedModel_AsOperator_ReturnsForbidden()
-    {
-        // Arrange
-        using var form = new MultipartFormDataContent();
-        form.Add(new StringContent("v1_test"), "Version");
-        form.Add(new StringContent("{}"), "ModelTopologyJson");
-        
-        var weightFile = new ByteArrayContent(new byte[] { 0x00 });
-        form.Add(weightFile, "WeightFiles", "weights.bin");
-
-        // Act
-        var response = await _operatorClient!.PostAsync("/api/image-recognition/upload-trained-model", form);
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-    }
-
-    [Fact]
-    public async Task UploadTrainedModel_WithMissingVersion_ReturnsBadRequest()
-    {
-        // Arrange
-        using var form = new MultipartFormDataContent();
-        form.Add(new StringContent("{}"), "ModelTopologyJson");
-        
-        var weightFile = new ByteArrayContent(new byte[] { 0x00 });
-        form.Add(weightFile, "WeightFiles", "weights.bin");
-
-        // Act
-        var response = await _adminClient!.PostAsync("/api/image-recognition/upload-trained-model", form);
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("version is required");
-    }
-
-    [Fact]
-    public async Task UploadTrainedModel_WithMissingWeightFiles_ReturnsBadRequest()
-    {
-        // Arrange
-        using var form = new MultipartFormDataContent();
-        form.Add(new StringContent("v1_test"), "Version");
-        form.Add(new StringContent("{}"), "ModelTopologyJson");
-        // No weight files added
-
-        // Act
-        var response = await _adminClient!.PostAsync("/api/image-recognition/upload-trained-model", form);
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("weight file is required");
-    }
-
-    [Fact]
-    public async Task UploadTrainedModel_WithDuplicateVersion_ReturnsBadRequest()
-    {
-        // Arrange - Create existing model
-        await CreateTestModelAsync();
-
-        using var form = new MultipartFormDataContent();
-        form.Add(new StringContent("v1_20260112"), "Version"); // Same version as existing
-        form.Add(new StringContent("{}"), "ModelTopologyJson");
-        
-        var weightFile = new ByteArrayContent(new byte[] { 0x00 });
-        form.Add(weightFile, "WeightFiles", "weights.bin");
-
-        // Act
-        var response = await _adminClient!.PostAsync("/api/image-recognition/upload-trained-model", form);
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("already exists");
-    }
-
-    [Fact]
-    public async Task UploadTrainedModel_DeactivatesPreviousActiveModel()
-    {
-        // Arrange - Create existing active model
-        await CreateTestModelAsync();
-        await CreateTestProductsWithPhotosAsync();
-
-        using var form = new MultipartFormDataContent();
-        form.Add(new StringContent("v2_20260113"), "Version");
-        form.Add(new StringContent("{}"), "ModelTopologyJson");
-        form.Add(new StringContent("88.0"), "ValidationAccuracy");
-        
-        var weightFile = new ByteArrayContent(new byte[] { 0x00 });
-        form.Add(weightFile, "WeightFiles", "weights.bin");
-
-        // Act
-        var response = await _adminClient!.PostAsync("/api/image-recognition/upload-trained-model", form);
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        // Verify old model was deactivated
-        using var scope = _factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        
-        var oldModel = await context.ModelMetadata.FirstOrDefaultAsync(m => m.Version == "v1_20260112");
-        oldModel.Should().NotBeNull();
-        oldModel!.IsActive.Should().BeFalse();
-        
-        var newModel = await context.ModelMetadata.FirstOrDefaultAsync(m => m.Version == "v2_20260113");
-        newModel.Should().NotBeNull();
-        newModel!.IsActive.Should().BeTrue();
-    }
-
-    #endregion
-
-    #region Training Dataset Tests
-
-    [Fact]
-    public async Task GetTrainingDataset_AsAdmin_ReturnsDataset()
-    {
-        // Arrange - Create products with photos
-        await CreateTestProductsWithPhotosAsync();
-
-        // Act
-        var response = await _adminClient!.GetAsync("/api/image-recognition/training-dataset");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        
-        var dataset = await response.Content.ReadFromJsonAsync<TrainingDatasetResponse>();
-        dataset.Should().NotBeNull();
-        dataset!.TotalProducts.Should().Be(5); // 5 products created
-        dataset.TotalPhotos.Should().Be(10); // 2 photos per product
-        dataset.Photos.Should().HaveCount(10);
-        dataset.ClassLabels.Should().HaveCount(5);
-        
-        // Verify photo structure
-        var firstPhoto = dataset.Photos.First();
-        firstPhoto.ProductId.Should().NotBeEmpty();
-        firstPhoto.ProductSku.Should().NotBeNullOrEmpty();
-        firstPhoto.ProductName.Should().NotBeNullOrEmpty();
-        firstPhoto.PhotoId.Should().NotBeEmpty();
-        firstPhoto.PhotoUrl.Should().StartWith("/api/products/");
-        firstPhoto.PhotoUrl.Should().Contain("/photos/");
-        firstPhoto.PhotoUrl.Should().EndWith("/file");
-    }
-
-    [Fact]
-    public async Task GetTrainingDataset_AsOperator_ReturnsForbidden()
-    {
-        // Act
         var response = await _operatorClient!.GetAsync("/api/image-recognition/training-dataset");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        await AssertWithdrawnAsync(response);
     }
 
     [Fact]
-    public async Task GetTrainingDataset_WhenNoPhotos_ReturnsEmptyDataset()
+    public async Task GetModelMetadata_Unauthenticated_ReturnsUnauthorized()
     {
-        // Act
-        var response = await _adminClient!.GetAsync("/api/image-recognition/training-dataset");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        
-        var dataset = await response.Content.ReadFromJsonAsync<TrainingDatasetResponse>();
-        dataset.Should().NotBeNull();
-        dataset!.TotalProducts.Should().Be(0);
-        dataset.TotalPhotos.Should().Be(0);
-        dataset.Photos.Should().BeEmpty();
-        dataset.ClassLabels.Should().BeEmpty();
+        var anonymousClient = _factory.CreateClient();
+        var response = await anonymousClient.GetAsync("/api/image-recognition/model/metadata");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
-    public async Task GetTrainingDataset_OnlyIncludesActiveProducts()
+    public async Task GetModelHealth_Unauthenticated_ReturnsUnauthorized()
     {
-        // Arrange - Create active and inactive products
-        using var scope = _factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        // Active product with photo
-        var activeProduct = new Product
-        {
-            SKU = "ACTIVE-001",
-            Name = "Active Product",
-            Price = 100m,
-            IsActive = true
-        };
-        context.Products.Add(activeProduct);
-        await context.SaveChangesAsync();
-
-        var activePhoto = new ProductPhoto
-        {
-            ProductId = activeProduct.Id,
-            FileName = "photo1.jpg",
-            DisplayOrder = 1,
-            IsPrimary = true
-        };
-        context.ProductPhotos.Add(activePhoto);
-
-        // Inactive product with photo
-        var inactiveProduct = new Product
-        {
-            SKU = "INACTIVE-001",
-            Name = "Inactive Product",
-            Price = 100m,
-            IsActive = false
-        };
-        context.Products.Add(inactiveProduct);
-        await context.SaveChangesAsync();
-
-        var inactivePhoto = new ProductPhoto
-        {
-            ProductId = inactiveProduct.Id,
-            FileName = "photo2.jpg",
-            DisplayOrder = 1,
-            IsPrimary = true
-        };
-        context.ProductPhotos.Add(inactivePhoto);
-
-        await context.SaveChangesAsync();
-
-        // Act
-        var response = await _adminClient!.GetAsync("/api/image-recognition/training-dataset");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        
-        var dataset = await response.Content.ReadFromJsonAsync<TrainingDatasetResponse>();
-        dataset.Should().NotBeNull();
-        dataset!.TotalProducts.Should().Be(1); // Only active product
-        dataset.TotalPhotos.Should().Be(1);
-        dataset.Photos.First().ProductSku.Should().Be("ACTIVE-001");
+        var anonymousClient = _factory.CreateClient();
+        var response = await anonymousClient.GetAsync("/api/image-recognition/model/health");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    #endregion
-
-    #region Helper Methods
-
-    private async Task CreateTestModelAsync()
+    [Fact]
+    public async Task PostRetrain_AsAdmin_ReturnsGone()
     {
-        using var scope = _factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        var model = new ModelMetadata
-        {
-            Version = "v1_20260112",
-            TrainedAt = DateTime.UtcNow.AddDays(-5),
-            ModelPath = "models/v1_20260112",
-            TotalPhotosUsed = 50,
-            TotalProductsUsed = 10,
-            IsActive = true
-        };
-
-        context.ModelMetadata.Add(model);
-        await context.SaveChangesAsync();
+        var response = await _adminClient!.PostAsync("/api/image-recognition/retrain", null);
+        await AssertWithdrawnAsync(response);
     }
 
-    private async Task CreateTestProductsWithPhotosAsync()
+    [Fact]
+    public async Task GetEmbeddings_AsOperator_ReturnsGone()
     {
-        using var scope = _factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        // Create 5 products with photos
-        for (int i = 1; i <= 5; i++)
-        {
-            var product = new Product
-            {
-                SKU = $"TEST-{i:D3}",
-                Name = $"Test Product {i}",
-                Price = 100m * i,
-                IsActive = true
-            };
-            context.Products.Add(product);
-            await context.SaveChangesAsync();
-
-            // Add 2 photos per product
-            for (int j = 1; j <= 2; j++)
-            {
-                var photo = new ProductPhoto
-                {
-                    ProductId = product.Id,
-                    FileName = $"photo{j}.jpg",
-                    DisplayOrder = j,
-                    IsPrimary = j == 1
-                };
-                context.ProductPhotos.Add(photo);
-            }
-        }
-
-        await context.SaveChangesAsync();
+        var response = await _operatorClient!.GetAsync("/api/image-recognition/embeddings");
+        await AssertWithdrawnAsync(response);
     }
-
-    private async Task<Guid> CreateQueuedJobAsync()
-    {
-        using var scope = _factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        // Get admin user ID
-        var adminUser = await context.Users.FirstAsync(u => u.Username == "admin");
-
-        var job = new ModelTrainingJob
-        {
-            InitiatedBy = adminUser.Id,
-            Status = "Queued",
-            ProgressPercentage = 0,
-            CurrentStage = "Queued"
-        };
-
-        context.ModelTrainingJobs.Add(job);
-        await context.SaveChangesAsync();
-
-        return job.Id;
-    }
-
-    private async Task CreateInProgressJobAsync()
-    {
-        using var scope = _factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        var adminUser = await context.Users.FirstAsync(u => u.Username == "admin");
-
-        var job = new ModelTrainingJob
-        {
-            InitiatedBy = adminUser.Id,
-            Status = "InProgress",
-            ProgressPercentage = 45,
-            CurrentStage = "Training epoch 9/20",
-            StartedAt = DateTime.UtcNow.AddMinutes(-15)
-        };
-
-        context.ModelTrainingJobs.Add(job);
-        await context.SaveChangesAsync();
-    }
-
-    private async Task CreateMockModelFilesAsync(string version)
-    {
-        using var scope = _factory.Services.CreateScope();
-        var fileStorage = scope.ServiceProvider.GetRequiredService<IFileStorageService>();
-        var modelFolder = $"models/{version}";
-
-        var modelJson = new
-        {
-            format = "graph-model",
-            generatedBy = "mock-test",
-            modelTopology = new { },
-            weightsManifest = new[]
-            {
-                new
-                {
-                    paths = new[] { "group1-shard1of1.bin" },
-                    weights = new object[] { }
-                }
-            }
-        };
-
-        var modelJsonBytes = System.Text.Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(modelJson));
-        using (var stream = new MemoryStream(modelJsonBytes))
-        {
-            await fileStorage.UploadExactAsync(stream, "model.json", "application/json", modelFolder);
-        }
-
-        using (var stream = new MemoryStream(new byte[] { 0x00, 0x01, 0x02, 0x03 }))
-        {
-            await fileStorage.UploadExactAsync(stream, "group1-shard1of1.bin", "application/octet-stream", modelFolder);
-        }
-    }
-
-    #endregion
 }

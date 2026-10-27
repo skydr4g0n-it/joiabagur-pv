@@ -42,7 +42,7 @@ rules:
     - After clarification, propose a short list of optional improvements or alternatives (each with a one-line trade-off). Ask the user to accept or reject each item; do not include rejected items in the proposal.
     - Only after clarification and the accept/reject pass are complete, create proposal.md (and related artifacts). Do not draft or write proposal files earlier.
     - Proposals must not contain code — only design documents (proposal.md, tasks.md, design.md, spec deltas).
-    - Check Documentos/epicas.md for existing user stories before proposing new ones.
+    - Check Documentos/epicas.md for existing user stories before proposing new ones; new Historias files must follow naming and placement in epicas.md (section Notas) and content structure in Documentos/Procedimientos/Procedimiento-UserStories.md.
     - Reference Documentos/modelo-de-datos.md for entity/field decisions.
     - Always state what is out of scope.
   specs:
@@ -65,10 +65,10 @@ operations:
       - Ship complete, buildable code in every file you touch. No stub bodies, skipped sections, or placeholder comments (ellipsis markers, "implement later", or "unchanged" elisions). When unsure, read the repo and artifacts before writing.
       - Progress notes must stay concise yet complete—list tasks finished, files changed, validation commands run, and any blockers or risks. Do not skip facts needed to verify the work.
       - Run focused tests for touched areas before marking a task complete.
-      - After implementation, update Documentos/ files affected by the change (epicas.md, Historias/, modelo-de-datos.md, modelo-c4.md, arquitectura.md, Guias/).
+      - After implementation, update Documentos/ files affected by the change (epicas.md, Historias/, modelo-de-datos.md, modelo-c4.md, arquitectura.md, Guias/). New or renamed Historias must follow epicas.md (Notas) and Procedimiento-UserStories.md; link each story from epicas.md.
   archive:
     guidance:
       - If the change has delta specs under openspec/changes/<name>/specs/, run the openspec-sync-specs workflow and merge into openspec/specs/ before archiving. Do not move the change to archive while main specs are still out of date unless the user explicitly chooses archive without spec sync.
-      - Before archiving, sync official project documentation under Documentos/ with what shipped in the change (same scope as apply). Update only affected files among epicas.md, Historias/, modelo-de-datos.md, modelo-c4.md, arquitectura.md, and Guias/. User-facing guides in Spanish; technical documentation in English.
+      - Before archiving, sync official project documentation under Documentos/ with what shipped in the change (same scope as apply). Update only affected files among epicas.md, Historias/, modelo-de-datos.md, modelo-c4.md, arquitectura.md, and Guias/. User-facing guides in Spanish; technical documentation in English. Historias naming, structure, and epicas.md cross-links follow epicas.md (Notas) and Procedimiento-UserStories.md.
       - Treat spec sync and Documentos sync as mandatory pre-archive steps. Complete both, then run openspec validate --specs when specs changed, then perform the archive move.
       - Summarize what shipped, which openspec/specs and Documentos/ files were updated, and the archive target path before finishing. Be concise.

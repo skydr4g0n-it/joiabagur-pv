@@ -141,7 +141,7 @@ public class ExcelImportService : IExcelImportService
             {
                 result.Errors.AddRange(headerErrors);
                 result.Success = false;
-                result.Message = "Invalid file format: missing required columns.";
+                result.Message = "Formato de archivo inválido: faltan columnas obligatorias.";
                 return result;
             }
 
@@ -195,7 +195,7 @@ public class ExcelImportService : IExcelImportService
             result.Success = !result.Errors.Any();
             result.Message = result.Success 
                 ? $"Validation passed for {result.TotalRows} rows." 
-                : $"Found {result.Errors.Count} validation error(s).";
+                : $"Se han encontrado {result.Errors.Count} errores de validación.";
         }
         catch (Exception ex)
         {
@@ -205,9 +205,9 @@ public class ExcelImportService : IExcelImportService
             {
                 RowNumber = 0,
                 Field = "File",
-                Message = "Invalid Excel file format."
+                Message = "Formato de archivo Excel inválido."
             });
-            result.Message = "Failed to read Excel file.";
+            result.Message = "Error al leer el archivo Excel.";
         }
 
         return result;
@@ -238,7 +238,7 @@ public class ExcelImportService : IExcelImportService
             {
                 result.Errors.AddRange(headerErrors);
                 result.Success = false;
-                result.Message = "Invalid file format: missing required columns.";
+                result.Message = "Formato de archivo inválido: faltan columnas obligatorias.";
                 return result;
             }
 
@@ -368,9 +368,9 @@ public class ExcelImportService : IExcelImportService
             {
                 RowNumber = 0,
                 Field = "File",
-                Message = $"Import failed: {ex.Message}"
+                Message = $"La importación ha fallado: {ex.Message}"
             });
-            result.Message = "Import failed due to an error.";
+            result.Message = "La importación ha fallado por un error.";
         }
 
         return result;
@@ -406,7 +406,7 @@ public class ExcelImportService : IExcelImportService
                 {
                     RowNumber = 1,
                     Field = col,
-                    Message = $"Required column '{col}' is missing."
+                    Message = $"Falta la columna obligatoria '{col}'."
                 });
             }
         }
@@ -479,7 +479,7 @@ public class ExcelImportService : IExcelImportService
                 {
                     RowNumber = row.RowNumber,
                     Field = ColSku,
-                    Message = "SKU is required.",
+                    Message = "El SKU es obligatorio.",
                     Value = row.Sku
                 });
             }
@@ -520,7 +520,7 @@ public class ExcelImportService : IExcelImportService
                 {
                     RowNumber = row.RowNumber,
                     Field = ColName,
-                    Message = "Name is required.",
+                    Message = "El nombre es obligatorio.",
                     Value = row.Name
                 });
             }
@@ -532,7 +532,7 @@ public class ExcelImportService : IExcelImportService
                 {
                     RowNumber = row.RowNumber,
                     Field = ColPrice,
-                    Message = "Price must be greater than zero.",
+                    Message = "El precio debe ser mayor que cero.",
                     Value = row.PriceRaw
                 });
             }

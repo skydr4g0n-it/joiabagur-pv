@@ -30,7 +30,7 @@ public class SalesReportController : ControllerBase
     {
         if (!_currentUserService.UserId.HasValue)
         {
-            return Unauthorized(new { message = "User not authenticated." });
+            return Unauthorized(new { message = "Usuario no autenticado." });
         }
 
         if (request.StartDate.HasValue)
@@ -53,7 +53,7 @@ public class SalesReportController : ControllerBase
     {
         if (!_currentUserService.UserId.HasValue)
         {
-            return Unauthorized(new { message = "User not authenticated." });
+            return Unauthorized(new { message = "Usuario no autenticado." });
         }
 
         if (request.StartDate.HasValue)

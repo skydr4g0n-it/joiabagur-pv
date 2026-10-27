@@ -172,7 +172,7 @@ public class ProductServiceTests
 
         // Assert
         await act.Should().ThrowAsync<DomainException>()
-            .WithMessage("*already exists*");
+            .WithMessage("*ya existe*");
     }
 
     [Theory]
@@ -197,7 +197,7 @@ public class ProductServiceTests
 
         // Assert
         await act.Should().ThrowAsync<DomainException>()
-            .WithMessage("*greater than zero*");
+            .WithMessage("*mayor que cero*");
     }
 
     [Fact]
@@ -223,7 +223,7 @@ public class ProductServiceTests
 
         // Assert
         await act.Should().ThrowAsync<DomainException>()
-            .WithMessage("*not found*");
+            .WithMessage("*no encontrad*");
     }
 
     #endregion
@@ -279,7 +279,7 @@ public class ProductServiceTests
 
         // Assert
         await act.Should().ThrowAsync<DomainException>()
-            .WithMessage("*not found*");
+            .WithMessage("*no encontrad*");
     }
 
     #endregion
@@ -316,7 +316,7 @@ public class ProductServiceTests
 
         // Assert
         await act.Should().ThrowAsync<DomainException>()
-            .WithMessage("*not found*");
+            .WithMessage("*no encontrad*");
     }
 
     #endregion

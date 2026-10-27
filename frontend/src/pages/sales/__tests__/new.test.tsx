@@ -21,6 +21,14 @@ vi.mock('@/services/point-of-sale.service');
 vi.mock('@/services/payment-method.service');
 vi.mock('@/services/inventory.service');
 
+vi.mock('@/providers/cart-provider', () => ({
+  CartProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  useCart: () => ({
+    addLine: vi.fn(() => true),
+    lineCount: 0,
+  }),
+}));
+
 // Mock auth context
 vi.mock('@/providers/auth-provider', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,

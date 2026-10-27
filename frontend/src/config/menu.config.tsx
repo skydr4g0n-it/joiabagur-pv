@@ -64,11 +64,6 @@ export const MENU_ADMINISTRATOR: MenuConfig = [
         path: ROUTES.PRODUCTS.ROOT,
       },
       {
-        title: 'Modelo de IA',
-        icon: ShoppingCart,
-        path: ROUTES.AI_MODEL,
-      },
-      {
         title: 'Métodos de Pago',
         icon: CreditCard,
         path: ROUTES.PAYMENT_METHODS,

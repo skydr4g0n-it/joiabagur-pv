@@ -1,3 +1,5 @@
+> **Withdrawn (2026-10-27):** Product-photo image recognition was retired. This document is historical. Current behavior is manual sales only, and /api/image-recognition returns 410 Gone.
+
 ## MODIFIED Requirements
 
 ### Requirement: Client-Side ML Inference
@@ -50,7 +52,7 @@ The system SHALL execute machine learning inference in the browser/mobile device
 - **AND** cached model is used immediately while check executes
 - **AND** compares cached version with server version
 - **AND** if server version is newer, frontend downloads new model in background
-- **AND** displays notification: "Nueva versión del modelo disponible. Descargando..."
+- **AND** displays notification: "Nueva versi�n del modelo disponible. Descargando..."
 - **AND** switches to new model after download completes
 - **NOTE**: Version check executes on every access when online to ensure latest model
 
@@ -60,7 +62,7 @@ The system SHALL execute machine learning inference in the browser/mobile device
 - **AND** device has no internet connection
 - **THEN** system detects network error on metadata fetch
 - **AND** uses cached model without version check
-- **AND** logs warning: "No se pudo verificar versión del modelo (offline)"
+- **AND** logs warning: "No se pudo verificar versi�n del modelo (offline)"
 - **AND** inference proceeds normally with cached model
 - **AND** version check retries on next feature access when connectivity restored
 
@@ -68,7 +70,7 @@ The system SHALL execute machine learning inference in the browser/mobile device
 
 - **WHEN** frontend detects cached model is older than server version
 - **AND** model age > 7 days behind latest
-- **THEN** system displays notification to operator: "El modelo de reconocimiento tiene una actualización disponible"
+- **THEN** system displays notification to operator: "El modelo de reconocimiento tiene una actualizaci�n disponible"
 - **AND** provides option to download immediately or continue with current version
 - **AND** allows operator to defer update (e.g., not during active sale)
 
@@ -79,7 +81,7 @@ The system SHALL execute machine learning inference in the browser/mobile device
 - **AND** downloads latest model if newer version exists
 - **AND** displays progress: "Descargando modelo... X%"
 - **AND** updates IndexedDB cache with new model
-- **AND** confirms: "Modelo actualizado a versión vX"
+- **AND** confirms: "Modelo actualizado a versi�n vX"
 
 #### Scenario: Execute inference locally
 
@@ -168,7 +170,7 @@ For classifier fallback: confidence threshold = 40%.
 - **WHEN** inference completes
 - **AND** for similarity: top match < 0.50 (MIN_TOP_SIMILARITY)
 - **AND** for classifier: ALL products have confidence < 40%
-- **THEN** system displays message: "No se encontró una correspondencia fiable"
+- **THEN** system displays message: "No se encontr� una correspondencia fiable"
 - **AND** offers options:
   - "Tomar otra foto" (retry image recognition)
   - "Registrar venta manual" (redirect to manual entry with photo preserved)
@@ -207,13 +209,13 @@ The system SHALL provide administrators with a dashboard showing model health me
 
 - **WHEN** system calculates model health status
 - **THEN** evaluates multiple criteria:
-  - Precision <70% → CRITICAL
-  - >=20% new products → CRITICAL
-  - >=10% new products → HIGH
-  - >=20% photo changes → HIGH
-  - >=10% photos deleted → HIGH
-  - Model >30 days + (>=5% products or >=10% photos changed) → HIGH
-  - Model >60 days → RECOMMENDED
+  - Precision <70% ? CRITICAL
+  - >=20% new products ? CRITICAL
+  - >=10% new products ? HIGH
+  - >=20% photo changes ? HIGH
+  - >=10% photos deleted ? HIGH
+  - Model >30 days + (>=5% products or >=10% photos changed) ? HIGH
+  - Model >60 days ? RECOMMENDED
 - **AND** returns highest severity alert level
 
 #### Scenario: Show toast notification on admin login
@@ -227,13 +229,13 @@ The system SHALL provide administrators with a dashboard showing model health me
 #### Scenario: Critical alert for low precision
 
 - **WHEN** top-3 accuracy is <70% based on last 100 sales with image recognition
-- **THEN** dashboard shows CRITICAL alert: "Precisión muy baja, re-entrenar inmediatamente"
+- **THEN** dashboard shows CRITICAL alert: "Precisi�n muy baja, re-entrenar inmediatamente"
 - **AND** toast notification appears on admin login
 
 #### Scenario: High priority alert for catalog changes
 
 - **WHEN** 45 new products added (9% of 500 total) and 127 new photos uploaded
-- **THEN** dashboard shows HIGH alert: "Cambios significativos en catálogo"
+- **THEN** dashboard shows HIGH alert: "Cambios significativos en cat�logo"
 - **AND** toast notification appears on admin login
 
 #### Scenario: OK status when model is current

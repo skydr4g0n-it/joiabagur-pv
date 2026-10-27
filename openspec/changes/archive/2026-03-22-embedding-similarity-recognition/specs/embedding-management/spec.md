@@ -1,3 +1,5 @@
+> **Withdrawn (2026-10-27):** Product-photo image recognition was retired. This document is historical. Current behavior is manual sales only, and /api/image-recognition returns 410 Gone.
+
 ## ADDED Requirements
 
 ### Requirement: Embedding Data Storage
@@ -98,7 +100,7 @@ The system SHALL automatically extract and save an embedding when a product phot
 - **WHEN** embedding extraction or save fails (model load error, network error)
 - **THEN** photo upload is still considered successful
 - **AND** system logs warning
-- **AND** displays brief toast: "No se pudo generar el embedding. Se generar√° en la pr√≥xima reconstrucci√≥n."
+- **AND** displays brief toast: "No se pudo generar el embedding. Se generar· en la prÛxima reconstrucciÛn."
 - **AND** missing embedding can be regenerated via full rebuild
 
 ### Requirement: Auto-Delete Embedding on Photo Deletion

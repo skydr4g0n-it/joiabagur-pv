@@ -1,148 +1,150 @@
-# Proyecto Final de M√°ster ‚Äî Dise√±o del sistema de IA para Joiabagur PV
+> **Retirado (2026-10-27):** El reconocimiento de productos por foto ya no forma parte del sistema. Este texto es histÛrico.
 
-**Versi√≥n:** 3 ‚Äî consenso tras la revisi√≥n de la [PR #4](https://github.com/skydr4g0n-it/joiabagur-pv/pull/4) y las [especificaciones funcionales v2](joiabagur-ia-especificaciones-funcionales-v2.md)
-**Documento:** dise√±o conceptual + estrategia de datos + plan de ejecuci√≥n
-**Dominio:** Joiabagur PV (gesti√≥n de puntos de venta de joyer√≠a)
-**Fecha de entrega del PF:** 3 de septiembre de 2026 ‚Äî *sin margen asumido*
+# Proyecto Final de M·ster ó DiseÒo del sistema de IA para Joiabagur PV
+
+**VersiÛn:** 3 ó consenso tras la revisiÛn de la [PR #4](https://github.com/skydr4g0n-it/joiabagur-pv/pull/4) y las [especificaciones funcionales v2](joiabagur-ia-especificaciones-funcionales-v2.md)
+**Documento:** diseÒo conceptual + estrategia de datos + plan de ejecuciÛn
+**Dominio:** Joiabagur PV (gestiÛn de puntos de venta de joyerÌa)
+**Fecha de entrega del PF:** 3 de septiembre de 2026 ó *sin margen asumido*
 **Rama de entrega:** `finalproject-[INICIALES]` *(placeholder)*
 **Equipo:** **2 desarrolladores**, ambos trabajando indistintamente en Python y .NET/frontend
-**Descomposici√≥n ejecutable:** [proyecto-final-plan-changes-openspec.md](proyecto-final-plan-changes-openspec.md)
+**DescomposiciÛn ejecutable:** [proyecto-final-plan-changes-openspec.md](proyecto-final-plan-changes-openspec.md)
 
 ---
 
 ## 0. Resumen ejecutivo
 
-Construimos un **buscador sem√°ntico de cat√°logo con venta asistida** para operadores de joyer√≠a, m√°s un **agente de inventario que propone reposiciones y traslados con aprobaci√≥n humana**, servidos por un microservicio RAG en Python sobre pgvector e integrados en el backend .NET existente.
+Construimos un **buscador sem·ntico de cat·logo con venta asistida** para operadores de joyerÌa, m·s un **agente de inventario que propone reposiciones y traslados con aprobaciÛn humana**, servidos por un microservicio RAG en Python sobre pgvector e integrados en el backend .NET existente.
 
-### Qu√© cambia respecto a la versi√≥n anterior
+### QuÈ cambia respecto a la versiÛn anterior
 
-La revisi√≥n del compa√±ero es acertada en casi todo y **se acepta en bloque** la parte de modelo de datos y disciplina. Los cambios estructurales:
+La revisiÛn del compaÒero es acertada en casi todo y **se acepta en bloque** la parte de modelo de datos y disciplina. Los cambios estructurales:
 
 | Cambio | Origen |
 |---|---|
-| `material` ‚Üí **`materials[]`** en todo el pipeline (extracci√≥n, filtros, `SourceText`, evaluaci√≥n) | Revisi√≥n, decisi√≥n 3 |
-| `variant_group_key` ‚Üí **`ProductFamily` + `ProductFamilyMember`** como entidad expl√≠cita y editable | Revisi√≥n, decisi√≥n 2 |
-| **No se persiste texto comercial generado por IA** en el perfil del producto: fuera `SalesPitchShort`, `OperatorHint`, `CareInstructions`, `SearchAliases` | Revisi√≥n, decisi√≥n 4 |
-| **Revisi√≥n humana h√≠brida**: campos sensibles siempre revisados si son inferidos; tags comerciales auto-aprobables | Revisi√≥n, decisi√≥n 5 |
-| **La proyecci√≥n de inventario nunca excluye**: prefiltro blando + sobre-recuperaci√≥n; .NET decide | Revisi√≥n, decisi√≥n 11 |
-| **Toda regla de negocio vive en .NET.** Python solo hace lo que necesita el espacio vectorial y el LLM | Revisi√≥n, decisi√≥n 9 |
-| **Entra inventario**: reposici√≥n, traslados, rotaci√≥n/stock parado, sustitutos y aprobaci√≥n manual | Revisi√≥n, decisi√≥n 6 |
-| **Entra argumentario por POS** como perfil calculado peri√≥dicamente y almacenado estructurado | Revisi√≥n, decisi√≥n 7 |
-| **Entran complementarios** por reglas + co-ocurrencia de ventas | Revisi√≥n, decisi√≥n 8 |
+| `material` ? **`materials[]`** en todo el pipeline (extracciÛn, filtros, `SourceText`, evaluaciÛn) | RevisiÛn, decisiÛn 3 |
+| `variant_group_key` ? **`ProductFamily` + `ProductFamilyMember`** como entidad explÌcita y editable | RevisiÛn, decisiÛn 2 |
+| **No se persiste texto comercial generado por IA** en el perfil del producto: fuera `SalesPitchShort`, `OperatorHint`, `CareInstructions`, `SearchAliases` | RevisiÛn, decisiÛn 4 |
+| **RevisiÛn humana hÌbrida**: campos sensibles siempre revisados si son inferidos; tags comerciales auto-aprobables | RevisiÛn, decisiÛn 5 |
+| **La proyecciÛn de inventario nunca excluye**: prefiltro blando + sobre-recuperaciÛn; .NET decide | RevisiÛn, decisiÛn 11 |
+| **Toda regla de negocio vive en .NET.** Python solo hace lo que necesita el espacio vectorial y el LLM | RevisiÛn, decisiÛn 9 |
+| **Entra inventario**: reposiciÛn, traslados, rotaciÛn/stock parado, sustitutos y aprobaciÛn manual | RevisiÛn, decisiÛn 6 |
+| **Entra argumentario por POS** como perfil calculado periÛdicamente y almacenado estructurado | RevisiÛn, decisiÛn 7 |
+| **Entran complementarios** por reglas + co-ocurrencia de ventas | RevisiÛn, decisiÛn 8 |
 
 ### Las tres decisiones que no acepto tal cual
 
-Las dos primeras est√°n **‚è≥ pendientes de acuerdo** y se cierran en conversaci√≥n, no en este documento. Ambas van planteadas de forma que la discusi√≥n sea sobre el intercambio, no sobre el gusto.
+Las dos primeras est·n **? pendientes de acuerdo** y se cierran en conversaciÛn, no en este documento. Ambas van planteadas de forma que la discusiÛn sea sobre el intercambio, no sobre el gusto.
 
-1. **‚è≥ `SearchAliases` fuera, s√≠ ‚Äî pero hace falta un sustituto.** Sin alias, la rama l√©xica no encuentra "sortija" cuando el producto se llama "anillo". La soluci√≥n no es persistir alias por producto (tiene raz√≥n: es texto IA por producto, con deriva), sino un **diccionario de sin√≥nimos del dominio, √∫nico, curado a mano** (~40-60 entradas), aplicado en expansi√≥n de consulta. Cumple su principio y resuelve mejor el problema (¬ß7.4).
-   **Si no hay acuerdo:** se implementa igual **tras un flag**, se mide con la categor√≠a de sin√≥nimos del golden set y se decide con el n√∫mero, no con el argumento. Coste de discrepancia: cero.
-2. **‚è≥ Packing list fuera del PF.** Es el √∫nico punto de su "m√≠nimo" que no acepto: es la √∫nica pieza del bloque de inventario con **cero contenido de IA**, tiene una m√°quina de 6 estados con auditor√≠a y est√° *aguas abajo* de las recomendaciones aprobadas, as√≠ que aplazarla no bloquea nada. En su lugar entra una **vista imprimible de recomendaciones aprobadas agrupadas por POS**.
-   **Si no hay acuerdo:** entra, cuesta **+1,5-2 changes en la ola 4**, que ya es la m√°s cargada, y arrastra el corte de **complementarios y rotaci√≥n** (puntos 1 y 2 de ¬ß13.4). El intercambio es ese, y es una decisi√≥n de producto leg√≠tima: packing list a cambio de complementarios y detecci√≥n de stock parado.
-3. **Upselling y downselling fuera.** El margen es calculable (`ProductComponentAssignment.CostPrice`/`SalePrice` existen), as√≠ que es viable t√©cnicamente, pero es estrategia de precio sin datos que la validen antes del 3 de septiembre. Este no est√° en discusi√≥n.
+1. **? `SearchAliases` fuera, sÌ ó pero hace falta un sustituto.** Sin alias, la rama lÈxica no encuentra "sortija" cuando el producto se llama "anillo". La soluciÛn no es persistir alias por producto (tiene razÛn: es texto IA por producto, con deriva), sino un **diccionario de sinÛnimos del dominio, ˙nico, curado a mano** (~40-60 entradas), aplicado en expansiÛn de consulta. Cumple su principio y resuelve mejor el problema (ß7.4).
+   **Si no hay acuerdo:** se implementa igual **tras un flag**, se mide con la categorÌa de sinÛnimos del golden set y se decide con el n˙mero, no con el argumento. Coste de discrepancia: cero.
+2. **? Packing list fuera del PF.** Es el ˙nico punto de su "mÌnimo" que no acepto: es la ˙nica pieza del bloque de inventario con **cero contenido de IA**, tiene una m·quina de 6 estados con auditorÌa y est· *aguas abajo* de las recomendaciones aprobadas, asÌ que aplazarla no bloquea nada. En su lugar entra una **vista imprimible de recomendaciones aprobadas agrupadas por POS**.
+   **Si no hay acuerdo:** entra, cuesta **+1,5-2 changes en la ola 4**, que ya es la m·s cargada, y arrastra el corte de **complementarios y rotaciÛn** (puntos 1 y 2 de ß13.4). El intercambio es ese, y es una decisiÛn de producto legÌtima: packing list a cambio de complementarios y detecciÛn de stock parado.
+3. **Upselling y downselling fuera.** El margen es calculable (`ProductComponentAssignment.CostPrice`/`SalePrice` existen), asÌ que es viable tÈcnicamente, pero es estrategia de precio sin datos que la validen antes del 3 de septiembre. Este no est· en discusiÛn.
 
 ### Restricciones que gobiernan el documento
 
-**Tiempo:** quedan **4,4 semanas** (3 de agosto ‚Üí 3 de septiembre). **Equipo: dos personas.** El alcance acordado son **39 changes** de 2-3 h, es decir **~4,4 changes por persona y semana** sostenidos durante mes y medio de agosto. Es un ritmo alto y conviene decirlo ahora: ¬ß13.4 fija el orden de corte **antes** de empezar, no cuando falle.
+**Tiempo:** quedan **4,4 semanas** (3 de agosto ? 3 de septiembre). **Equipo: dos personas.** El alcance acordado son **39 changes** de 2-3 h, es decir **~4,4 changes por persona y semana** sostenidos durante mes y medio de agosto. Es un ritmo alto y conviene decirlo ahora: ß13.4 fija el orden de corte **antes** de empezar, no cuando falle.
 
-> **Alcance de la entrega (respuesta a la decisi√≥n 1):** esto es **Fase 1 completa + Fase 3 parcial** de las especificaciones v2. Packing list (Fase 4), liquidaci√≥n con descuentos, upsell/downsell y pol√≠ticas de inventario configurables quedan **expl√≠citamente fuera** y documentadas como fase posterior.
+> **Alcance de la entrega (respuesta a la decisiÛn 1):** esto es **Fase 1 completa + Fase 3 parcial** de las especificaciones v2. Packing list (Fase 4), liquidaciÛn con descuentos, upsell/downsell y polÌticas de inventario configurables quedan **explÌcitamente fuera** y documentadas como fase posterior.
 
 ---
 
 ## 1. Punto de partida verificado en el repositorio
 
-| √Årea | Estado real | Implicaci√≥n |
+| ¡rea | Estado real | ImplicaciÛn |
 |---|---|---|
-| Backend | .NET 10, capas Domain/Infrastructure/Application/API, EF Core, PostgreSQL, JWT, Serilog, 18 controllers | El servicio de IA se acopla por HTTP, no por c√≥digo |
-| Modelo de dominio | `Product`, `Collection`, `Inventory` (Product√óPOS), `InventoryMovement`, `Sale` (precio congelado), `PointOfSale`, `User`/`UserPointOfSale`, `Return`, `ProductPhoto` | Todas las se√±ales del RAG y del inventario ya existen |
-| **Margen por producto** | `ProductComponent` + `ProductComponentAssignment` (`CostPrice`, `SalePrice`, `Quantity`) y `ComponentReportService` | El margen **es calculable**. Habilita "prioridad comercial" como se√±al futura; fuera de este alcance por tiempo, no por imposibilidad |
-| B√∫squeda actual | `GET /api/products/search` ‚Üí SKU exacto + nombre parcial, m√°x. 50, filtrado por POS asignados ([ProductsController.cs:92](../../backend/src/JoiabagurPV.API/Controllers/ProductsController.cs#L92)) | Es el **baseline v0-lexico** y el **fallback** |
-| **Tienda central** | **No existe** como concepto: `PointOfSale` solo tiene Name, Code, Address, Phone, Email, IsActive, AllowManualPriceEdit | **Bloquea las reglas de reposici√≥n y traslado.** Ver pregunta abierta en ¬ß14 |
+| Backend | .NET 10, capas Domain/Infrastructure/Application/API, EF Core, PostgreSQL, JWT, Serilog, 18 controllers | El servicio de IA se acopla por HTTP, no por cÛdigo |
+| Modelo de dominio | `Product`, `Collection`, `Inventory` (Product◊POS), `InventoryMovement`, `Sale` (precio congelado), `PointOfSale`, `User`/`UserPointOfSale`, `Return`, `ProductPhoto` | Todas las seÒales del RAG y del inventario ya existen |
+| **Margen por producto** | `ProductComponent` + `ProductComponentAssignment` (`CostPrice`, `SalePrice`, `Quantity`) y `ComponentReportService` | El margen **es calculable**. Habilita "prioridad comercial" como seÒal futura; fuera de este alcance por tiempo, no por imposibilidad |
+| B˙squeda actual | `GET /api/products/search` ? SKU exacto + nombre parcial, m·x. 50, filtrado por POS asignados ([ProductsController.cs:92](../../backend/src/JoiabagurPV.API/Controllers/ProductsController.cs#L92)) | Es el **baseline v0-lexico** y el **fallback** |
+| **Tienda central** | **No existe** como concepto: `PointOfSale` solo tiene Name, Code, Address, Phone, Email, IsActive, AllowManualPriceEdit | **Bloquea las reglas de reposiciÛn y traslado.** Ver pregunta abierta en ß14 |
 | IA existente | Reconocimiento **visual**: `ProductPhotoEmbedding` (MobileNetV2 1280d en JSON), TF.js en navegador | No se toca. Otro problema, otro espacio vectorial |
-| pgvector | **No instalado** | Trabajo nuevo: extensi√≥n en RDS + esquema propio |
-| Datos versionados | Solo admin y m√©todos de pago en el seeder. **Sin cat√°logo, inventario ni ventas** | Sin export real, el corpus es sint√©tico. Ver ¬ß8 |
-| Despliegue | EC2 + nginx + Docker + RDS + S3 + ECR + GitHub Actions OIDC. Producci√≥n viva en `pv.joiabagur.com` | A√±adimos un contenedor |
-| Metodolog√≠a | OpenSpec en uso | El trabajo se entrega como *changes* |
-| Frontend | React 19 + Vite + TS + Metronic, `src/pages/sales/` con flujo manual y `scan.tsx` | Punto de inserci√≥n del panel de b√∫squeda |
+| pgvector | **No instalado** | Trabajo nuevo: extensiÛn en RDS + esquema propio |
+| Datos versionados | Solo admin y mÈtodos de pago en el seeder. **Sin cat·logo, inventario ni ventas** | Sin export real, el corpus es sintÈtico. Ver ß8 |
+| Despliegue | EC2 + nginx + Docker + RDS + S3 + ECR + GitHub Actions OIDC. ProducciÛn viva en `pv.joiabagur.com` | AÒadimos un contenedor |
+| MetodologÌa | OpenSpec en uso | El trabajo se entrega como *changes* |
+| Frontend | React 19 + Vite + TS + Metronic, `src/pages/sales/` con flujo manual y `scan.tsx` | Punto de inserciÛn del panel de b˙squeda |
 
 ---
 
-## 2. An√°lisis cr√≠tico de las especificaciones funcionales v2
+## 2. An·lisis crÌtico de las especificaciones funcionales v2
 
-La v2 corrige la mayor√≠a de lo que criticaba la versi√≥n anterior de este documento: `Materials[]`, familias expl√≠citas, sin textos comerciales persistidos, avisos por reglas. Lo que sigue es lo que **queda por resolver**.
+La v2 corrige la mayorÌa de lo que criticaba la versiÛn anterior de este documento: `Materials[]`, familias explÌcitas, sin textos comerciales persistidos, avisos por reglas. Lo que sigue es lo que **queda por resolver**.
 
 ### 2.1. Lo que la v2 resuelve bien y se adopta sin cambios
 
-`Materials[]` como array ¬∑ `ProductFamily`/`ProductFamilyMember` editable ¬∑ avisos calculados por reglas y no persistidos ¬∑ principio 2 (IA no es fuente de verdad de stock/precio) ¬∑ principio 5 (control por POS) ¬∑ `SourceHash` e idempotencia ¬∑ versionado de embeddings ¬∑ separaci√≥n embeddings visuales/sem√°nticos ¬∑ matriz ¬ß7.3 de cu√°ndo usar generativa, embeddings o reglas ¬∑ `InventoryRecommendation` con estados y aprobaci√≥n humana.
+`Materials[]` como array ∑ `ProductFamily`/`ProductFamilyMember` editable ∑ avisos calculados por reglas y no persistidos ∑ principio 2 (IA no es fuente de verdad de stock/precio) ∑ principio 5 (control por POS) ∑ `SourceHash` e idempotencia ∑ versionado de embeddings ∑ separaciÛn embeddings visuales/sem·nticos ∑ matriz ß7.3 de cu·ndo usar generativa, embeddings o reglas ∑ `InventoryRecommendation` con estados y aprobaciÛn humana.
 
 ### 2.2. Lo que sigue sin resolverse en la v2
 
-| Punto | Problema | Resoluci√≥n adoptada |
+| Punto | Problema | ResoluciÛn adoptada |
 |---|---|---|
-| **Arquitectura ¬ß7.1** sigue colocando todo en .NET (`Application/AiCatalog`, `AiSalesAssist`, `AiInventory`) | Incompatible con el requisito del PF de implementar RAG en Python, y con el instrumental del m√°ster (pgvector desde Python, RAGAS) | Frontera precisa en ¬ß6: **.NET conserva toda la regla de negocio** (incluido el motor de inventario), Python solo espacio vectorial y LLM |
-| **Sin capa de evaluaci√≥n.** La v2 tiene KPIs de negocio pero ninguna m√©trica de sistema | El PF exige evals objetivas; es criterio expl√≠cito de "destaca" | ¬ß11 como componente de primera clase |
-| **Sin agentes.** La v2 los excluye ("agentes que modifiquen stock sin aprobaci√≥n humana") | El PF los exige. La tensi√≥n es aparente: lo prohibido es **escribir** sin aprobaci√≥n | Agentes con tools de **solo lectura** + HITL en toda escritura (¬ß9) |
-| **Eliminar `SearchAliases` sin sustituto** deja ciega la rama l√©xica ante sin√≥nimos | "sortija", "aro", "gargantilla" no aparecen en el cat√°logo | Diccionario de sin√≥nimos del dominio, curado, en expansi√≥n de consulta (¬ß7.4) |
-| **`ProductFamily` sin definir qui√©n la crea** (decisi√≥n abierta 4 de la v2) | Crear ~350 familias a mano es inviable | **Flujo mixto**: la IA propone familias por similitud, el admin aprueba o edita (¬ß7.5) |
-| **Ranking ¬ß5.5 con 8 t√©rminos** | No hay datos para calibrar 8 pesos en 4 semanas | 4 se√±ales calibradas contra el golden set; el resto documentado (¬ß7.6) |
-| **`ProductRecommendation` precomputada** para Similar/Complementary/Substitute | Precomputar similitud es cach√© prematura: el retriever la calcula en milisegundos | La tabla existe **solo para curaci√≥n manual** (complementarios configurados por el admin). Similar y sustituto se calculan en l√≠nea |
-| **Sin concepto de tienda central** pese a que las reglas de reposici√≥n lo asumen | `PointOfSale` no distingue tipos | Pregunta abierta ¬ß14. Mitigaci√≥n provisional: campo `IsSupplySource` en POS |
-| **KPIs de negocio no medibles** antes del 3 de septiembre | Requieren tr√°fico real y A/B | Se **instrumentan**, no se prometen n√∫meros |
+| **Arquitectura ß7.1** sigue colocando todo en .NET (`Application/AiCatalog`, `AiSalesAssist`, `AiInventory`) | Incompatible con el requisito del PF de implementar RAG en Python, y con el instrumental del m·ster (pgvector desde Python, RAGAS) | Frontera precisa en ß6: **.NET conserva toda la regla de negocio** (incluido el motor de inventario), Python solo espacio vectorial y LLM |
+| **Sin capa de evaluaciÛn.** La v2 tiene KPIs de negocio pero ninguna mÈtrica de sistema | El PF exige evals objetivas; es criterio explÌcito de "destaca" | ß11 como componente de primera clase |
+| **Sin agentes.** La v2 los excluye ("agentes que modifiquen stock sin aprobaciÛn humana") | El PF los exige. La tensiÛn es aparente: lo prohibido es **escribir** sin aprobaciÛn | Agentes con tools de **solo lectura** + HITL en toda escritura (ß9) |
+| **Eliminar `SearchAliases` sin sustituto** deja ciega la rama lÈxica ante sinÛnimos | "sortija", "aro", "gargantilla" no aparecen en el cat·logo | Diccionario de sinÛnimos del dominio, curado, en expansiÛn de consulta (ß7.4) |
+| **`ProductFamily` sin definir quiÈn la crea** (decisiÛn abierta 4 de la v2) | Crear ~350 familias a mano es inviable | **Flujo mixto**: la IA propone familias por similitud, el admin aprueba o edita (ß7.5) |
+| **Ranking ß5.5 con 8 tÈrminos** | No hay datos para calibrar 8 pesos en 4 semanas | 4 seÒales calibradas contra el golden set; el resto documentado (ß7.6) |
+| **`ProductRecommendation` precomputada** para Similar/Complementary/Substitute | Precomputar similitud es cachÈ prematura: el retriever la calcula en milisegundos | La tabla existe **solo para curaciÛn manual** (complementarios configurados por el admin). Similar y sustituto se calculan en lÌnea |
+| **Sin concepto de tienda central** pese a que las reglas de reposiciÛn lo asumen | `PointOfSale` no distingue tipos | Pregunta abierta ß14. MitigaciÛn provisional: campo `IsSupplySource` en POS |
+| **KPIs de negocio no medibles** antes del 3 de septiembre | Requieren tr·fico real y A/B | Se **instrumentan**, no se prometen n˙meros |
 
 ### 2.3. Veredicto
 
-> **Adoptar la v2 como especificaci√≥n funcional de referencia**, con la frontera arquitect√≥nica de ¬ß6, la capa de evaluaci√≥n de ¬ß11 y los agentes de ¬ß9 como adiciones exigidas por el Proyecto Final. El alcance entregable es Fase 1 completa + Fase 3 parcial.
+> **Adoptar la v2 como especificaciÛn funcional de referencia**, con la frontera arquitectÛnica de ß6, la capa de evaluaciÛn de ß11 y los agentes de ß9 como adiciones exigidas por el Proyecto Final. El alcance entregable es Fase 1 completa + Fase 3 parcial.
 
 ---
 
-## 3. Respuesta punto por punto a la revisi√≥n de la PR
+## 3. Respuesta punto por punto a la revisiÛn de la PR
 
-| # | Decisi√≥n pedida | Postura | Justificaci√≥n | Coste |
+| # | DecisiÛn pedida | Postura | JustificaciÛn | Coste |
 |---|---|---|---|---|
-| 1 | Alcance de la entrega | **Fase 1 + Fase 3 parcial**, declarado expl√≠citamente | Con 2 personas y 4,4 semanas, comprometer las 5 fases ser√≠a mentir | ‚Äî |
-| 2 | Modelo de variantes | **`ProductFamily` + `ProductFamilyMember`**. Acepto | Tiene raz√≥n: una clave textual generada por IA se rompe ("anillo-erizo-mar" vs "anillo-erizo-de-mar"), no la puede corregir un admin y falla justo en el caso que queremos evitar. Adem√°s la entidad hace implementable la alerta de "productos parecidos sin familia" | +2 changes |
-| 3 | `materials[]` | Acepto. `text[]` en el √≠ndice, `MaterialsJson` en .NET, **vocabulario cerrado**, filtro por solape (`&&`) con √≠ndice GIN | Un producto es "plata con ba√±o de oro". Con un solo valor, el filtro por material da falsos negativos | +0 (dentro del enriquecimiento) |
-| 4 | Campos reaparecidos | Acepto eliminar los cuatro del perfil. **‚è≥ Contrapropuesta pendiente de acuerdo para los alias** (¬ß7.4) y una precisi√≥n sobre cuidados (¬ß7.7) | Persistir texto IA por producto genera deriva y datos no revisables. Pero el problema que resolv√≠an los alias sigue existiendo | +1 change |
-| 5 | Revisi√≥n humana | **H√≠brido, como propone**: `piece_type`, `materials`, `stone_type`, `size_label` y familia siempre revisados **si son inferidos**; tags comerciales auto-aprobados con confianza alta | Es su propuesta y es mejor que la m√≠a. Ver ¬ß7.8 para c√≥mo se demuestra sin dejar el corpus vac√≠o | +0 |
-| 6 | Alcance m√≠nimo de inventario | **Reposici√≥n + sustitutos + traslados + stock parado/rotaci√≥n + aprobaci√≥n manual. ‚è≥ Packing list fuera, pendiente de acuerdo** | Todo lo que acepto tiene contenido de IA o HITL demostrable. La packing list es CRUD con m√°quina de 6 estados y auditor√≠a, cero IA, y est√° aguas abajo: aplazarla no bloquea nada. En su lugar, vista imprimible de recomendaciones aprobadas por POS. Si entra, sale complementarios y rotaci√≥n | +6 changes (+2 si entra packing list) |
-| 7 | Argumentario por hotel | **Perfil peri√≥dico calculado y almacenado estructurado**, como propone | Es la opci√≥n correcta: barata, verificable contra m√©tricas y reutilizable por ranking, sustitutos y reposici√≥n | +1,5 changes |
-| 8 | Complementarios | **Reglas + co-ocurrencia de ventas + tabla de curaci√≥n manual.** Upsell/downsell fuera | Complementario ‚â† similar: distinto `piece_type`, colores y estilos compatibles, banda de precio, y co-venta hist√≥rica. El margen existe pero validar upselling requiere datos de negocio que no tendremos | +1 change |
-| 9 | Python vs .NET | **Permanente, con frontera estrecha**: Python solo embeddings, √≠ndice vectorial, recuperaci√≥n, generaci√≥n y bucle ag√©ntico. **Toda regla de negocio, c√°lculo y persistencia de negocio en .NET** | Reduce a la mitad los riesgos que se√±ala (duplicaci√≥n, sincronizaci√≥n, migraciones). Si alg√∫n d√≠a se consolida en .NET, solo se mueve la capa de recuperaci√≥n | ‚Äî |
-| 10 | Propiedad y sincronizaci√≥n | Contrato expl√≠cito en ¬ß6.3: propietario por dato, qui√©n inicia, altas/bajas/desactivaciones con **tombstones**, detecci√≥n de divergencia, reintentos, versionado | Faltaba en mi versi√≥n anterior. Tiene raz√≥n | +0 (va en los feeds) |
-| 11 | Frescura del inventario | **Acepto, y es su mejor aportaci√≥n t√©cnica.** La proyecci√≥n pasa a ser prior de ranking; se sobre-recupera y **.NET decide** | Mi versi√≥n pod√≠a descartar un producto v√°lido antes de que .NET lo viera, sin posibilidad de recuperarlo. Ver ¬ß7.6 | +0 |
-| 12 | Datos de evaluaci√≥n | **Aceptado y resuelto: corpus h√≠brido.** Habr√° export real, de tama√±o probablemente insuficiente, ampliado con sint√©tico. Cada documento lleva `data_origin: real \| synthetic` y **toda m√©trica se reporta desglosada** | Es la respuesta correcta a su objeci√≥n: el golden set se ancla en lo real, lo sint√©tico solo aporta volumen y estr√©s. Sin el desglose, los productos sint√©ticos ‚Äîm√°s limpios‚Äî inflar√≠an los n√∫meros. Medir errores de selecci√≥n reales exige usuarios: fuera de plazo | +0,5 change |
+| 1 | Alcance de la entrega | **Fase 1 + Fase 3 parcial**, declarado explÌcitamente | Con 2 personas y 4,4 semanas, comprometer las 5 fases serÌa mentir | ó |
+| 2 | Modelo de variantes | **`ProductFamily` + `ProductFamilyMember`**. Acepto | Tiene razÛn: una clave textual generada por IA se rompe ("anillo-erizo-mar" vs "anillo-erizo-de-mar"), no la puede corregir un admin y falla justo en el caso que queremos evitar. Adem·s la entidad hace implementable la alerta de "productos parecidos sin familia" | +2 changes |
+| 3 | `materials[]` | Acepto. `text[]` en el Ìndice, `MaterialsJson` en .NET, **vocabulario cerrado**, filtro por solape (`&&`) con Ìndice GIN | Un producto es "plata con baÒo de oro". Con un solo valor, el filtro por material da falsos negativos | +0 (dentro del enriquecimiento) |
+| 4 | Campos reaparecidos | Acepto eliminar los cuatro del perfil. **? Contrapropuesta pendiente de acuerdo para los alias** (ß7.4) y una precisiÛn sobre cuidados (ß7.7) | Persistir texto IA por producto genera deriva y datos no revisables. Pero el problema que resolvÌan los alias sigue existiendo | +1 change |
+| 5 | RevisiÛn humana | **HÌbrido, como propone**: `piece_type`, `materials`, `stone_type`, `size_label` y familia siempre revisados **si son inferidos**; tags comerciales auto-aprobados con confianza alta | Es su propuesta y es mejor que la mÌa. Ver ß7.8 para cÛmo se demuestra sin dejar el corpus vacÌo | +0 |
+| 6 | Alcance mÌnimo de inventario | **ReposiciÛn + sustitutos + traslados + stock parado/rotaciÛn + aprobaciÛn manual. ? Packing list fuera, pendiente de acuerdo** | Todo lo que acepto tiene contenido de IA o HITL demostrable. La packing list es CRUD con m·quina de 6 estados y auditorÌa, cero IA, y est· aguas abajo: aplazarla no bloquea nada. En su lugar, vista imprimible de recomendaciones aprobadas por POS. Si entra, sale complementarios y rotaciÛn | +6 changes (+2 si entra packing list) |
+| 7 | Argumentario por hotel | **Perfil periÛdico calculado y almacenado estructurado**, como propone | Es la opciÛn correcta: barata, verificable contra mÈtricas y reutilizable por ranking, sustitutos y reposiciÛn | +1,5 changes |
+| 8 | Complementarios | **Reglas + co-ocurrencia de ventas + tabla de curaciÛn manual.** Upsell/downsell fuera | Complementario ? similar: distinto `piece_type`, colores y estilos compatibles, banda de precio, y co-venta histÛrica. El margen existe pero validar upselling requiere datos de negocio que no tendremos | +1 change |
+| 9 | Python vs .NET | **Permanente, con frontera estrecha**: Python solo embeddings, Ìndice vectorial, recuperaciÛn, generaciÛn y bucle agÈntico. **Toda regla de negocio, c·lculo y persistencia de negocio en .NET** | Reduce a la mitad los riesgos que seÒala (duplicaciÛn, sincronizaciÛn, migraciones). Si alg˙n dÌa se consolida en .NET, solo se mueve la capa de recuperaciÛn | ó |
+| 10 | Propiedad y sincronizaciÛn | Contrato explÌcito en ß6.3: propietario por dato, quiÈn inicia, altas/bajas/desactivaciones con **tombstones**, detecciÛn de divergencia, reintentos, versionado | Faltaba en mi versiÛn anterior. Tiene razÛn | +0 (va en los feeds) |
+| 11 | Frescura del inventario | **Acepto, y es su mejor aportaciÛn tÈcnica.** La proyecciÛn pasa a ser prior de ranking; se sobre-recupera y **.NET decide** | Mi versiÛn podÌa descartar un producto v·lido antes de que .NET lo viera, sin posibilidad de recuperarlo. Ver ß7.6 | +0 |
+| 12 | Datos de evaluaciÛn | **Aceptado y resuelto: corpus hÌbrido.** Habr· export real, de tamaÒo probablemente insuficiente, ampliado con sintÈtico. Cada documento lleva `data_origin: real \| synthetic` y **toda mÈtrica se reporta desglosada** | Es la respuesta correcta a su objeciÛn: el golden set se ancla en lo real, lo sintÈtico solo aporta volumen y estrÈs. Sin el desglose, los productos sintÈticos óm·s limpiosó inflarÌan los n˙meros. Medir errores de selecciÛn reales exige usuarios: fuera de plazo | +0,5 change |
 
 ---
 
 ## 4. Alcance acordado
 
-| # | Capacidad | Estado | Justificaci√≥n |
+| # | Capacidad | Estado | JustificaciÛn |
 |---|---|---|---|
-| 1 | Enriquecimiento de cat√°logo (`materials[]`, vocabulario cerrado, confianza por campo, revisi√≥n h√≠brida) | **N√∫cleo** | Es la construcci√≥n del corpus |
-| 2 | `ProductFamily` + `ProductFamilyMember`, con propuesta asistida y aprobaci√≥n humana | **N√∫cleo** | Desambiguaci√≥n de variantes: el caso de negocio cr√≠tico |
-| 3 | B√∫squeda sem√°ntica h√≠brida por POS (dos √≠ndices, sin√≥nimos, prefiltro blando, abstenci√≥n) | **N√∫cleo** | Coraz√≥n del PF |
-| 4 | Venta asistida (agrupaci√≥n por familia, avisos por reglas, citas) | **N√∫cleo** | Capa de generaci√≥n con atribuci√≥n verificable |
-| 5 | Agente asistente de venta (tools de solo lectura, guardrails, HITL) | **N√∫cleo** | Requisito del PF |
-| 6 | Sustitutos por falta de stock | **N√∫cleo** | Reutiliza el retriever |
-| 7 | Complementarios por reglas + co-ocurrencia | **Acordado** | Decisi√≥n 8 de la revisi√≥n |
-| 8 | Perfil comercial por POS, calculado peri√≥dicamente | **Acordado** | Decisi√≥n 7 |
-| 9 | Agente de inventario: reposici√≥n, traslados, rotaci√≥n/stock parado, con aprobaci√≥n | **Acordado** | Decisi√≥n 6. Segundo agente + HITL: sirve al producto y al PF |
-| 10 | Evaluaci√≥n (golden set, ablations, validador anti-alucinaci√≥n, escenarios de agente) | **N√∫cleo** | Requisito del PF |
+| 1 | Enriquecimiento de cat·logo (`materials[]`, vocabulario cerrado, confianza por campo, revisiÛn hÌbrida) | **N˙cleo** | Es la construcciÛn del corpus |
+| 2 | `ProductFamily` + `ProductFamilyMember`, con propuesta asistida y aprobaciÛn humana | **N˙cleo** | DesambiguaciÛn de variantes: el caso de negocio crÌtico |
+| 3 | B˙squeda sem·ntica hÌbrida por POS (dos Ìndices, sinÛnimos, prefiltro blando, abstenciÛn) | **N˙cleo** | CorazÛn del PF |
+| 4 | Venta asistida (agrupaciÛn por familia, avisos por reglas, citas) | **N˙cleo** | Capa de generaciÛn con atribuciÛn verificable |
+| 5 | Agente asistente de venta (tools de solo lectura, guardrails, HITL) | **N˙cleo** | Requisito del PF |
+| 6 | Sustitutos por falta de stock | **N˙cleo** | Reutiliza el retriever |
+| 7 | Complementarios por reglas + co-ocurrencia | **Acordado** | DecisiÛn 8 de la revisiÛn |
+| 8 | Perfil comercial por POS, calculado periÛdicamente | **Acordado** | DecisiÛn 7 |
+| 9 | Agente de inventario: reposiciÛn, traslados, rotaciÛn/stock parado, con aprobaciÛn | **Acordado** | DecisiÛn 6. Segundo agente + HITL: sirve al producto y al PF |
+| 10 | EvaluaciÛn (golden set, ablations, validador anti-alucinaciÛn, escenarios de agente) | **N˙cleo** | Requisito del PF |
 | 11 | Vista imprimible de recomendaciones aprobadas por POS | **Acordado (reducido)** | Sustituye a la packing list completa |
-| 12 | Packing list con m√°quina de 6 estados y auditor√≠a | **Fuera ‚Äî fase posterior** | Cero IA, aguas abajo, no bloquea nada |
-| 13 | Liquidaci√≥n con descuentos, `InventoryPolicy` configurable | **Fuera** | Toca precios; requiere decisi√≥n de negocio y auditor√≠a propia |
+| 12 | Packing list con m·quina de 6 estados y auditorÌa | **Fuera ó fase posterior** | Cero IA, aguas abajo, no bloquea nada |
+| 13 | LiquidaciÛn con descuentos, `InventoryPolicy` configurable | **Fuera** | Toca precios; requiere decisiÛn de negocio y auditorÌa propia |
 | 14 | Upsell / downsell / prioridad comercial por margen | **Fuera** | Viable (el margen existe) pero sin datos para validarlo antes del 3/9 |
-| 15 | Reranking cross-encoder | **No implementado, protocolizado** | Con ~1.500 vectores la hip√≥tesis es que no compensa. Se documenta c√≥mo se medir√≠a |
+| 15 | Reranking cross-encoder | **No implementado, protocolizado** | Con ~1.500 vectores la hipÛtesis es que no compensa. Se documenta cÛmo se medirÌa |
 | 16 | Reconocimiento visual, try-on, fine-tuning | **Fuera** | Ya existe (visual) o no aporta |
 
 ---
 
-## 5. El problema de recuperaci√≥n, bien planteado
+## 5. El problema de recuperaciÛn, bien planteado
 
-- **No hay documentos largos que trocear.** Un producto es una entidad con ~15 atributos y 40-120 palabras. **Chunking = ninguno** en el √≠ndice de cat√°logo.
-- **La consulta es corta, coloquial y de jerga mixta**, y mezcla intenci√≥n sem√°ntica, restricciones duras (precio, talla, materiales, POS) y t√©rminos literales (SKU). **B√∫squeda h√≠brida obligatoria**: lo sem√°ntico diluir√≠a "ERIZO-M".
-- **Con `SearchAliases` fuera, la rama l√©xica necesita ayuda externa**: un diccionario de sin√≥nimos del dominio en expansi√≥n de consulta (¬ß7.4).
-- **El resultado no es prosa: es un conjunto ordenado de entidades** agrupadas por familia, m√°s una explicaci√≥n. La generaci√≥n es la capa fina.
-- **S√≠ hay un segundo corpus con forma de documento**: conocimiento comercial general (materiales y alergias, equivalencias de talla, guiones de venta, pol√≠tica de devoluciones) ‚Äî **general, no por producto**, que es exactamente lo que la revisi√≥n pide evitar. Ese s√≠ se trocea y es lo que permite citas verificables.
+- **No hay documentos largos que trocear.** Un producto es una entidad con ~15 atributos y 40-120 palabras. **Chunking = ninguno** en el Ìndice de cat·logo.
+- **La consulta es corta, coloquial y de jerga mixta**, y mezcla intenciÛn sem·ntica, restricciones duras (precio, talla, materiales, POS) y tÈrminos literales (SKU). **B˙squeda hÌbrida obligatoria**: lo sem·ntico diluirÌa "ERIZO-M".
+- **Con `SearchAliases` fuera, la rama lÈxica necesita ayuda externa**: un diccionario de sinÛnimos del dominio en expansiÛn de consulta (ß7.4).
+- **El resultado no es prosa: es un conjunto ordenado de entidades** agrupadas por familia, m·s una explicaciÛn. La generaciÛn es la capa fina.
+- **SÌ hay un segundo corpus con forma de documento**: conocimiento comercial general (materiales y alergias, equivalencias de talla, guiones de venta, polÌtica de devoluciones) ó **general, no por producto**, que es exactamente lo que la revisiÛn pide evitar. Ese sÌ se trocea y es lo que permite citas verificables.
 
 ---
 
@@ -153,26 +155,26 @@ La v2 corrige la mayor√≠a de lo que criticaba la versi√≥n anterior de este docum
 ```mermaid
 flowchart TB
     subgraph cliente["Cliente"]
-        SPA["React SPA ¬∑ Buscar con ayuda ¬∑ Revisi√≥n de recomendaciones"]
+        SPA["React SPA ∑ Buscar con ayuda ∑ RevisiÛn de recomendaciones"]
     end
 
-    subgraph ec2["EC2 ¬∑ nginx TLS"]
-        subgraph net["Backend .NET 10 ‚Äî toda la regla de negocio"]
+    subgraph ec2["EC2 ∑ nginx TLS"]
+        subgraph net["Backend .NET 10 ó toda la regla de negocio"]
             API["ASP.NET Core API"]
-            BIZ["Familias ¬∑ Perfiles IA ¬∑ Se√±ales de demanda ¬∑ Motor de recomendaciones ¬∑ Perfil por POS"]
-            HYD["Hidratador: stock, precio, permisos POS ‚Äî AUTORIDAD FINAL"]
-            CB["Circuit breaker + fallback l√©xico"]
+            BIZ["Familias ∑ Perfiles IA ∑ SeÒales de demanda ∑ Motor de recomendaciones ∑ Perfil por POS"]
+            HYD["Hidratador: stock, precio, permisos POS ó AUTORIDAD FINAL"]
+            CB["Circuit breaker + fallback lÈxico"]
         end
-        subgraph py["jbg-ai (Python ¬∑ FastAPI) ‚Äî solo vectorial y LLM"]
-            R1["/v1/retrieval ¬∑ h√≠brido, sin√≥nimos, sustitutos, complementarios"]
-            R2["/v1/assist ¬∑ generaci√≥n con citas + agente de venta"]
-            R3["/v1/inventory/propose ¬∑ agente de inventario"]
-            R4["/v1/index ¬∑ /v1/enrich"]
+        subgraph py["jbg-ai (Python ∑ FastAPI) ó solo vectorial y LLM"]
+            R1["/v1/retrieval ∑ hÌbrido, sinÛnimos, sustitutos, complementarios"]
+            R2["/v1/assist ∑ generaciÛn con citas + agente de venta"]
+            R3["/v1/inventory/propose ∑ agente de inventario"]
+            R4["/v1/index ∑ /v1/enrich"]
             EV["Harness de evals (offline)"]
         end
     end
 
-    DB[("RDS PostgreSQL ¬∑ public (negocio, fuente de verdad) + ai (vectores)")]
+    DB[("RDS PostgreSQL ∑ public (negocio, fuente de verdad) + ai (vectores)")]
     LLM["Proveedor LLM + embeddings"]
 
     SPA -->|JWT usuario| API
@@ -181,7 +183,7 @@ flowchart TB
     CB -->|JWT interno| R2
     CB -->|JWT interno| R3
     R4 -->|feed paginado since-cursor| API
-    R3 -->|tools: se√±ales de demanda| API
+    R3 -->|tools: seÒales de demanda| API
     API --> BIZ
     BIZ --> DB
     API --> HYD
@@ -193,59 +195,59 @@ flowchart TB
     R4 --> LLM
 ```
 
-### 6.2. Qu√© vive d√≥nde (respuesta a la decisi√≥n 9)
+### 6.2. QuÈ vive dÛnde (respuesta a la decisiÛn 9)
 
 | Responsabilidad | Servicio | Motivo |
 |---|---|---|
-| Cat√°logo, precios, POS, permisos, inventario, ventas | **.NET** | Fuente de verdad transaccional |
-| `ProductAiProfile`, `ProductFamily`, `ProductFamilyMember`, `ProductRecommendation` (curaci√≥n manual) | **.NET** | Datos de negocio revisables por humanos |
-| **Se√±ales de demanda** (`sales_7/30/60d`, cobertura, d√≠as sin venta, stock en otros POS) | **.NET, en SQL** | C√°lculos deterministas sobre datos transaccionales. Un LLM aqu√≠ solo introduce error |
-| **Motor de recomendaciones de inventario** (reglas de reposici√≥n, traslado, rotaci√≥n) | **.NET** | Reglas de negocio auditables y testeables sin LLM |
-| `InventoryRecommendation` y su ciclo de aprobaci√≥n | **.NET** | Escritura sensible con auditor√≠a |
-| Perfil comercial por POS (m√©tricas) | **.NET, en SQL** | M√©tricas calculadas; el LLM solo redacta el resumen |
-| Embeddings, √≠ndice vectorial, recuperaci√≥n h√≠brida, sustitutos, complementarios | **Python** | Es el espacio vectorial |
-| Generaci√≥n con citas, guardrails, bucles ag√©nticos | **Python** | Es la capa LLM |
-| Evaluaci√≥n offline | **Python** | Instrumental del m√°ster (RAGAS, harness) |
+| Cat·logo, precios, POS, permisos, inventario, ventas | **.NET** | Fuente de verdad transaccional |
+| `ProductAiProfile`, `ProductFamily`, `ProductFamilyMember`, `ProductRecommendation` (curaciÛn manual) | **.NET** | Datos de negocio revisables por humanos |
+| **SeÒales de demanda** (`sales_7/30/60d`, cobertura, dÌas sin venta, stock en otros POS) | **.NET, en SQL** | C·lculos deterministas sobre datos transaccionales. Un LLM aquÌ solo introduce error |
+| **Motor de recomendaciones de inventario** (reglas de reposiciÛn, traslado, rotaciÛn) | **.NET** | Reglas de negocio auditables y testeables sin LLM |
+| `InventoryRecommendation` y su ciclo de aprobaciÛn | **.NET** | Escritura sensible con auditorÌa |
+| Perfil comercial por POS (mÈtricas) | **.NET, en SQL** | MÈtricas calculadas; el LLM solo redacta el resumen |
+| Embeddings, Ìndice vectorial, recuperaciÛn hÌbrida, sustitutos, complementarios | **Python** | Es el espacio vectorial |
+| GeneraciÛn con citas, guardrails, bucles agÈnticos | **Python** | Es la capa LLM |
+| EvaluaciÛn offline | **Python** | Instrumental del m·ster (RAGAS, harness) |
 
-**Regla de una frase:** *Python calcula parecidos y redacta; .NET calcula n√∫meros y decide.*
+**Regla de una frase:** *Python calcula parecidos y redacta; .NET calcula n˙meros y decide.*
 
-### 6.3. Contrato de sincronizaci√≥n (respuesta a la decisi√≥n 10)
+### 6.3. Contrato de sincronizaciÛn (respuesta a la decisiÛn 10)
 
 | Aspecto | Regla |
 |---|---|
 | **Propiedad** | `public.*` y las tablas IA de negocio son de .NET. `ai.*` es de Python. Python **nunca** escribe en `public` ni lo lee por SQL |
-| **Qui√©n inicia** | Python **tira** (`pull`) de feeds HTTP paginados con cursor `since`. .NET **empuja** una invalidaci√≥n cuando se aprueba un perfil o cambia una familia |
+| **QuiÈn inicia** | Python **tira** (`pull`) de feeds HTTP paginados con cursor `since`. .NET **empuja** una invalidaciÛn cuando se aprueba un perfil o cambia una familia |
 | **Altas y cambios** | Upsert idempotente por `product_id`, guiado por `source_hash`. Sin cambio de hash no se recalcula embedding |
-| **Bajas y desactivaciones** | El feed emite **tombstones** (`{product_id, deleted_at \| deactivated_at}`). Un producto desactivado sale del √≠ndice en la siguiente sincronizaci√≥n, y adem√°s el hidratador lo descarta al instante |
-| **Detecci√≥n de divergencia** | `GET /v1/index/status` compara conteo y hash agregado del √≠ndice contra el del feed; expone `drift_count` y `last_full_sync_at`. Sincronizaci√≥n completa nocturna que reconcilia |
+| **Bajas y desactivaciones** | El feed emite **tombstones** (`{product_id, deleted_at \| deactivated_at}`). Un producto desactivado sale del Ìndice en la siguiente sincronizaciÛn, y adem·s el hidratador lo descarta al instante |
+| **DetecciÛn de divergencia** | `GET /v1/index/status` compara conteo y hash agregado del Ìndice contra el del feed; expone `drift_count` y `last_full_sync_at`. SincronizaciÛn completa nocturna que reconcilia |
 | **Reintentos** | Backoff exponencial con tope; un lote fallido no bloquea el resto; los fallos quedan en `ai.sync_failure` para reintento manual |
 | **Versionado** | `embedding_model` + `embedding_version` por fila. Cambiar de modelo se hace en **columna nueva**, nunca sobrescribiendo |
-| **Frescura de inventario** | La proyecci√≥n se refresca cada 5-10 min y **nunca excluye** (¬ß7.6) |
+| **Frescura de inventario** | La proyecciÛn se refresca cada 5-10 min y **nunca excluye** (ß7.6) |
 
-### 6.4. Seguridad y degradaci√≥n
+### 6.4. Seguridad y degradaciÛn
 
-- El frontend nunca habla con Python. .NET ‚Üí Python con **JWT interno de servicio** (HS256, TTL corto, secreto en SSM) que transporta `user_id`, `role`, `pos_id`, `trace_id`. Python valida y aplica ese scope; no conf√≠a en el body. Red interna Docker, puerto no publicado en nginx.
-- Timeouts (0,8 s retrieval / 5 s assist), reintento √∫nico, circuit breaker con Polly. Si el circuito abre, .NET responde con el **buscador l√©xico existente** y `ai_available: false`. **El sistema nunca se cae por culpa de la IA.** Feature flag por POS.
+- El frontend nunca habla con Python. .NET ? Python con **JWT interno de servicio** (HS256, TTL corto, secreto en SSM) que transporta `user_id`, `role`, `pos_id`, `trace_id`. Python valida y aplica ese scope; no confÌa en el body. Red interna Docker, puerto no publicado en nginx.
+- Timeouts (0,8 s retrieval / 5 s assist), reintento ˙nico, circuit breaker con Polly. Si el circuito abre, .NET responde con el **buscador lÈxico existente** y `ai_available: false`. **El sistema nunca se cae por culpa de la IA.** Feature flag por POS.
 
 ---
 
-## 7. Dise√±o del sistema RAG
+## 7. DiseÒo del sistema RAG
 
 ### 7.1. Pipeline de enriquecimiento
 
 ```text
-Producto (SKU, nombre, descripci√≥n, precio, colecci√≥n)
-  ‚Üí normalizaci√≥n determinista (limpieza, unidades, tallas por regex)
-  ‚Üí extracci√≥n estructurada con LLM (JSON schema estricto, temperatura 0)
-  ‚Üí validaci√≥n: esquema + vocabularios cerrados + coherencia
-  ‚Üí confianza POR CAMPO ‚Üí enrutado h√≠brido de revisi√≥n (¬ß7.8)
-  ‚Üí ProductAiProfile (.NET) + SourceText can√≥nico + SourceHash
-  ‚Üí embedding solo si cambia SourceHash ‚Üí ai.product_document
+Producto (SKU, nombre, descripciÛn, precio, colecciÛn)
+  ? normalizaciÛn determinista (limpieza, unidades, tallas por regex)
+  ? extracciÛn estructurada con LLM (JSON schema estricto, temperatura 0)
+  ? validaciÛn: esquema + vocabularios cerrados + coherencia
+  ? confianza POR CAMPO ? enrutado hÌbrido de revisiÛn (ß7.8)
+  ? ProductAiProfile (.NET) + SourceText canÛnico + SourceHash
+  ? embedding solo si cambia SourceHash ? ai.product_document
 ```
 
-`materials` se extrae como **lista** contra vocabulario cerrado (plata, acero, ba√±o de oro, oro, lat√≥n, resina, cuero, perla cultivada‚Ä¶). El extractor devuelve `[]` si no hay evidencia, nunca inventa un material por defecto ‚Äî y `[]` con confianza baja enruta a revisi√≥n.
+`materials` se extrae como **lista** contra vocabulario cerrado (plata, acero, baÒo de oro, oro, latÛn, resina, cuero, perla cultivadaÖ). El extractor devuelve `[]` si no hay evidencia, nunca inventa un material por defecto ó y `[]` con confianza baja enruta a revisiÛn.
 
-### 7.2. Esquema del √≠ndice (`ai`, pgvector)
+### 7.2. Esquema del Ìndice (`ai`, pgvector)
 
 ```text
 ai.product_document              -- 1 fila por producto, sin chunking
@@ -254,7 +256,7 @@ ai.product_document              -- 1 fila por producto, sin chunking
   piece_type, materials text[], stone_type, size_label
   family_id uuid nullable, family_name, variant_label
   color_tags[], style_tags[], occasion_tags[]
-  doc_text text                  -- SourceText can√≥nico
+  doc_text text                  -- SourceText canÛnico
   source_hash char(64)
   embedding vector(1536)
   tsv tsvector                   -- to_tsvector('spanish', ...)
@@ -269,97 +271,97 @@ ai.pos_projection                -- prior de ranking, NUNCA filtro excluyente
   pos_id, product_id, is_assigned_hint, qty_bucket (0 | 1-2 | 3+)
   sales_30d, sales_90d, last_sale_at, refreshed_at
 
-ai.co_occurrence                 -- se√±al de complementarios
+ai.co_occurrence                 -- seÒal de complementarios
   product_a, product_b, co_sales_count, last_seen_at
 
 ai.sync_failure, ai.query_log, ai.eval_run, ai.eval_case, ai.eval_result
 ```
 
-√çndices: **HNSW `vector_cosine_ops`** sobre ambos `embedding` (alineado con el operador `<=>`; desalinearlo desactiva el √≠ndice en silencio), **GIN** sobre `tsv`, sobre `metadata` y **sobre `materials`** (filtro por solape), B-tree sobre `family_id`, `piece_type`, `price_band`.
+Õndices: **HNSW `vector_cosine_ops`** sobre ambos `embedding` (alineado con el operador `<=>`; desalinearlo desactiva el Ìndice en silencio), **GIN** sobre `tsv`, sobre `metadata` y **sobre `materials`** (filtro por solape), B-tree sobre `family_id`, `piece_type`, `price_band`.
 
-**`qty_bucket`, no cantidad exacta.** La proyecci√≥n puede estar desfasada; guardar el n√∫mero exacto invitar√≠a a mostrarlo. Con un *bucket* solo puede usarse como se√±al de ranking. La cantidad real la pone .NET.
+**`qty_bucket`, no cantidad exacta.** La proyecciÛn puede estar desfasada; guardar el n˙mero exacto invitarÌa a mostrarlo. Con un *bucket* solo puede usarse como seÒal de ranking. La cantidad real la pone .NET.
 
 ### 7.3. Filtro por materiales
 
-Con `materials[]`, el filtro deja de ser igualdad y pasa a ser **solape**: "algo de plata" recupera productos cuyo array contiene `plata`, aunque tambi√©n tengan `ba√±o de oro`. Dos sem√°nticas, elegidas por consulta:
+Con `materials[]`, el filtro deja de ser igualdad y pasa a ser **solape**: "algo de plata" recupera productos cuyo array contiene `plata`, aunque tambiÈn tengan `baÒo de oro`. Dos sem·nticas, elegidas por consulta:
 
-- **Contiene alguno** (`materials && ARRAY['plata']`) ‚Äî comportamiento por defecto, el que espera un operador.
-- **Contiene todos** (`materials @> ARRAY['plata','ba√±o de oro']`) ‚Äî cuando la consulta nombra varios.
+- **Contiene alguno** (`materials && ARRAY['plata']`) ó comportamiento por defecto, el que espera un operador.
+- **Contiene todos** (`materials @> ARRAY['plata','baÒo de oro']`) ó cuando la consulta nombra varios.
 
-La normalizaci√≥n de sin√≥nimos de material ("plata de ley", "925", "sterling" ‚Üí `plata`) se hace en el **vocabulario cerrado** durante la extracci√≥n, no en consulta.
+La normalizaciÛn de sinÛnimos de material ("plata de ley", "925", "sterling" ? `plata`) se hace en el **vocabulario cerrado** durante la extracciÛn, no en consulta.
 
-### 7.4. Diccionario de sin√≥nimos (sustituto de `SearchAliases`)
+### 7.4. Diccionario de sinÛnimos (sustituto de `SearchAliases`)
 
-**Problema:** sin alias por producto, la rama l√©xica no encuentra "sortija" para un producto llamado "anillo", ni "gargantilla" para "collar".
+**Problema:** sin alias por producto, la rama lÈxica no encuentra "sortija" para un producto llamado "anillo", ni "gargantilla" para "collar".
 
-**Propuesta:** un fichero **√∫nico y curado a mano** en el repositorio, ~40-60 entradas, versionado y revisable:
+**Propuesta:** un fichero **˙nico y curado a mano** en el repositorio, ~40-60 entradas, versionado y revisable:
 
 ```yaml
 anillo:    [sortija, aro de dedo, alianza]
 pendiente: [aro, arete, pendientes, criolla]
 collar:    [gargantilla, cadena, colgante]
 pulsera:   [brazalete, esclava]
-dorado:    [oro, color oro, ba√±o de oro, gold]
+dorado:    [oro, color oro, baÒo de oro, gold]
 ```
 
-Se aplica en **expansi√≥n de consulta** ("sortija plata" busca tambi√©n "anillo plata"), nunca en indexaci√≥n, para no contaminar los documentos. Ventajas frente a alias por producto: una sola lista, cero generaci√≥n por IA, cero deriva, corregible en un commit y aplicable a productos futuros sin reindexar. **Su efecto se mide**: el golden set tiene una categor√≠a de consultas con sin√≥nimos y se compara con y sin diccionario.
+Se aplica en **expansiÛn de consulta** ("sortija plata" busca tambiÈn "anillo plata"), nunca en indexaciÛn, para no contaminar los documentos. Ventajas frente a alias por producto: una sola lista, cero generaciÛn por IA, cero deriva, corregible en un commit y aplicable a productos futuros sin reindexar. **Su efecto se mide**: el golden set tiene una categorÌa de consultas con sinÛnimos y se compara con y sin diccionario.
 
-### 7.5. Familias: flujo mixto (respuesta a la decisi√≥n abierta 4 de la v2)
+### 7.5. Familias: flujo mixto (respuesta a la decisiÛn abierta 4 de la v2)
 
-Crear ~350 familias a mano es inviable, y dejarlas a la IA es lo que la revisi√≥n rechaza con raz√≥n. El flujo acordado:
+Crear ~350 familias a mano es inviable, y dejarlas a la IA es lo que la revisiÛn rechaza con razÛn. El flujo acordado:
 
-1. **La IA propone**: agrupa candidatos por similitud de embedding (umbral alto) + mismo `piece_type` + ra√≠z com√∫n de nombre, y genera propuestas con miembros y etiquetas de variante detectadas.
-2. **El admin aprueba, edita o rechaza** en una pantalla de revisi√≥n por lotes. Al aprobar se crean `ProductFamily` y `ProductFamilyMember` reales, en .NET.
-3. **La familia es editable despu√©s** sin tocar nada de IA: es una entidad de negocio.
-4. **Alerta de hu√©rfanos**: productos con similitud alta a una familia existente pero sin pertenecer a ella se listan como incidencia de calidad.
+1. **La IA propone**: agrupa candidatos por similitud de embedding (umbral alto) + mismo `piece_type` + raÌz com˙n de nombre, y genera propuestas con miembros y etiquetas de variante detectadas.
+2. **El admin aprueba, edita o rechaza** en una pantalla de revisiÛn por lotes. Al aprobar se crean `ProductFamily` y `ProductFamilyMember` reales, en .NET.
+3. **La familia es editable despuÈs** sin tocar nada de IA: es una entidad de negocio.
+4. **Alerta de huÈrfanos**: productos con similitud alta a una familia existente pero sin pertenecer a ella se listan como incidencia de calidad.
 
-Esto convierte la exigencia del compa√±ero en un uso leg√≠timo del √≠ndice que ya construimos, y es un segundo caso de HITL demostrable para el PF.
+Esto convierte la exigencia del compaÒero en un uso legÌtimo del Ìndice que ya construimos, y es un segundo caso de HITL demostrable para el PF.
 
-### 7.6. Recuperaci√≥n: prefiltro blando y sobre-recuperaci√≥n (respuesta a la decisi√≥n 11)
+### 7.6. RecuperaciÛn: prefiltro blando y sobre-recuperaciÛn (respuesta a la decisiÛn 11)
 
-El orden importa, y cambia respecto a la versi√≥n anterior:
+El orden importa, y cambia respecto a la versiÛn anterior:
 
-1. **Filtros duros ‚Äî solo los que no pueden estar obsoletos.** El `pos_id` del solicitante viene del token, no de la proyecci√≥n: eso s√≠ es duro. Nada m√°s se excluye en Python.
-2. **Filtros estructurales de la consulta**: banda de precio, tipo de pieza, talla, materiales (solape). Extra√≠dos **por reglas** (`menos de 80`, `talla M`, nombres del vocabulario de materiales) con *fallback* a consulta cruda.
-3. **B√∫squeda h√≠brida**: vectorial (`<=>` sobre HNSW) + l√©xica (`ts_rank` espa√±ol + expansi√≥n de sin√≥nimos + *boost* de SKU/nombre exacto), fusionadas con **RRF**.
+1. **Filtros duros ó solo los que no pueden estar obsoletos.** El `pos_id` del solicitante viene del token, no de la proyecciÛn: eso sÌ es duro. Nada m·s se excluye en Python.
+2. **Filtros estructurales de la consulta**: banda de precio, tipo de pieza, talla, materiales (solape). ExtraÌdos **por reglas** (`menos de 80`, `talla M`, nombres del vocabulario de materiales) con *fallback* a consulta cruda.
+3. **B˙squeda hÌbrida**: vectorial (`<=>` sobre HNSW) + lÈxica (`ts_rank` espaÒol + expansiÛn de sinÛnimos + *boost* de SKU/nombre exacto), fusionadas con **RRF**.
 4. **Prior de disponibilidad, no filtro**: `qty_bucket = 0` o `is_assigned_hint = false` **penalizan** el score; nunca eliminan al candidato.
-5. **Sobre-recuperaci√≥n**: Python devuelve `top_k √ó 3` candidatos (tope 60) para que .NET tenga margen tras descartar.
-6. **.NET decide**: el hidratador aplica la verdad ‚Äî producto activo, `Inventory.IsActive` real, stock, precio, permisos ‚Äî descarta lo inv√°lido y **trunca a `top_k`**. Si tras hidratar quedan menos de los pedidos, .NET puede repedir con `top_k` mayor.
-7. **Threshold y abstenci√≥n**: por debajo del umbral no se devuelve nada y se marca `low_confidence: true`. Devolver cero es informaci√≥n v√°lida.
-8. **Reranking cross-encoder**: no se implementa; se documenta la hip√≥tesis y el protocolo (¬ß11.2).
+5. **Sobre-recuperaciÛn**: Python devuelve `top_k ◊ 3` candidatos (tope 60) para que .NET tenga margen tras descartar.
+6. **.NET decide**: el hidratador aplica la verdad ó producto activo, `Inventory.IsActive` real, stock, precio, permisos ó descarta lo inv·lido y **trunca a `top_k`**. Si tras hidratar quedan menos de los pedidos, .NET puede repedir con `top_k` mayor.
+7. **Threshold y abstenciÛn**: por debajo del umbral no se devuelve nada y se marca `low_confidence: true`. Devolver cero es informaciÛn v·lida.
+8. **Reranking cross-encoder**: no se implementa; se documenta la hipÛtesis y el protocolo (ß11.2).
 
-Con esto, un producto v√°lido **no puede** desaparecer por una proyecci√≥n desfasada: como mucho baja de posici√≥n, y .NET siempre lo ve.
+Con esto, un producto v·lido **no puede** desaparecer por una proyecciÛn desfasada: como mucho baja de posiciÛn, y .NET siempre lo ve.
 
-### 7.7. Generaci√≥n, avisos y citas
+### 7.7. GeneraciÛn, avisos y citas
 
 La respuesta es **estructurada**, no prosa libre:
 
 - `groups[]`: candidatos agrupados por **`family_id`**, con `variant_label` destacado.
-- `reason` por candidato: qu√© se√±ales coincidieron, construido desde datos (tipo, materiales, color, disponibilidad), no inventado.
-- `warnings[]`: **calculados por reglas**, no persistidos ni generados libremente ‚Äî existen variantes en la familia, falta `size_label`, stock cr√≠tico, familia con miembros sin stock.
+- `reason` por candidato: quÈ seÒales coincidieron, construido desde datos (tipo, materiales, color, disponibilidad), no inventado.
+- `warnings[]`: **calculados por reglas**, no persistidos ni generados libremente ó existen variantes en la familia, falta `size_label`, stock crÌtico, familia con miembros sin stock.
 - `pitch`: argumentario **generado en tiempo de consulta** desde metadatos aprobados y, si aplica, chunks del corpus de conocimiento con `citations[]`. **No se persiste.**
 - `clarification_question` si la consulta es ambigua.
 
-**Sobre los cuidados**: se elimina `CareInstructions` como atributo del producto, de acuerdo. Pero el conocimiento sobre cuidados **s√≠ existe** en el corpus general (`doc_type: material`), donde es una ficha por material y no por producto ‚Äî cumple el principio de la revisi√≥n y permite responder "¬øeste anillo se puede mojar?" con cita verificable.
+**Sobre los cuidados**: se elimina `CareInstructions` como atributo del producto, de acuerdo. Pero el conocimiento sobre cuidados **sÌ existe** en el corpus general (`doc_type: material`), donde es una ficha por material y no por producto ó cumple el principio de la revisiÛn y permite responder "øeste anillo se puede mojar?" con cita verificable.
 
 **Toda cifra de precio o stock se emite como placeholder** (`{{price}}`, `{{stock}}`) que el modelo no puede rellenar; .NET los sustituye al hidratar y **rechaza la respuesta** si alguno queda sin resolver.
 
-### 7.8. Revisi√≥n humana h√≠brida (respuesta a la decisi√≥n 5)
+### 7.8. RevisiÛn humana hÌbrida (respuesta a la decisiÛn 5)
 
-| Campo | Pol√≠tica |
+| Campo | PolÌtica |
 |---|---|
-| `piece_type`, `materials`, `stone_type`, `size_label`, pertenencia a familia | **Revisi√≥n obligatoria si el valor es inferido.** Si viene de un dato estructurado existente o de una regla determinista (regex de talla), se marca `source: rule` y no requiere revisi√≥n |
-| `color_tags`, `style_tags`, `occasion_tags` | **Auto-aprobaci√≥n** si la confianza supera el umbral; a revisi√≥n si no |
-| Cualquier campo con confianza bajo umbral | Revisi√≥n |
+| `piece_type`, `materials`, `stone_type`, `size_label`, pertenencia a familia | **RevisiÛn obligatoria si el valor es inferido.** Si viene de un dato estructurado existente o de una regla determinista (regex de talla), se marca `source: rule` y no requiere revisiÛn |
+| `color_tags`, `style_tags`, `occasion_tags` | **Auto-aprobaciÛn** si la confianza supera el umbral; a revisiÛn si no |
+| Cualquier campo con confianza bajo umbral | RevisiÛn |
 
-**El problema operativo, dicho abiertamente:** con ~1.000 productos, "revisar todos los campos sensibles inferidos" son horas de trabajo humano que no tenemos antes del 3 de septiembre, y si solo se indexan perfiles aprobados el corpus queda vac√≠o y no hay demo.
+**El problema operativo, dicho abiertamente:** con ~1.000 productos, "revisar todos los campos sensibles inferidos" son horas de trabajo humano que no tenemos antes del 3 de septiembre, y si solo se indexan perfiles aprobados el corpus queda vacÌo y no hay demo.
 
-**C√≥mo se resuelve sin hacer trampa:** dos v√≠as declaradas y distinguibles en los datos.
+**CÛmo se resuelve sin hacer trampa:** dos vÌas declaradas y distinguibles en los datos.
 
-- **V√≠a revisada**: un lote de 120-150 productos pasa por la pantalla de revisi√≥n de verdad, cronometrado. De ah√≠ sale un dato que va al README: **tiempo medio de revisi√≥n por producto y tasa de correcci√≥n real del extractor**. Es la evidencia de que el mecanismo funciona y de cu√°nto cuesta.
-- **V√≠a masiva**: el resto se marca `review_state = auto_bulk`, se indexa y se distingue en toda m√©trica. El README dice expl√≠citamente qu√© porcentaje del corpus est√° revisado por humanos.
+- **VÌa revisada**: un lote de 120-150 productos pasa por la pantalla de revisiÛn de verdad, cronometrado. De ahÌ sale un dato que va al README: **tiempo medio de revisiÛn por producto y tasa de correcciÛn real del extractor**. Es la evidencia de que el mecanismo funciona y de cu·nto cuesta.
+- **VÌa masiva**: el resto se marca `review_state = auto_bulk`, se indexa y se distingue en toda mÈtrica. El README dice explÌcitamente quÈ porcentaje del corpus est· revisado por humanos.
 
-Ning√∫n n√∫mero de evaluaci√≥n mezcla ambas v√≠as sin decirlo.
+Ning˙n n˙mero de evaluaciÛn mezcla ambas vÌas sin decirlo.
 
 ---
 
@@ -369,162 +371,162 @@ Ning√∫n n√∫mero de evaluaci√≥n mezcla ambas v√≠as sin decirlo.
 
 | Fuente | Disponibilidad | Uso |
 |---|---|---|
-| Modelo de datos y sem√°ntica de negocio | **Real y verificado** | Define esquemas, filtros, permisos, reglas |
-| **Cat√°logo real e hist√≥rico de ventas 2026 anonimizado** | **Confirmado, de tama√±o desconocido** | N√∫cleo del corpus y **ancla del golden set**. Se ampl√≠a con sint√©tico hasta alcanzar volumen |
-| Textos comerciales de la joyer√≠a (materiales, garant√≠a, tallas) | A pedir al negocio | Semilla del corpus de conocimiento |
-| Fotos de producto | Reales si hay export | No se usan (el √≠ndice visual ya existe y es otro problema) |
+| Modelo de datos y sem·ntica de negocio | **Real y verificado** | Define esquemas, filtros, permisos, reglas |
+| **Cat·logo real e histÛrico de ventas 2026 anonimizado** | **Confirmado, de tamaÒo desconocido** | N˙cleo del corpus y **ancla del golden set**. Se amplÌa con sintÈtico hasta alcanzar volumen |
+| Textos comerciales de la joyerÌa (materiales, garantÌa, tallas) | A pedir al negocio | Semilla del corpus de conocimiento |
+| Fotos de producto | Reales si hay export | No se usan (el Ìndice visual ya existe y es otro problema) |
 
-### 8.1.1. Corpus h√≠brido: c√≥mo se combinan real y sint√©tico
+### 8.1.1. Corpus hÌbrido: cÛmo se combinan real y sintÈtico
 
-El export real llegar√° pero probablemente no d√© el volumen necesario. La combinaci√≥n no es "mezclar y olvidar": tiene tres reglas que protegen la validez de la evaluaci√≥n.
+El export real llegar· pero probablemente no dÈ el volumen necesario. La combinaciÛn no es "mezclar y olvidar": tiene tres reglas que protegen la validez de la evaluaciÛn.
 
 1. **Todo documento lleva `data_origin: real | synthetic`**, tanto en `ai.product_document` como en el golden set. Es una columna, no un comentario.
-2. **El generador sint√©tico se calibra con lo real, no al rev√©s.** Del export se extraen distribuci√≥n de precios, longitud t√≠pica de descripci√≥n, convenciones de SKU, mezcla de materiales y tama√±o medio de familia; el generador reproduce esas distribuciones. As√≠ el sint√©tico no es "m√°s f√°cil" por accidente de estilo.
-3. **Toda m√©trica se reporta desglosada: real, sint√©tico y global.** Es la regla que evita el autoenga√±o. Los productos sint√©ticos son m√°s limpios y regulares; si el Recall@5 global sale bien pero el de la porci√≥n real sale mal, el sistema no sirve y hay que verlo. **El n√∫mero que va al README como resultado principal es el de la porci√≥n real.**
+2. **El generador sintÈtico se calibra con lo real, no al revÈs.** Del export se extraen distribuciÛn de precios, longitud tÌpica de descripciÛn, convenciones de SKU, mezcla de materiales y tamaÒo medio de familia; el generador reproduce esas distribuciones. AsÌ el sintÈtico no es "m·s f·cil" por accidente de estilo.
+3. **Toda mÈtrica se reporta desglosada: real, sintÈtico y global.** Es la regla que evita el autoengaÒo. Los productos sintÈticos son m·s limpios y regulares; si el Recall@5 global sale bien pero el de la porciÛn real sale mal, el sistema no sirve y hay que verlo. **El n˙mero que va al README como resultado principal es el de la porciÛn real.**
 
-Y una regla sobre el golden set: **se etiqueta primero sobre productos reales** y solo se completa con sint√©ticos si no hay material suficiente para cubrir las 9 categor√≠as. Si el export trae, por ejemplo, 200 productos, esos 200 sostienen la mayor parte de las 60-70 consultas.
+Y una regla sobre el golden set: **se etiqueta primero sobre productos reales** y solo se completa con sintÈticos si no hay material suficiente para cubrir las 9 categorÌas. Si el export trae, por ejemplo, 200 productos, esos 200 sostienen la mayor parte de las 60-70 consultas.
 
-**Postura:** el sistema funciona con cualquiera de los dos extremos; el dise√±o no depende del tama√±o del export, solo la fuerza de la evidencia.
+**Postura:** el sistema funciona con cualquiera de los dos extremos; el diseÒo no depende del tamaÒo del export, solo la fuerza de la evidencia.
 
 ### 8.2. Estrategia: mundo determinista, texto con IA
 
-- **LLM ‚Üí lo textual y sem√°ntico**: nombres, descripciones, corpus de conocimiento, consultas de operador.
-- **C√≥digo determinista con semilla ‚Üí lo num√©rico y relacional**: red de POS, propensi√≥n producto√óPOS, simulaci√≥n de ventas (Poisson con estacionalidad y perfil por hotel), inventario, movimientos, co-ocurrencia.
+- **LLM ? lo textual y sem·ntico**: nombres, descripciones, corpus de conocimiento, consultas de operador.
+- **CÛdigo determinista con semilla ? lo numÈrico y relacional**: red de POS, propensiÛn producto◊POS, simulaciÛn de ventas (Poisson con estacionalidad y perfil por hotel), inventario, movimientos, co-ocurrencia.
 
-El hist√≥rico as√≠ generado es **coherente por construcci√≥n** con cat√°logo y stock, que es lo que necesitan rotaci√≥n, sustitutos, complementarios, perfil por POS y reposici√≥n.
+El histÛrico asÌ generado es **coherente por construcciÛn** con cat·logo y stock, que es lo que necesitan rotaciÛn, sustitutos, complementarios, perfil por POS y reposiciÛn.
 
 ### 8.3. Datasets
 
 | # | Dataset | Volumen | Novedades v3 | Alimenta |
 |---|---|---|---|---|
-| D0 | **Cat√°logo real anonimizado** | Desconocido | **Ancla del corpus y del golden set**; calibra las distribuciones de D1 | √çndice, evaluaci√≥n |
-| D1 | Cat√°logo sint√©tico | Hasta completar 900-1.200 con D0, ~350 familias | **`materials[]` multivalor** (~35 % con 2+ materiales); distribuciones calibradas con D0 | √çndice |
-| D2 | Perfiles IA | = D1 | `materials[]`, confianza por campo, `source: rule\|inferred` | Filtros, revisi√≥n |
-| D3 | `SourceText` + embeddings | = D1 | Incluye familia y variante | B√∫squeda vectorial |
-| D4 | Familias | ~350 | **`ProductFamily` + miembros**, con 15 % de hu√©rfanos deliberados | Desambiguaci√≥n, alerta de calidad |
-| D5 | Corpus de conocimiento | 30-45 docs ‚Üí 150-250 chunks | Fichas **por material**, no por producto | Citas, faithfulness |
-| D6 | Red de POS | 10-14 | **Marca de origen de suministro** (¬ß14) | Filtros, perfil, reposici√≥n |
-| D7 | Inventario por POS | 5.000-9.000 filas | ‚Äî | Prior de ranking, sustitutos |
-| D8 | Hist√≥rico de ventas | 15.000-25.000 / 14-18 meses | **Co-ocurrencia por operaci√≥n de venta** | Rotaci√≥n, perfil POS, complementarios, reposici√≥n |
-| D9 | Diccionario de sin√≥nimos | 40-60 entradas | **Nuevo**, curado a mano | Rama l√©xica |
-| D10 | Consultas de operador | 300-400 | Categor√≠as de sin√≥nimos y multi-material | Calibraci√≥n |
-| D11 | **Golden set** | 60-70 etiquetadas a mano por ambos | + categor√≠as sin√≥nimo y materiales m√∫ltiples; **prioridad a productos reales**, con `data_origin` por caso | M√©tricas de recuperaci√≥n |
-| D12 | Casos adversarios | 20-25 | ‚Äî | Guardrails |
+| D0 | **Cat·logo real anonimizado** | Desconocido | **Ancla del corpus y del golden set**; calibra las distribuciones de D1 | Õndice, evaluaciÛn |
+| D1 | Cat·logo sintÈtico | Hasta completar 900-1.200 con D0, ~350 familias | **`materials[]` multivalor** (~35 % con 2+ materiales); distribuciones calibradas con D0 | Õndice |
+| D2 | Perfiles IA | = D1 | `materials[]`, confianza por campo, `source: rule\|inferred` | Filtros, revisiÛn |
+| D3 | `SourceText` + embeddings | = D1 | Incluye familia y variante | B˙squeda vectorial |
+| D4 | Familias | ~350 | **`ProductFamily` + miembros**, con 15 % de huÈrfanos deliberados | DesambiguaciÛn, alerta de calidad |
+| D5 | Corpus de conocimiento | 30-45 docs ? 150-250 chunks | Fichas **por material**, no por producto | Citas, faithfulness |
+| D6 | Red de POS | 10-14 | **Marca de origen de suministro** (ß14) | Filtros, perfil, reposiciÛn |
+| D7 | Inventario por POS | 5.000-9.000 filas | ó | Prior de ranking, sustitutos |
+| D8 | HistÛrico de ventas | 15.000-25.000 / 14-18 meses | **Co-ocurrencia por operaciÛn de venta** | RotaciÛn, perfil POS, complementarios, reposiciÛn |
+| D9 | Diccionario de sinÛnimos | 40-60 entradas | **Nuevo**, curado a mano | Rama lÈxica |
+| D10 | Consultas de operador | 300-400 | CategorÌas de sinÛnimos y multi-material | CalibraciÛn |
+| D11 | **Golden set** | 60-70 etiquetadas a mano por ambos | + categorÌas sinÛnimo y materiales m˙ltiples; **prioridad a productos reales**, con `data_origin` por caso | MÈtricas de recuperaciÛn |
+| D12 | Casos adversarios | 20-25 | ó | Guardrails |
 | D13 | Escenarios de agente | 20-25 (venta) + 8-10 (inventario) | **Nuevo**: escenarios de inventario | Eval de agentes |
 
-**√çndice vectorial total: ~1.200-1.500 vectores.** Peque√±o, y conviene decirlo: pgvector con HNSW es holgado aqu√≠; la decisi√≥n se justifica por operaci√≥n (una sola base de datos, filtros SQL nativos, cero infraestructura nueva), no por escala.
+**Õndice vectorial total: ~1.200-1.500 vectores.** PequeÒo, y conviene decirlo: pgvector con HNSW es holgado aquÌ; la decisiÛn se justifica por operaciÛn (una sola base de datos, filtros SQL nativos, cero infraestructura nueva), no por escala.
 
 ### 8.4. Realismo dirigido
 
-Familias confundibles (3-5 variantes con diferencia solo de talla) ¬∑ ~30 % de descripciones pobres ¬∑ 3-4 convenciones de SKU mezcladas ¬∑ **~35 % de productos multi-material** ¬∑ **15 % de productos hu√©rfanos de familia** para probar la alerta ¬∑ colisiones sem√°nticas verificadas (ning√∫n par > 0,97 coseno) ¬∑ consultas con faltas, abreviaturas y sin√≥nimos ¬∑ estacionalidad por hotel.
+Familias confundibles (3-5 variantes con diferencia solo de talla) ∑ ~30 % de descripciones pobres ∑ 3-4 convenciones de SKU mezcladas ∑ **~35 % de productos multi-material** ∑ **15 % de productos huÈrfanos de familia** para probar la alerta ∑ colisiones sem·nticas verificadas (ning˙n par > 0,97 coseno) ∑ consultas con faltas, abreviaturas y sinÛnimos ∑ estacionalidad por hotel.
 
 ### 8.5. Calidad, privacidad y trazabilidad
 
-- **Puertas de calidad** antes de indexar: unicidad de SKU, vocabulario cerrado respetado, `materials` no vac√≠o salvo justificaci√≥n, cobertura de tags ‚â• 90 %, sin colisiones, sin obligatorios vac√≠os. Falla la puerta ‚Üí falla el pipeline.
-- **PII**: el modelo **no almacena datos de cliente final** (`Sale` no tiene cliente). Los √∫nicos datos personales son de operadores: ficticios en sint√©tico, anonimizados antes de salir de producci√≥n si hay export. Ning√∫n dato personal entra en el √≠ndice ni en un prompt.
+- **Puertas de calidad** antes de indexar: unicidad de SKU, vocabulario cerrado respetado, `materials` no vacÌo salvo justificaciÛn, cobertura de tags = 90 %, sin colisiones, sin obligatorios vacÌos. Falla la puerta ? falla el pipeline.
+- **PII**: el modelo **no almacena datos de cliente final** (`Sale` no tiene cliente). Los ˙nicos datos personales son de operadores: ficticios en sintÈtico, anonimizados antes de salir de producciÛn si hay export. Ning˙n dato personal entra en el Ìndice ni en un prompt.
 - **Trazabilidad**: cada dataset lleva `generator_version`, `seed`, `model`, `generated_at`; el corpus se regenera con un comando.
 
 ---
 
-## 9. Capa ag√©ntica
+## 9. Capa agÈntica
 
 ### 9.1. Dos agentes, ninguno escribe
 
-| Agente | Qu√© decide | Tools (todas de lectura) | Salida |
+| Agente | QuÈ decide | Tools (todas de lectura) | Salida |
 |---|---|---|---|
-| **Asistente de venta** (s√≠ncrono) | Si buscar, si pedir aclaraci√≥n, si pivotar a sustitutos o variantes, si consultar conocimiento | `buscar_catalogo`, `consultar_disponibilidad` (.NET), `listar_familia`, `buscar_sustitutos`, `buscar_complementarios`, `consultar_conocimiento`, `perfil_punto_venta`, `pedir_aclaracion` | Resultados estructurados + borrador de venta que confirma el operador |
-| **Agente de inventario** (batch) | Qu√© priorizar, qu√© sustituto proponer cuando no hay stock, c√≥mo redactar el motivo | `senales_demanda` (.NET, SQL), `stock_por_pos` (.NET), `buscar_sustitutos`, `perfil_punto_venta` | `InventoryRecommendation` en estado **`Proposed`**; el admin aprueba |
+| **Asistente de venta** (sÌncrono) | Si buscar, si pedir aclaraciÛn, si pivotar a sustitutos o variantes, si consultar conocimiento | `buscar_catalogo`, `consultar_disponibilidad` (.NET), `listar_familia`, `buscar_sustitutos`, `buscar_complementarios`, `consultar_conocimiento`, `perfil_punto_venta`, `pedir_aclaracion` | Resultados estructurados + borrador de venta que confirma el operador |
+| **Agente de inventario** (batch) | QuÈ priorizar, quÈ sustituto proponer cuando no hay stock, cÛmo redactar el motivo | `senales_demanda` (.NET, SQL), `stock_por_pos` (.NET), `buscar_sustitutos`, `perfil_punto_venta` | `InventoryRecommendation` en estado **`Proposed`**; el admin aprueba |
 
-**Los n√∫meros nunca los calcula el LLM.** Las se√±ales de demanda y las reglas de reposici√≥n son SQL en .NET; el agente prioriza, elige sustituto y redacta el motivo. Es exactamente la matriz ¬ß7.3 de las especificaciones v2.
+**Los n˙meros nunca los calcula el LLM.** Las seÒales de demanda y las reglas de reposiciÛn son SQL en .NET; el agente prioriza, elige sustituto y redacta el motivo. Es exactamente la matriz ß7.3 de las especificaciones v2.
 
 ### 9.2. Control del bucle y HITL
 
 - Presupuesto duro: 5 iteraciones y 6 llamadas a tools por consulta; superado, responde con lo que tenga y marca `partial: true`.
-- **Ninguna tool escribe.** La √∫nica acci√≥n con efecto en venta es "seleccionar para venta", que devuelve un borrador confirmado por el operador en el flujo existente. En inventario, toda recomendaci√≥n nace `Proposed` y requiere aprobaci√≥n expl√≠cita del admin.
-- Orquestaci√≥n: bucle manual con function calling. No se adopta LangGraph: no hay ramificaci√≥n con estado ni reanudaci√≥n que lo justifique. El punto de migraci√≥n queda identificado.
+- **Ninguna tool escribe.** La ˙nica acciÛn con efecto en venta es "seleccionar para venta", que devuelve un borrador confirmado por el operador en el flujo existente. En inventario, toda recomendaciÛn nace `Proposed` y requiere aprobaciÛn explÌcita del admin.
+- OrquestaciÛn: bucle manual con function calling. No se adopta LangGraph: no hay ramificaciÛn con estado ni reanudaciÛn que lo justifique. El punto de migraciÛn queda identificado.
 
 ---
 
 ## 10. Inventario asistido (alcance acordado)
 
-### 10.1. Se√±ales de demanda ‚Äî .NET, en SQL
+### 10.1. SeÒales de demanda ó .NET, en SQL
 
-Por producto y POS: `sales_7d`, `sales_30d`, `sales_60d`, `current_stock`, `stock_in_other_pos`, `days_since_last_sale`, `avg_daily_sales_30d`, `estimated_days_to_stockout`, `is_top_seller_in_pos`. Deterministas, testeables sin LLM y reutilizadas por el ranking de b√∫squeda.
+Por producto y POS: `sales_7d`, `sales_30d`, `sales_60d`, `current_stock`, `stock_in_other_pos`, `days_since_last_sale`, `avg_daily_sales_30d`, `estimated_days_to_stockout`, `is_top_seller_in_pos`. Deterministas, testeables sin LLM y reutilizadas por el ranking de b˙squeda.
 
 ### 10.2. Reglas iniciales
 
 | Tipo | Regla | Salida |
 |---|---|---|
-| `Replenish` | `current_stock = 0` y `sales_30d > 0` ‚Üí prioridad alta; `estimated_days_to_stockout < 14` y `sales_30d ‚â• 2` ‚Üí media/alta | Producto, POS destino, cantidad, origen sugerido |
-| `Transfer` | Destino con stock 0 y `sales_30d ‚â• 2`; origen con stock ‚â• 3 y `sales_60d = 0` | Origen, destino, cantidad |
-| `Substitute` | Reposici√≥n no satisfacible por falta de stock global | Sustitutos del retriever con se√±ales de similitud |
-| `Rotate` | `stock > 0` y `days_since_last_sale > 90` ‚Üí stock parado; si otro POS vende, sugerir traslado | POS destino sugerido |
-| `Review` | Sin ventas y perfil IA incompleto | Revisar cat√°logo antes de decidir |
+| `Replenish` | `current_stock = 0` y `sales_30d > 0` ? prioridad alta; `estimated_days_to_stockout < 14` y `sales_30d = 2` ? media/alta | Producto, POS destino, cantidad, origen sugerido |
+| `Transfer` | Destino con stock 0 y `sales_30d = 2`; origen con stock = 3 y `sales_60d = 0` | Origen, destino, cantidad |
+| `Substitute` | ReposiciÛn no satisfacible por falta de stock global | Sustitutos del retriever con seÒales de similitud |
+| `Rotate` | `stock > 0` y `days_since_last_sale > 90` ? stock parado; si otro POS vende, sugerir traslado | POS destino sugerido |
+| `Review` | Sin ventas y perfil IA incompleto | Revisar cat·logo antes de decidir |
 
-`Liquidate` **no se implementa**: toca precios y exige decisi√≥n de negocio y auditor√≠a propias.
+`Liquidate` **no se implementa**: toca precios y exige decisiÛn de negocio y auditorÌa propias.
 
-### 10.3. Perfil comercial por POS (decisi√≥n 7)
+### 10.3. Perfil comercial por POS (decisiÛn 7)
 
-Calculado peri√≥dicamente en .NET desde ventas e inventario: `top_piece_types`, `top_materials`, `top_price_ranges`, `top_collections`, `average_ticket`, `best_selling`, `slow_moving`. Se almacena estructurado y el LLM **solo redacta el resumen a partir de esas m√©tricas**, con un test que verifica que no menciona nada ausente del payload. Se consume en tres sitios: prior de ranking en b√∫squeda, priorizaci√≥n de sustitutos y ajuste de cantidades en reposici√≥n.
+Calculado periÛdicamente en .NET desde ventas e inventario: `top_piece_types`, `top_materials`, `top_price_ranges`, `top_collections`, `average_ticket`, `best_selling`, `slow_moving`. Se almacena estructurado y el LLM **solo redacta el resumen a partir de esas mÈtricas**, con un test que verifica que no menciona nada ausente del payload. Se consume en tres sitios: prior de ranking en b˙squeda, priorizaciÛn de sustitutos y ajuste de cantidades en reposiciÛn.
 
-### 10.4. Aprobaci√≥n y salida f√≠sica
+### 10.4. AprobaciÛn y salida fÌsica
 
-Pantalla de revisi√≥n con aprobar/rechazar por recomendaci√≥n, se√±ales visibles y motivo. Desde las aprobadas, **vista imprimible agrupada por POS destino** con SKU, nombre, foto, cantidad, origen y motivo ‚Äî el 80 % del valor operativo de una packing list sin su m√°quina de estados. La packing list completa (Draft‚ÜíApproved‚ÜíPrepared‚ÜíDelivered‚ÜíApplied‚ÜíCancelled con auditor√≠a) queda para fase posterior.
+Pantalla de revisiÛn con aprobar/rechazar por recomendaciÛn, seÒales visibles y motivo. Desde las aprobadas, **vista imprimible agrupada por POS destino** con SKU, nombre, foto, cantidad, origen y motivo ó el 80 % del valor operativo de una packing list sin su m·quina de estados. La packing list completa (Draft?Approved?Prepared?Delivered?Applied?Cancelled con auditorÌa) queda para fase posterior.
 
 ---
 
-## 11. Evaluaci√≥n
+## 11. EvaluaciÛn
 
 ### 11.1. Golden set
 
-**60-70 consultas** etiquetadas a mano **por las dos personas por separado, con conciliaci√≥n de discrepancias**, con relevancia graduada (0/1/2) sobre un *pool* generado por la uni√≥n de todas las configuraciones (*pooling*).
+**60-70 consultas** etiquetadas a mano **por las dos personas por separado, con conciliaciÛn de discrepancias**, con relevancia graduada (0/1/2) sobre un *pool* generado por la uniÛn de todas las configuraciones (*pooling*).
 
-| Categor√≠a | N¬∫ | Qu√© mide |
+| CategorÌa | N∫ | QuÈ mide |
 |---|---:|---|
-| Descripci√≥n natural | 20 | Recuperaci√≥n sem√°ntica pura |
-| Variante / talla (familia) | 10 | Desambiguaci√≥n: el caso cr√≠tico |
+| DescripciÛn natural | 20 | RecuperaciÛn sem·ntica pura |
+| Variante / talla (familia) | 10 | DesambiguaciÛn: el caso crÌtico |
 | **Materiales (incl. multi-material)** | 8 | Filtro por solape sobre `materials[]` |
-| **Sin√≥nimos** | 6 | Diccionario de expansi√≥n |
-| Precio / ocasi√≥n / regalo | 8 | Filtros estructurales |
+| **SinÛnimos** | 6 | Diccionario de expansiÛn |
+| Precio / ocasiÛn / regalo | 8 | Filtros estructurales |
 | Sustituto / sin stock | 6 | Retriever invertido |
-| L√©xico exacto (SKU, nombre) | 5 | Rama l√©xica |
-| Ambigua ‚Üí requiere aclaraci√≥n | 5 | Decisi√≥n del agente |
-| Fuera de dominio / imposible | 5 | Abstenci√≥n y guardrails |
+| LÈxico exacto (SKU, nombre) | 5 | Rama lÈxica |
+| Ambigua ? requiere aclaraciÛn | 5 | DecisiÛn del agente |
+| Fuera de dominio / imposible | 5 | AbstenciÛn y guardrails |
 
 ### 11.2. Ablations
 
-| Config | Descripci√≥n |
+| Config | DescripciÛn |
 |---|---|
-| **v0-lexico** | Buscador actual del repo ‚Äî **es la comparaci√≥n "b√∫squeda actual vs sem√°ntica" que pide la decisi√≥n 12** |
-| **v0-cag** | Cat√°logo del POS entero en contexto, sin retrieval |
+| **v0-lexico** | Buscador actual del repo ó **es la comparaciÛn "b˙squeda actual vs sem·ntica" que pide la decisiÛn 12** |
+| **v0-cag** | Cat·logo del POS entero en contexto, sin retrieval |
 | **v1-vectorial** | Solo pgvector + threshold |
-| **v2-hibrido** | Vectorial + l√©xico (RRF) + **sin√≥nimos** + filtros estructurales |
-| **v3-se√±ales** | v2 + disponibilidad, rotaci√≥n y perfil de POS, con pesos calibrados |
+| **v2-hibrido** | Vectorial + lÈxico (RRF) + **sinÛnimos** + filtros estructurales |
+| **v3-seÒales** | v2 + disponibilidad, rotaciÛn y perfil de POS, con pesos calibrados |
 
-M√©tricas: Recall@5, nDCG@5, MRR, P@3, abstenci√≥n correcta, % sin resultado, p50/p95 y coste por consulta. Aceptaci√≥n de v3: Recall@5 ‚â• 0,85 en las tres primeras categor√≠as; nDCG@5 ‚â• 0,75; abstenci√≥n correcta ‚â• 0,80; p95 de retrieval < 500 ms.
+MÈtricas: Recall@5, nDCG@5, MRR, P@3, abstenciÛn correcta, % sin resultado, p50/p95 y coste por consulta. AceptaciÛn de v3: Recall@5 = 0,85 en las tres primeras categorÌas; nDCG@5 = 0,75; abstenciÛn correcta = 0,80; p95 de retrieval < 500 ms.
 
-**Cada m√©trica se reporta tres veces: sobre la porci√≥n real, sobre la sint√©tica y global** (¬ß8.1.1). El umbral de aceptaci√≥n se aplica a **la porci√≥n real**; si el global cumple y el real no, la conclusi√≥n es que el corpus sint√©tico es demasiado f√°cil, no que el sistema funcione.
+**Cada mÈtrica se reporta tres veces: sobre la porciÛn real, sobre la sintÈtica y global** (ß8.1.1). El umbral de aceptaciÛn se aplica a **la porciÛn real**; si el global cumple y el real no, la conclusiÛn es que el corpus sintÈtico es demasiado f·cil, no que el sistema funcione.
 
-**Reranking:** no se implementa. El README documenta la hip√≥tesis (con ~1.500 entidades el cuello de botella es el corpus y el filtrado, no el orden dentro del top-20), el protocolo con el que se medir√≠a (dos filas m√°s en esta tabla, delta de nDCG@5 contra delta de p95) y el criterio de decisi√≥n.
+**Reranking:** no se implementa. El README documenta la hipÛtesis (con ~1.500 entidades el cuello de botella es el corpus y el filtrado, no el orden dentro del top-20), el protocolo con el que se medirÌa (dos filas m·s en esta tabla, delta de nDCG@5 contra delta de p95) y el criterio de decisiÛn.
 
-### 11.3. Generaci√≥n
+### 11.3. GeneraciÛn
 
-- **Validador anti-alucinaci√≥n determinista** (sin LLM juez): extrae toda cifra de precio/stock de la respuesta final y la contrasta con el hidratador. **Umbral: 0 fallos.** Es la pieza de evaluaci√≥n con mejor retorno y convierte el principio 2 en garant√≠a verificable.
+- **Validador anti-alucinaciÛn determinista** (sin LLM juez): extrae toda cifra de precio/stock de la respuesta final y la contrasta con el hidratador. **Umbral: 0 fallos.** Es la pieza de evaluaciÛn con mejor retorno y convierte el principio 2 en garantÌa verificable.
 - **RAGAS** (faithfulness, answer relevancy, context precision, context recall) sobre el subconjunto con citas.
-- **Verificaci√≥n de citas**: toda afirmaci√≥n del corpus apunta a un `chunk_id` existente y realmente recuperado.
-- **Test de fidelidad del perfil por POS**: el resumen no menciona m√©tricas ausentes del payload.
+- **VerificaciÛn de citas**: toda afirmaciÛn del corpus apunta a un `chunk_id` existente y realmente recuperado.
+- **Test de fidelidad del perfil por POS**: el resumen no menciona mÈtricas ausentes del payload.
 
 ### 11.4. Agentes
 
-20-25 escenarios multi-turno de venta y 8-10 de inventario, con √©xito definido. M√©tricas: *task success rate*, tools invocadas vs esperadas, pasos, coste medio, tasa de escalado. M√°s 20-25 casos adversarios con criterio de bloqueo por categor√≠a.
+20-25 escenarios multi-turno de venta y 8-10 de inventario, con Èxito definido. MÈtricas: *task success rate*, tools invocadas vs esperadas, pasos, coste medio, tasa de escalado. M·s 20-25 casos adversarios con criterio de bloqueo por categorÌa.
 
-### 11.5. M√©tricas del enriquecimiento
+### 11.5. MÈtricas del enriquecimiento
 
-Del lote revisado a mano (¬ß7.8): **tasa de correcci√≥n por campo** (cu√°ntos `materials`, `piece_type`, `size_label` inferidos corrigi√≥ el humano) y **tiempo medio de revisi√≥n**. Son los n√∫meros que dicen si el extractor sirve, y no existen sin la v√≠a revisada.
+Del lote revisado a mano (ß7.8): **tasa de correcciÛn por campo** (cu·ntos `materials`, `piece_type`, `size_label` inferidos corrigiÛ el humano) y **tiempo medio de revisiÛn**. Son los n˙meros que dicen si el extractor sirve, y no existen sin la vÌa revisada.
 
-### 11.6. Iteraci√≥n de prompts
+### 11.6. IteraciÛn de prompts
 
-Prompts versionados en `ai-service/prompts/`; cada versi√≥n guarda su ejecuci√≥n del harness. El README muestra qu√© se cambi√≥ y qu√© m√©trica se movi√≥.
+Prompts versionados en `ai-service/prompts/`; cada versiÛn guarda su ejecuciÛn del harness. El README muestra quÈ se cambiÛ y quÈ mÈtrica se moviÛ.
 
 ---
 
@@ -535,109 +537,109 @@ Se hace en la **ola 2**, no al final: con dos personas, descubrir un problema de
 1. `docker-compose` gana el servicio `jbg-ai` en red interna de la EC2, **no publicado en nginx**.
 2. RDS: `CREATE EXTENSION vector`, esquema `ai`, usuario propio. Alembic, independiente de EF Core. **Verificar que RDS lo admite en la ola 0.**
 3. Secretos en SSM Parameter Store.
-4. Workflow `deploy-ai-service.yml` con el patr√≥n OIDC + ECR existente.
-5. `/health` con conectividad a BD, proveedor y estado del √≠ndice; tarjeta en el dashboard de admin.
-6. **Evidencia**: URL p√∫blica con usuario demo, v√≠deo de 2-3 min y `docker compose up` reproducible con corpus incluido.
+4. Workflow `deploy-ai-service.yml` con el patrÛn OIDC + ECR existente.
+5. `/health` con conectividad a BD, proveedor y estado del Ìndice; tarjeta en el dashboard de admin.
+6. **Evidencia**: URL p˙blica con usuario demo, vÌdeo de 2-3 min y `docker compose up` reproducible con corpus incluido.
 
-**Coste estimado**: decenas de euros con modelo de embeddings peque√±o y generaci√≥n econ√≥mica; instrumentado y reportado.
+**Coste estimado**: decenas de euros con modelo de embeddings pequeÒo y generaciÛn econÛmica; instrumentado y reportado.
 
 ---
 
-## 13. Plan de trabajo (3 agosto ‚Üí 3 septiembre 2026)
+## 13. Plan de trabajo (3 agosto ? 3 septiembre 2026)
 
 ### 13.1. Modelo de trabajo
 
-**Sin roles fijos.** Las dos personas trabajan indistintamente en Python y .NET/frontend y **toman el siguiente change desbloqueado** de la ruta cr√≠tica. El detalle, con prerequisitos y ruta cr√≠tica marcada, est√° en [proyecto-final-plan-changes-openspec.md](proyecto-final-plan-changes-openspec.md).
+**Sin roles fijos.** Las dos personas trabajan indistintamente en Python y .NET/frontend y **toman el siguiente change desbloqueado** de la ruta crÌtica. El detalle, con prerequisitos y ruta crÌtica marcada, est· en [proyecto-final-plan-changes-openspec.md](proyecto-final-plan-changes-openspec.md).
 
-Tres reglas que sustituyen a la coordinaci√≥n por roles:
+Tres reglas que sustituyen a la coordinaciÛn por roles:
 
-1. **Prioridad a la ruta cr√≠tica.** Si hay un change de ruta cr√≠tica libre, se coge ese antes que cualquier otro.
-2. **Una sola migraci√≥n EF Core activa a la vez.** Quien la abre lo anuncia y la mergea antes de que empiece otra.
-3. **Contratos congelados el d√≠a 2** con test de *snapshot* de OpenAPI: cambiar el contrato rompe el build y se negocia, en vez de filtrarse.
+1. **Prioridad a la ruta crÌtica.** Si hay un change de ruta crÌtica libre, se coge ese antes que cualquier otro.
+2. **Una sola migraciÛn EF Core activa a la vez.** Quien la abre lo anuncia y la mergea antes de que empiece otra.
+3. **Contratos congelados el dÌa 2** con test de *snapshot* de OpenAPI: cambiar el contrato rompe el build y se negocia, en vez de filtrarse.
 
 ### 13.2. Olas
 
 | Ola | Fechas | Objetivo | Hito verificable |
 |---|---|---|---|
-| **O0** | 3-5 ago | Cimientos y **contratos congelados**. Esqueleto del servicio, cliente .NET con circuit breaker, verificaci√≥n de pgvector en RDS | `GET /health` responde; nadie espera a nadie |
-| **O1** | 6-12 ago | **Datos y modelo.** Generador de cat√°logo con `materials[]`, familias, enriquecimiento, esquema `ai`, entidades .NET (`ProductAiProfile`, `ProductFamily`), feeds con tombstones | ~1.000 perfiles generados y validados; familias propuestas |
-| **O2** | 13-19 ago | **Slice vertical desplegado.** Indexador, recuperaci√≥n, endpoint .NET con hidrataci√≥n autoritativa, panel en la SPA, **servicio en producci√≥n** | Un operador busca en lenguaje natural desde `pv.joiabagur.com` con stock real |
-| **O3** | 20-26 ago | **Calidad y medici√≥n.** H√≠brido + sin√≥nimos, prior de disponibilidad, corpus de conocimiento, **golden set (ambos)**, baselines, se√±ales de negocio, sustitutos y complementarios | **Tabla de ablations v0‚Üív3 con n√∫meros reales** |
-| **O4** | 27-31 ago | **Agentes e inventario.** Generaci√≥n con citas y avisos por reglas, guardrails, agente de venta, se√±ales de demanda, motor de recomendaciones, agente de inventario, pantallas de revisi√≥n, evals finales | Flujo completo en producci√≥n; validador anti-alucinaci√≥n en verde; recomendaciones aprobables |
-| **O5** | 1-3 sep | **Congelaci√≥n.** README, diagramas, limitaciones, v√≠deo, tag, entrega | Entrega el 3 de septiembre |
+| **O0** | 3-5 ago | Cimientos y **contratos congelados**. Esqueleto del servicio, cliente .NET con circuit breaker, verificaciÛn de pgvector en RDS | `GET /health` responde; nadie espera a nadie |
+| **O1** | 6-12 ago | **Datos y modelo.** Generador de cat·logo con `materials[]`, familias, enriquecimiento, esquema `ai`, entidades .NET (`ProductAiProfile`, `ProductFamily`), feeds con tombstones | ~1.000 perfiles generados y validados; familias propuestas |
+| **O2** | 13-19 ago | **Slice vertical desplegado.** Indexador, recuperaciÛn, endpoint .NET con hidrataciÛn autoritativa, panel en la SPA, **servicio en producciÛn** | Un operador busca en lenguaje natural desde `pv.joiabagur.com` con stock real |
+| **O3** | 20-26 ago | **Calidad y mediciÛn.** HÌbrido + sinÛnimos, prior de disponibilidad, corpus de conocimiento, **golden set (ambos)**, baselines, seÒales de negocio, sustitutos y complementarios | **Tabla de ablations v0?v3 con n˙meros reales** |
+| **O4** | 27-31 ago | **Agentes e inventario.** GeneraciÛn con citas y avisos por reglas, guardrails, agente de venta, seÒales de demanda, motor de recomendaciones, agente de inventario, pantallas de revisiÛn, evals finales | Flujo completo en producciÛn; validador anti-alucinaciÛn en verde; recomendaciones aprobables |
+| **O5** | 1-3 sep | **CongelaciÛn.** README, diagramas, limitaciones, vÌdeo, tag, entrega | Entrega el 3 de septiembre |
 
 ### 13.3. Carga real
 
-39 changes en 4,4 semanas entre 2 personas = **~4,4 changes por persona y semana**, unos 10-13 h semanales cada uno. Es sostenible solo si se empieza el 3 de agosto y no se acumula deuda. La ola 4 concentra agentes e inventario y es la m√°s expuesta.
+39 changes en 4,4 semanas entre 2 personas = **~4,4 changes por persona y semana**, unos 10-13 h semanales cada uno. Es sostenible solo si se empieza el 3 de agosto y no se acumula deuda. La ola 4 concentra agentes e inventario y es la m·s expuesta.
 
 ### 13.4. Orden de corte, fijado de antemano
 
-Si el **26 de agosto** (fin de O3) no est√° la tabla de ablations y el sistema desplegado, se abandona en este orden:
+Si el **26 de agosto** (fin de O3) no est· la tabla de ablations y el sistema desplegado, se abandona en este orden:
 
-1. **Complementarios** ‚Üí se documenta como fase posterior; sustitutos ya cubren el caso de venta
-2. **Rotaci√≥n / stock parado** ‚Üí el motor queda, se cae el tipo de recomendaci√≥n
-3. **RAGAS** ‚Üí se conservan validador anti-alucinaci√≥n y m√©tricas de recuperaci√≥n
-4. **Traslados** ‚Üí se conserva solo reposici√≥n
-5. **Vista imprimible** ‚Üí se aprueba desde la pantalla de revisi√≥n y se exporta a CSV
-6. **Corpus de conocimiento** 30-45 ‚Üí 15 documentos, manteniendo las citas
-7. **Golden set** 70 ‚Üí 45 consultas, **nunca renunciando al doble etiquetado**
-8. **Agente de inventario** ‚Üí las recomendaciones se generan por reglas puras sin capa ag√©ntica ni redacci√≥n LLM
+1. **Complementarios** ? se documenta como fase posterior; sustitutos ya cubren el caso de venta
+2. **RotaciÛn / stock parado** ? el motor queda, se cae el tipo de recomendaciÛn
+3. **RAGAS** ? se conservan validador anti-alucinaciÛn y mÈtricas de recuperaciÛn
+4. **Traslados** ? se conserva solo reposiciÛn
+5. **Vista imprimible** ? se aprueba desde la pantalla de revisiÛn y se exporta a CSV
+6. **Corpus de conocimiento** 30-45 ? 15 documentos, manteniendo las citas
+7. **Golden set** 70 ? 45 consultas, **nunca renunciando al doble etiquetado**
+8. **Agente de inventario** ? las recomendaciones se generan por reglas puras sin capa agÈntica ni redacciÛn LLM
 
-**Nunca se recorta:** corpus e √≠ndice, familias, retriever h√≠brido con prefiltro blando, hidrataci√≥n autoritativa en .NET, agente de venta, harness con ablations, validador anti-alucinaci√≥n, despliegue y README.
+**Nunca se recorta:** corpus e Ìndice, familias, retriever hÌbrido con prefiltro blando, hidrataciÛn autoritativa en .NET, agente de venta, harness con ablations, validador anti-alucinaciÛn, despliegue y README.
 
 ### 13.5. Riesgos
 
-| Riesgo | Prob. | Impacto | Mitigaci√≥n |
+| Riesgo | Prob. | Impacto | MitigaciÛn |
 |---|---|---|---|
-| **Equipo de dos sin holgura**: una baja de una semana se lleva el 25 % de la capacidad | Media | **Muy alto** | Slice vertical desplegado en O2; orden de corte fijado; ning√∫n change bloquea a m√°s de dos |
-| **El alcance de inventario desborda la ola 4** | **Alta** | Alto | Las reglas y se√±ales se entregan antes que el agente; si el agente no llega, las recomendaciones se generan por reglas y se documenta |
-| **El export real llega tarde o es muy peque√±o** | Media | Medio | El generador se calibra con lo que haya; si el export llega despu√©s de C24, el golden set se re-ancla sobre productos reales en una sesi√≥n adicional. Nunca se bloquea el desarrollo esper√°ndolo |
-| La revisi√≥n humana de 120-150 perfiles se alarga | Media | Medio | Pantalla de revisi√≥n por lotes con atajos; tope de 3 h por persona; el resto va a `auto_bulk` declarado |
-| Datos sint√©ticos demasiado f√°ciles ‚Üí m√©tricas infladas | Alta | Alto | Ruido dirigido (¬ß8.4); etiqueta el golden set quien no gener√≥ el corpus |
+| **Equipo de dos sin holgura**: una baja de una semana se lleva el 25 % de la capacidad | Media | **Muy alto** | Slice vertical desplegado en O2; orden de corte fijado; ning˙n change bloquea a m·s de dos |
+| **El alcance de inventario desborda la ola 4** | **Alta** | Alto | Las reglas y seÒales se entregan antes que el agente; si el agente no llega, las recomendaciones se generan por reglas y se documenta |
+| **El export real llega tarde o es muy pequeÒo** | Media | Medio | El generador se calibra con lo que haya; si el export llega despuÈs de C24, el golden set se re-ancla sobre productos reales en una sesiÛn adicional. Nunca se bloquea el desarrollo esper·ndolo |
+| La revisiÛn humana de 120-150 perfiles se alarga | Media | Medio | Pantalla de revisiÛn por lotes con atajos; tope de 3 h por persona; el resto va a `auto_bulk` declarado |
+| Datos sintÈticos demasiado f·ciles ? mÈtricas infladas | Alta | Alto | Ruido dirigido (ß8.4); etiqueta el golden set quien no generÛ el corpus |
 | Agosto: disponibilidad irregular | Alta | Alto | Contratos congelados en O0; trabajo desacoplado; pool de changes sin espera por rol |
-| Fricci√≥n con pgvector en RDS | Baja | Alto | **Verificar en O0**; alternativa: contenedor Postgres+pgvector en la misma EC2 |
+| FricciÛn con pgvector en RDS | Baja | Alto | **Verificar en O0**; alternativa: contenedor Postgres+pgvector en la misma EC2 |
 
 ---
 
 ## 14. Preguntas abiertas que bloquean trabajo
 
-| # | Pregunta | Estado | Resoluci√≥n |
+| # | Pregunta | Estado | ResoluciÛn |
 |---|---|---|---|
-| 1 | **¬øExiste una "tienda central" u origen de suministro?** | ‚úÖ **Resuelto** | S√≠. Se a√±ade **`IsSupplySource bool` a `PointOfSale`** (una columna, migraci√≥n en C19). Desbloquea las reglas de reposici√≥n y traslado de ¬ß10.2 |
-| 2 | **¬øHabr√° export anonimizado de cat√°logo e hist√≥rico 2026?** | ‚úÖ **Resuelto** | S√≠, de tama√±o desconocido y probablemente insuficiente. **Corpus h√≠brido** con `data_origin` y m√©tricas desglosadas (¬ß8.1.1). El golden set se ancla en lo real |
-| 3 | **¬øDiccionario de sin√≥nimos en lugar de `SearchAliases`?** | ‚è≥ **Pendiente de acuerdo** | Se implementa tras flag y se decide con la categor√≠a de sin√≥nimos del golden set. Coste de discrepancia: cero |
-| 4 | **¬øPacking list fuera del PF?** | ‚è≥ **Pendiente de acuerdo** | Fuera, con vista imprimible en su lugar. Si entra: +1,5-2 changes en la ola 4 y salen complementarios y rotaci√≥n |
-| 5 | **Umbrales iniciales de reposici√≥n** (d√≠as de cobertura, m√≠nimo por POS) | üîπ No bloqueante | Configurables con valores por defecto: cobertura < 14 d√≠as, `sales_30d ‚â• 2`. Se recalibran con datos |
-| 6 | **¬øSe captura feedback del admin sobre sustitutos?** | üîπ No bloqueante | Se registra aceptado/rechazado en la recomendaci√≥n; no se usa para reentrenar en esta fase |
-| 7 | **¬øQu√© tama√±o tiene el export real?** | üî∏ **A verificar antes del 10 de agosto** | Determina cu√°ntas de las 60-70 consultas del golden set se pueden anclar en productos reales y cu√°nto sint√©tico hay que generar. No cambia el dise√±o, s√≠ la fuerza de la evidencia |
+| 1 | **øExiste una "tienda central" u origen de suministro?** | ? **Resuelto** | SÌ. Se aÒade **`IsSupplySource bool` a `PointOfSale`** (una columna, migraciÛn en C19). Desbloquea las reglas de reposiciÛn y traslado de ß10.2 |
+| 2 | **øHabr· export anonimizado de cat·logo e histÛrico 2026?** | ? **Resuelto** | SÌ, de tamaÒo desconocido y probablemente insuficiente. **Corpus hÌbrido** con `data_origin` y mÈtricas desglosadas (ß8.1.1). El golden set se ancla en lo real |
+| 3 | **øDiccionario de sinÛnimos en lugar de `SearchAliases`?** | ? **Pendiente de acuerdo** | Se implementa tras flag y se decide con la categorÌa de sinÛnimos del golden set. Coste de discrepancia: cero |
+| 4 | **øPacking list fuera del PF?** | ? **Pendiente de acuerdo** | Fuera, con vista imprimible en su lugar. Si entra: +1,5-2 changes en la ola 4 y salen complementarios y rotaciÛn |
+| 5 | **Umbrales iniciales de reposiciÛn** (dÌas de cobertura, mÌnimo por POS) | ?? No bloqueante | Configurables con valores por defecto: cobertura < 14 dÌas, `sales_30d = 2`. Se recalibran con datos |
+| 6 | **øSe captura feedback del admin sobre sustitutos?** | ?? No bloqueante | Se registra aceptado/rechazado en la recomendaciÛn; no se usa para reentrenar en esta fase |
+| 7 | **øQuÈ tamaÒo tiene el export real?** | ?? **A verificar antes del 10 de agosto** | Determina cu·ntas de las 60-70 consultas del golden set se pueden anclar en productos reales y cu·nto sintÈtico hay que generar. No cambia el diseÒo, sÌ la fuerza de la evidencia |
 
 ---
 
 ## 15. Limitaciones que el README debe declarar
 
-1. **El corpus es h√≠brido**: una porci√≥n real anonimizada, ampliada con datos sint√©ticos calibrados sobre ella. El README declara el porcentaje exacto de cada origen y **reporta las m√©tricas desglosadas**, con la porci√≥n real como resultado principal.
-2. **Solo el 12-15 % de los perfiles est√° revisado por humanos**; el resto es `auto_bulk` y est√° marcado como tal en todas las m√©tricas.
-3. **No hay validaci√≥n con usuarios reales.** Los KPIs de negocio est√°n instrumentados, no medidos.
-4. **El golden set es peque√±o (60-70) y hecho por el equipo.** Mitigado con *pooling* y doble etiquetado, no eliminado.
+1. **El corpus es hÌbrido**: una porciÛn real anonimizada, ampliada con datos sintÈticos calibrados sobre ella. El README declara el porcentaje exacto de cada origen y **reporta las mÈtricas desglosadas**, con la porciÛn real como resultado principal.
+2. **Solo el 12-15 % de los perfiles est· revisado por humanos**; el resto es `auto_bulk` y est· marcado como tal en todas las mÈtricas.
+3. **No hay validaciÛn con usuarios reales.** Los KPIs de negocio est·n instrumentados, no medidos.
+4. **El golden set es pequeÒo (60-70) y hecho por el equipo.** Mitigado con *pooling* y doble etiquetado, no eliminado.
 5. **El reranking no se ha medido**, solo argumentado y protocolizado.
-6. **Packing list, liquidaci√≥n con descuentos, upsell/downsell y pol√≠ticas de inventario configurables no est√°n implementados** y se declaran como fase posterior.
+6. **Packing list, liquidaciÛn con descuentos, upsell/downsell y polÌticas de inventario configurables no est·n implementados** y se declaran como fase posterior.
 7. **Dos espacios vectoriales conviven** (visual MobileNetV2 y textual): no se fusionan.
-8. **Ning√∫n agente escribe.** Toda acci√≥n con efecto pasa por el operador o el admin.
-9. **La proyecci√≥n de disponibilidad puede desfasarse minutos**; por eso solo pondera el ranking y nunca excluye.
+8. **Ning˙n agente escribe.** Toda acciÛn con efecto pasa por el operador o el admin.
+9. **La proyecciÛn de disponibilidad puede desfasarse minutos**; por eso solo pondera el ranking y nunca excluye.
 
-**Pr√≥ximos pasos:** packing list completa; liquidaci√≥n y pol√≠ticas de inventario; prioridad comercial por margen (los datos existen en `ProductComponentAssignment`); reranking medido; reranking aprendido con `ProductSearchEvent` reales; fusi√≥n de se√±al visual y textual; evaluaci√≥n online con A/B por POS.
+**PrÛximos pasos:** packing list completa; liquidaciÛn y polÌticas de inventario; prioridad comercial por margen (los datos existen en `ProductComponentAssignment`); reranking medido; reranking aprendido con `ProductSearchEvent` reales; fusiÛn de seÒal visual y textual; evaluaciÛn online con A/B por POS.
 
 ---
 
 ## 16. Checklist de entrega
 
-- [ ] Rama `finalproject-[INICIALES]` con README y c√≥digo funcional
-- [ ] README con dominio, arquitectura y decisiones justificadas, CAG/RAG/agentes/evaluaci√≥n/despliegue, arranque local, **los dos integrantes**, limitaciones y pr√≥ximos pasos
-- [ ] URL p√∫blica con usuario demo **y** v√≠deo de 2-3 min
-- [ ] Tabla de ablations v0‚Üív3 reproducible con un comando
-- [ ] M√©tricas de revisi√≥n humana del enriquecimiento (tasa de correcci√≥n y tiempo medio)
-- [ ] Prompts versionados con evidencia de iteraci√≥n
-- [ ] `docker compose up` reproducible con corpus sint√©tico
+- [ ] Rama `finalproject-[INICIALES]` con README y cÛdigo funcional
+- [ ] README con dominio, arquitectura y decisiones justificadas, CAG/RAG/agentes/evaluaciÛn/despliegue, arranque local, **los dos integrantes**, limitaciones y prÛximos pasos
+- [ ] URL p˙blica con usuario demo **y** vÌdeo de 2-3 min
+- [ ] Tabla de ablations v0?v3 reproducible con un comando
+- [ ] MÈtricas de revisiÛn humana del enriquecimiento (tasa de correcciÛn y tiempo medio)
+- [ ] Prompts versionados con evidencia de iteraciÛn
+- [ ] `docker compose up` reproducible con corpus sintÈtico
 - [ ] Tag `v1.0-final-[INICIALES]`
 - [ ] Acceso al TA si el repositorio es privado
 - [ ] Entrega antes del **3 de septiembre de 2026**

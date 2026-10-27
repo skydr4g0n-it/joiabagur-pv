@@ -231,13 +231,15 @@ export function SalesReportPage() {
         size: 110,
         meta: { skeleton: <Skeleton className="h-4 w-20" /> },
       }),
-      columnHelper.accessor('hasPhoto', {
-        header: () => 'Foto',
+      columnHelper.accessor('hasReturn', {
+        header: () => 'Devolución',
         cell: (info) =>
           info.getValue() ? (
             <Badge variant="secondary" className="text-xs">Sí</Badge>
-          ) : null,
-        size: 60,
+          ) : (
+            <span className="text-sm text-muted-foreground">No</span>
+          ),
+        size: 90,
         meta: { skeleton: <Skeleton className="h-4 w-8" /> },
       }),
     ],

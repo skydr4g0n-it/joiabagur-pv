@@ -31,7 +31,7 @@ public class DashboardController : ControllerBase
     public async Task<ActionResult<DashboardStatsDto>> GetStats([FromQuery] Guid? posId)
     {
         if (!_currentUserService.UserId.HasValue)
-            return Unauthorized(new { message = "User not authenticated." });
+            return Unauthorized(new { message = "Usuario no autenticado." });
 
         var userId = _currentUserService.UserId.Value;
         var isAdmin = _currentUserService.IsAdmin;

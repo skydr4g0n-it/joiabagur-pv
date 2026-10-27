@@ -103,6 +103,56 @@ public class SalesReportGiftCardTests : IAsyncLifetime
         report.TotalAmount.Should().Be(50m);
     }
 
+    [Fact]
+    public async Task SalesReport_SameDayIssuanceAndRedemption_SubtractsCoverageOnce()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var giftCards = scope.ServiceProvider.GetRequiredService<IGiftCardService>();
+        var operatorUser = await CreateOperatorAsync(scope);
+
+        var issued = await giftCards.IssueAsync(new IssueGiftCardRequest
+        {
+            PointOfSaleId = _pos.Id,
+            NominalAmount = 200m,
+            ExpiryDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(365)),
+            PaymentMethodId = _cash.Id
+        }, operatorUser.Id, false, null);
+        issued.Success.Should().BeTrue(issued.ErrorMessage);
+
+        using var mother = new TestDataMother(_factory.Services);
+        var product = await mother.Product().WithSku("SR-29999").WithName("Product 29999").WithPrice(29999.05m).CreateAsync();
+        await mother.Inventory().WithProduct(product.Id).WithPointOfSale(_pos.Id).WithQuantity(5).CreateAsync();
+        var sales = scope.ServiceProvider.GetRequiredService<ISalesService>();
+        var bulk = await sales.CreateBulkSalesAsync(new CreateBulkSalesRequest
+        {
+            PointOfSaleId = _pos.Id,
+            PaymentMethodId = _cash.Id,
+            GiftCardCodes = new List<string> { issued.Card!.Code },
+            Lines = new List<BulkSaleLineRequest>
+            {
+                new() { ProductId = product.Id, Quantity = 1 },
+                new() { ProductId = product.Id, Quantity = 1 }
+            }
+        }, operatorUser.Id, false);
+        bulk.Success.Should().BeTrue(bulk.ErrorMessage);
+        bulk.Sales.Should().HaveCount(2);
+        bulk.Sales!.Sum(s => s.GiftCardCoverageAmount).Should().Be(200m);
+
+        var dayStart = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
+        var dayEnd = dayStart.AddDays(1).AddTicks(-1);
+        var report = await sales.GetSalesReportAsync(new SalesReportFilterRequest
+        {
+            StartDate = dayStart,
+            EndDate = dayEnd,
+            PointOfSaleId = _pos.Id,
+            Page = 1,
+            PageSize = 50
+        }, _admin.Id, true);
+
+        report.TotalSalesCount.Should().Be(3);
+        report.TotalAmount.Should().Be(59998.10m);
+    }
+
     private static async Task SetSaleDateAsync(ApplicationDbContext ctx, Guid saleId, DateTime saleDate)
     {
         var sale = await ctx.Sales.FirstAsync(s => s.Id == saleId);

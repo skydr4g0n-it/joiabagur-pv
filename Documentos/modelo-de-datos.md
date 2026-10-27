@@ -1,5 +1,7 @@
 # Modelo de Datos - Sistema de Gestión de Puntos de Venta para Joyería
 
+> **Nota (2026-10-27):** Las entidades `ProductPhotoEmbedding`, `ModelMetadata`, `ModelTrainingJob` y `SalePhoto` siguen documentadas por compatibilidad de esquema. La aplicación actual **no** genera embeddings ni entrena modelos; `/api/image-recognition` responde 410 Gone.
+
 ## Visión General
 
 Modelo de datos diseñado para soportar el MVP del sistema de gestión de puntos de venta, con consideraciones para facilitar la escalabilidad hacia la Fase 2. El modelo está optimizado para PostgreSQL 15+ y utiliza Entity Framework Core como ORM.

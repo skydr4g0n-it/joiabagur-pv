@@ -1,3 +1,5 @@
+> **Withdrawn (2026-10-27):** Product-photo image recognition was retired. This document is historical. Current behavior is manual sales only, and /api/image-recognition returns 410 Gone.
+
 # Design: Sales Registration and AI Image Recognition
 
 ## Context
@@ -100,15 +102,15 @@ Jewelry retail requires fast, accurate product identification at point of sale. 
 
 **Fallback Flow:**
 ```
-Capture Photo → Inference → Check Confidence
+Capture Photo ? Inference ? Check Confidence
                                   |
-                    ≥40% ────────┴──────── <40%
+                    =40% ----------------- <40%
                      |                      |
                Show 3-5 suggestions    Redirect to manual entry
                      |                 (photo preserved as attachment)
                 Operator selects       Operator searches SKU/name
                      |                      |
-                     └──────────┬───────────┘
+                     +----------------------+
                            Continue to stock validation
 ```
 
@@ -190,10 +192,10 @@ catch {
 - **User experience:** Non-blocking background checks don't interrupt sales workflow
 
 **MVP Scope:**
-- ✅ Version check on every feature access (online required)
-- ✅ Model download from server (no local caching)
-- ✅ Fallback to manual entry if network unavailable
-- ⏭️ **Phase 2:** Offline model caching, IndexedDB storage, offline inference
+- ? Version check on every feature access (online required)
+- ? Model download from server (no local caching)
+- ? Fallback to manual entry if network unavailable
+- ?? **Phase 2:** Offline model caching, IndexedDB storage, offline inference
 
 **Version Format:** `v{incrementalNumber}_{YYYYMMDD}` (e.g., "v2_20260111")
 - Semantic version number (incremental)
@@ -207,27 +209,27 @@ catch {
 4. **If network error:** Show error message, redirect to manual entry (no offline fallback)
 
 **Network Error Behavior (MVP):**
-- Display error: "Se requiere conexión a internet para reconocimiento de imágenes"
+- Display error: "Se requiere conexi�n a internet para reconocimiento de im�genes"
 - Provide "Registrar venta manual" button
 - Manual entry always available as fallback
 
 **Version Check Flow (MVP - Online Only):**
 ```
 Operator opens image recognition
-         ↓
+         ?
 Check network connectivity
-         ↓
-    Online ──────────────────── Offline
-     ↓                            ↓
+         ?
+    Online -------------------- Offline
+     ?                            ?
 Fetch model metadata          Show error:
-     ↓                        "Se requiere conexión"
-Compare with previous               ↓
-     ↓                        Redirect to manual entry
-Same? ────── Different?
-  ↓              ↓
+     ?                        "Se requiere conexi�n"
+Compare with previous               ?
+     ?                        Redirect to manual entry
+Same? ------ Different?
+  ?              ?
 Use model   Download new model
             Display: "Descargando modelo..."
-                     ↓
+                     ?
             Use new model for inference
 ```
 
@@ -251,7 +253,7 @@ Use model   Download new model
 - **Infrequent operation:** Training only needed when catalog changes significantly (1-2x/month)
 
 **Browser Training Workflow (MVP):**
-1. Admin sees retraining alert in dashboard (🔴 CRITICAL or 🟠 HIGH)
+1. Admin sees retraining alert in dashboard (?? CRITICAL or ?? HIGH)
 2. Admin clicks "Train Model" button in `/admin/ai-model` dashboard
 3. Browser checks device capabilities (WebGL, memory, battery)
 4. Browser downloads product photos from server (~5-10MB)
@@ -263,21 +265,21 @@ Use model   Download new model
 
 **Training UX:**
 ```
-╔════════════════════════════════════════════════════════════╗
-║  🧠 Train AI Model                                          ║
-╠════════════════════════════════════════════════════════════╣
-║                                                            ║
-║  Device Check:                                             ║
-║  ✅ GPU detected (WebGL 2.0)                               ║
-║  ✅ Memory: 16GB available                                 ║
-║  ⚠️ On battery - connect to power recommended              ║
-║                                                            ║
-║  Estimated duration: 15-20 minutes                         ║
-║                                                            ║
-║  ⚠️ Keep this browser tab open during training             ║
-║                                                            ║
-║  [Start Training]                                          ║
-╚════════════════════════════════════════════════════════════╝
++------------------------------------------------------------+
+�  ?? Train AI Model                                          �
+�------------------------------------------------------------�
+�                                                            �
+�  Device Check:                                             �
+�  ? GPU detected (WebGL 2.0)                               �
+�  ? Memory: 16GB available                                 �
+�  ?? On battery - connect to power recommended              �
+�                                                            �
+�  Estimated duration: 15-20 minutes                         �
+�                                                            �
+�  ?? Keep this browser tab open during training             �
+�                                                            �
+�  [Start Training]                                          �
++------------------------------------------------------------+
 ```
 
 **Browser Requirements:**
@@ -285,7 +287,7 @@ Use model   Download new model
 - WebGL 2.0 support (GPU acceleration)
 - 8GB+ RAM recommended (2GB minimum)
 - Stable internet connection
-- **No Python required!** ✅
+- **No Python required!** ?
 
 **Training Duration:**
 - With GPU (WebGL): 10-20 minutes
@@ -316,19 +318,19 @@ Use model   Download new model
 
 | Criterion | Condition | Alert Level | Example |
 |-----------|-----------|-------------|---------|
-| **Low Precision** | Top-3 accuracy <70% (last 100 sales) | 🔴 CRITICAL | Model suggesting wrong products frequently |
-| **Many New Products** | ≥20% products added without photos in model | 🔴 CRITICAL | 100 new products of 500 = 20% |
-| **Moderate New Products** | ≥10% products added | 🟠 HIGH | 50 new products of 500 = 10% |
-| **Many Photo Changes** | ≥20% photos added since training | 🟠 HIGH | 500 photos added of 2,500 = 20% |
-| **Photos Removed** | ≥10% photos deleted since training | 🟠 HIGH | 250 photos deleted of 2,500 = 10% |
-| **Stale Model + Changes** | Model >30 days + (≥5% products or ≥10% photos changed) | 🟠 HIGH | Model 45 days old + 30 new products |
-| **Very Stale Model** | Model >60 days | 🟡 RECOMMENDED | Model trained 2 months ago |
+| **Low Precision** | Top-3 accuracy <70% (last 100 sales) | ?? CRITICAL | Model suggesting wrong products frequently |
+| **Many New Products** | =20% products added without photos in model | ?? CRITICAL | 100 new products of 500 = 20% |
+| **Moderate New Products** | =10% products added | ?? HIGH | 50 new products of 500 = 10% |
+| **Many Photo Changes** | =20% photos added since training | ?? HIGH | 500 photos added of 2,500 = 20% |
+| **Photos Removed** | =10% photos deleted since training | ?? HIGH | 250 photos deleted of 2,500 = 10% |
+| **Stale Model + Changes** | Model >30 days + (=5% products or =10% photos changed) | ?? HIGH | Model 45 days old + 30 new products |
+| **Very Stale Model** | Model >60 days | ?? RECOMMENDED | Model trained 2 months ago |
 
 **Alert Levels:**
-- 🔴 **CRITICAL:** Retrain immediately (toast notification on admin login)
-- 🟠 **HIGH PRIORITY:** Retrain this week (toast notification on admin login)
-- 🟡 **RECOMMENDED:** Retrain when convenient (shown in dashboard only)
-- ✅ **OK:** Model is up-to-date
+- ?? **CRITICAL:** Retrain immediately (toast notification on admin login)
+- ?? **HIGH PRIORITY:** Retrain this week (toast notification on admin login)
+- ?? **RECOMMENDED:** Retrain when convenient (shown in dashboard only)
+- ? **OK:** Model is up-to-date
 
 **Admin Dashboard Components:**
 
@@ -346,7 +348,7 @@ Use model   Download new model
    - Total products: 500
    - With photos: 487 (97%)
    - Without photos: 13 (3%)
-   - New products not in model: 45 (9%) 🟠
+   - New products not in model: 45 (9%) ??
 
 3. Photo Metrics:
    - Total photos: 2,435
@@ -367,9 +369,9 @@ Use model   Download new model
 ```
 
 **Notification Strategy:**
-- ✅ **Toast on login:** Displayed when admin logs in if alert level is 🔴 CRITICAL or 🟠 HIGH
-- ❌ **Badge removed:** No persistent badge in sidebar (simplified UX)
-- ❌ **Email removed:** No email notifications (admin checks dashboard when needed)
+- ? **Toast on login:** Displayed when admin logs in if alert level is ?? CRITICAL or ?? HIGH
+- ? **Badge removed:** No persistent badge in sidebar (simplified UX)
+- ? **Email removed:** No email notifications (admin checks dashboard when needed)
 
 **Training Performance (Local Machine):**
 
@@ -378,7 +380,7 @@ With project volumes (~500 products, ~2,500 photos):
 | Phase | Duration (GPU Laptop) | Duration (CPU Only) |
 |-------|----------------------|---------------------|
 | Download photos from S3 | 2-3 min | 2-3 min |
-| Data augmentation (×3) | 1-2 min | 3-5 min |
+| Data augmentation (�3) | 1-2 min | 3-5 min |
 | Fine-tune MobileNetV2 (20 epochs) | 5-10 min | 20-40 min |
 | Export to TensorFlow.js | 1-2 min | 1-2 min |
 | Upload to S3 | 1-2 min | 1-2 min |
@@ -401,10 +403,10 @@ With project volumes (~500 products, ~2,500 photos):
 
 **Logic:**
 ```
-confidence >= 40% for top-3 → Show 3 suggestions
-confidence >= 40% for top-4 → Show 4 suggestions  
-confidence >= 40% for top-5+ → Show 5 suggestions (cap at 5)
-confidence >= 40% for 0 products → Redirect to manual entry
+confidence >= 40% for top-3 ? Show 3 suggestions
+confidence >= 40% for top-4 ? Show 4 suggestions  
+confidence >= 40% for top-5+ ? Show 5 suggestions (cap at 5)
+confidence >= 40% for 0 products ? Redirect to manual entry
 ```
 
 **Alternatives Considered:**
@@ -431,7 +433,7 @@ using var transaction = await BeginTransactionAsync();
 var currentStock = await ValidateStockAsync(productId, posId, qty);
 if (currentStock < qty) {
     throw new InsufficientStockException(
-        $"Stock cambió. Disponible: {currentStock}, Solicitado: {qty}"
+        $"Stock cambi�. Disponible: {currentStock}, Solicitado: {qty}"
     );
 }
 // Proceed with sale creation...
@@ -461,7 +463,7 @@ if (currentStock < qty) {
 ```
 
 **Fallback Strategy:**
-- If image recognition accessed before model exists: Show error "Modelo de IA no disponible aún" + redirect to manual entry
+- If image recognition accessed before model exists: Show error "Modelo de IA no disponible a�n" + redirect to manual entry
 - Manual entry ALWAYS available regardless of model status
 
 **Alternatives Considered:**
@@ -533,7 +535,7 @@ async function checkDeviceCompatibility(): Promise<boolean> {
 
 **Error Message:**
 ```
-"Tu dispositivo no es compatible con reconocimiento de imágenes.
+"Tu dispositivo no es compatible con reconocimiento de im�genes.
  Requisitos: iOS 12+, Android 8+, navegador moderno.
  
  [Registrar Venta Manual]"
@@ -586,9 +588,9 @@ public interface IFileStorageService {
 
 // Photo access through API
 GET /api/products/{id}/photos/{photoId}/file
-→ Backend calls IFileStorageService.GetFileAsync()
-→ Streams file to response
-→ Works with local, S3, or Blob Storage transparently
+? Backend calls IFileStorageService.GetFileAsync()
+? Streams file to response
+? Works with local, S3, or Blob Storage transparently
 ```
 
 **Frontend:**
@@ -598,9 +600,9 @@ GET /api/products/{id}/photos/{photoId}/file
 ```
 
 **Trade-offs:**
-- ✅ Provider-agnostic (works with any storage)
-- ✅ No provider-specific code (same interface for local/S3/Blob)
-- ⚠️ Bandwidth through backend (vs direct S3/CDN access)
+- ? Provider-agnostic (works with any storage)
+- ? No provider-specific code (same interface for local/S3/Blob)
+- ?? Bandwidth through backend (vs direct S3/CDN access)
 - **Acceptable for MVP:** Low traffic (2-3 concurrent users), small images (~500KB compressed)
 
 **Alternatives Considered:**
@@ -630,7 +632,7 @@ GET /api/products/{id}/photos/{photoId}/file
 - **Infrequent operation:** Training only needed when catalog changes significantly (1-2x/month)
 
 **Browser Training Workflow (MVP):**
-1. Admin sees retraining alert in dashboard (🔴 CRITICAL or 🟠 HIGH)
+1. Admin sees retraining alert in dashboard (?? CRITICAL or ?? HIGH)
 2. Admin clicks "Train Model" button
 3. Browser checks device capabilities (WebGL, memory, battery)
 4. Browser downloads product photos from server
@@ -645,23 +647,23 @@ Model Status Card:
 - Current version: v3_20260105
 - Last trained: 12 days ago
 - Accuracy: 78% top-3
-- Alert level: 🟠 HIGH (45 new products)
+- Alert level: ?? HIGH (45 new products)
 
 Device Capabilities:
-- GPU: ✅ Detected (WebGL 2.0)
-- Memory: ✅ 16GB available
+- GPU: ? Detected (WebGL 2.0)
+- Memory: ? 16GB available
 - Estimated time: 15-20 minutes
 
 [Train Model] - Train directly in browser
 
-⚠️ Keep this tab open during training
+?? Keep this tab open during training
 ```
 
 **Browser Requirements:**
 - Modern browser: Chrome/Edge 90+, Safari 14+, Firefox 88+
 - WebGL 2.0 support
 - 8GB+ RAM recommended (2GB minimum)
-- **No Python required!** ✅
+- **No Python required!** ?
 
 **Training Duration:**
 - With GPU (WebGL): 10-20 minutes
@@ -690,11 +692,11 @@ Device Capabilities:
 - **ML.NET training:** Rejected (no TensorFlow.js export)
 
 **Trade-offs:**
-- ✅ Zero dependencies (just browser)
-- ✅ Better UX (one-click training)
-- ✅ GPU acceleration (faster on modern hardware)
-- ⚠️ Must keep tab open (10-60 minutes)
-- ⚠️ No automated/scheduled training (acceptable for MVP, infrequent operation)
+- ? Zero dependencies (just browser)
+- ? Better UX (one-click training)
+- ? GPU acceleration (faster on modern hardware)
+- ?? Must keep tab open (10-60 minutes)
+- ?? No automated/scheduled training (acceptable for MVP, infrequent operation)
 
 ## Risks / Trade-offs
 
@@ -751,7 +753,7 @@ Device Capabilities:
 2. Test transaction integrity with Testcontainers
 3. Admin uploads product photos via EP1 (Product Management)
 4. Admin navigates to /admin/ai-model dashboard
-5. Dashboard shows "No hay modelo entrenado aún" + "Re-train Model Now" button
+5. Dashboard shows "No hay modelo entrenado a�n" + "Re-train Model Now" button
 6. Admin triggers first training (30-45 minutes, recommended off-hours)
 7. Image recognition becomes available after first training completes
 8. Operators automatically get model on next image recognition access
@@ -780,7 +782,7 @@ Device Capabilities:
    - **Recommendation:** Show percentage (transparency), add qualitative labels in Phase 2 based on user feedback
 
 4. **Model accuracy target:** What's acceptable accuracy for MVP launch?
-   - **Recommendation:** ≥70% top-3 accuracy (operator sees correct product in top 3 suggestions), measure in beta
+   - **Recommendation:** =70% top-3 accuracy (operator sees correct product in top 3 suggestions), measure in beta
 
 5. **Retraining frequency:** How often should model be retrained in Phase 2?
    - **Recommendation:** Weekly automated retrain if photos changed, manual override available

@@ -1,3 +1,5 @@
+> **Withdrawn (2026-10-27):** Product-photo image recognition was retired. This document is historical. Current behavior is manual sales only, and /api/image-recognition returns 410 Gone.
+
 # Change: Add Sales Registration and AI Image Recognition
 
 ## Why
@@ -55,23 +57,23 @@ The system requires comprehensive sales registration capabilities with AI-powere
 ## Scope Clarifications
 
 **MVP Scope (This Phase):**
-- ✅ Sales registration (manual and with image recognition)
-- ✅ Image recognition with online model version check
-- ✅ **Browser-based model training** (admin trains model in browser using TensorFlow.js - no Python required)
-- ✅ Model upload to S3 via admin dashboard (automatic after browser training)
-- ✅ Model metadata management (version, date, accuracy)
-- ✅ Transaction-based inventory updates
-- ✅ Photo compression and storage
+- ? Sales registration (manual and with image recognition)
+- ? Image recognition with online model version check
+- ? **Browser-based model training** (admin trains model in browser using TensorFlow.js - no Python required)
+- ? Model upload to S3 via admin dashboard (automatic after browser training)
+- ? Model metadata management (version, date, accuracy)
+- ? Transaction-based inventory updates
+- ? Photo compression and storage
 
 **Deferred to Phase 2 (Documented but NOT Implemented):**
-- ⏭️ Offline model usage (cached model when no network)
-- ⏭️ Progressive Web App offline capabilities
-- ⏭️ Push notifications for new model versions
-- ⏭️ Automatic model retraining triggers
+- ?? Offline model usage (cached model when no network)
+- ?? Progressive Web App offline capabilities
+- ?? Push notifications for new model versions
+- ?? Automatic model retraining triggers
 
 **Explicitly NOT Supported (Disabled):**
-- ❌ Server-side training (disabled to keep AWS infrastructure within free-tier limits)
-- ❌ Python-based local training scripts (removed - browser training is the only option)
+- ? Server-side training (disabled to keep AWS infrastructure within free-tier limits)
+- ? Python-based local training scripts (removed - browser training is the only option)
 
 **Rationale:** Browser-based TensorFlow.js training is the most user-friendly approach for MVP. It requires **zero Python installation** on the admin's machine - just a modern browser with WebGL 2.0 support. Training leverages the admin's GPU (if available) for faster performance. Server-side training is disabled to keep AWS infrastructure costs minimal.
 
@@ -83,13 +85,13 @@ The system requires comprehensive sales registration capabilities with AI-powere
   - Catalog changes (new products, photo additions/deletions)
   - Model staleness (days since last training)
   - Precision metrics (Phase 2 - optional in MVP)
-- Alert levels: 🔴 CRITICAL, 🟠 HIGH, 🟡 RECOMMENDED, ✅ OK
+- Alert levels: ?? CRITICAL, ?? HIGH, ?? RECOMMENDED, ? OK
 - Toast notifications on admin login for CRITICAL and HIGH priority alerts
 
 **Browser-Based Training Infrastructure (MVP):**
 - **Training location:** Admin's browser (TensorFlow.js with WebGL acceleration)
 - **Requirements:** Modern browser (Chrome/Edge 90+, Safari 14+, Firefox 88+), WebGL 2.0, 8GB+ RAM recommended
-- **No Python required!** ✅
+- **No Python required!** ?
 - **Process:**
   1. Admin clicks "Train Model" button in dashboard
   2. Browser downloads product photos from server (~5-10MB, 30-60 seconds)
@@ -101,8 +103,8 @@ The system requires comprehensive sales registration capabilities with AI-powere
 
 **Training UX:**
 - Admin must keep browser tab open during training
-- Real-time progress updates (download → train → upload stages)
-- Prominent warning: "⚠️ Keep this tab open during training"
+- Real-time progress updates (download ? train ? upload stages)
+- Prominent warning: "?? Keep this tab open during training"
 - Device capability check before training (GPU detected, memory check, battery status)
 - Estimated duration shown before starting
 

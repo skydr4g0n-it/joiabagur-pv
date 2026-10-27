@@ -1,3 +1,5 @@
+> **Withdrawn (2026-10-27):** Product-photo image recognition was retired. This document is historical. Current behavior is manual sales only, and /api/image-recognition returns 410 Gone.
+
 ## 1. Backend Data Layer
 
 - [x] 1.1 Create `ProductPhotoEmbedding` entity in `backend/src/JoiabagurPV.Domain/Entities/ProductPhotoEmbedding.cs` inheriting `BaseEntity` with fields: `ProductPhotoId` (Guid, FK), `ProductId` (Guid, FK), `ProductSku` (string), `EmbeddingVector` (string). Add navigation properties to `ProductPhoto` and `Product`.

@@ -2,136 +2,108 @@
 
 ## Purpose
 
-Register sales at the POS via AI-assisted or manual entry with stock, payment method, and price-policy validation in one atomic flow.
-
+Register sales at the POS via manual product selection with stock, payment method, and price-policy validation in one atomic flow.
 ## Requirements
-### Requirement: Sales Registration with Dual Entry Methods
-
-The system SHALL allow operators to register sales using two methods: AI-assisted image recognition (with photo attached) or manual product selection (with optional photo). Both methods validate stock availability, payment method assignment, operator authorization, and point-of-sale price policy before creating sale records.
-
-#### Scenario: Create sale with image recognition successfully
-
-- **WHEN** authenticated operator captures product photo
-- **AND** selects product from AI suggestions
-- **AND** enters quantity (>= 1)
-- **AND** selects payment method assigned to point of sale
-- **AND** product has sufficient stock at point of sale
-- **THEN** system creates Sale record using effective sale price rules (official Product.Price by default, optional override only if POS allows manual price edit)
-- **AND** creates SalePhoto record with compressed photo (JPEG 80%, <= 2MB)
-- **AND** creates InventoryMovement record with type "Sale" (via inventory-management integration)
-- **AND** updates Inventory.Quantity atomically in same transaction
-- **AND** returns success with sale ID and low stock warning if applicable
+### Requirement: Sales Registration by Manual Selection
+The system SHALL allow operators to register sales by manual product selection. The system SHALL NOT offer an AI-assisted image-recognition entry method. Manual registration SHALL validate stock availability, payment method assignment, operator authorization, and point-of-sale price policy before creating sale records. An optional documentation photo on a manual sale remains allowed by the sales API. The recognition capture page is not an entry point.
 
 #### Scenario: Create manual sale without photo
-
-- **WHEN** authenticated operator searches and selects product by SKU or name
+- **GIVEN** an authenticated operator assigned to the point of sale
+- **WHEN** the operator searches and selects a product by SKU or name
 - **AND** enters quantity (>= 1)
-- **AND** selects payment method assigned to point of sale
-- **AND** product has sufficient stock at point of sale
-- **THEN** system creates Sale record using effective sale price rules
-- **AND** SalePhoto is null (no photo attached)
-- **AND** creates InventoryMovement and updates stock atomically
-- **AND** returns success with sale ID
+- **AND** selects a payment method assigned to the point of sale
+- **AND** the product has sufficient stock at the point of sale
+- **THEN** the system creates a Sale record using effective sale price rules
+- **AND** SalePhoto is null
+- **AND** the system creates an InventoryMovement and updates stock atomically
+- **AND** the system returns success with the sale ID
 
 #### Scenario: Create manual sale with optional photo
-
-- **WHEN** authenticated operator manually selects product
-- **AND** optionally attaches photo (e.g., for documentation purposes)
-- **AND** enters quantity and selects payment method
-- **AND** product has sufficient stock
-- **THEN** system creates Sale using effective sale price rules
-- **AND** creates SalePhoto with compressed photo
-- **AND** creates InventoryMovement and updates stock atomically
+- **GIVEN** an authenticated operator
+- **WHEN** the operator manually selects a product
+- **AND** optionally attaches a documentation photo
+- **AND** enters quantity and selects a payment method
+- **AND** the product has sufficient stock
+- **THEN** the system creates the Sale using effective sale price rules
+- **AND** creates a SalePhoto with the compressed photo
+- **AND** creates an InventoryMovement and updates stock atomically
 
 #### Scenario: Reject sale with insufficient stock
-
-- **WHEN** operator attempts to create sale
-- **AND** requested quantity > available stock at point of sale
-- **THEN** system validates stock before creating sale record
+- **GIVEN** an operator creating a sale
+- **WHEN** the requested quantity is greater than available stock at the point of sale
+- **THEN** the system validates stock before creating a sale record
 - **AND** returns 400 Bad Request with error: "Stock insuficiente. Disponible: X, Solicitado: Y"
-- **AND** does not create sale, photo, or inventory movement
-- **AND** operator can cancel or reduce quantity
+- **AND** does not create a sale, photo, or inventory movement
 
 #### Scenario: Double stock validation for concurrency safety
-
-- **WHEN** operator selects product and enters quantity
-- **THEN** system performs first validation to show available stock in form
-- **AND** displays "Stock disponible: X unidades"
-- **WHEN** operator confirms sale
-- **THEN** system performs second validation immediately before transaction commit
-- **AND** validates stock has not changed since first check
-- **AND** if stock changed (another sale occurred), returns error: "Stock cambió durante la venta. Disponible ahora: X, Solicitado: Y"
-- **AND** operator can retry with updated stock information
+- **GIVEN** an operator selecting a product and entering a quantity
+- **WHEN** the form is shown
+- **THEN** the system performs a first validation and displays "Stock disponible: X unidades"
+- **WHEN** the operator confirms the sale
+- **THEN** the system performs a second validation immediately before transaction commit
+- **AND** if stock changed, returns error: "Stock cambió durante la venta. Disponible ahora: X, Solicitado: Y"
 
 #### Scenario: Concurrent sales of last unit
-
-- **WHEN** two operators attempt to sell last unit of product simultaneously
-- **AND** both see "Stock disponible: 1" (first validation passed for both)
-- **AND** Operator A confirms sale first (stock becomes 0)
-- **AND** Operator B confirms sale second
-- **THEN** Operator B's second validation fails
-- **AND** returns error: "Stock cambió. Disponible: 0, Solicitado: 1"
-- **AND** Operator A's sale succeeds, Operator B's sale is rejected
+- **GIVEN** two operators who both see "Stock disponible: 1"
+- **WHEN** operator A confirms the sale first and stock becomes 0
+- **AND** operator B confirms second
+- **THEN** operator B's second validation fails with "Stock cambió. Disponible: 0, Solicitado: 1"
+- **AND** operator A's sale succeeds
 
 #### Scenario: Reject sale for unassigned product
-
-- **WHEN** operator attempts to create sale
-- **AND** product has no Inventory record at point of sale (IsActive = false or missing)
-- **THEN** system returns 400 Bad Request with error: "El producto no está asignado a este punto de venta"
-- **AND** does not create sale record
-- **NOTE**: Uses IStockValidationService from inventory-management
+- **GIVEN** a product with no Inventory record at the point of sale
+- **WHEN** an operator attempts to create a sale for that product
+- **THEN** the system returns 400 Bad Request with error: "El producto no está asignado a este punto de venta"
+- **AND** does not create a sale record
 
 #### Scenario: Reject sale with unavailable payment method
-
-- **WHEN** operator attempts to create sale
-- **AND** payment method is not assigned to point of sale OR IsActive = false
-- **THEN** system returns 400 Bad Request with error: "El método de pago no está disponible en este punto de venta"
-- **AND** does not create sale record
-- **NOTE**: Uses payment-method-management validation integration
+- **GIVEN** a payment method that is not assigned to the point of sale or is inactive
+- **WHEN** an operator attempts to create a sale with that method
+- **THEN** the system returns 400 Bad Request with error: "El método de pago no está disponible en este punto de venta"
+- **AND** does not create a sale record
 
 #### Scenario: Reject sale from unauthorized operator
-
-- **WHEN** operator attempts to create sale at point of sale not assigned to them
-- **THEN** system returns 403 Forbidden
-- **AND** provides error message indicating unauthorized access
-- **NOTE**: Uses access-control integration
+- **GIVEN** an operator who is not assigned to the point of sale
+- **WHEN** the operator attempts to create a sale at that point of sale
+- **THEN** the system returns 403 Forbidden
 
 #### Scenario: Reject manual price when POS disallows overrides
-
-- **WHEN** operator submits a sale request with explicit price
-- **AND** selected point of sale has AllowManualPriceEdit = false
-- **THEN** system returns 400 Bad Request with validation error
-- **AND** does not create sale record
+- **GIVEN** a point of sale with AllowManualPriceEdit = false
+- **WHEN** an operator submits a sale request with an explicit price
+- **THEN** the system returns 400 Bad Request
+- **AND** does not create a sale record
 
 #### Scenario: Validate manual price is positive when provided
-
-- **WHEN** operator submits a sale request with manual price <= 0
-- **THEN** system returns 400 Bad Request with validation error
-- **AND** does not create sale record
+- **GIVEN** a sale request with a manual price less than or equal to 0
+- **WHEN** the operator submits the request
+- **THEN** the system returns 400 Bad Request
+- **AND** does not create a sale record
 
 #### Scenario: Low stock warning after sale
-
-- **WHEN** sale is created successfully
-- **AND** remaining stock after sale <= Inventory.MinimumThreshold (if configured)
-- **THEN** system returns success response with lowStockWarning flag = true
-- **AND** includes remaining stock quantity in response
-- **AND** frontend displays non-blocking toast: "⚠️ Quedan solo X unidades de este producto"
-- **NOTE**: Warning does not block sale, only informs operator
+- **GIVEN** a successful sale
+- **WHEN** remaining stock is less than or equal to Inventory.MinimumThreshold, if configured
+- **THEN** the response sets lowStockWarning to true and includes the remaining quantity
+- **AND** the frontend displays a non-blocking toast: "⚠️ Quedan solo X unidades de este producto"
 
 #### Scenario: Validate quantity is positive
-
-- **WHEN** operator attempts to create sale with quantity <= 0
-- **THEN** system returns 400 Bad Request with validation error
-- **AND** does not create sale record
+- **GIVEN** a sale request with quantity less than or equal to 0
+- **WHEN** the operator submits the request
+- **THEN** the system returns 400 Bad Request
+- **AND** does not create a sale record
 
 #### Scenario: Price snapshot on sale creation
+- **GIVEN** a sale that is created
+- **WHEN** the sale is stored
+- **THEN** the system stores the effective price in Sale.Price
+- **AND** stores PriceWasOverridden = true and OriginalProductPrice = official Product.Price when an override is applied
+- **AND** stores PriceWasOverridden = false and OriginalProductPrice = null when an override is not applied
+- **AND** later product price changes do not change those historical fields
 
-- **WHEN** sale is created
-- **THEN** system captures current Product.Price at time of sale as official price reference
-- **AND** stores effective price in Sale.Price
-- **AND** stores PriceWasOverridden = true and OriginalProductPrice = official Product.Price when override is applied
-- **AND** stores PriceWasOverridden = false and OriginalProductPrice = null when override is not applied
-- **AND** subsequent product price changes do not affect historical sale pricing fields
+#### Scenario: No image-recognition sales entry
+- **GIVEN** an authenticated operator
+- **WHEN** the operator looks for a way to sell by product photo
+- **THEN** the application has no `/sales/new/image` page and that path follows the existing catch-all to `/dashboard`
+- **AND** the sales API is not required to accept an image-recognition suggestion payload
 
 ### Requirement: Transaction-Based Stock Updates
 
@@ -165,31 +137,33 @@ The system SHALL ensure atomic consistency between sale creation and inventory u
 
 ### Requirement: Photo Compression and Storage
 
-The system SHALL compress sale photos to reduce storage costs and improve mobile upload performance, saving photos only on successful sale completion.
+The system SHALL compress sale photos to reduce storage costs and improve mobile upload performance, saving photos only on successful sale completion. This applies when a manual sale includes an optional documentation photo. Existing SalePhoto records remain readable.
 
 #### Scenario: Compress photo before storage
 
-- **WHEN** operator provides photo with sale (image recognition or manual)
-- **THEN** system compresses photo to JPEG quality 80%
+- **GIVEN** an operator provides a photo with a manual sale
+- **WHEN** the photo is accepted for storage
+- **THEN** the system compresses the photo to JPEG quality 80%
 - **AND** converts all formats (PNG, HEIC, etc.) to JPEG
 - **AND** resizes to max 1920x1920 pixels if larger (preserves aspect ratio)
 - **AND** validates output size <= 2MB
-- **AND** returns error if compressed size still exceeds 2MB
+- **AND** returns an error if the compressed size still exceeds 2MB
 
 #### Scenario: Save photo only on successful sale
 
-- **WHEN** sale transaction commits successfully
-- **THEN** system uploads compressed photo to storage (IFileStorageService)
-- **AND** creates SalePhoto record with FilePath, FileName, FileSize, MimeType
-- **AND** photo becomes permanently associated with sale
+- **GIVEN** a sale transaction that commits successfully and includes a photo
+- **WHEN** the transaction commits
+- **THEN** the system uploads the compressed photo to storage (IFileStorageService)
+- **AND** creates a SalePhoto record with FilePath, FileName, FileSize, MimeType
+- **AND** the photo becomes permanently associated with the sale
 
 #### Scenario: Discard photo on canceled sale
 
-- **WHEN** operator cancels sale before confirmation
-- **OR** sale creation fails validation or transaction rollback
-- **THEN** system discards captured/uploaded photo immediately
-- **AND** does not save photo to storage
-- **AND** does not create SalePhoto record
+- **GIVEN** an operator who cancels the sale before confirmation, or a sale that fails validation or rolls back
+- **WHEN** the sale is not committed
+- **THEN** the system discards the captured or uploaded photo immediately
+- **AND** does not save the photo to storage
+- **AND** does not create a SalePhoto record
 
 ### Requirement: Sales History and Queries
 
@@ -425,3 +399,42 @@ The system SHALL assign a `BulkOperationId` to each successful bulk checkout and
 - **WHEN** a bulk checkout succeeds
 - **THEN** all created sales include the same `BulkOperationId`
 - **AND** the bulk response returns that identifier for auditing and support workflows
+
+### Requirement: Bulk checkout applies gift cards
+`POST /api/sales/bulk` SHALL accept zero or more gift card codes together with product lines. All lines SHALL still share one point of sale and one payment method. Jewelry lines SHALL create inventory movements. Coverage and card balances SHALL commit in the same transaction as the sales. A failed line SHALL roll back sales, movements, and card changes. The cart checkout and the manual sale page SHALL both send gift card codes on this endpoint when the operator attaches cards.
+
+#### Scenario: Manual sale page applies a gift card
+- **GIVEN** an operator on the manual sale page with one jewelry line and a valid gift card attached
+- **WHEN** the operator confirms the sale
+- **THEN** the client submits `POST /api/sales/bulk` with that line and the gift card codes
+- **AND** does not look up the gift card code as a product SKU
+
+#### Scenario: Gift card checkout rolls back together
+- **GIVEN** a bulk request that applies a valid gift card and includes one line with no stock
+- **WHEN** the user submits the checkout
+- **THEN** the system persists no sale, no inventory movement, and no coverage
+- **AND** the card spendable balance is unchanged
+
+#### Scenario: Sale history exposes gift-card coverage
+
+- **GIVEN** a product sale with 100.00 EUR of gift-card coverage
+- **WHEN** a user loads sales history including that sale
+- **THEN** the sale shows its catalog total
+- **AND** shows gift-card coverage of 100.00 EUR
+
+#### Scenario: Mixed payment methods stay rejected
+- **GIVEN** a bulk request that applies a gift card
+- **AND** two product lines with different payment method ids
+- **WHEN** the user submits the checkout
+- **THEN** the system returns 400 Bad Request
+- **AND** persists nothing
+
+### Requirement: System product sales only through gift card issuance
+`POST /api/sales/bulk` SHALL NOT create a sale for a system product. The system gift-card product SHALL be sold only through `POST /api/gift-cards`.
+
+#### Scenario: Reject bulk checkout of the system gift-card product
+- **GIVEN** a bulk request whose lines include the system gift-card product
+- **WHEN** the user submits the checkout
+- **THEN** the system returns 400 Bad Request
+- **AND** persists no sale or inventory movement
+

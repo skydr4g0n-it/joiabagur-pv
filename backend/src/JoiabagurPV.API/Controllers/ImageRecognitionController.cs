@@ -1,5 +1,6 @@
 using JoiabagurPV.Application.DTOs.ImageRecognition;
 using JoiabagurPV.Application.Interfaces;
+using JoiabagurPV.API.Filters;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json.Nodes;
@@ -8,10 +9,13 @@ namespace JoiabagurPV.API.Controllers;
 
 /// <summary>
 /// Controller for image recognition and ML model management operations.
+/// Product-photo image recognition is withdrawn; endpoints return 410 Gone.
 /// </summary>
 [ApiController]
 [Route("api/image-recognition")]
 [Authorize]
+[ServiceFilter(typeof(ImageRecognitionWithdrawnFilter))]
+[Obsolete("Product-photo image recognition is withdrawn. Endpoints return 410 Gone.")]
 public class ImageRecognitionController : ControllerBase
 {
     private readonly IImageRecognitionService _imageRecognitionService;
@@ -45,7 +49,7 @@ public class ImageRecognitionController : ControllerBase
 
         if (metadata == null)
         {
-            return NotFound(new { message = "No AI model available yet. Please train an initial model." });
+            return NotFound(new { message = "No hay un modelo de IA. Entrena un modelo inicial." });
         }
 
         return Ok(metadata);
@@ -57,7 +61,6 @@ public class ImageRecognitionController : ControllerBase
     /// </summary>
     /// <returns>Model health metrics with alert level.</returns>
     [HttpGet("model/health")]
-    [Authorize(Roles = "Administrator")]
     [ProducesResponseType(typeof(ModelHealthDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<ModelHealthDto>> GetModelHealth()
     {
@@ -70,7 +73,6 @@ public class ImageRecognitionController : ControllerBase
     /// </summary>
     /// <returns>List of all model versions ordered by training date.</returns>
     [HttpGet("model/versions")]
-    [Authorize(Roles = "Administrator")]
     [ProducesResponseType(typeof(List<ModelMetadataDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<ModelMetadataDto>>> GetModelVersions()
     {
@@ -84,7 +86,6 @@ public class ImageRecognitionController : ControllerBase
     /// </summary>
     /// <returns>Training job ID for status polling.</returns>
     [HttpPost("retrain")]
-    [Authorize(Roles = "Administrator")]
     [ProducesResponseType(typeof(object), StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -135,7 +136,7 @@ public class ImageRecognitionController : ControllerBase
 
         if (status == null)
         {
-            return NotFound(new { message = "Training job not found." });
+            return NotFound(new { message = "Trabajo de entrenamiento no encontrado." });
         }
 
         return Ok(status);
@@ -146,7 +147,6 @@ public class ImageRecognitionController : ControllerBase
     /// </summary>
     /// <returns>Latest job status if exists.</returns>
     [HttpGet("retrain/latest")]
-    [Authorize(Roles = "Administrator")]
     [ProducesResponseType(typeof(TrainingJobStatusDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<TrainingJobStatusDto>> GetLatestTrainingStatus()
@@ -155,7 +155,7 @@ public class ImageRecognitionController : ControllerBase
 
         if (status == null)
         {
-            return NotFound(new { message = "No training jobs found." });
+            return NotFound(new { message = "No hay trabajos de entrenamiento." });
         }
 
         return Ok(status);
@@ -175,7 +175,7 @@ public class ImageRecognitionController : ControllerBase
 
         if (string.IsNullOrEmpty(modelPath))
         {
-            return NotFound(new { message = "No model available. Please train a model first." });
+            return NotFound(new { message = "No hay un modelo disponible. Entrena un modelo primero." });
         }
 
         // Return model path for frontend to construct download URLs
@@ -207,14 +207,14 @@ public class ImageRecognitionController : ControllerBase
         // Validate file name to prevent directory traversal
         if (fileName.Contains("..") || fileName.Contains("/") || fileName.Contains("\\"))
         {
-            return BadRequest(new { message = "Invalid file name." });
+            return BadRequest(new { message = "Nombre de archivo no válido." });
         }
 
         var result = await _imageRecognitionService.DownloadModelFileAsync(version, fileName);
         if (result == null)
         {
             _logger.LogWarning("Model file not found: models/{Version}/{FileName}", version, fileName);
-            return NotFound(new { message = "Model file not found." });
+            return NotFound(new { message = "Archivo del modelo no encontrado." });
         }
 
         var (stream, contentType) = result.Value;
@@ -287,7 +287,7 @@ public class ImageRecognitionController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to apply legacy model.json wrapper for version {Version}", version);
-            return NotFound(new { message = "Error processing model file." });
+            return NotFound(new { message = "Error al procesar el archivo del modelo." });
         }
     }
 
@@ -297,7 +297,6 @@ public class ImageRecognitionController : ControllerBase
     /// </summary>
     /// <returns>Upload result with new model metadata.</returns>
     [HttpPost("upload-trained-model")]
-    [Authorize(Roles = "Administrator")]
     [ProducesResponseType(typeof(UploadTrainedModelResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequestSizeLimit(100_000_000)] // 100MB limit for model files
@@ -311,17 +310,17 @@ public class ImageRecognitionController : ControllerBase
         // Validate request
         if (string.IsNullOrEmpty(request.Version))
         {
-            return BadRequest(new { message = "Model version is required." });
+            return BadRequest(new { message = "La versión del modelo es obligatoria." });
         }
 
         if (string.IsNullOrEmpty(request.ModelTopologyJson))
         {
-            return BadRequest(new { message = "Model topology JSON is required." });
+            return BadRequest(new { message = "El JSON de topología del modelo es obligatorio." });
         }
 
         if (request.WeightFiles == null || request.WeightFiles.Count == 0)
         {
-            return BadRequest(new { message = "At least one weight file is required." });
+            return BadRequest(new { message = "Hace falta al menos un archivo de pesos." });
         }
 
         // Read weight files
@@ -415,7 +414,6 @@ public class ImageRecognitionController : ControllerBase
     /// </summary>
     /// <returns>Training dataset with photo metadata and URLs.</returns>
     [HttpGet("training-dataset")]
-    [Authorize(Roles = "Administrator")]
     [ProducesResponseType(typeof(TrainingDatasetResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<TrainingDatasetResponse>> GetTrainingDataset()
     {
@@ -429,7 +427,7 @@ public class ImageRecognitionController : ControllerBase
                 dataset.TotalPhotos,
                 dataset.TotalProducts,
                 dataset.ClassLabels,
-                message = "No product photos available for training. Please upload product photos first."
+                message = "No hay fotos de producto para entrenar. Sube fotos primero."
             });
         }
 
@@ -441,14 +439,13 @@ public class ImageRecognitionController : ControllerBase
     /// Vector must have exactly 1280 elements.
     /// </summary>
     [HttpPost("embeddings")]
-    [Authorize(Roles = "Administrator")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> SaveEmbedding([FromBody] SaveEmbeddingRequest request)
     {
         if (request.Vector == null || request.Vector.Length != 1280)
         {
-            return BadRequest(new { message = "Embedding vector must have exactly 1280 elements." });
+            return BadRequest(new { message = "El vector de embedding tiene que tener exactamente 1280 elementos." });
         }
 
         try
@@ -466,7 +463,6 @@ public class ImageRecognitionController : ControllerBase
     /// Deletes the embedding for a specific product photo.
     /// </summary>
     [HttpDelete("embeddings/{photoId:guid}")]
-    [Authorize(Roles = "Administrator")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteEmbedding(Guid photoId)
     {
@@ -478,7 +474,6 @@ public class ImageRecognitionController : ControllerBase
     /// Deletes all stored embeddings.
     /// </summary>
     [HttpDelete("embeddings")]
-    [Authorize(Roles = "Administrator")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteAllEmbeddings()
     {

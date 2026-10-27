@@ -1,3 +1,5 @@
+> **Withdrawn (2026-10-27):** Product-photo image recognition was retired. This document is historical. Current behavior is manual sales only, and /api/image-recognition returns 410 Gone.
+
 ## ADDED Requirements
 
 **MVP Scope Note:** This specification documents complete functionality including offline scenarios. However, **offline capabilities (cached model usage, IndexedDB storage) are deferred to Phase 2**. MVP implementation requires network connectivity for image recognition and will show error + redirect to manual entry when offline.
@@ -32,7 +34,7 @@ The system SHALL execute machine learning inference in the browser/mobile device
 - **AND** cached model is used immediately while check executes
 - **AND** compares cached version with server version
 - **AND** if server version is newer, frontend downloads new model in background
-- **AND** displays notification: "Nueva versión del modelo disponible. Descargando..."
+- **AND** displays notification: "Nueva versi�n del modelo disponible. Descargando..."
 - **AND** switches to new model after download completes
 - **NOTE**: Version check executes on every access when online to ensure latest model
 
@@ -42,7 +44,7 @@ The system SHALL execute machine learning inference in the browser/mobile device
 - **AND** device has no internet connection
 - **THEN** system detects network error on metadata fetch
 - **AND** uses cached model without version check
-- **AND** logs warning: "No se pudo verificar versión del modelo (offline)"
+- **AND** logs warning: "No se pudo verificar versi�n del modelo (offline)"
 - **AND** inference proceeds normally with cached model
 - **AND** version check retries on next feature access when connectivity restored
 
@@ -50,7 +52,7 @@ The system SHALL execute machine learning inference in the browser/mobile device
 
 - **WHEN** frontend detects cached model is older than server version
 - **AND** model age > 7 days behind latest
-- **THEN** system displays notification to operator: "El modelo de reconocimiento tiene una actualización disponible"
+- **THEN** system displays notification to operator: "El modelo de reconocimiento tiene una actualizaci�n disponible"
 - **AND** provides option to download immediately or continue with current version
 - **AND** allows operator to defer update (e.g., not during active sale)
 
@@ -61,7 +63,7 @@ The system SHALL execute machine learning inference in the browser/mobile device
 - **AND** downloads latest model if newer version exists
 - **AND** displays progress: "Descargando modelo... X%"
 - **AND** updates IndexedDB cache with new model
-- **AND** confirms: "Modelo actualizado a versión vX"
+- **AND** confirms: "Modelo actualizado a versi�n vX"
 
 #### Scenario: Execute inference locally
 
@@ -144,7 +146,7 @@ The system SHALL use a configurable confidence threshold (default 40%) to determ
 
 - **WHEN** inference completes
 - **AND** ALL products have confidence < 40%
-- **THEN** system displays message: "No se encontró una correspondencia fiable"
+- **THEN** system displays message: "No se encontr� una correspondencia fiable"
 - **AND** offers options:
   - "Tomar otra foto" (retry image recognition)
   - "Registrar venta manual" (redirect to manual entry with photo preserved)
@@ -216,7 +218,7 @@ The system SHALL support model training executed in administrator's browser usin
 
 - **WHEN** photos are downloaded successfully
 - **THEN** browser loads pre-trained MobileNetV2 from TensorFlow Hub
-- **AND** applies data augmentation (rotation ±15°, brightness ±20%, flip, zoom ±10%)
+- **AND** applies data augmentation (rotation �15�, brightness �20%, flip, zoom �10%)
 - **AND** adds custom classification head for product classes
 - **AND** trains for 15 epochs with validation split 0.2
 - **AND** displays training progress (Epoch X/15, Accuracy: Y%, Loss: Z)
@@ -243,7 +245,7 @@ The system SHALL support model training executed in administrator's browser usin
 #### Scenario: Keep browser tab open during training
 
 - **WHEN** training is in progress
-- **THEN** browser displays prominent warning: "⚠️ Keep this tab open during training"
+- **THEN** browser displays prominent warning: "?? Keep this tab open during training"
 - **AND** browser shows beforeunload warning if user tries to close tab
 - **AND** training progress updates in real-time (no polling)
 - **AND** admin cannot navigate away without warning
@@ -306,7 +308,7 @@ The system SHALL track model versions, training dates, and accuracy metrics to e
 - **AND** includes accuracy metrics (top-1, top-3 accuracy percentages)
 - **AND** includes model_url (download path: "/api/image-recognition/model?version=v2_20260111")
 - **AND** includes model_size_bytes (for download progress estimation)
-- **AND** frontend displays in UI ("Modelo v2, entrenado hace 5 días, precisión 82%")
+- **AND** frontend displays in UI ("Modelo v2, entrenado hace 5 d�as, precisi�n 82%")
 
 #### Scenario: Model metadata response format
 
@@ -351,7 +353,7 @@ The system SHALL provide intuitive photo capture functionality optimized for mob
 #### Scenario: Handle camera permission denial
 
 - **WHEN** operator denies camera permission
-- **THEN** system displays error: "Se requiere acceso a la cámara para reconocimiento de imagen"
+- **THEN** system displays error: "Se requiere acceso a la c�mara para reconocimiento de imagen"
 - **AND** offers alternative: "Registrar venta manual"
 - **AND** redirects to manual entry workflow
 
@@ -421,7 +423,7 @@ The system SHALL validate minimum device requirements for running TensorFlow.js 
 
 - **WHEN** device fails compatibility check (no WebGL 2.0, browser too old, insufficient RAM)
 - **THEN** system displays error message:
-  "Tu dispositivo no es compatible con reconocimiento de imágenes.
+  "Tu dispositivo no es compatible con reconocimiento de im�genes.
    Requisitos: iOS 12+, Android 8+, navegador moderno.
    
    [Registrar Venta Manual]"
@@ -432,7 +434,7 @@ The system SHALL validate minimum device requirements for running TensorFlow.js 
 
 - **WHEN** device supports TensorFlow.js but WebGL is unavailable
 - **THEN** system attempts to use WASM backend (CPU inference)
-- **AND** displays warning: "Reconocimiento puede ser más lento en este dispositivo"
+- **AND** displays warning: "Reconocimiento puede ser m�s lento en este dispositivo"
 - **AND** inference may take >1 second (still functional, just slower)
 
 #### Scenario: Log device compatibility for analytics
@@ -457,7 +459,7 @@ The system SHALL handle errors gracefully during image recognition workflow, ens
 #### Scenario: Handle inference timeout
 
 - **WHEN** inference takes >5 seconds (device too slow, model too large)
-- **THEN** system displays error: "El reconocimiento está tardando demasiado"
+- **THEN** system displays error: "El reconocimiento est� tardando demasiado"
 - **AND** offers options: "Esperar" or "Registrar venta manual"
 - **AND** if inference completes after timeout, shows suggestions
 
@@ -494,19 +496,19 @@ The system SHALL provide administrators with a dashboard showing model health me
 
 - **WHEN** system calculates model health status
 - **THEN** evaluates multiple criteria:
-  - Precision <70% → 🔴 CRITICAL
-  - ≥20% new products → 🔴 CRITICAL
-  - ≥10% new products → 🟠 HIGH
-  - ≥20% photo changes → 🟠 HIGH
-  - ≥10% photos deleted → 🟠 HIGH
-  - Model >30 days + (≥5% products or ≥10% photos changed) → 🟠 HIGH
-  - Model >60 days → 🟡 RECOMMENDED
+  - Precision <70% ? ?? CRITICAL
+  - =20% new products ? ?? CRITICAL
+  - =10% new products ? ?? HIGH
+  - =20% photo changes ? ?? HIGH
+  - =10% photos deleted ? ?? HIGH
+  - Model >30 days + (=5% products or =10% photos changed) ? ?? HIGH
+  - Model >60 days ? ?? RECOMMENDED
 - **AND** returns highest severity alert level
 
 #### Scenario: Show toast notification on admin login
 
 - **WHEN** administrator logs in
-- **AND** model health status is 🔴 CRITICAL or 🟠 HIGH
+- **AND** model health status is ?? CRITICAL or ?? HIGH
 - **THEN** system displays toast notification with alert message
 - **AND** toast includes "View Dashboard" button linking to /admin/ai-model
 - **AND** toast auto-dismisses after 10 seconds (or until user clicks)
@@ -514,21 +516,21 @@ The system SHALL provide administrators with a dashboard showing model health me
 #### Scenario: Critical alert for low precision
 
 - **WHEN** top-3 accuracy is <70% based on last 100 sales with image recognition
-- **THEN** dashboard shows 🔴 CRITICAL alert: "Precisión muy baja, re-entrenar inmediatamente"
-- **AND** toast notification appears on admin login: "⚠️ El modelo de IA tiene baja precisión. Re-entrenamiento recomendado."
+- **THEN** dashboard shows ?? CRITICAL alert: "Precisi�n muy baja, re-entrenar inmediatamente"
+- **AND** toast notification appears on admin login: "?? El modelo de IA tiene baja precisi�n. Re-entrenamiento recomendado."
 
 #### Scenario: High priority alert for catalog changes
 
 - **WHEN** 45 new products added (9% of 500 total) and 127 new photos uploaded
-- **THEN** dashboard shows 🟠 HIGH alert: "Cambios significativos en catálogo"
-- **AND** toast notification appears on admin login: "🟠 El modelo de IA necesita actualización. 45 productos nuevos detectados."
+- **THEN** dashboard shows ?? HIGH alert: "Cambios significativos en cat�logo"
+- **AND** toast notification appears on admin login: "?? El modelo de IA necesita actualizaci�n. 45 productos nuevos detectados."
 
 #### Scenario: OK status when model is current
 
 - **WHEN** model trained 5 days ago
 - **AND** only 2 new products (0.4%)
 - **AND** only 10 new photos (0.4%)
-- **THEN** dashboard shows ✅ OK: "Modelo actualizado"
+- **THEN** dashboard shows ? OK: "Modelo actualizado"
 - **AND** no toast notification appears
 
 #### Scenario: Precision metrics unavailable in MVP
@@ -551,13 +553,13 @@ The system SHALL validate photo quality and dimensions before accepting uploads 
 
 - **WHEN** administrator or operator uploads product photo
 - **THEN** system validates dimensions are at least 200x200 pixels
-- **AND** rejects photos smaller than minimum with error: "La foto debe tener al menos 200x200 píxeles"
+- **AND** rejects photos smaller than minimum with error: "La foto debe tener al menos 200x200 p�xeles"
 
 #### Scenario: Validate aspect ratio
 
 - **WHEN** photo is uploaded
 - **THEN** system validates aspect ratio is not extreme (max 5:1 or 1:5)
-- **AND** rejects photos with aspect ratio > 5:1 with error: "La foto tiene proporciones extremas. Usa una foto más cuadrada."
+- **AND** rejects photos with aspect ratio > 5:1 with error: "La foto tiene proporciones extremas. Usa una foto m�s cuadrada."
 
 #### Scenario: Detect completely black or white images
 
@@ -571,7 +573,7 @@ The system SHALL validate photo quality and dimensions before accepting uploads 
 - **WHEN** photo passes content validation
 - **THEN** system validates file size <= 2MB after compression
 - **AND** rejects if compressed size exceeds limit
-- **AND** displays error: "La foto es demasiado grande incluso después de compresión. Intenta con una foto de menor resolución."
+- **AND** displays error: "La foto es demasiado grande incluso despu�s de compresi�n. Intenta con una foto de menor resoluci�n."
 
 #### Scenario: Client-side validation before upload
 
@@ -588,7 +590,7 @@ The system SHALL validate sufficient training data exists before allowing model 
 
 - **WHEN** administrator triggers model retraining
 - **THEN** system checks total ProductPhoto count in database
-- **AND** requires at least 50 total photos (10 products × 5 photos minimum)
+- **AND** requires at least 50 total photos (10 products � 5 photos minimum)
 - **AND** returns 400 Bad Request if insufficient photos: "Se requieren al menos 50 fotos para entrenar el modelo"
 
 #### Scenario: Validate photo distribution

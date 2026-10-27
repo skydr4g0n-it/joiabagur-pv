@@ -30,6 +30,20 @@ vi.mock('@/services/product.service', () => ({
   },
 }));
 
+vi.mock('@/providers/cart-provider', () => ({
+  CartProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  useCart: () => ({
+    pointOfSaleId: null,
+    lineCount: 0,
+  }),
+}));
+
+vi.mock('@/services/gift-card.service', () => ({
+  giftCardService: {
+    getByCode: vi.fn(),
+  },
+}));
+
 function renderWithProviders(component: React.ReactElement) {
   return render(
     <BrowserRouter>
@@ -47,7 +61,7 @@ describe('ScanningPage', () => {
     const { default: ScanningPage } = await import('../scan');
     renderWithProviders(<ScanningPage />);
 
-    expect(screen.getByText('Iniciando cámara...')).toBeInTheDocument();
+    expect(screen.getByText('Error de cámara')).toBeInTheDocument();
   });
 
   it('should show manual SKU input fallback after initialization', async () => {

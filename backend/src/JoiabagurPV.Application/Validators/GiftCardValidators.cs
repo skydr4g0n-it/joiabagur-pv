@@ -14,13 +14,13 @@ public class IssueGiftCardRequestValidator : AbstractValidator<IssueGiftCardRequ
         RuleFor(x => x.PaymentMethodId).NotEmpty();
         RuleFor(x => x.ExpiryDate)
             .Must(GiftCardEconomics.IsValidExpiryForIssuance)
-            .WithMessage("Expiry date must be strictly after today (UTC).");
+            .WithMessage("La fecha de caducidad tiene que ser posterior a hoy (UTC).");
         RuleFor(x => x.HolderName)
             .MaximumLength(100)
             .When(x => !string.IsNullOrEmpty(x.HolderName));
         RuleFor(x => x.NominalAmount)
             .Must(IsAllowedNominal)
-            .WithMessage("Nominal amount must be 50, 100, 150, 200 EUR or a custom amount between 0.01 and 99999.99 with at most 2 decimal places.");
+            .WithMessage("El importe tiene que ser 50, 100, 150 o 200 €, o un importe libre entre 0,01 y 99.999,99 con dos decimales como máximo.");
     }
 
     private static bool IsAllowedNominal(decimal amount)
